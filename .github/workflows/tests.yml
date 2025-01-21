@@ -1,0 +1,86 @@
+name: Tests
+
+on:
+  push:
+    branches: [ main ]
+  schedule:
+    - cron: "0 6 * * *"
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  php-version:
+
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        php-version:
+          - "8.2"
+          - "8.3"
+          - "8.4"
+
+    steps:
+
+        - name: Checkout
+          uses: actions/checkout@v4
+
+        - name: Install PHP
+          uses: shivammathur/setup-php@v2
+          with:
+            php-version: "${{ matrix.php-version }}"
+            coverage: "pcov"
+
+        - name: Get Composer Cache Directory 2
+          id: composer-cache
+          run: |
+            echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+
+        - uses: actions/cache@v4
+          id: actions-cache
+          with:
+            path: ${{ steps.composer-cache.outputs.dir }}
+            key: ${{ runner.os }}-composer-${{ matrix.php-version }}-${{ hashFiles('**/composer.lock') }}
+            restore-keys: |
+              ${{ runner.os }}-composer-${{ matrix.php-version }}-
+
+        - name: Cache PHP dependencies
+          uses: actions/cache@v4
+          id: vendor-cache
+          with:
+            path: vendor
+            key: ${{ runner.os }}-build-${{ matrix.php-version }}-${{ hashFiles('**/composer.lock') }}
+
+        - name: Install Composer dependencies
+          run: composer install --no-progress
+
+        - name: Code style test
+          run: ./vendor/bin/phpcs
+
+        - name: PHPStan code analysis
+          run: php vendor/bin/phpstan analyze
+
+        - name: PHPinsights code analysis
+          run: php vendor/bin/phpinsights analyse --no-interaction
+
+        - name: Execute Rector
+          run: vendor/bin/rector --dry-run
+
+        - name: Run tests
+          run: ./vendor/bin/phpunit --coverage-clover=coverage.xml --log-junit=junit.xml
+
+        - name: Upload test results to Codecov
+          if: ${{ !cancelled() }}
+          uses: codecov/test-results-action@v1
+          with:
+            token: ${{ secrets.CODECOV_TOKEN }}
+
+        - name: Send code coverage report to Codecov.io
+          uses: codecov/codecov-action@v4
+          with:
+            token: ${{ secrets.CODECOV_TOKEN }}
+            files: coverage.xml

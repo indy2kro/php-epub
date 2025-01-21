@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    backupGlobals="false" 
+    colors="true"
+    stopOnFailure="false"
+    bootstrap="vendor/autoload.php"
+    failOnDeprecation="true"
+    failOnEmptyTestSuite="true"
+    failOnIncomplete="true"
+    failOnNotice="true"
+    failOnRisky="true"
+    failOnSkipped="false"
+    failOnWarning="true"
+    xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/8.3/phpunit.xsd">
+    <source>
+        <include>
+            <directory>./src/</directory>
+        </include>
+        <exclude>
+            <directory>./src/Cli/</directory>
+        </exclude>
+    </source>
+    <testsuites>
+        <testsuite name="PhpIso Testing Suite">
+            <directory suffix=".php">./tests/</directory>
+        </testsuite>
+    </testsuites>
+</phpunit>
