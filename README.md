@@ -21,18 +21,17 @@ composer require your-vendor-name/epub-processor
 
 Ensure that you have the necessary PHP extensions and optional libraries installed for full functionality:
 
-Required: ext-xml
-Optional: dompdf/dompdf, tecnickcom/tcpdf for PDF conversion
+- **Required**: `ext-xml`
+- **Optional**: `dompdf/dompdf`, `tecnickcom/tcpdf` for PDF conversion, `Calibre` for mobi conversion
 
 ## Usage
 
-Loading an EPUB File
+Loading an EPUB File:
 
 ```php
 use PhpEpub\EpubFile;
-use Psr\Log\NullLogger;
 
-$epubFile = new EpubFile('/path/to/your.epub', new NullLogger());
+$epubFile = new EpubFile('/path/to/your.epub');
 $epubFile->load();
 ```
 
@@ -56,7 +55,11 @@ use PhpEpub\Converters\TCPDFAdapter;
 
 $adapter = new TCPDFAdapter();
 $adapter->convert('/path/to/extracted/epub', '/path/to/output.pdf');
-Managing Metadata
+```
+
+## Managing Metadata
+
+```php
 use PhpEpub\Metadata;
 
 $metadata = new Metadata('/path/to/opf/file.opf');
@@ -84,7 +87,7 @@ vendor/bin/phpstan
 - **Rector**: A tool for automated code refactoring. Use it to apply coding standards and upgrade code:
 
 ```bash
-vendor/bin/rector process src
+vendor/bin/rector
 ```
 
 - **PHP Insights**: Provides a comprehensive analysis of code quality, including complexity, architecture, and style. Run it with:
