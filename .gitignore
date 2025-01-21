@@ -1,0 +1,4 @@
+/vendor/
+/coverage.xml
+/.phpunit.result.cache
+/.phpcs-cache
