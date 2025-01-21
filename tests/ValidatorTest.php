@@ -38,7 +38,7 @@ class ValidatorTest extends TestCase
             mkdir($this->missingFilesEpubDir, 0777, true);
             // Intentionally leave out required files
         }
-        
+
         $this->markTestSkipped();
     }
 
