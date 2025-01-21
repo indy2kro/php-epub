@@ -7,8 +7,10 @@ use NunoMaduro\PhpInsights\Domain\Insights\ForbiddenNormalClasses;
 use NunoMaduro\PhpInsights\Domain\Sniffs\ForbiddenSetterSniff;
 use PHP_CodeSniffer\Standards\Generic\Sniffs\Commenting\TodoSniff;
 use PHP_CodeSniffer\Standards\Generic\Sniffs\Files\LineLengthSniff;
+use PHP_CodeSniffer\Standards\Generic\Sniffs\PHP\NoSilencedErrorsSniff;
 use SlevomatCodingStandard\Sniffs\Classes\ForbiddenPublicPropertySniff;
 use SlevomatCodingStandard\Sniffs\Classes\SuperfluousExceptionNamingSniff;
+use SlevomatCodingStandard\Sniffs\Classes\SuperfluousInterfaceNamingSniff;
 use SlevomatCodingStandard\Sniffs\Functions\FunctionLengthSniff;
 use SlevomatCodingStandard\Sniffs\Functions\UnusedParameterSniff;
 use SlevomatCodingStandard\Sniffs\TypeHints\DisallowMixedTypeHintSniff;
@@ -73,11 +75,13 @@ return [
         LineLengthSniff::class,
         FunctionLengthSniff::class,
         SuperfluousExceptionNamingSniff::class,
+        SuperfluousInterfaceNamingSniff::class,
         ForbiddenNormalClasses::class,
         CyclomaticComplexityIsHigh::class,
         UnusedParameterSniff::class,
         TodoSniff::class,
         ForbiddenPublicPropertySniff::class,
+        NoSilencedErrorsSniff::class,
     ],
 
     'config' => [
