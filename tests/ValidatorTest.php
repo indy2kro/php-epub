@@ -19,19 +19,11 @@ class ValidatorTest extends TestCase
         $this->invalidEpubDir = __DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'invalid_epub';
         $this->missingFilesEpubDir = __DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'missing_files_epub';
 
-        // Ensure the directories exist and are set up correctly
-        if (!is_dir($this->validEpubDir)) {
-            mkdir($this->validEpubDir, 0777, true);
-            file_put_contents($this->validEpubDir . DIRECTORY_SEPARATOR . 'mimetype', 'application/epub+zip');
-            mkdir($this->validEpubDir . DIRECTORY_SEPARATOR . 'META-INF', 0777, true);
-            file_put_contents($this->validEpubDir . DIRECTORY_SEPARATOR . 'META-INF' . DIRECTORY_SEPARATOR . 'container.xml', '<container></container>');
-        }
-
         if (!is_dir($this->invalidEpubDir)) {
             mkdir($this->invalidEpubDir, 0777, true);
             file_put_contents($this->invalidEpubDir . DIRECTORY_SEPARATOR . 'mimetype', 'invalid/mimetype');
             mkdir($this->invalidEpubDir . DIRECTORY_SEPARATOR . 'META-INF', 0777, true);
-            file_put_contents($this->invalidEpubDir . DIRECTORY_SEPARATOR . 'META-INF' . DIRECTORY_SEPARATOR . 'container.xml', '<container></container>');
+            file_put_contents($this->invalidEpubDir . DIRECTORY_SEPARATOR . DIRECTORY_SEPARATOR . 'container.xml', '<container xmlns="urn:oasis:names:tc:opendocument:xmlns:container" version="1.0"><rootfiles><rootfile full-path="EPUB/package.opf" media-type="application/oebps-package+xml"/></rootfiles></container>');
         }
 
         if (!is_dir($this->missingFilesEpubDir)) {
@@ -43,7 +35,6 @@ class ValidatorTest extends TestCase
     protected function tearDown(): void
     {
         // Clean up any directories created during tests
-        $this->deleteDirectory($this->validEpubDir);
         $this->deleteDirectory($this->invalidEpubDir);
         $this->deleteDirectory($this->missingFilesEpubDir);
     }
