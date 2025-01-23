@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace PhpEpub\Traits;
 
+use SimpleXMLElement;
+
 trait InteractsWithDate
 {
+    protected readonly SimpleXMLElement $opfXml;
+
     /**
      * Gets the date of the EPUB.
      */

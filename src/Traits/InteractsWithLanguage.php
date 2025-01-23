@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace PhpEpub\Traits;
 
+use SimpleXMLElement;
+
 trait InteractsWithLanguage
 {
+    protected readonly SimpleXMLElement $opfXml;
+
     /**
      * Gets the language of the EPUB.
      */

@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace PhpEpub\Traits;
 
+use SimpleXMLElement;
+
 trait InteractsWithDescription
 {
+    protected readonly SimpleXMLElement $opfXml;
+
     /**
      * Gets the description of the EPUB.
      */

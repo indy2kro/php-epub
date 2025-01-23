@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace PhpEpub\Traits;
 
+use SimpleXMLElement;
+
 trait InteractsWithTitle
 {
+    protected readonly SimpleXMLElement $opfXml;
+
     /**
      * Gets the title of the EPUB.
      */

@@ -17,7 +17,7 @@ class Metadata
     use Traits\InteractsWithSubject;
     use Traits\InteractsWithIdentifier;
 
-    private readonly SimpleXMLElement $opfXml;
+    protected readonly SimpleXMLElement $opfXml;
     private string $dcNamespace;
 
     /**
