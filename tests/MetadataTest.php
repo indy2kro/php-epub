@@ -51,6 +51,23 @@ class MetadataTest extends TestCase
         $this->assertSame('New Title', $updatedMetadata->getTitle());
     }
 
+    public function testGetDate(): void
+    {
+        $metadata = new Metadata($this->tempOpfFilePath);
+        $date = $metadata->getDate();
+        $this->assertSame('', $date);
+    }
+
+    public function testSetDate(): void
+    {
+        $metadata = new Metadata($this->tempOpfFilePath);
+        $metadata->setDate('2022-01-01');
+        $metadata->save($this->tempOpfFilePath);
+
+        $updatedMetadata = new Metadata($this->tempOpfFilePath);
+        $this->assertSame('2022-01-01', $updatedMetadata->getDate());
+    }
+
     public function testGetAuthors(): void
     {
         $metadata = new Metadata($this->tempOpfFilePath);
@@ -117,6 +134,40 @@ class MetadataTest extends TestCase
 
         $updatedMetadata = new Metadata($this->tempOpfFilePath);
         $this->assertSame('new description', $updatedMetadata->getDescription());
+    }
+
+    public function testGetSubject(): void
+    {
+        $metadata = new Metadata($this->tempOpfFilePath);
+        $subject = $metadata->getSubject();
+        $this->assertSame('basic-functionality', $subject);
+    }
+
+    public function testSetSubject(): void
+    {
+        $metadata = new Metadata($this->tempOpfFilePath);
+        $metadata->setSubject('new subject');
+        $metadata->save($this->tempOpfFilePath);
+
+        $updatedMetadata = new Metadata($this->tempOpfFilePath);
+        $this->assertSame('new subject', $updatedMetadata->getSubject());
+    }
+
+    public function testGetIdentifier(): void
+    {
+        $metadata = new Metadata($this->tempOpfFilePath);
+        $identifiers = $metadata->getIdentifiers();
+        $this->assertSame(['com.github.epub-testsuite.epub30-test-0301-2.0.0', '9781003410126'], $identifiers);
+    }
+
+    public function testSetIdentifier(): void
+    {
+        $metadata = new Metadata($this->tempOpfFilePath);
+        $metadata->setIdentifiers(['new identifier']);
+        $metadata->save($this->tempOpfFilePath);
+
+        $updatedMetadata = new Metadata($this->tempOpfFilePath);
+        $this->assertSame(['new identifier'], $updatedMetadata->getIdentifiers());
     }
 
     public function testLoadInvalidOpfThrowsException(): void

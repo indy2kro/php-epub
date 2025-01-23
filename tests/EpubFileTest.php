@@ -85,6 +85,9 @@ class EpubFileTest extends TestCase
             $this->assertSame($expectedMetadata['description'], $metadata->getDescription());
             $this->assertSame($expectedMetadata['publisher'], $metadata->getPublisher());
             $this->assertSame($expectedMetadata['language'], $metadata->getLanguage());
+            $this->assertSame($expectedMetadata['subject'], $metadata->getSubject());
+            $this->assertSame($expectedMetadata['date'], $metadata->getDate());
+            $this->assertSame($expectedMetadata['identifiers'], $metadata->getIdentifiers());
         }
     }
 
@@ -114,6 +117,12 @@ class EpubFileTest extends TestCase
             'description' => 'These tests include starting the reading system and opening the titles, navigating the content, searching, and using bookmarks and notes.',
             'publisher' => '',
             'language' => 'en',
+            'subject' => 'basic-functionality',
+            'date' => '',
+            'identifiers' => [
+                'com.github.epub-testsuite.epub30-test-0301-2.0.0',
+                '9781003410126'
+            ],
         ]];
         yield [__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'valid_1.epub', true, [
             'title' => 'Anonim',
@@ -123,6 +132,11 @@ class EpubFileTest extends TestCase
             'description' => '',
             'publisher' => '',
             'language' => 'ro',
+            'subject' => '',
+            'date' => '2015-08-24',
+            'identifiers' => [
+                'AWP-DF47F263-F894-490D-9E8A-2492EC571534'
+            ],
         ]];
         yield [__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'valid_2.epub', true, [
             'title' => 'Brave New World',
@@ -132,6 +146,11 @@ class EpubFileTest extends TestCase
             'description' => '',
             'publisher' => 'epubBooks Classics',
             'language' => 'en',
+            'subject' => 'Science Fiction',
+            'date' => '2014-12-29',
+            'identifiers' => [
+                '_simple_book'
+            ],
         ]];
         yield [__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'valid_3.epub', true, [
             'title' => 'King of the Range',
@@ -141,6 +160,11 @@ class EpubFileTest extends TestCase
             'description' => '',
             'publisher' => 'Distributed Proofreaders Canada',
             'language' => 'en',
+            'subject' => 'fiction',
+            'date' => '1974-01-14T13:30:00+00:00',
+            'identifiers' => [
+                '0fe42443-c7d5-4615-a5b2-cc8b07de619c'
+            ],
         ]];
         yield [__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'valid_4.epub', true, [
             'title' => 'EPUB 3.0 Specification',
@@ -150,6 +174,11 @@ class EpubFileTest extends TestCase
             'description' => '',
             'publisher' => '',
             'language' => 'en',
+            'subject' => '',
+            'date' => '',
+            'identifiers' => [
+                'code.google.com.epub-samples.epub30-spec'
+            ],
         ]];
         yield [__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'valid_5.epub', true, [
             'title' => 'Children\'s Literature',
@@ -160,6 +189,11 @@ class EpubFileTest extends TestCase
             'description' => '',
             'publisher' => '',
             'language' => 'en',
+            'subject' => 'Children -- Books and reading',
+            'date' => '2008-05-20',
+            'identifiers' => [
+                'http://www.gutenberg.org/ebooks/25545'
+            ],
         ]];
         yield [__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'valid_6.epub', true, [
             'title' => '500 Rätsel und Rätselscherze für jung und alt / Ein Bringmichraus für Schul und Haus',
@@ -169,6 +203,11 @@ class EpubFileTest extends TestCase
             'description' => '',
             'publisher' => '',
             'language' => 'de',
+            'subject' => 'Puzzles',
+            'date' => '2010-02-15',
+            'identifiers' => [
+                'http://www.gutenberg.org/31281'
+            ],
         ]];
         yield [__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'invalid.epub', false, [
             'title' => '',
@@ -176,6 +215,11 @@ class EpubFileTest extends TestCase
             'description' => '',
             'publisher' => '',
             'language' => '',
+            'subject' => '',
+            'date' => '',
+            'identifiers' => [
+                ''
+            ],
         ]];
         yield [__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'nonexistent.epub', false, [
             'title' => '',
@@ -183,6 +227,11 @@ class EpubFileTest extends TestCase
             'description' => '',
             'publisher' => '',
             'language' => '',
+            'subject' => '',
+            'date' => '',
+            'identifiers' => [
+                ''
+            ],
         ]];
     }
 

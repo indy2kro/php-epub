@@ -4,27 +4,38 @@ declare(strict_types=1);
 
 namespace PhpEpub\Traits;
 
-use DateTime;
-
 trait InteractsWithDate
 {
     /**
      * Gets the date of the EPUB.
      */
-    public function getDate(): ?DateTime
+    public function getDate(): string
     {
-        if (! isset($this->opfXml->metadata->date)) {
-            return null;
+        $this->opfXml->registerXPathNamespace('dc', $this->dcNamespace);
+
+        $dateNode = $this->opfXml->xpath('//dc:date');
+
+        if ($dateNode === false || $dateNode === null || $dateNode === []) {
+            return '';
         }
 
-        return new DateTime((string) $this->opfXml->metadata->date);
+        return (string) $dateNode[0];
     }
 
     /**
      * Sets the date of the EPUB.
      */
-    public function setDate(DateTime $date): void
+    public function setDate(string $date): void
     {
-        $this->opfXml->metadata->date = $date->format('Y-m-d');
+        $this->opfXml->registerXPathNamespace('dc', $this->dcNamespace);
+
+        $dateNode = $this->opfXml->xpath('//dc:date');
+
+        if ($dateNode !== false && $dateNode !== null && $dateNode !== [] && isset($dateNode[0])) {
+            // @phpstan-ignore-next-line
+            $dateNode[0][0] = $date;
+        } else {
+            $this->opfXml->metadata->addChild('date', $date, $this->dcNamespace);
+        }
     }
 }

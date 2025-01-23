@@ -14,6 +14,8 @@ class Metadata
     use Traits\InteractsWithAuthors;
     use Traits\InteractsWithPublisher;
     use Traits\InteractsWithLanguage;
+    use Traits\InteractsWithSubject;
+    use Traits\InteractsWithIdentifier;
 
     private readonly SimpleXMLElement $opfXml;
     private string $dcNamespace;
