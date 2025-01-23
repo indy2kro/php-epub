@@ -16,7 +16,7 @@ A PHP library for processing EPUB files, including parsing, metadata manipulatio
 To install the library, use Composer:
 
 ```bash
-composer require your-vendor-name/epub-processor
+composer require indy2kro/php-epub
 ```
 
 Ensure that you have the necessary PHP extensions and optional libraries installed for full functionality:
