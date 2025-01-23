@@ -69,6 +69,7 @@ class EpubFileTest extends TestCase
             $this->assertSame($expectedMetadata['identifiers'], $metadata->getIdentifiers());
 
             $spine = $epubFile->getSpine();
+            $this->assertNotNull($spine);
             $this->assertSame($expectedMetadata['spine'], $spine->get());
         }
     }
