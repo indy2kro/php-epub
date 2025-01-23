@@ -27,7 +27,7 @@ class Metadata
 
         $namespaces = $this->opfXml->getNamespaces(true);
 
-        if (!isset($namespaces['dc'])) {
+        if (! isset($namespaces['dc'])) {
             throw new Exception('Failed to identify dc namespace');
         }
 
