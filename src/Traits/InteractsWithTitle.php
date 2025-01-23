@@ -11,7 +11,15 @@ trait InteractsWithTitle
      */
     public function getTitle(): string
     {
-        return (string) $this->opfXml->metadata->title;
+        $this->opfXml->registerXPathNamespace('dc', $this->dcNamespace);
+
+        $titleNode = $this->opfXml->xpath('//dc:title');
+
+        if ($titleNode === false || $titleNode === null || $titleNode === []) {
+            return '';
+        }
+
+        return (string) $titleNode[0];
     }
 
     /**
@@ -19,6 +27,15 @@ trait InteractsWithTitle
      */
     public function setTitle(string $title): void
     {
-        $this->opfXml->metadata->title = $title;
+        $this->opfXml->registerXPathNamespace('dc', $this->dcNamespace);
+
+        $titleNode = $this->opfXml->xpath('//dc:title');
+
+        if ($titleNode !== false && $titleNode !== null && $titleNode !== [] && isset($titleNode[0])) {
+            // @phpstan-ignore-next-line
+            $titleNode[0][0] = $title;
+        } else {
+            $this->opfXml->metadata->addChild('title', $title, $this->dcNamespace);
+        }
     }
 }

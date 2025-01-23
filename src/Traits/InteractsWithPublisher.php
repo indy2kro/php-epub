@@ -11,7 +11,15 @@ trait InteractsWithPublisher
      */
     public function getPublisher(): string
     {
-        return (string) $this->opfXml->metadata->publisher;
+        $this->opfXml->registerXPathNamespace('dc', $this->dcNamespace);
+
+        $publisherNode = $this->opfXml->xpath('//dc:publisher');
+
+        if ($publisherNode === false || $publisherNode === null || $publisherNode === []) {
+            return '';
+        }
+
+        return (string) $publisherNode[0];
     }
 
     /**
@@ -19,6 +27,15 @@ trait InteractsWithPublisher
      */
     public function setPublisher(string $publisher): void
     {
-        $this->opfXml->metadata->publisher = $publisher;
+        $this->opfXml->registerXPathNamespace('dc', $this->dcNamespace);
+
+        $publisherNode = $this->opfXml->xpath('//dc:publisher');
+
+        if ($publisherNode !== false && $publisherNode !== null && $publisherNode !== [] && isset($publisherNode[0])) {
+            // @phpstan-ignore-next-line
+            $publisherNode[0][0] = $publisher;
+        } else {
+            $this->opfXml->metadata->addChild('publisher', $publisher, $this->dcNamespace);
+        }
     }
 }

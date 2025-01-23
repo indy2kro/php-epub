@@ -10,13 +10,13 @@ class Metadata
 {
     use Traits\InteractsWithTitle;
     use Traits\InteractsWithDescription;
-    use Traits\InteractsWithCreator;
     use Traits\InteractsWithDate;
     use Traits\InteractsWithAuthors;
     use Traits\InteractsWithPublisher;
     use Traits\InteractsWithLanguage;
 
     private readonly SimpleXMLElement $opfXml;
+    private string $dcNamespace;
 
     /**
      * Metadata constructor.
@@ -24,6 +24,14 @@ class Metadata
     public function __construct(string $opfFilePath, private readonly XmlParser $xmlParser = new XmlParser())
     {
         $this->opfXml = $this->xmlParser->parse($opfFilePath);
+
+        $namespaces = $this->opfXml->getNamespaces(true);
+
+        if (isset($namespaces['dc'])) {
+            throw new Exception('Failed to identify dc namespace');
+        }
+
+        $this->dcNamespace = $namespaces['dc'];
     }
 
     /**
@@ -36,6 +44,7 @@ class Metadata
     public function save(string $opfFilePath): void
     {
         $result = $this->opfXml->asXML($opfFilePath);
+
         if ($result === false) {
             throw new Exception("Failed to save OPF file: {$opfFilePath}");
         }

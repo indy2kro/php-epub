@@ -1,51 +1,47 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<package xmlns="http://www.idpf.org/2007/opf" version="3.0" xml:lang="en" unique-identifier="uid" prefix="cc: http://creativecommons.org/ns#">
+<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="uid">
   <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
-    <title id="title">Creative Commons - A Shared Culture</title>
-    <creator>Jesse Dylan</creator>
-    <identifier id="uid">code.google.com.epub-samples.cc-shared-culture</identifier>
-    <language>en-US</language>
-    <meta property="dcterms:modified">2012-01-20T12:47:00Z</meta>
-    <publisher>Creative Commons</publisher>  
-    <contributor>mgylling</contributor>
-    <description>Multiple video tests (see Navigation Document (toc) for details)</description>
-    <rights>This work is licensed under a Creative Commons Attribution-Noncommercial-Share Alike (CC BY-NC-SA) license.</rights>               
-    <link rel="cc:license" href="http://creativecommons.org/licenses/by-nc-sa/3.0/"/>
-    <meta property="cc:attributionURL">http://creativecommons.org/videos/a-shared-culture</meta>
-    <link refines="#img1" rel="cc:license" href="http://creativecommons.org/licenses/by-nc/2.0/"/>
-    <link refines="#img2" rel="cc:license" href="http://creativecommons.org/licenses/by-nc-sa/2.0/"/>
+    <dc:identifier id="uid">com.github.epub-testsuite.epub30-test-0301-2.0.0</dc:identifier>
+    <dc:identifier id="isbn-id">9781003410126</dc:identifier>
+    <meta refines="#isbn-id" property="identifier-type" scheme="onix:codelist5">15</meta>
+    <dc:description>These tests include starting the reading system and opening the titles, navigating the content, searching, and using bookmarks and notes.</dc:description>
+    <dc:title>Fundamental Accessibility Tests: Basic Functionality</dc:title>
+    <!-- repeat creator element for all contributors -->
+    <dc:creator>DAISY Consortium</dc:creator>
+    <dc:source>Page numbers added for test purposes.</dc:source>
+    <dc:language>en</dc:language>
+    <dc:subject>basic-functionality</dc:subject>
+    <dc:publisher>Creative Commons</dc:publisher>  
+    <meta property="dcterms:modified">2024-02-05T11:00:00Z</meta>
+    <meta property="dcterms:conformsTo" id="conf">EPUB Accessibility 1.1 - WCAG 2.2 Level AA</meta>
+    <meta property="schema:accessibilitySummary">The publication contains structural and page navigation. The publication meets WCAG 2.0 Level AA.</meta>
+    <meta property="schema:accessMode">textual</meta>
+    <meta property="schema:accessMode">visual</meta>
+    <meta property="schema:accessModeSufficient">textual</meta>
+    <meta property="schema:accessibilityFeature">structuralNavigation</meta>
+    <meta property="schema:version">2.0.0</meta>
   </metadata>
   <manifest>
-    <item id="font1" href="fonts/Quicksand_Light.otf" media-type="application/vnd.ms-opentype"/>
-    <item id="font2" href="fonts/Quicksand_Bold_Oblique.otf" media-type="application/vnd.ms-opentype"/>                       
-    <item id="img1" href="images/326261902_3fa36f548d.jpg" media-type="image/jpeg" properties="cover-image"/>
-    <item id="img2" href="images/2565514353_2ae2073e14.jpg" media-type="image/jpeg"/>    
-    <item id="video1" href="video/shared-culture.mp4" media-type="video/mp4"/>
-    <item id="video2" href="video/shared-culture.webm" media-type="video/webm"/>
-    <item id="bgs1" href="audio/asharedculture_soundtrack.mp3" media-type="audio/mpeg"/>
-    <item id="style" href="css/shared-culture.css" media-type="text/css"/>
-    <item id="cap1" href="captions/cc-en.vtt" media-type="text/vtt"/>
-    <item id="cap2" href="captions/cc-fr.vtt" media-type="text/vtt"/>
-    <item id="cap3" href="captions/cc-en.xml" media-type="application/ttml+xml"/>
-    <item id="cap4" href="captions/cc-fr.xml" media-type="application/ttml+xml"/>
-    <item id="js" href="script/shared.js" media-type="text/javascript"/>    
+    <!-- css -->
+    <item href="css/base.css" media-type="text/css" id="css"/>
+    <!-- cover -->
+    <item id="cover_jpg" properties="cover-image" href="images/cover.jpg" media-type="image/jpeg"/>
     <item id="cover" href="xhtml/cover.xhtml" media-type="application/xhtml+xml"/>
-    <item id="toc" properties="nav" href="xhtml/toc.xhtml" media-type="application/xhtml+xml"/>
-    <item id="p10" href="xhtml/p10.xhtml" media-type="application/xhtml+xml"/>
-    <item id="p20" href="xhtml/p20.xhtml" media-type="application/xhtml+xml" properties="scripted"/>
-    <item id="p30" href="xhtml/p30.xhtml" media-type="application/xhtml+xml"/>
-    <item id="p40" href="xhtml/p40.xhtml" media-type="application/xhtml+xml"/>
-    <item id="p50" href="xhtml/p50.xhtml" media-type="application/xhtml+xml"/>
-    <item id="p60" href="xhtml/p60.xhtml" media-type="application/xhtml+xml"/>    
+    <!-- frontmatter -->
+    <item href="xhtml/nav.xhtml" id="nav" media-type="application/xhtml+xml" properties="nav"/>
+    <item href="xhtml/front.xhtml" id="front" media-type="application/xhtml+xml"/>
+    <!-- bodymatter -->
+    <!-- xhtml -->
+    <item href="xhtml/introduction.xhtml" id="introduction" media-type="application/xhtml+xml"/>
+    <item href="xhtml/Basic-functionality-tests.xhtml" id="xhtml-001" media-type="application/xhtml+xml"/>
+    <item href="xhtml/supplement.xhtml" id="xhtml-002" media-type="application/xhtml+xml"/>
   </manifest>
   <spine>
-    <itemref idref="cover" linear="no"/>
-    <itemref idref="toc"/>
-    <itemref idref="p10"/>
-    <itemref idref="p20"/>
-    <itemref idref="p30"/>
-    <itemref idref="p40"/>
-    <itemref idref="p50"/>
-    <itemref idref="p60"/>    
+    <itemref idref="cover"/>
+    <itemref idref="front"/>
+   <!-- <itemref idref="nav"/> -->
+    <itemref idref="introduction"/>
+    <itemref idref="xhtml-001"/>
+    <itemref idref="xhtml-002"/>
   </spine>
 </package>

@@ -13,9 +13,18 @@ trait InteractsWithAuthors
      */
     public function getAuthors(): array
     {
+        $this->opfXml->registerXPathNamespace('dc', $this->dcNamespace);
+
+        $creatorNodes = $this->opfXml->xpath('//dc:creator');
+
         $authors = [];
-        foreach ($this->opfXml->metadata->creator as $creator) {
-            $authors[] = (string) $creator;
+
+        if ($creatorNodes === false || $creatorNodes === null || $creatorNodes === []) {
+            return $authors;
+        }
+
+        foreach ($creatorNodes as $creatorNode) {
+            $authors[] = (string) $creatorNode;
         }
         return $authors;
     }
@@ -27,9 +36,18 @@ trait InteractsWithAuthors
      */
     public function setAuthors(array $authors): void
     {
-        unset($this->opfXml->metadata->creator);
+        $this->opfXml->registerXPathNamespace('dc', $this->dcNamespace);
+
+        $creatorNodes = $this->opfXml->xpath('//dc:creator');
+
+        if ($creatorNodes !== false && $creatorNodes !== null && $creatorNodes !== []) {
+            foreach ($creatorNodes as $key => $creatorNode) {
+                unset($creatorNodes[$key][0]);
+            }
+        }
+
         foreach ($authors as $author) {
-            $this->opfXml->metadata->addChild('creator', $author);
+            $this->opfXml->metadata->addChild('creator', $author, $this->dcNamespace);
         }
     }
 }

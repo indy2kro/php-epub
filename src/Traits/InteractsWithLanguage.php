@@ -11,7 +11,15 @@ trait InteractsWithLanguage
      */
     public function getLanguage(): string
     {
-        return (string) $this->opfXml->metadata->language;
+        $this->opfXml->registerXPathNamespace('dc', $this->dcNamespace);
+
+        $languageNode = $this->opfXml->xpath('//dc:language');
+
+        if ($languageNode === false || $languageNode === null || $languageNode === []) {
+            return '';
+        }
+
+        return (string) $languageNode[0];
     }
 
     /**
@@ -19,6 +27,15 @@ trait InteractsWithLanguage
      */
     public function setLanguage(string $language): void
     {
-        $this->opfXml->metadata->language = $language;
+        $this->opfXml->registerXPathNamespace('dc', $this->dcNamespace);
+
+        $languageNode = $this->opfXml->xpath('//dc:language');
+
+        if ($languageNode !== false && $languageNode !== null && $languageNode !== [] && isset($languageNode[0])) {
+            // @phpstan-ignore-next-line
+            $languageNode[0][0] = $language;
+        } else {
+            $this->opfXml->metadata->addChild('language', $language, $this->dcNamespace);
+        }
     }
 }

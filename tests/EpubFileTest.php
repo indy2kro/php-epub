@@ -64,8 +64,11 @@ class EpubFileTest extends TestCase
         rmdir($dir);
     }
 
+    /**
+     * @param array<string, string> $expectedMetadata
+     */
     #[DataProvider('epubFileProvider')]
-    public function testLoadEpub(string $epubPath, bool $shouldLoad): void
+    public function testLoadEpub(string $epubPath, bool $shouldLoad, array $expectedMetadata): void
     {
         if (!$shouldLoad) {
             $this->expectException(Exception::class);
@@ -75,7 +78,13 @@ class EpubFileTest extends TestCase
         $epubFile->load();
 
         if ($shouldLoad) {
-            $this->assertDirectoryExists($this->tempDir);
+            $metadata = $epubFile->getMetadata();
+            $this->assertNotNull($metadata);
+            $this->assertSame($expectedMetadata['title'], $metadata->getTitle());
+            $this->assertSame($expectedMetadata['authors'], $metadata->getAuthors());
+            $this->assertSame($expectedMetadata['description'], $metadata->getDescription());
+            $this->assertSame($expectedMetadata['publisher'], $metadata->getPublisher());
+            $this->assertSame($expectedMetadata['language'], $metadata->getLanguage());
         }
     }
 
@@ -97,12 +106,56 @@ class EpubFileTest extends TestCase
 
     public static function epubFileProvider(): Iterator
     {
-        yield [__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'valid.epub', true];
-        yield [__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'valid_1.epub', true];
-        yield [__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'valid_2.epub', true];
-        yield [__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'valid_3.epub', true];
-        yield [__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'invalid.epub', false];
-        yield [__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'nonexistent.epub', false];
+        yield [__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'valid.epub', true, [
+            'title' => 'Fundamental Accessibility Tests: Basic Functionality',
+            'authors' => [
+                'DAISY Consortium'
+            ],
+            'description' => 'These tests include starting the reading system and opening the titles, navigating the content, searching, and using bookmarks and notes.',
+            'publisher' => '',
+            'language' => 'en',
+        ]];
+        yield [__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'valid_1.epub', true, [
+            'title' => 'Anonim',
+            'authors' => [
+                'Bancuri Cu John'
+            ],
+            'description' => '',
+            'publisher' => '',
+            'language' => 'ro',
+        ]];
+        yield [__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'valid_2.epub', true, [
+            'title' => 'Brave New World',
+            'authors' => [
+                'Aldous Huxley'
+            ],
+            'description' => '',
+            'publisher' => 'epubBooks Classics',
+            'language' => 'en',
+        ]];
+        yield [__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'valid_3.epub', true, [
+            'title' => 'King of the Range',
+            'authors' => [
+                'Frederick Schiller Faust (as Max Brand)'
+            ],
+            'description' => '',
+            'publisher' => 'Distributed Proofreaders Canada',
+            'language' => 'en',
+        ]];
+        yield [__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'invalid.epub', false, [
+            'title' => '',
+            'authors' => [],
+            'description' => '',
+            'publisher' => '',
+            'language' => '',
+        ]];
+        yield [__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'nonexistent.epub', false, [
+            'title' => '',
+            'authors' => [],
+            'description' => '',
+            'publisher' => '',
+            'language' => '',
+        ]];
     }
 
     public function testSaveWithoutLoadThrowsException(): void

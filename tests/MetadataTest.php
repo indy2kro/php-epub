@@ -38,7 +38,7 @@ class MetadataTest extends TestCase
     {
         $metadata = new Metadata($this->tempOpfFilePath);
         $title = $metadata->getTitle();
-        $this->assertSame('Creative Commons - A Shared Culture', $title);
+        $this->assertSame('Fundamental Accessibility Tests: Basic Functionality', $title);
     }
 
     public function testSetTitle(): void
@@ -55,7 +55,7 @@ class MetadataTest extends TestCase
     {
         $metadata = new Metadata($this->tempOpfFilePath);
         $authors = $metadata->getAuthors();
-        $this->assertSame(['Jesse Dylan'], $authors);
+        $this->assertSame(['DAISY Consortium'], $authors);
     }
 
     public function testSetAuthors(): void
@@ -89,7 +89,7 @@ class MetadataTest extends TestCase
     {
         $metadata = new Metadata($this->tempOpfFilePath);
         $language = $metadata->getLanguage();
-        $this->assertSame('en-US', $language);
+        $this->assertSame('en', $language);
     }
 
     public function testSetLanguage(): void

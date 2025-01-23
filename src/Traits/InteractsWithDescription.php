@@ -11,7 +11,15 @@ trait InteractsWithDescription
      */
     public function getDescription(): string
     {
-        return (string) $this->opfXml->metadata->description;
+        $this->opfXml->registerXPathNamespace('dc', $this->dcNamespace);
+
+        $descriptionNode = $this->opfXml->xpath('//dc:description');
+
+        if ($descriptionNode === false || $descriptionNode === null || $descriptionNode === []) {
+            return '';
+        }
+
+        return (string) $descriptionNode[0];
     }
 
     /**
@@ -19,6 +27,15 @@ trait InteractsWithDescription
      */
     public function setDescription(string $description): void
     {
-        $this->opfXml->metadata->description = $description;
+        $this->opfXml->registerXPathNamespace('dc', $this->dcNamespace);
+
+        $descriptionNode = $this->opfXml->xpath('//dc:description');
+
+        if ($descriptionNode !== false && $descriptionNode !== null && $descriptionNode !== [] && isset($descriptionNode[0])) {
+            // @phpstan-ignore-next-line
+            $descriptionNode[0][0] = $description;
+        } else {
+            $this->opfXml->metadata->addChild('description', $description, $this->dcNamespace);
+        }
     }
 }
