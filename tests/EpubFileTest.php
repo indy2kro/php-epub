@@ -142,6 +142,34 @@ class EpubFileTest extends TestCase
             'publisher' => 'Distributed Proofreaders Canada',
             'language' => 'en',
         ]];
+        yield [__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'valid_4.epub', true, [
+            'title' => 'EPUB 3.0 Specification',
+            'authors' => [
+                'EPUB 3 Working Group'
+            ],
+            'description' => '',
+            'publisher' => '',
+            'language' => 'en',
+        ]];
+        yield [__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'valid_5.epub', true, [
+            'title' => 'Children\'s Literature',
+            'authors' => [
+                'Charles Madison Curry',
+                'Erle Elsworth Clippinger'
+            ],
+            'description' => '',
+            'publisher' => '',
+            'language' => 'en',
+        ]];
+        yield [__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'valid_6.epub', true, [
+            'title' => '500 Rätsel und Rätselscherze für jung und alt / Ein Bringmichraus für Schul und Haus',
+            'authors' => [
+                'Joseph Frick'
+            ],
+            'description' => '',
+            'publisher' => '',
+            'language' => 'de',
+        ]];
         yield [__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'invalid.epub', false, [
             'title' => '',
             'authors' => [],
