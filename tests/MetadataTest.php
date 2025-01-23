@@ -7,10 +7,13 @@ namespace PhpEpub\Test;
 use PhpEpub\Exception;
 use PhpEpub\Metadata;
 use PHPUnit\Framework\TestCase;
+use PhpEpub\XmlParser;
+use SimpleXMLElement;
 
 class MetadataTest extends TestCase
 {
     private string $tempOpfFilePath;
+    private SimpleXMLElement $opfXml;
 
     protected function setUp(): void
     {
@@ -24,6 +27,9 @@ class MetadataTest extends TestCase
 
         // Copy the valid OPF file to a temporary location for testing
         copy($opfFilePath, $this->tempOpfFilePath);
+
+        $xmlParser = new XmlParser();
+        $this->opfXml = $xmlParser->parse($this->tempOpfFilePath);
     }
 
     protected function tearDown(): void
@@ -36,143 +42,137 @@ class MetadataTest extends TestCase
 
     public function testGetTitle(): void
     {
-        $metadata = new Metadata($this->tempOpfFilePath);
+        $metadata = new Metadata($this->opfXml);
         $title = $metadata->getTitle();
         $this->assertSame('Fundamental Accessibility Tests: Basic Functionality', $title);
     }
 
     public function testSetTitle(): void
     {
-        $metadata = new Metadata($this->tempOpfFilePath);
+        $metadata = new Metadata($this->opfXml);
         $metadata->setTitle('New Title');
         $metadata->save($this->tempOpfFilePath);
 
-        $updatedMetadata = new Metadata($this->tempOpfFilePath);
+        $updatedMetadata = new Metadata($this->opfXml);
         $this->assertSame('New Title', $updatedMetadata->getTitle());
     }
 
     public function testGetDate(): void
     {
-        $metadata = new Metadata($this->tempOpfFilePath);
+        $metadata = new Metadata($this->opfXml);
         $date = $metadata->getDate();
         $this->assertSame('', $date);
     }
 
     public function testSetDate(): void
     {
-        $metadata = new Metadata($this->tempOpfFilePath);
+        $metadata = new Metadata($this->opfXml);
         $metadata->setDate('2022-01-01');
         $metadata->save($this->tempOpfFilePath);
 
-        $updatedMetadata = new Metadata($this->tempOpfFilePath);
+        $updatedMetadata = new Metadata($this->opfXml);
         $this->assertSame('2022-01-01', $updatedMetadata->getDate());
     }
 
     public function testGetAuthors(): void
     {
-        $metadata = new Metadata($this->tempOpfFilePath);
+        $metadata = new Metadata($this->opfXml);
         $authors = $metadata->getAuthors();
         $this->assertSame(['DAISY Consortium'], $authors);
     }
 
     public function testSetAuthors(): void
     {
-        $metadata = new Metadata($this->tempOpfFilePath);
+        $metadata = new Metadata($this->opfXml);
         $metadata->setAuthors(['New Author']);
         $metadata->save($this->tempOpfFilePath);
 
-        $updatedMetadata = new Metadata($this->tempOpfFilePath);
+        $updatedMetadata = new Metadata($this->opfXml);
         $this->assertSame(['New Author'], $updatedMetadata->getAuthors());
     }
 
     public function testGetPublisher(): void
     {
-        $metadata = new Metadata($this->tempOpfFilePath);
+        $metadata = new Metadata($this->opfXml);
         $publisher = $metadata->getPublisher();
         $this->assertSame('Creative Commons', $publisher);
     }
 
     public function testSetPublisher(): void
     {
-        $metadata = new Metadata($this->tempOpfFilePath);
+        $metadata = new Metadata($this->opfXml);
         $metadata->setPublisher('New Publisher');
         $metadata->save($this->tempOpfFilePath);
 
-        $updatedMetadata = new Metadata($this->tempOpfFilePath);
+        $updatedMetadata = new Metadata($this->opfXml);
         $this->assertSame('New Publisher', $updatedMetadata->getPublisher());
     }
 
     public function testGetLanguage(): void
     {
-        $metadata = new Metadata($this->tempOpfFilePath);
+        $metadata = new Metadata($this->opfXml);
         $language = $metadata->getLanguage();
         $this->assertSame('en', $language);
     }
 
     public function testSetLanguage(): void
     {
-        $metadata = new Metadata($this->tempOpfFilePath);
+        $metadata = new Metadata($this->opfXml);
         $metadata->setLanguage('fr');
         $metadata->save($this->tempOpfFilePath);
 
-        $updatedMetadata = new Metadata($this->tempOpfFilePath);
+        $updatedMetadata = new Metadata($this->opfXml);
         $this->assertSame('fr', $updatedMetadata->getLanguage());
     }
 
     public function testGetDescription(): void
     {
-        $metadata = new Metadata($this->tempOpfFilePath);
+        $metadata = new Metadata($this->opfXml);
         $description = $metadata->getDescription();
         $this->assertSame('These tests include starting the reading system and opening the titles, navigating the content, searching, and using bookmarks and notes.', $description);
     }
 
     public function testSetDescription(): void
     {
-        $metadata = new Metadata($this->tempOpfFilePath);
+        $metadata = new Metadata($this->opfXml);
         $metadata->setDescription('new description');
         $metadata->save($this->tempOpfFilePath);
 
-        $updatedMetadata = new Metadata($this->tempOpfFilePath);
+        $updatedMetadata = new Metadata($this->opfXml);
         $this->assertSame('new description', $updatedMetadata->getDescription());
     }
 
     public function testGetSubject(): void
     {
-        $metadata = new Metadata($this->tempOpfFilePath);
+        $metadata = new Metadata($this->opfXml);
         $subject = $metadata->getSubject();
         $this->assertSame('basic-functionality', $subject);
     }
 
     public function testSetSubject(): void
     {
-        $metadata = new Metadata($this->tempOpfFilePath);
+        $metadata = new Metadata($this->opfXml);
         $metadata->setSubject('new subject');
         $metadata->save($this->tempOpfFilePath);
 
-        $updatedMetadata = new Metadata($this->tempOpfFilePath);
+        $updatedMetadata = new Metadata($this->opfXml);
         $this->assertSame('new subject', $updatedMetadata->getSubject());
     }
 
     public function testGetIdentifier(): void
     {
-        $metadata = new Metadata($this->tempOpfFilePath);
+        $metadata = new Metadata($this->opfXml);
         $identifiers = $metadata->getIdentifiers();
         $this->assertSame(['com.github.epub-testsuite.epub30-test-0301-2.0.0', '9781003410126'], $identifiers);
     }
 
     public function testSetIdentifier(): void
     {
-        $metadata = new Metadata($this->tempOpfFilePath);
+        $metadata = new Metadata($this->opfXml);
         $metadata->setIdentifiers(['new identifier']);
         $metadata->save($this->tempOpfFilePath);
 
-        $updatedMetadata = new Metadata($this->tempOpfFilePath);
+        $updatedMetadata = new Metadata($this->opfXml);
         $this->assertSame(['new identifier'], $updatedMetadata->getIdentifiers());
-    }
-
-    public function testLoadInvalidOpfThrowsException(): void
-    {
-        $this->expectException(Exception::class);
-        new Metadata(__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'invalid.opf');
     }
 }

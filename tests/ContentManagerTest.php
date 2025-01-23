@@ -7,6 +7,7 @@ namespace PhpEpub\Test;
 use PhpEpub\ContentManager;
 use PhpEpub\Exception;
 use PHPUnit\Framework\TestCase;
+use PhpEpub\Util\FileUtil;
 
 class ContentManagerTest extends TestCase
 {
@@ -28,30 +29,8 @@ class ContentManagerTest extends TestCase
     {
         // Clean up any files or directories created during tests
         if (is_dir($this->contentDir)) {
-            $this->deleteDirectory($this->contentDir);
+            FileUtil::deleteDirectory($this->contentDir);
         }
-    }
-
-    private function deleteDirectory(string $dir): void
-    {
-        if (! is_dir($dir)) {
-            return;
-        }
-
-        $files = scandir($dir);
-
-        if ($files === false) {
-            return;
-        }
-
-        foreach ($files as $file) {
-            if ($file === '.' || $file === '..') {
-                continue;
-            }
-            $filePath = $dir . DIRECTORY_SEPARATOR . $file;
-            is_dir($filePath) ? $this->deleteDirectory($filePath) : unlink($filePath);
-        }
-        rmdir($dir);
     }
 
     public function testAddContent(): void

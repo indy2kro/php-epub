@@ -8,7 +8,8 @@ use SimpleXMLElement;
 
 trait InteractsWithTitle
 {
-    protected readonly SimpleXMLElement $opfXml;
+    private readonly SimpleXMLElement $opfXml;
+    private readonly string $dcNamespace;
 
     /**
      * Gets the title of the EPUB.

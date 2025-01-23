@@ -8,7 +8,8 @@ use SimpleXMLElement;
 
 trait InteractsWithIdentifier
 {
-    protected readonly SimpleXMLElement $opfXml;
+    private readonly SimpleXMLElement $opfXml;
+    private readonly string $dcNamespace;
 
     /**
      * Gets the authors of the EPUB.

@@ -8,7 +8,8 @@ use SimpleXMLElement;
 
 trait InteractsWithPublisher
 {
-    protected readonly SimpleXMLElement $opfXml;
+    private readonly SimpleXMLElement $opfXml;
+    private readonly string $dcNamespace;
 
     /**
      * Gets the publisher of the EPUB.

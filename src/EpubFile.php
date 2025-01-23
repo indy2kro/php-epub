@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace PhpEpub;
 
+use PhpEpub\Util\FileUtil;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
+use SimpleXMLElement;
 
 class EpubFile
 {
@@ -14,6 +16,8 @@ class EpubFile
     private readonly ZipHandler $zipHandler;
     private readonly Parser $parser;
     private ?Metadata $metadata = null;
+    private ?Spine $spine = null;
+    private ?SimpleXMLElement $opfXml = null;
 
     public function __construct(private readonly string $filePath, private readonly LoggerInterface $logger = new NullLogger())
     {
@@ -25,7 +29,7 @@ class EpubFile
     public function __destruct()
     {
         if ($this->tempDir !== null && is_dir($this->tempDir)) {
-            $this->deleteDirectory($this->tempDir);
+            FileUtil::deleteDirectory($this->tempDir);
             $this->logger->info("Temporary directory {$this->tempDir} deleted.");
         }
     }
@@ -45,7 +49,10 @@ class EpubFile
         $opfFilePath = $this->parser->parse($this->tempDir);
         $opfFileFullPath = $this->tempDir . DIRECTORY_SEPARATOR . $opfFilePath;
 
-        $this->metadata = new Metadata($opfFileFullPath, $this->xmlParser);
+        $this->opfXml = $this->xmlParser->parse($opfFileFullPath);
+
+        $this->metadata = new Metadata($this->opfXml);
+        $this->spine = new Spine($this->opfXml);
     }
 
     public function save(string $filePath): void
@@ -64,28 +71,8 @@ class EpubFile
         return $this->metadata;
     }
 
-    /**
-     * Recursively deletes a directory and its contents.
-     */
-    private function deleteDirectory(string $dir): void
+    public function getSpine(): ?Spine
     {
-        if (! is_dir($dir)) {
-            return;
-        }
-
-        $files = scandir($dir);
-
-        if ($files === false) {
-            return;
-        }
-
-        foreach ($files as $file) {
-            if ($file === '.' || $file === '..') {
-                continue;
-            }
-            $filePath = $dir . DIRECTORY_SEPARATOR . $file;
-            is_dir($filePath) ? $this->deleteDirectory($filePath) : unlink($filePath);
-        }
-        rmdir($dir);
+        return $this->spine;
     }
 }

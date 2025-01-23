@@ -7,6 +7,7 @@ namespace PhpEpub\Test;
 use PhpEpub\ZipHandler;
 use PhpEpub\Exception;
 use PHPUnit\Framework\TestCase;
+use PhpEpub\Util\FileUtil;
 
 class ZipHandlerTest extends TestCase
 {
@@ -41,34 +42,12 @@ class ZipHandlerTest extends TestCase
         }
 
         if (is_dir($this->extractDir)) {
-            $this->deleteDirectory($this->extractDir);
+            FileUtil::deleteDirectory($this->extractDir);
         }
 
         if (is_dir($this->compressDir)) {
-            $this->deleteDirectory($this->compressDir);
+            FileUtil::deleteDirectory($this->compressDir);
         }
-    }
-
-    private function deleteDirectory(string $dir): void
-    {
-        if (! is_dir($dir)) {
-            return;
-        }
-
-        $files = scandir($dir);
-
-        if ($files === false) {
-            return;
-        }
-
-        foreach ($files as $file) {
-            if ($file === '.' || $file === '..') {
-                continue;
-            }
-            $filePath = $dir . DIRECTORY_SEPARATOR . $file;
-            is_dir($filePath) ? $this->deleteDirectory($filePath) : unlink($filePath);
-        }
-        rmdir($dir);
     }
 
     public function testExtractValidZip(): void

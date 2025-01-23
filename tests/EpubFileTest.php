@@ -10,6 +10,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Iterator;
+use PhpEpub\Util\FileUtil;
 
 class EpubFileTest extends TestCase
 {
@@ -38,30 +39,8 @@ class EpubFileTest extends TestCase
         }
 
         if (is_dir($this->tempDir)) {
-            $this->deleteDirectory($this->tempDir);
+            FileUtil::deleteDirectory($this->tempDir);
         }
-    }
-
-    private function deleteDirectory(string $dir): void
-    {
-        if (! is_dir($dir)) {
-            return;
-        }
-
-        $files = scandir($dir);
-
-        if ($files === false) {
-            return;
-        }
-
-        foreach ($files as $file) {
-            if ($file === '.' || $file === '..') {
-                continue;
-            }
-            $filePath = $dir . DIRECTORY_SEPARATOR . $file;
-            is_dir($filePath) ? $this->deleteDirectory($filePath) : unlink($filePath);
-        }
-        rmdir($dir);
     }
 
     /**
@@ -88,6 +67,9 @@ class EpubFileTest extends TestCase
             $this->assertSame($expectedMetadata['subject'], $metadata->getSubject());
             $this->assertSame($expectedMetadata['date'], $metadata->getDate());
             $this->assertSame($expectedMetadata['identifiers'], $metadata->getIdentifiers());
+
+            $spine = $epubFile->getSpine();
+            $this->assertSame($expectedMetadata['spine'], $spine->get());
         }
     }
 
@@ -123,6 +105,13 @@ class EpubFileTest extends TestCase
                 'com.github.epub-testsuite.epub30-test-0301-2.0.0',
                 '9781003410126'
             ],
+            'spine' => [
+                'cover',
+                'front',
+                'introduction',
+                'xhtml-001',
+                'xhtml-002',
+            ],
         ]];
         yield [__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'valid_1.epub', true, [
             'title' => 'Anonim',
@@ -136,6 +125,9 @@ class EpubFileTest extends TestCase
             'date' => '2015-08-24',
             'identifiers' => [
                 'AWP-DF47F263-F894-490D-9E8A-2492EC571534'
+            ],
+            'spine' => [
+                'id001',
             ],
         ]];
         yield [__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'valid_2.epub', true, [
@@ -151,6 +143,36 @@ class EpubFileTest extends TestCase
             'identifiers' => [
                 '_simple_book'
             ],
+            'spine' => [
+                'cover',
+                'htmltoc',
+                'id-idp140344214732736',
+                'id-idp140344213853136',
+                'id-idp140344215476048',
+                'id-idp140344212955984',
+                'id-idp140344211917536',
+                'id-idp140344214336112',
+                'id-idp140344214743856',
+                'id-idp140344226668640',
+                'id-idp140344211589232',
+                'id-idp140344214390016',
+                'id-idp140344211908768',
+                'id-idp140344214089072',
+                'id-idp140344214517984',
+                'id-idp140344213846896',
+                'id-idp140344211998544',
+                'id-idp140344215682448',
+                'id-idp140344214734976',
+                'id-idp140344256923168',
+                'id-idp140344247117760',
+                'id-idp140344249631104',
+                'id-idp140344257533568',
+                'id-idp140344214744800',
+                'id-idp140344212019376',
+                'id-idp140344252995472',
+                'id-idp140344257345024',
+                'id-idp140344256406352',
+            ],
         ]];
         yield [__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'valid_3.epub', true, [
             'title' => 'King of the Range',
@@ -165,6 +187,18 @@ class EpubFileTest extends TestCase
             'identifiers' => [
                 '0fe42443-c7d5-4615-a5b2-cc8b07de619c'
             ],
+            'spine' => [
+                'titlepage',
+                'html9',
+                'html8',
+                'html7',
+                'html6',
+                'html5',
+                'html4',
+                'html3',
+                'html2',
+                'html1',
+            ],
         ]];
         yield [__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'valid_4.epub', true, [
             'title' => 'EPUB 3.0 Specification',
@@ -178,6 +212,19 @@ class EpubFileTest extends TestCase
             'date' => '',
             'identifiers' => [
                 'code.google.com.epub-samples.epub30-spec'
+            ],
+            'spine' => [
+                'ttl',
+                'nav',
+                'term',
+                'ovw',
+                'pub',
+                'cd',
+                'mo',
+                'ocf',
+                'ack',
+                'ref',
+                'cha',
             ],
         ]];
         yield [__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'valid_5.epub', true, [
@@ -194,6 +241,11 @@ class EpubFileTest extends TestCase
             'identifiers' => [
                 'http://www.gutenberg.org/ebooks/25545'
             ],
+            'spine' => [
+                'cover',
+                'nav',
+                's04',
+            ],
         ]];
         yield [__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'valid_6.epub', true, [
             'title' => '500 Rätsel und Rätselscherze für jung und alt / Ein Bringmichraus für Schul und Haus',
@@ -208,6 +260,16 @@ class EpubFileTest extends TestCase
             'identifiers' => [
                 'http://www.gutenberg.org/31281'
             ],
+            'spine' => [
+                'coverpage-wrapper',
+                'pg-header',
+                'item4',
+                'item5',
+                'item6',
+                'item7',
+                'item8',
+                'pg-footer',
+            ],
         ]];
         yield [__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'invalid.epub', false, [
             'title' => '',
@@ -220,6 +282,9 @@ class EpubFileTest extends TestCase
             'identifiers' => [
                 ''
             ],
+            'spine' => [
+                '',
+            ],
         ]];
         yield [__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'nonexistent.epub', false, [
             'title' => '',
@@ -231,6 +296,9 @@ class EpubFileTest extends TestCase
             'date' => '',
             'identifiers' => [
                 ''
+            ],
+            'spine' => [
+                '',
             ],
         ]];
     }

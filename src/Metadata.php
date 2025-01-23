@@ -17,16 +17,13 @@ class Metadata
     use Traits\InteractsWithSubject;
     use Traits\InteractsWithIdentifier;
 
-    protected readonly SimpleXMLElement $opfXml;
-    private string $dcNamespace;
+    private readonly string $dcNamespace;
 
     /**
      * Metadata constructor.
      */
-    public function __construct(string $opfFilePath, private readonly XmlParser $xmlParser = new XmlParser())
+    public function __construct(private readonly SimpleXMLElement $opfXml)
     {
-        $this->opfXml = $this->xmlParser->parse($opfFilePath);
-
         $namespaces = $this->opfXml->getNamespaces(true);
 
         if (! isset($namespaces['dc'])) {
