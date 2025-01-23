@@ -71,7 +71,7 @@ class EpubFileTest extends TestCase
             $this->expectException(Exception::class);
         }
 
-        $epubFile = new EpubFile($epubPath, new NullLogger());
+        $epubFile = new EpubFile($epubPath);
         $epubFile->load();
 
         if ($shouldLoad) {
@@ -86,7 +86,7 @@ class EpubFileTest extends TestCase
             $this->expectException(Exception::class);
         }
 
-        $epubFile = new EpubFile($epubPath, new NullLogger());
+        $epubFile = new EpubFile($epubPath);
         $epubFile->load();
 
         $validationResult = $epubFile->validate();
@@ -100,7 +100,7 @@ class EpubFileTest extends TestCase
             $this->expectException(Exception::class);
         }
 
-        $epubFile = new EpubFile($epubPath, new NullLogger());
+        $epubFile = new EpubFile($epubPath);
         $epubFile->load();
         $epubFile->save($this->outputEpubPath);
 
