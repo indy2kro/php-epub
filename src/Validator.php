@@ -79,13 +79,27 @@ class Validator
         }
 
         $namespaces = $xml->getNamespaces(true);
-        $rootfiles = $xml->children($namespaces[''])->rootfiles;
-        if (! $rootfiles || ! $rootfiles->rootfile) {
+
+        $containerNamespace = $namespaces[''] ?? null;
+
+        if ($containerNamespace === null) {
+            $this->errors[] = 'No container namespace found in container.xml';
+            return null;
+        }
+
+        $xml->registerXPathNamespace('ns', $containerNamespace);
+
+        $rootfiles = $xml->xpath('//ns:rootfile');
+
+        if ($rootfiles === false || $rootfiles === null) {
             $this->errors[] = 'No rootfile found in container.xml';
             return null;
         }
 
-        $opfPath = (string) $rootfiles->rootfile['full-path'];
+        $rootfile = $rootfiles[0]; // Get the first rootfile node
+
+        $opfPath = (string) $rootfile['full-path'];
+
         if ($opfPath === '') {
             $this->errors[] = 'Missing full-path attribute in rootfile element';
             return null;
@@ -111,23 +125,32 @@ class Validator
         }
 
         $namespaces = $xml->getNamespaces(true);
-        $manifest = $xml->children($namespaces[''])->manifest;
-        if (! $manifest) {
+
+        $containerNamespace = $namespaces[''] ?? null;
+
+        if ($containerNamespace === null) {
+            $this->errors[] = 'No container namespace found in container.xml';
+            return;
+        }
+
+        $xml->registerXPathNamespace('opf', $containerNamespace);
+
+        $items = $xml->xpath('//opf:manifest/opf:item');
+
+        if ($items === false || $items === null) {
             $this->errors[] = 'Missing manifest in OPF file';
             return;
         }
 
         $ncxItem = null;
-        foreach ($manifest->item as $item) {
+        foreach ($items as $item) {
             if ((string) $item['media-type'] === 'application/x-dtbncx+xml') {
                 $ncxItem = (string) $item['href'];
                 break;
             }
         }
 
-        if ($ncxItem === null) {
-            $this->errors[] = 'NCX file not referenced in OPF manifest';
-        } else {
+        if ($ncxItem !== null) {
             $ncxPath = dirname($opfPath) . DIRECTORY_SEPARATOR . $ncxItem;
             $this->validateNcx($ncxPath);
         }
@@ -144,6 +167,7 @@ class Validator
         }
 
         $xml = simplexml_load_file($ncxPath);
+
         if ($xml === false) {
             $this->errors[] = 'Invalid XML in NCX file';
             return;
