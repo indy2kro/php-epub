@@ -10,13 +10,16 @@ use Psr\Log\NullLogger;
 class EpubFile
 {
     private ?string $tempDir = null;
+    private readonly XmlParser $xmlParser;
     private readonly ZipHandler $zipHandler;
-    private readonly Validator $validator;
+    private readonly Parser $parser;
+    private ?Metadata $metadata = null;
 
     public function __construct(private readonly string $filePath, private readonly LoggerInterface $logger = new NullLogger())
     {
         $this->zipHandler = new ZipHandler();
-        $this->validator = new Validator();
+        $this->xmlParser = new XmlParser();
+        $this->parser = new Parser($this->xmlParser);
     }
 
     public function __destruct()
@@ -38,6 +41,10 @@ class EpubFile
 
         $this->zipHandler->extract($this->filePath, $this->tempDir);
         $this->logger->info("EPUB file extracted to temporary directory {$this->tempDir}");
+
+        $opfFilePath = $this->parser->parse($this->filePath);
+
+        $this->metadata = new Metadata($opfFilePath, $this->xmlParser);
     }
 
     public function save(string $filePath): void
@@ -51,25 +58,9 @@ class EpubFile
         $this->logger->info('EPUB file saved successfully.');
     }
 
-    public function validate(): bool
+    public function getMetadata(): ?Metadata
     {
-        if ($this->tempDir === null) {
-            throw new Exception('EPUB file must be loaded before validation.');
-        }
-
-        $this->logger->info('Validating EPUB file structure.');
-        $isValid = $this->validator->isValid($this->tempDir);
-
-        if ($isValid) {
-            $this->logger->info('EPUB file is valid.');
-        } else {
-            $errors = $this->validator->getErrors();
-            foreach ($errors as $error) {
-                $this->logger->error("Validation error: {$error}");
-            }
-        }
-
-        return $isValid;
+        return $this->metadata;
     }
 
     /**

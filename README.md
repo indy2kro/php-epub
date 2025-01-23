@@ -21,7 +21,7 @@ composer require indy2kro/php-epub
 
 Ensure that you have the necessary PHP extensions and optional libraries installed for full functionality:
 
-- **Required**: `ext-xml`
+- **Required**: `ext-xml`, `ext-zip`
 - **Optional**: `dompdf/dompdf`, `tecnickcom/tcpdf` for PDF conversion, `Calibre` for mobi conversion
 
 ## Usage

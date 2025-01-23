@@ -80,20 +80,6 @@ class EpubFileTest extends TestCase
     }
 
     #[DataProvider('epubFileProvider')]
-    public function testValidateEpub(string $epubPath, bool $shouldLoad, bool $isValid): void
-    {
-        if (!$shouldLoad) {
-            $this->expectException(Exception::class);
-        }
-
-        $epubFile = new EpubFile($epubPath);
-        $epubFile->load();
-
-        $validationResult = $epubFile->validate();
-        $this->assertSame($isValid, $validationResult);
-    }
-
-    #[DataProvider('epubFileProvider')]
     public function testSaveEpub(string $epubPath, bool $shouldLoad, bool $isValid): void
     {
         if (!$shouldLoad) {
@@ -125,13 +111,5 @@ class EpubFileTest extends TestCase
 
         $epubFile = new EpubFile(__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'valid.epub', new NullLogger());
         $epubFile->save($this->outputEpubPath);
-    }
-
-    public function testValidateWithoutLoadThrowsException(): void
-    {
-        $this->expectException(Exception::class);
-
-        $epubFile = new EpubFile(__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'valid.epub', new NullLogger());
-        $epubFile->validate();
     }
 }
