@@ -65,7 +65,7 @@ class EpubFileTest extends TestCase
     }
 
     #[DataProvider('epubFileProvider')]
-    public function testLoadEpub(string $epubPath, bool $shouldLoad, bool $isValid): void
+    public function testLoadEpub(string $epubPath, bool $shouldLoad): void
     {
         if (!$shouldLoad) {
             $this->expectException(Exception::class);
@@ -80,7 +80,7 @@ class EpubFileTest extends TestCase
     }
 
     #[DataProvider('epubFileProvider')]
-    public function testSaveEpub(string $epubPath, bool $shouldLoad, bool $isValid): void
+    public function testSaveEpub(string $epubPath, bool $shouldLoad): void
     {
         if (!$shouldLoad) {
             $this->expectException(Exception::class);
@@ -97,12 +97,12 @@ class EpubFileTest extends TestCase
 
     public static function epubFileProvider(): Iterator
     {
-        yield [__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'valid.epub', true, true];
-        yield [__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'valid_1.epub', true, true];
-        yield [__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'valid_2.epub', true, true];
-        yield [__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'valid_3.epub', true, true];
-        yield [__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'invalid.epub', true, false];
-        yield [__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'nonexistent.epub', false, false];
+        yield [__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'valid.epub', true];
+        yield [__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'valid_1.epub', true];
+        yield [__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'valid_2.epub', true];
+        yield [__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'valid_3.epub', true];
+        yield [__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'invalid.epub', false];
+        yield [__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'nonexistent.epub', false];
     }
 
     public function testSaveWithoutLoadThrowsException(): void

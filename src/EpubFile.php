@@ -42,9 +42,10 @@ class EpubFile
         $this->zipHandler->extract($this->filePath, $this->tempDir);
         $this->logger->info("EPUB file extracted to temporary directory {$this->tempDir}");
 
-        $opfFilePath = $this->parser->parse($this->filePath);
+        $opfFilePath = $this->parser->parse($this->tempDir);
+        $opfFileFullPath = $this->tempDir . DIRECTORY_SEPARATOR . $opfFilePath;
 
-        $this->metadata = new Metadata($opfFilePath, $this->xmlParser);
+        $this->metadata = new Metadata($opfFileFullPath, $this->xmlParser);
     }
 
     public function save(string $filePath): void

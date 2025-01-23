@@ -37,13 +37,13 @@ class Parser
         $mimetypePath = $directory . DIRECTORY_SEPARATOR . 'mimetype';
 
         if (! file_exists($mimetypePath)) {
-            throw new Exception('Missing mimetype file');
+            throw new Exception('Missing mimetype file: ' . $mimetypePath);
         }
 
         $mimetype = file_get_contents($mimetypePath);
 
         if ($mimetype === false || trim($mimetype) !== 'application/epub+zip') {
-            throw new Exception('Invalid mimetype content');
+            throw new Exception('Invalid mimetype content: ' . $mimetypePath);
         }
     }
 
