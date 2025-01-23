@@ -102,6 +102,23 @@ class MetadataTest extends TestCase
         $this->assertSame('fr', $updatedMetadata->getLanguage());
     }
 
+    public function testGetDescription(): void
+    {
+        $metadata = new Metadata($this->tempOpfFilePath);
+        $description = $metadata->getDescription();
+        $this->assertSame('These tests include starting the reading system and opening the titles, navigating the content, searching, and using bookmarks and notes.', $description);
+    }
+
+    public function testSetDescription(): void
+    {
+        $metadata = new Metadata($this->tempOpfFilePath);
+        $metadata->setDescription('new description');
+        $metadata->save($this->tempOpfFilePath);
+
+        $updatedMetadata = new Metadata($this->tempOpfFilePath);
+        $this->assertSame('new description', $updatedMetadata->getDescription());
+    }
+
     public function testLoadInvalidOpfThrowsException(): void
     {
         $this->expectException(Exception::class);
