@@ -20,12 +20,19 @@
         }
     },
     "require-dev": {
+        "ext-curl": "*",
+        "ext-dom": "*",
+        "ext-mbstring": "*",
+        "ext-gd": "*",
+        "ext-json": "*",
         "squizlabs/php_codesniffer" : ">=3.7",
-        "phpunit/phpunit" : "^11 ",
+        "phpunit/phpunit" : "^11",
         "phpstan/phpstan": "^2",
         "phpstan/phpstan-phpunit": "^2",
         "rector/rector": "^2",
-        "nunomaduro/phpinsights": "^2"
+        "nunomaduro/phpinsights": "^2",
+        "tecnickcom/tcpdf": "^6.8",
+        "dompdf/dompdf": "^3.1"
     },
     "suggest": {
         "dompdf/dompdf": "Required for PDF generation using Dompdf.",

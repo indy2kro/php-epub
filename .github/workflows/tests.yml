@@ -33,7 +33,7 @@ jobs:
           uses: shivammathur/setup-php@v2
           with:
             php-version: "${{ matrix.php-version }}"
-            extensions: xml, zip
+            extensions: xml, zip, curl, dom, mbstring, gd, json
             coverage: "pcov"
 
         - name: Get Composer Cache Directory 2
