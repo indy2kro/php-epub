@@ -33,12 +33,11 @@ class CalibreAdapter implements ConverterInterface
     /**
      * Converts the EPUB content to a specified format using Calibre.
      *
-     * @param string $epubDirectory The directory containing the extracted EPUB contents.
      * @param string $outputPath The path where the converted file should be saved.
      *
      * @throws Exception If the conversion fails.
      */
-    public function convert(string $epubDirectory, string $outputPath): void
+    public function convert(string $inputFile, string $outputPath): void
     {
         $calibrePath = $this->options['calibre_path'];
 
@@ -47,8 +46,6 @@ class CalibreAdapter implements ConverterInterface
             throw new Exception('Calibre tool not found at path: ' . $calibrePath);
         }
 
-        // Construct the command
-        $inputFile = $epubDirectory . '/book.epub'; // Adjust this path as needed
         if (! file_exists($inputFile)) {
             throw new Exception("EPUB file not found: {$inputFile}");
         }
@@ -68,6 +65,10 @@ class CalibreAdapter implements ConverterInterface
 
         if ($returnVar !== 0) {
             throw new Exception('Calibre conversion failed: ' . implode("\n", $output));
+        }
+
+        if (! file_exists($outputPath) || filesize($outputPath) === 0) {
+            throw new Exception('Calibre conversion failed');
         }
     }
 }
