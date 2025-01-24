@@ -6,11 +6,11 @@ namespace PhpEpub\Test;
 
 use PhpEpub\EpubFile;
 use PhpEpub\Exception;
+use PhpEpub\Util\FileUtil;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Iterator;
-use PhpEpub\Util\FileUtil;
 
 class EpubFileTest extends TestCase
 {
