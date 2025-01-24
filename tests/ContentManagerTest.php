@@ -116,4 +116,52 @@ class ContentManagerTest extends TestCase
         $contentManager = new ContentManager($this->contentDir);
         $contentManager->getContent('nonexistent.txt');
     }
+
+    public function testConstructorThrowsExceptionForNonExistentDirectory(): void
+    {
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('Content directory does not exist:');
+
+        $nonExistentDir = __DIR__ . DIRECTORY_SEPARATOR . 'non_existent_dir';
+        new ContentManager($nonExistentDir);
+    }
+
+    public function testAddContentFailsWithInvalidPath(): void
+    {
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('Failed to add content to:');
+
+        // Create a directory path where we expect a file
+        $invalidPath = $this->contentDir . DIRECTORY_SEPARATOR . 'test' . DIRECTORY_SEPARATOR;
+
+        $contentManager = new ContentManager($this->contentDir);
+        @$contentManager->addContent($invalidPath, 'Sample content');
+    }
+
+    public function testUpdateContentFailsWithNonexistentFile(): void
+    {
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('Content file does not exist:');
+
+        $contentManager = new ContentManager($this->contentDir);
+        $contentManager->updateContent('nonexistent.txt', 'New content');
+    }
+
+    public function testDeleteContentFailsWithNonexistentFile(): void
+    {
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('Content file does not exist:');
+
+        $contentManager = new ContentManager($this->contentDir);
+        $contentManager->deleteContent('nonexistent.txt');
+    }
+
+    public function testGetContentFailsWithNonexistentFile(): void
+    {
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('Content file does not exist:');
+
+        $contentManager = new ContentManager($this->contentDir);
+        $contentManager->getContent('nonexistent.txt');
+    }
 }
