@@ -104,6 +104,6 @@ class ZipHandlerTest extends TestCase
         $this->expectException(Exception::class);
 
         $zipHandler = new ZipHandler();
-        $zipHandler->compress($this->compressDir, __DIR__ . DIRECTORY_SEPARATOR . 'nonexistent' . DIRECTORY_SEPARATOR . 'output.zip');
+        @$zipHandler->compress($this->compressDir, __DIR__ . DIRECTORY_SEPARATOR . 'nonexistent' . DIRECTORY_SEPARATOR . 'output.zip');
     }
 }

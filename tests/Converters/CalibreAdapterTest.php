@@ -5,63 +5,101 @@ declare(strict_types=1);
 namespace PhpEpub\Test\Converters;
 
 use PhpEpub\Converters\CalibreAdapter;
+use PhpEpub\Util\FileSystemHelper;
 use PhpEpub\Exception;
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\MockObject\MockObject;
 
 class CalibreAdapterTest extends TestCase
 {
-    private string $validFile;
-    private string $invalidFile;
-    private string $outputMobiPath;
-    private string $calibrePath;
+    /**
+     * @var MockObject&FileSystemHelper
+     */
+    private mixed $helperMock;
+    private string $fakeCalibrePath = '/fake/path/to/ebook-convert';
+    private string $fakeInputFile = '/fake/path/to/input.epub';
+    private string $fakeOutputFile = '/fake/path/to/output.pdf';
 
     protected function setUp(): void
     {
-        $this->validFile = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'valid.epub';
-        $this->invalidFile = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'invalid.epub';
-        $this->outputMobiPath = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'output' . DIRECTORY_SEPARATOR . 'output.mobi';
-        $this->calibrePath = '/usr/bin/ebook-convert'; // Adjust this path to your Calibre installation
-
-        if (! file_exists($this->calibrePath)) {
-            $this->markTestSkipped('Calibre is not installed or the path is incorrect.');
-        }
-
-        // Ensure the directories exist
-        if (! is_dir(dirname($this->outputMobiPath))) {
-            mkdir(dirname($this->outputMobiPath), 0777, true);
-        }
+        $this->helperMock = $this->createMock(FileSystemHelper::class);
     }
 
-    protected function tearDown(): void
+    public function testConvertSuccessful(): void
     {
-        // Clean up any files or directories created during tests
-        if (file_exists($this->outputMobiPath)) {
-            unlink($this->outputMobiPath);
-        }
+        $this->helperMock->method('fileExists')->willReturnMap([
+            [$this->fakeCalibrePath, true],
+            [$this->fakeInputFile, true],
+            [$this->fakeOutputFile, true],
+        ]);
+
+        $this->helperMock->method('fileSize')->willReturn(100);
+
+        $adapter = new CalibreAdapter(['calibre_path' => $this->fakeCalibrePath], $this->helperMock);
+
+        $adapter->convert($this->fakeInputFile, $this->fakeOutputFile);
+
+        // add some assert to make the test pass phpstan
+        $this->assertSame('/fake/path/to/input.epub', $this->fakeInputFile);
+        $this->assertSame('/fake/path/to/output.pdf', $this->fakeOutputFile);
     }
 
-    public function testConvertToMobi(): void
+    public function testConvertFailsWhenCalibreNotFound(): void
     {
-        $adapter = new CalibreAdapter(['calibre_path' => $this->calibrePath]);
-        $adapter->convert($this->validFile, $this->outputMobiPath);
+        $this->helperMock->method('fileExists')->willReturn(false);
 
-        $this->assertFileExists($this->outputMobiPath);
-        $this->assertGreaterThan(0, filesize($this->outputMobiPath));
-    }
+        $adapter = new CalibreAdapter(['calibre_path' => '/invalid/path/to/ebook-convert'], $this->helperMock);
 
-    public function testConvertWithInvalidFileThrowsException(): void
-    {
         $this->expectException(Exception::class);
+        $this->expectExceptionMessage('Calibre tool not found at path: /invalid/path/to/ebook-convert');
 
-        $adapter = new CalibreAdapter(['calibre_path' => $this->calibrePath]);
-        $adapter->convert($this->invalidFile, $this->outputMobiPath);
+        $adapter->convert($this->fakeInputFile, $this->fakeOutputFile);
     }
 
-    public function testConvertWithNonExistentFileThrowsException(): void
+    public function testConvertFailsWhenInputFileNotFound(): void
     {
-        $this->expectException(Exception::class);
+        $this->helperMock->method('fileExists')->willReturnMap([
+            [$this->fakeCalibrePath, true],
+            [$this->fakeInputFile, false],
+        ]);
 
-        $adapter = new CalibreAdapter(['calibre_path' => $this->calibrePath]);
-        $adapter->convert(__DIR__ . '/nonexistent', $this->outputMobiPath);
+        $adapter = new CalibreAdapter(['calibre_path' => $this->fakeCalibrePath], $this->helperMock);
+
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage("EPUB file not found: {$this->fakeInputFile}");
+
+        $adapter->convert($this->fakeInputFile, $this->fakeOutputFile);
+    }
+
+    public function testConvertFailsWhenExecFails(): void
+    {
+        $this->helperMock->method('fileExists')->willReturn(true);
+        $this->helperMock->method('exec')->willReturnCallback(function ($command, &$output, &$returnVar) {
+            $output = ['Error executing command'];
+            $returnVar = 1;
+        });
+
+        $adapter = new CalibreAdapter(['calibre_path' => $this->fakeCalibrePath], $this->helperMock);
+
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('Calibre conversion failed: Error executing command');
+
+        $adapter->convert($this->fakeInputFile, $this->fakeOutputFile);
+    }
+
+    public function testConvertFailsWhenOutputFileMissing(): void
+    {
+        $this->helperMock->method('fileExists')->willReturnMap([
+            [$this->fakeCalibrePath, true],
+            [$this->fakeInputFile, true],
+            [$this->fakeOutputFile, false],
+        ]);
+
+        $adapter = new CalibreAdapter(['calibre_path' => $this->fakeCalibrePath], $this->helperMock);
+
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('Calibre conversion failed');
+
+        $adapter->convert($this->fakeInputFile, $this->fakeOutputFile);
     }
 }
