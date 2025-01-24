@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PhpEpub\Test;
 
+use PhpEpub\Exception;
 use PhpEpub\Metadata;
 use PhpEpub\XmlParser;
 use PHPUnit\Framework\TestCase;
@@ -37,6 +38,27 @@ class MetadataTest extends TestCase
         if (file_exists($this->tempOpfFilePath)) {
             unlink($this->tempOpfFilePath);
         }
+    }
+
+    public function testConstructorThrowsExceptionWhenDcNamespaceMissing(): void
+    {
+        $opfXml = new SimpleXMLElement('<package xmlns="http://www.idpf.org/2007/opf"></package>');
+
+        $this->expectException(Exception::class);
+
+        new Metadata($opfXml);
+    }
+
+    public function testSaveThrowsExceptionWhenFileCannotBeSaved(): void
+    {
+        $metadata = new Metadata($this->opfXml);
+
+        // Set the file path to an invalid directory to simulate a failure
+        $invalidFilePath = '/invalid/path/opf.opf';
+
+        $this->expectException(Exception::class);
+
+        @$metadata->save($invalidFilePath);
     }
 
     public function testGetTitle(): void
