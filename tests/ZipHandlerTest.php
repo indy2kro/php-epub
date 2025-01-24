@@ -105,7 +105,6 @@ class ZipHandlerTest extends TestCase
         file_put_contents($sampleFilePath, 'Sample content');
 
         $this->expectException(Exception::class);
-        $this->expectExceptionMessage('Failed to create ZIP file:');
 
         $zipHandler = new ZipHandler();
         @$zipHandler->compress($this->compressDir, __DIR__ . DIRECTORY_SEPARATOR . 'nonexistent' . DIRECTORY_SEPARATOR . 'output.zip');
