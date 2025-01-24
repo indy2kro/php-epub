@@ -66,6 +66,14 @@ class XmlParserTest extends TestCase
         $parser->parse($this->invalidXmlFilePath);
     }
 
+    public function testParseNonExistentXmlThrowsException(): void
+    {
+        $this->expectException(Exception::class);
+
+        $parser = new XmlParser();
+        $parser->parse(__DIR__ . DIRECTORY_SEPARATOR . 'nonexistent');
+    }
+
     public function testSaveXml(): void
     {
         $parser = new XmlParser();
@@ -77,5 +85,15 @@ class XmlParserTest extends TestCase
         $savedXml = simplexml_load_file($this->outputXmlFilePath);
         $this->assertNotFalse($savedXml);
         $this->assertSame('New Value', (string) $savedXml->element);
+    }
+
+    public function testSaveNonExistentXmlThrowsException(): void
+    {
+        $parser = new XmlParser();
+        $xml = new SimpleXMLElement('<root><element>New Value</element></root>');
+
+        $this->expectException(Exception::class);
+        // suppress warnings intedended
+        @$parser->save($xml, __DIR__ . DIRECTORY_SEPARATOR . 'nonexistent' . DIRECTORY_SEPARATOR . 'output.xml');
     }
 }

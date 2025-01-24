@@ -67,6 +67,14 @@ class ZipHandlerTest extends TestCase
         $zipHandler->extract($this->invalidZipPath, $this->extractDir);
     }
 
+    public function testExtractNonExistentZipThrowsException(): void
+    {
+        $this->expectException(Exception::class);
+
+        $zipHandler = new ZipHandler();
+        $zipHandler->extract(__DIR__ . DIRECTORY_SEPARATOR . 'nonexistent.zip', $this->extractDir);
+    }
+
     public function testCompressDirectory(): void
     {
         // Create a sample file to compress
@@ -85,5 +93,17 @@ class ZipHandlerTest extends TestCase
 
         $zipHandler = new ZipHandler();
         $zipHandler->compress(__DIR__ . DIRECTORY_SEPARATOR . 'nonexistent', $this->outputZipPath);
+    }
+
+    public function testCompressNonExistentOutputDirectoryThrowsException(): void
+    {
+        // Create a sample file to compress
+        $sampleFilePath = $this->compressDir . DIRECTORY_SEPARATOR . 'sample.txt';
+        file_put_contents($sampleFilePath, 'Sample content');
+
+        $this->expectException(Exception::class);
+
+        $zipHandler = new ZipHandler();
+        $zipHandler->compress($this->compressDir, __DIR__ . DIRECTORY_SEPARATOR . 'nonexistent' . DIRECTORY_SEPARATOR . 'output.zip');
     }
 }
