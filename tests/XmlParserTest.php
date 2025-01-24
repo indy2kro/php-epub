@@ -22,7 +22,7 @@ class XmlParserTest extends TestCase
         $this->outputXmlFilePath = __DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'output' . DIRECTORY_SEPARATOR . 'output.xml';
 
         // Ensure the output directory exists
-        if (!is_dir(dirname($this->outputXmlFilePath))) {
+        if (! is_dir(dirname($this->outputXmlFilePath))) {
             mkdir(dirname($this->outputXmlFilePath), 0777, true);
         }
 
@@ -55,7 +55,7 @@ class XmlParserTest extends TestCase
         $xml = $parser->parse($this->xmlFilePath);
 
         $this->assertInstanceOf(SimpleXMLElement::class, $xml);
-        $this->assertSame('Value', (string)$xml->element);
+        $this->assertSame('Value', (string) $xml->element);
     }
 
     public function testParseInvalidXmlThrowsException(): void
@@ -76,6 +76,6 @@ class XmlParserTest extends TestCase
         $this->assertFileExists($this->outputXmlFilePath);
         $savedXml = simplexml_load_file($this->outputXmlFilePath);
         $this->assertNotFalse($savedXml);
-        $this->assertSame('New Value', (string)$savedXml->element);
+        $this->assertSame('New Value', (string) $savedXml->element);
     }
 }

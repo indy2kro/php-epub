@@ -8,7 +8,6 @@ use PhpEpub\Converters\DompdfAdapter;
 use PhpEpub\Exception;
 use PhpEpub\Util\FileUtil;
 use PHPUnit\Framework\TestCase;
-use Dompdf\Dompdf;
 
 class DompdfAdapterTest extends TestCase
 {
@@ -21,12 +20,12 @@ class DompdfAdapterTest extends TestCase
         $this->outputPdfPath = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'output' . DIRECTORY_SEPARATOR . 'output.pdf';
 
         // Ensure the directories exist
-        if (!is_dir(dirname($this->outputPdfPath))) {
+        if (! is_dir(dirname($this->outputPdfPath))) {
             mkdir(dirname($this->outputPdfPath), 0777, true);
         }
 
         // Create a mock EPUB content file
-        if (!is_dir($this->epubDirectory)) {
+        if (! is_dir($this->epubDirectory)) {
             mkdir($this->epubDirectory, 0777, true);
             file_put_contents($this->epubDirectory . '/content.xhtml', '<html><body>Sample Content</body></html>');
         }

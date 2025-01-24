@@ -4,10 +4,9 @@ declare(strict_types=1);
 
 namespace PhpEpub\Test;
 
-use PhpEpub\Exception;
 use PhpEpub\Metadata;
-use PHPUnit\Framework\TestCase;
 use PhpEpub\XmlParser;
+use PHPUnit\Framework\TestCase;
 use SimpleXMLElement;
 
 class MetadataTest extends TestCase
@@ -21,7 +20,7 @@ class MetadataTest extends TestCase
         $this->tempOpfFilePath = __DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'tmp' . DIRECTORY_SEPARATOR . 'valid.opf';
 
         // Ensure the temp directory exists
-        if (!is_dir(dirname($this->tempOpfFilePath))) {
+        if (! is_dir(dirname($this->tempOpfFilePath))) {
             mkdir(dirname($this->tempOpfFilePath), 0777, true);
         }
 

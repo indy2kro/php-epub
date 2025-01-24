@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace PhpEpub\Test;
 
-use PhpEpub\ZipHandler;
 use PhpEpub\Exception;
-use PHPUnit\Framework\TestCase;
 use PhpEpub\Util\FileUtil;
+use PhpEpub\ZipHandler;
+use PHPUnit\Framework\TestCase;
 
 class ZipHandlerTest extends TestCase
 {
@@ -26,10 +26,10 @@ class ZipHandlerTest extends TestCase
         $this->outputZipPath = __DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'output' . DIRECTORY_SEPARATOR . 'output.zip';
 
         // Ensure the directories exist
-        if (!is_dir($this->extractDir)) {
+        if (! is_dir($this->extractDir)) {
             mkdir($this->extractDir, 0777, true);
         }
-        if (!is_dir($this->compressDir)) {
+        if (! is_dir($this->compressDir)) {
             mkdir($this->compressDir, 0777, true);
         }
     }

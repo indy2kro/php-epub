@@ -6,8 +6,8 @@ namespace PhpEpub\Test;
 
 use PhpEpub\ContentManager;
 use PhpEpub\Exception;
-use PHPUnit\Framework\TestCase;
 use PhpEpub\Util\FileUtil;
+use PHPUnit\Framework\TestCase;
 
 class ContentManagerTest extends TestCase
 {
@@ -20,7 +20,7 @@ class ContentManagerTest extends TestCase
         $this->sampleFilePath = $this->contentDir . DIRECTORY_SEPARATOR . 'sample.txt';
 
         // Ensure the content directory exists
-        if (!is_dir($this->contentDir)) {
+        if (! is_dir($this->contentDir)) {
             mkdir($this->contentDir, 0777, true);
         }
     }

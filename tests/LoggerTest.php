@@ -16,7 +16,7 @@ class LoggerTest extends TestCase
         $this->logFilePath = __DIR__ . '/fixtures/output/log.txt';
 
         // Ensure the output directory exists
-        if (!is_dir(dirname($this->logFilePath))) {
+        if (! is_dir(dirname($this->logFilePath))) {
             mkdir(dirname($this->logFilePath), 0777, true);
         }
     }

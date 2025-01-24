@@ -21,17 +21,17 @@ class CalibreAdapterTest extends TestCase
         $this->outputMobiPath = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'output' . DIRECTORY_SEPARATOR . 'output.mobi';
         $this->calibrePath = '/usr/bin/ebook-convert'; // Adjust this path to your Calibre installation
 
-        if (!file_exists($this->calibrePath)) {
+        if (! file_exists($this->calibrePath)) {
             $this->markTestSkipped('Calibre is not installed or the path is incorrect.');
         }
 
         // Ensure the directories exist
-        if (!is_dir(dirname($this->outputMobiPath))) {
+        if (! is_dir(dirname($this->outputMobiPath))) {
             mkdir(dirname($this->outputMobiPath), 0777, true);
         }
 
         // Create a mock EPUB content file
-        if (!is_dir($this->epubDirectory)) {
+        if (! is_dir($this->epubDirectory)) {
             mkdir($this->epubDirectory, 0777, true);
             file_put_contents($this->epubDirectory . '/book.epub', 'Mock EPUB content');
         }
