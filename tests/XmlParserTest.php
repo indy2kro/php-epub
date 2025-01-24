@@ -61,6 +61,7 @@ class XmlParserTest extends TestCase
     public function testParseInvalidXmlThrowsException(): void
     {
         $this->expectException(Exception::class);
+        $this->expectExceptionMessage('Failed to load XML file:');
 
         $parser = new XmlParser();
         $parser->parse($this->invalidXmlFilePath);
@@ -69,6 +70,7 @@ class XmlParserTest extends TestCase
     public function testParseNonExistentXmlThrowsException(): void
     {
         $this->expectException(Exception::class);
+        $this->expectExceptionMessage('XML file not found:');
 
         $parser = new XmlParser();
         $parser->parse(__DIR__ . DIRECTORY_SEPARATOR . 'nonexistent');
@@ -93,6 +95,7 @@ class XmlParserTest extends TestCase
         $xml = new SimpleXMLElement('<root><element>New Value</element></root>');
 
         $this->expectException(Exception::class);
+        $this->expectExceptionMessage('Failed to save XML file:');
         // suppress warnings intedended
         @$parser->save($xml, __DIR__ . DIRECTORY_SEPARATOR . 'nonexistent' . DIRECTORY_SEPARATOR . 'output.xml');
     }

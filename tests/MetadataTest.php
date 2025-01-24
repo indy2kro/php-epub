@@ -45,6 +45,7 @@ class MetadataTest extends TestCase
         $opfXml = new SimpleXMLElement('<package xmlns="http://www.idpf.org/2007/opf"></package>');
 
         $this->expectException(Exception::class);
+        $this->expectExceptionMessage('Failed to identify dc namespace');
 
         new Metadata($opfXml);
     }
@@ -57,6 +58,7 @@ class MetadataTest extends TestCase
         $invalidFilePath = '/invalid/path/opf.opf';
 
         $this->expectException(Exception::class);
+        $this->expectExceptionMessage('Failed to save OPF file:');
 
         @$metadata->save($invalidFilePath);
     }

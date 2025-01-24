@@ -52,13 +52,13 @@ class ZipHandler
             throw new Exception("Failed to create ZIP file: {$zipFilePath}");
         }
 
-        $source = realpath($source);
-        if ($source === false) {
+        $realSource = realpath($source);
+        if ($realSource === false) {
             throw new Exception("Invalid source directory: {$source}");
         }
 
         $files = new RecursiveIteratorIterator(
-            new RecursiveDirectoryIterator($source, RecursiveDirectoryIterator::SKIP_DOTS),
+            new RecursiveDirectoryIterator($realSource, RecursiveDirectoryIterator::SKIP_DOTS),
             RecursiveIteratorIterator::SELF_FIRST
         );
 
@@ -69,7 +69,7 @@ class ZipHandler
                 continue;
             }
 
-            $relativePath = substr($filePath, strlen($source) + 1);
+            $relativePath = substr($filePath, strlen($realSource) + 1);
 
             if ($file->isDir()) {
                 $zip->addEmptyDir($relativePath);

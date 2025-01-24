@@ -88,6 +88,7 @@ class ContentManagerTest extends TestCase
     public function testAddContentToNonExistentDirectoryThrowsException(): void
     {
         $this->expectException(Exception::class);
+        $this->expectExceptionMessage('Content directory does not exist:');
 
         $contentManager = new ContentManager(__DIR__ . DIRECTORY_SEPARATOR . 'nonexistent');
         $contentManager->addContent('sample.txt', 'Sample content');
@@ -96,6 +97,7 @@ class ContentManagerTest extends TestCase
     public function testUpdateNonExistentContentThrowsException(): void
     {
         $this->expectException(Exception::class);
+        $this->expectExceptionMessage('Content file does not exist:');
 
         $contentManager = new ContentManager($this->contentDir);
         $contentManager->updateContent('nonexistent.txt', 'Content');
@@ -104,6 +106,7 @@ class ContentManagerTest extends TestCase
     public function testDeleteNonExistentContentThrowsException(): void
     {
         $this->expectException(Exception::class);
+        $this->expectExceptionMessage('Content file does not exist:');
 
         $contentManager = new ContentManager($this->contentDir);
         $contentManager->deleteContent('nonexistent.txt');
@@ -112,6 +115,7 @@ class ContentManagerTest extends TestCase
     public function testGetNonExistentContentThrowsException(): void
     {
         $this->expectException(Exception::class);
+        $this->expectExceptionMessage('Content file does not exist:');
 
         $contentManager = new ContentManager($this->contentDir);
         $contentManager->getContent('nonexistent.txt');

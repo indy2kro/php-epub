@@ -48,6 +48,7 @@ class ParserTest extends TestCase
         unlink($directory . '/mimetype');
 
         $this->expectException(Exception::class);
+        $this->expectExceptionMessage('Missing mimetype file:');
 
         $this->parser->parse($directory);
     }
@@ -58,6 +59,7 @@ class ParserTest extends TestCase
         file_put_contents($directory . '/mimetype', 'invalid-mimetype');
 
         $this->expectException(Exception::class);
+        $this->expectExceptionMessage('Invalid mimetype content:');
 
         $this->parser->parse($directory);
     }
@@ -68,6 +70,7 @@ class ParserTest extends TestCase
         unlink($directory . '/META-INF/container.xml');
 
         $this->expectException(Exception::class);
+        $this->expectExceptionMessage('XML file not found:');
 
         $this->parser->parse($directory);
     }
@@ -81,6 +84,7 @@ class ParserTest extends TestCase
         file_put_contents($opfPath, str_replace('<manifest>', '', $opfContent));
 
         $this->expectException(Exception::class);
+        $this->expectExceptionMessage('Failed to load XML file:');
 
         $this->parser->parse($directory);
     }

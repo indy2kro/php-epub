@@ -37,7 +37,7 @@ class FileSystemHelperTest extends TestCase
         $this->helper->exec($command, $output, $returnVar);
 
         $this->assertSame(0, $returnVar);
-        $this->assertSame(["Hello, world!"], $output);
+        $this->assertSame(['Hello, world!'], $output);
     }
 
     public function testFileSize(): void

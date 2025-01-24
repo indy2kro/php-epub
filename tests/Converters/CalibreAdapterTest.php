@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace PhpEpub\Test\Converters;
 
 use PhpEpub\Converters\CalibreAdapter;
-use PhpEpub\Util\FileSystemHelper;
 use PhpEpub\Exception;
-use PHPUnit\Framework\TestCase;
+use PhpEpub\Util\FileSystemHelper;
 use PHPUnit\Framework\MockObject\MockObject;
+use PHPUnit\Framework\TestCase;
 
 class CalibreAdapterTest extends TestCase
 {
@@ -74,7 +74,7 @@ class CalibreAdapterTest extends TestCase
     public function testConvertFailsWhenExecFails(): void
     {
         $this->helperMock->method('fileExists')->willReturn(true);
-        $this->helperMock->method('exec')->willReturnCallback(function ($command, &$output, &$returnVar) {
+        $this->helperMock->method('exec')->willReturnCallback(static function ($command, &$output, &$returnVar): void {
             $output = ['Error executing command'];
             $returnVar = 1;
         });
