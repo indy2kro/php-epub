@@ -1,4 +1,5 @@
 /vendor/
+/site/
 /junit.xml
 /coverage.xml
 /.phpunit.result.cache

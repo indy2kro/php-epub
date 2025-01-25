@@ -19,12 +19,14 @@ theme:
 
 # Navigation structure
 nav:
+  - Index: index.md
   - Installation: Installation.md
   - Usage:
     - Basic Usage: BasicUsage.md
     - Advanced Features: AdvancedUsage.md
   - Classes:
     - EpubFile: EpubFile.md
+    - ContentManager: ContentManager.md
     - Metadata: Metadata.md
     - Spine: Spine.md
     - Parser: Parser.md
