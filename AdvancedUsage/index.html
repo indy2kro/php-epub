@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="author" content="indy2kro" /><link rel="canonical" href="https://github.com/indy2kro/php-epub/AdvancedUsage/" />
+      <link rel="shortcut icon" href="../img/favicon.ico" />
+    <title>Advanced Features - PHP EPUB</title>
+    <link rel="stylesheet" href="../css/theme.css" />
+    <link rel="stylesheet" href="../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Advanced Features";
+        var mkdocs_page_input_path = "AdvancedUsage.md";
+        var mkdocs_page_url = "/indy2kro/php-epub/AdvancedUsage/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href=".." class="icon icon-home"> PHP EPUB
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../Installation/">Installation</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Usage</span></p>
+              <ul class="current">
+                  <li class="toctree-l1"><a class="reference internal" href="../BasicUsage/">Basic Usage</a>
+                  </li>
+                  <li class="toctree-l1 current"><a class="reference internal current" href="#">Advanced Features</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#modifying-epub-content">Modifying EPUB Content</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#saving-changes">Saving Changes</a>
+        <ul>
+    <li class="toctree-l4"><a class="reference internal" href="#save-to-the-same-file">Save to the Same File</a>
+    </li>
+    <li class="toctree-l4"><a class="reference internal" href="#save-as-a-new-file">Save as a New File</a>
+    </li>
+        </ul>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#converting-epub">Converting EPUB</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#convert-to-pdf-using-dompdfadapter">Convert to PDF Using DompdfAdapter</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#convert-to-pdf-using-tcpdfadapter">Convert to PDF Using TCPDFAdapter</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#convert-to-mobi-using-calibreadapter">Convert to MOBI Using CalibreAdapter</a>
+    </li>
+        </ul>
+    </li>
+    </ul>
+                  </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Classes</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../EpubFile/">EpubFile</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../Metadata/">Metadata</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../Spine/">Spine</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../Parser/">Parser</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../XmlParser/">XmlParser</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../ZipHandler/">ZipHandler</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../Converter/">Converter</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Converters</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../Converters/CalibreAdapter/">Calibre Adapter</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../Converters/DompdfAdapter/">Dompdf Adapter</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../Converters/TCPDFAdapter/">TCPDF Adapter</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="..">PHP EPUB</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
+          <li class="breadcrumb-item">Usage</li>
+      <li class="breadcrumb-item active">Advanced Features</li>
+    <li class="wy-breadcrumbs-aside">
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="advanced-usage">Advanced Usage<a class="headerlink" href="#advanced-usage" title="Permanent link">&para;</a></h1>
+<h2 id="modifying-epub-content">Modifying EPUB Content<a class="headerlink" href="#modifying-epub-content" title="Permanent link">&para;</a></h2>
+<p>To modify the content within an EPUB file, you can use the ContentManager class to access specific files, make changes, and save them.</p>
+<div class="codehilite"><pre><span></span><code><span class="x">use PhpEpub\EpubFile;</span>
+<span class="x">use PhpEpub\ContentManager;</span>
+
+<span class="x">$epubFilePath = &#39;/path/to/your.epub&#39;;</span>
+
+<span class="x">// Load the EPUB file</span>
+<span class="x">$epubFile = new EpubFile($epubFilePath);</span>
+<span class="x">$epubFile-&gt;load();</span>
+
+<span class="x">// Access the content manager</span>
+<span class="x">$tempDir = $epubFile-&gt;getTempDir();</span>
+<span class="x">$contentManager = new ContentManager($tempDir);</span>
+
+<span class="x">// Retrieve and modify content</span>
+<span class="x">$contentFile = &#39;chapter1.xhtml&#39;;</span>
+<span class="x">$content = $contentManager-&gt;getContent($contentFile);</span>
+<span class="x">$modifiedContent = str_replace(&#39;Old Text&#39;, &#39;New Text&#39;, $content);</span>
+
+<span class="x">// Save the modified content</span>
+<span class="x">$contentManager-&gt;updateContent($contentFile, $modifiedContent);</span>
+</code></pre></div>
+
+<h3 id="saving-changes">Saving Changes<a class="headerlink" href="#saving-changes" title="Permanent link">&para;</a></h3>
+<h4 id="save-to-the-same-file">Save to the Same File<a class="headerlink" href="#save-to-the-same-file" title="Permanent link">&para;</a></h4>
+<p>To save changes to the same EPUB file:</p>
+<div class="codehilite"><pre><span></span><code><span class="x">$epubFile-&gt;save();</span>
+</code></pre></div>
+
+<p>This will overwrite the original EPUB file with the modified content.</p>
+<h4 id="save-as-a-new-file">Save as a New File<a class="headerlink" href="#save-as-a-new-file" title="Permanent link">&para;</a></h4>
+<p>To save the modified EPUB as a new file:</p>
+<div class="codehilite"><pre><span></span><code><span class="x">$newEpubFilePath = &#39;/path/to/new.epub&#39;;</span>
+<span class="x">$epubFile-&gt;save($newEpubFilePath);</span>
+</code></pre></div>
+
+<p>This will create a new EPUB file with the changes, leaving the original file unchanged.</p>
+<h2 id="converting-epub">Converting EPUB<a class="headerlink" href="#converting-epub" title="Permanent link">&para;</a></h2>
+<p>You can convert an EPUB to PDF using one of the available adapters.</p>
+<h3 id="convert-to-pdf-using-dompdfadapter">Convert to PDF Using DompdfAdapter<a class="headerlink" href="#convert-to-pdf-using-dompdfadapter" title="Permanent link">&para;</a></h3>
+<div class="codehilite"><pre><span></span><code><span class="x">use PhpEpub\Converters\DompdfAdapter;</span>
+
+<span class="x">$dompdfAdapter = new DompdfAdapter();</span>
+<span class="x">$dompdfAdapter-&gt;convert(&#39;/path/to/extracted/epub&#39;, &#39;/path/to/output.pdf&#39;);</span>
+</code></pre></div>
+
+<h3 id="convert-to-pdf-using-tcpdfadapter">Convert to PDF Using TCPDFAdapter<a class="headerlink" href="#convert-to-pdf-using-tcpdfadapter" title="Permanent link">&para;</a></h3>
+<p>To convert using TCPDF:</p>
+<div class="codehilite"><pre><span></span><code><span class="x">use PhpEpub\Converters\TCPDFAdapter;</span>
+
+<span class="x">$tcpdfAdapter = new TCPDFAdapter();</span>
+<span class="x">$tcpdfAdapter-&gt;convert(&#39;/path/to/extracted/epub&#39;, &#39;/path/to/output.pdf&#39;);</span>
+</code></pre></div>
+
+<h3 id="convert-to-mobi-using-calibreadapter">Convert to MOBI Using CalibreAdapter<a class="headerlink" href="#convert-to-mobi-using-calibreadapter" title="Permanent link">&para;</a></h3>
+<p>To convert using Calibre:</p>
+<div class="codehilite"><pre><span></span><code><span class="x">use PhpEpub\Converters\CalibreAdapter;</span>
+
+<span class="x">$options = [</span>
+<span class="x">    &#39;calibre_path&#39; =&gt; &#39;/usr/bin/ebook-convert&#39;,</span>
+<span class="x">    &#39;extra_args&#39; =&gt; &#39;--output-profile kindle&#39;,</span>
+<span class="x">];</span>
+
+<span class="x">$calibreAdapter = new CalibreAdapter($options);</span>
+<span class="x">$calibreAdapter-&gt;convert(&#39;/path/to/input.epub&#39;, &#39;/path/to/output.mobi&#39;);</span>
+</code></pre></div>
+              
+            </div>
+          </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href="../BasicUsage/" class="btn btn-neutral float-left" title="Basic Usage"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../EpubFile/" class="btn btn-neutral float-right" title="EpubFile">Next <span class="icon icon-circle-arrow-right"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+    
+      <span><a href="../BasicUsage/" style="color: #fcfcfc">&laquo; Previous</a></span>
+    
+    
+      <span><a href="../EpubFile/" style="color: #fcfcfc">Next &raquo;</a></span>
+    
+  </span>
+</div>
+    <script src="../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "..";</script>
+    <script src="../js/theme_extra.js"></script>
+    <script src="../js/theme.js"></script>
+      <script src="../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>
