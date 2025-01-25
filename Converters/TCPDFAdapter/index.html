@@ -127,28 +127,28 @@ It provides a flexible interface to customize the PDF output through various sty
 </li>
 </ul>
 <h2 id="usage-example">Usage Example<a class="headerlink" href="#usage-example" title="Permanent link">&para;</a></h2>
-<div class="codehilite"><pre><span></span><code><span class="x">use PhpEpub\Converters\TCPDFAdapter;</span>
+<pre class="codehilite"><code class="language-php">use PhpEpub\Converters\TCPDFAdapter;
 
-<span class="x">$styles = [</span>
-<span class="x">    &#39;font&#39; =&gt; &#39;times&#39;,</span>
-<span class="x">    &#39;font_size&#39; =&gt; 14,</span>
-<span class="x">    &#39;margin_left&#39; =&gt; 20,</span>
-<span class="x">    &#39;margin_top&#39; =&gt; 30,</span>
-<span class="x">    &#39;margin_right&#39; =&gt; 20,</span>
-<span class="x">    &#39;margin_bottom&#39; =&gt; 30,</span>
-<span class="x">    &#39;header&#39; =&gt; true,</span>
-<span class="x">    &#39;footer&#39; =&gt; false,</span>
-<span class="x">];</span>
+$styles = [
+    'font' =&gt; 'times',
+    'font_size' =&gt; 14,
+    'margin_left' =&gt; 20,
+    'margin_top' =&gt; 30,
+    'margin_right' =&gt; 20,
+    'margin_bottom' =&gt; 30,
+    'header' =&gt; true,
+    'footer' =&gt; false,
+];
 
-<span class="x">$tcpdfAdapter = new TCPDFAdapter($styles);</span>
+$tcpdfAdapter = new TCPDFAdapter($styles);
 
-<span class="x">try {</span>
-<span class="x">    $tcpdfAdapter-&gt;convert(&#39;/path/to/extracted/epub&#39;, &#39;/path/to/output.pdf&#39;);</span>
-<span class="x">    echo &quot;EPUB successfully converted to PDF.&quot;;</span>
-<span class="x">} catch (Exception $e) {</span>
-<span class="x">    echo &quot;Conversion failed: &quot; . $e-&gt;getMessage();</span>
-<span class="x">}</span>
-</code></pre></div>
+try {
+    $tcpdfAdapter-&gt;convert('/path/to/extracted/epub', '/path/to/output.pdf');
+    echo &quot;EPUB successfully converted to PDF.&quot;;
+} catch (Exception $e) {
+    echo &quot;Conversion failed: &quot; . $e-&gt;getMessage();
+}
+</code></pre>
               
             </div>
           </div><footer>

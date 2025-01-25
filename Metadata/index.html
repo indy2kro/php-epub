@@ -143,20 +143,20 @@ This includes operations such as reading and updating the title, authors, langua
 <li><strong><code>InteractsWithIdentifier</code></strong>: Methods for managing identifiers like ISBN.</li>
 </ul>
 <h2 id="usage-example">Usage Example<a class="headerlink" href="#usage-example" title="Permanent link">&para;</a></h2>
-<div class="codehilite"><pre><span></span><code><span class="x">use PhpEpub\EpubFile;</span>
+<pre class="codehilite"><code class="language-php">use PhpEpub\EpubFile;
 
-<span class="x">$epubFilePath = &#39;/path/to/your.epub&#39;;</span>
+$epubFilePath = '/path/to/your.epub';
 
-<span class="x">$epubFile = new EpubFile($epubFilePath);</span>
-<span class="x">$epubFile-&gt;load();</span>
+$epubFile = new EpubFile($epubFilePath);
+$epubFile-&gt;load();
 
-<span class="x">$metadata = $epubFile-&gt;getMetadata();</span>
-<span class="x">$title = $metadata-&gt;getTitle();</span>
-<span class="x">$metadata-&gt;setTitle(&#39;New Title&#39;);</span>
-<span class="x">$metadata-&gt;save();</span>
+$metadata = $epubFile-&gt;getMetadata();
+$title = $metadata-&gt;getTitle();
+$metadata-&gt;setTitle('New Title');
+$metadata-&gt;save();
 
-<span class="x">$epubFile-&gt;save();</span>
-</code></pre></div>
+$epubFile-&gt;save();
+</code></pre>
               
             </div>
           </div><footer>

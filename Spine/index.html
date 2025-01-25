@@ -126,20 +126,20 @@ It parses the spine section of the OPF file to determine the sequence in which t
 </li>
 </ul>
 <h2 id="usage-example">Usage Example<a class="headerlink" href="#usage-example" title="Permanent link">&para;</a></h2>
-<div class="codehilite"><pre><span></span><code><span class="x">use PhpEpub\EpubFile;</span>
+<pre class="codehilite"><code class="language-php">use PhpEpub\EpubFile;
 
-<span class="x">$epubFilePath = &#39;/path/to/your.epub&#39;;</span>
+$epubFilePath = '/path/to/your.epub';
 
-<span class="x">$epubFile = new EpubFile($epubFilePath);</span>
-<span class="x">$epubFile-&gt;load();</span>
+$epubFile = new EpubFile($epubFilePath);
+$epubFile-&gt;load();
 
-<span class="x">$spine = $epubFile-&gt;getSpine();</span>
-<span class="x">$readingOrder = $spine-&gt;get();</span>
+$spine = $epubFile-&gt;getSpine();
+$readingOrder = $spine-&gt;get();
 
-<span class="x">foreach ($readingOrder as $itemId) {</span>
-<span class="x">    echo &quot;Content item ID in reading order: $itemId\n&quot;;</span>
-<span class="x">}</span>
-</code></pre></div>
+foreach ($readingOrder as $itemId) {
+    echo &quot;Content item ID in reading order: $itemId\n&quot;;
+}
+</code></pre>
               
             </div>
           </div><footer>

@@ -139,19 +139,19 @@ ensuring that the EPUB file is correctly structured and ready for further proces
 </li>
 </ul>
 <h2 id="usage-example">Usage Example<a class="headerlink" href="#usage-example" title="Permanent link">&para;</a></h2>
-<div class="codehilite"><pre><span></span><code><span class="x">use PhpEpub\Parser;</span>
-<span class="x">use PhpEpub\XmlParser;</span>
+<pre class="codehilite"><code class="language-php">use PhpEpub\Parser;
+use PhpEpub\XmlParser;
 
-<span class="x">$directory = &#39;/path/to/extracted/epub&#39;;</span>
-<span class="x">$parser = new Parser(new XmlParser());</span>
+$directory = '/path/to/extracted/epub';
+$parser = new Parser(new XmlParser());
 
-<span class="x">try {</span>
-<span class="x">    $opfPath = $parser-&gt;parse($directory);</span>
-<span class="x">    echo &quot;OPF file located at: $opfPath&quot;;</span>
-<span class="x">} catch (Exception $e) {</span>
-<span class="x">    echo &quot;Error parsing EPUB: &quot; . $e-&gt;getMessage();</span>
-<span class="x">}</span>
-</code></pre></div>
+try {
+    $opfPath = $parser-&gt;parse($directory);
+    echo &quot;OPF file located at: $opfPath&quot;;
+} catch (Exception $e) {
+    echo &quot;Error parsing EPUB: &quot; . $e-&gt;getMessage();
+}
+</code></pre>
               
             </div>
           </div><footer>

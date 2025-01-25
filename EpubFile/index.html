@@ -141,16 +141,16 @@ This class handles the extraction of EPUB contents, parsing of metadata, and man
 </li>
 </ul>
 <h2 id="usage-example">Usage Example<a class="headerlink" href="#usage-example" title="Permanent link">&para;</a></h2>
-<div class="codehilite"><pre><span></span><code><span class="x">use PhpEpub\EpubFile;</span>
+<pre class="codehilite"><code class="language-php">use PhpEpub\EpubFile;
 
-<span class="x">$epubFile = new EpubFile(&#39;/path/to/your.epub&#39;);</span>
-<span class="x">$epubFile-&gt;load();</span>
+$epubFile = new EpubFile('/path/to/your.epub');
+$epubFile-&gt;load();
 
-<span class="x">// make changes</span>
+// make changes
 
-<span class="x">// Save changes</span>
-<span class="x">$epubFile-&gt;save();</span>
-</code></pre></div>
+// Save changes
+$epubFile-&gt;save();
+</code></pre>
 
 <h2 id="destruction">Destruction<a class="headerlink" href="#destruction" title="Permanent link">&para;</a></h2>
 <p>The <code>__destruct()</code> method ensures that the temporary directory used during processing is cleaned up, preventing any leftover files from occupying disk space.</p>

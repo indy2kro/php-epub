@@ -126,22 +126,22 @@ It provides methods to extract contents from a ZIP file and to compress a direct
 </li>
 </ul>
 <h2 id="usage-example">Usage Example<a class="headerlink" href="#usage-example" title="Permanent link">&para;</a></h2>
-<div class="codehilite"><pre><span></span><code><span class="x">use PhpEpub\ZipHandler;</span>
+<pre class="codehilite"><code class="language-php">use PhpEpub\ZipHandler;
 
-<span class="x">$zipHandler = new ZipHandler();</span>
+$zipHandler = new ZipHandler();
 
-<span class="x">try {</span>
-<span class="x">    // Extract a ZIP file</span>
-<span class="x">    $zipHandler-&gt;extract(&#39;/path/to/file.zip&#39;, &#39;/path/to/destination&#39;);</span>
-<span class="x">    echo &quot;ZIP file extracted successfully.&quot;;</span>
+try {
+    // Extract a ZIP file
+    $zipHandler-&gt;extract('/path/to/file.zip', '/path/to/destination');
+    echo &quot;ZIP file extracted successfully.&quot;;
 
-<span class="x">    // Compress a directory into a ZIP file</span>
-<span class="x">    $zipHandler-&gt;compress(&#39;/path/to/source&#39;, &#39;/path/to/output.zip&#39;);</span>
-<span class="x">    echo &quot;Directory compressed into ZIP file successfully.&quot;;</span>
-<span class="x">} catch (Exception $e) {</span>
-<span class="x">    echo &quot;Error handling ZIP file: &quot; . $e-&gt;getMessage();</span>
-<span class="x">}</span>
-</code></pre></div>
+    // Compress a directory into a ZIP file
+    $zipHandler-&gt;compress('/path/to/source', '/path/to/output.zip');
+    echo &quot;Directory compressed into ZIP file successfully.&quot;;
+} catch (Exception $e) {
+    echo &quot;Error handling ZIP file: &quot; . $e-&gt;getMessage();
+}
+</code></pre>
               
             </div>
           </div><footer>

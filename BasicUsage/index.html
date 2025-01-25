@@ -116,19 +116,19 @@
                 <h1 id="basic-usage">Basic Usage<a class="headerlink" href="#basic-usage" title="Permanent link">&para;</a></h1>
 <h2 id="loading-an-epub-file">Loading an EPUB File<a class="headerlink" href="#loading-an-epub-file" title="Permanent link">&para;</a></h2>
 <p>To load an EPUB file, use the EpubFile class:</p>
-<div class="codehilite"><pre><span></span><code><span class="x">use PhpEpub\EpubFile;</span>
+<pre class="codehilite"><code class="language-php">use PhpEpub\EpubFile;
 
-<span class="x">$epubFile = new EpubFile(&#39;/path/to/your.epub&#39;);</span>
-<span class="x">$epubFile-&gt;load();</span>
-</code></pre></div>
+$epubFile = new EpubFile('/path/to/your.epub');
+$epubFile-&gt;load();
+</code></pre>
 
 <h2 id="accessing-metadata">Accessing Metadata<a class="headerlink" href="#accessing-metadata" title="Permanent link">&para;</a></h2>
 <p>Once the EPUB is loaded, you can access and modify its metadata:</p>
-<div class="codehilite"><pre><span></span><code><span class="x">$metadata = $epubFile-&gt;getMetadata();</span>
-<span class="x">$title = $metadata-&gt;getTitle();</span>
-<span class="x">$metadata-&gt;setTitle(&#39;New Title&#39;);</span>
-<span class="x">$metadata-&gt;save();</span>
-</code></pre></div>
+<pre class="codehilite"><code class="language-php">$metadata = $epubFile-&gt;getMetadata();
+$title = $metadata-&gt;getTitle();
+$metadata-&gt;setTitle('New Title');
+$metadata-&gt;save();
+</code></pre>
               
             </div>
           </div><footer>

@@ -127,22 +127,22 @@ It provides a flexible interface to execute conversions by leveraging Calibre's 
 </li>
 </ul>
 <h2 id="usage-example">Usage Example<a class="headerlink" href="#usage-example" title="Permanent link">&para;</a></h2>
-<div class="codehilite"><pre><span></span><code><span class="x">use PhpEpub\Converters\CalibreAdapter;</span>
-<span class="x">use PhpEpub\Util\FileSystemHelper;</span>
+<pre class="codehilite"><code class="language-php">use PhpEpub\Converters\CalibreAdapter;
+use PhpEpub\Util\FileSystemHelper;
 
-<span class="x">$options = [</span>
-<span class="x">    &#39;calibre_path&#39; =&gt; &#39;/usr/local/bin/ebook-convert&#39;,</span>
-<span class="x">    &#39;extra_args&#39; =&gt; &#39;--output-profile kindle&#39;,</span>
-<span class="x">];</span>
+$options = [
+    'calibre_path' =&gt; '/usr/local/bin/ebook-convert',
+    'extra_args' =&gt; '--output-profile kindle',
+];
 
-<span class="x">$calibreAdapter = new CalibreAdapter($options, new FileSystemHelper());</span>
+$calibreAdapter = new CalibreAdapter($options, new FileSystemHelper());
 
-<span class="x">try {</span>
-<span class="x">    $calibreAdapter-&gt;convert(&#39;/path/to/input.epub&#39;, &#39;/path/to/output.mobi&#39;);</span>
-<span class="x">    echo &quot;EPUB successfully converted to MOBI.&quot;;</span>
-<span class="x">} catch (Exception $e) {</span>
-<span class="x">    echo &quot;Conversion failed: &quot; . $e-&gt;getMessage();</span>
-</code></pre></div>
+try {
+    $calibreAdapter-&gt;convert('/path/to/input.epub', '/path/to/output.mobi');
+    echo &quot;EPUB successfully converted to MOBI.&quot;;
+} catch (Exception $e) {
+    echo &quot;Conversion failed: &quot; . $e-&gt;getMessage();
+</code></pre>
               
             </div>
           </div><footer>

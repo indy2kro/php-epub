@@ -134,71 +134,71 @@
                 <h1 id="advanced-usage">Advanced Usage<a class="headerlink" href="#advanced-usage" title="Permanent link">&para;</a></h1>
 <h2 id="modifying-epub-content">Modifying EPUB Content<a class="headerlink" href="#modifying-epub-content" title="Permanent link">&para;</a></h2>
 <p>To modify the content within an EPUB file, you can use the ContentManager class to access specific files, make changes, and save them.</p>
-<div class="codehilite"><pre><span></span><code><span class="x">use PhpEpub\EpubFile;</span>
-<span class="x">use PhpEpub\ContentManager;</span>
+<pre class="codehilite"><code class="language-php">use PhpEpub\EpubFile;
+use PhpEpub\ContentManager;
 
-<span class="x">$epubFilePath = &#39;/path/to/your.epub&#39;;</span>
+$epubFilePath = '/path/to/your.epub';
 
-<span class="x">// Load the EPUB file</span>
-<span class="x">$epubFile = new EpubFile($epubFilePath);</span>
-<span class="x">$epubFile-&gt;load();</span>
+// Load the EPUB file
+$epubFile = new EpubFile($epubFilePath);
+$epubFile-&gt;load();
 
-<span class="x">// Access the content manager</span>
-<span class="x">$tempDir = $epubFile-&gt;getTempDir();</span>
-<span class="x">$contentManager = new ContentManager($tempDir);</span>
+// Access the content manager
+$tempDir = $epubFile-&gt;getTempDir();
+$contentManager = new ContentManager($tempDir);
 
-<span class="x">// Retrieve and modify content</span>
-<span class="x">$contentFile = &#39;chapter1.xhtml&#39;;</span>
-<span class="x">$content = $contentManager-&gt;getContent($contentFile);</span>
-<span class="x">$modifiedContent = str_replace(&#39;Old Text&#39;, &#39;New Text&#39;, $content);</span>
+// Retrieve and modify content
+$contentFile = 'chapter1.xhtml';
+$content = $contentManager-&gt;getContent($contentFile);
+$modifiedContent = str_replace('Old Text', 'New Text', $content);
 
-<span class="x">// Save the modified content</span>
-<span class="x">$contentManager-&gt;updateContent($contentFile, $modifiedContent);</span>
-</code></pre></div>
+// Save the modified content
+$contentManager-&gt;updateContent($contentFile, $modifiedContent);
+</code></pre>
 
 <h3 id="saving-changes">Saving Changes<a class="headerlink" href="#saving-changes" title="Permanent link">&para;</a></h3>
 <h4 id="save-to-the-same-file">Save to the Same File<a class="headerlink" href="#save-to-the-same-file" title="Permanent link">&para;</a></h4>
 <p>To save changes to the same EPUB file:</p>
-<div class="codehilite"><pre><span></span><code><span class="x">$epubFile-&gt;save();</span>
-</code></pre></div>
+<pre class="codehilite"><code class="language-php">$epubFile-&gt;save();
+</code></pre>
 
 <p>This will overwrite the original EPUB file with the modified content.</p>
 <h4 id="save-as-a-new-file">Save as a New File<a class="headerlink" href="#save-as-a-new-file" title="Permanent link">&para;</a></h4>
 <p>To save the modified EPUB as a new file:</p>
-<div class="codehilite"><pre><span></span><code><span class="x">$newEpubFilePath = &#39;/path/to/new.epub&#39;;</span>
-<span class="x">$epubFile-&gt;save($newEpubFilePath);</span>
-</code></pre></div>
+<pre class="codehilite"><code class="language-php">$newEpubFilePath = '/path/to/new.epub';
+$epubFile-&gt;save($newEpubFilePath);
+</code></pre>
 
 <p>This will create a new EPUB file with the changes, leaving the original file unchanged.</p>
 <h2 id="converting-epub">Converting EPUB<a class="headerlink" href="#converting-epub" title="Permanent link">&para;</a></h2>
 <p>You can convert an EPUB to PDF using one of the available adapters.</p>
 <h3 id="convert-to-pdf-using-dompdfadapter">Convert to PDF Using DompdfAdapter<a class="headerlink" href="#convert-to-pdf-using-dompdfadapter" title="Permanent link">&para;</a></h3>
-<div class="codehilite"><pre><span></span><code><span class="x">use PhpEpub\Converters\DompdfAdapter;</span>
+<pre class="codehilite"><code class="language-php">use PhpEpub\Converters\DompdfAdapter;
 
-<span class="x">$dompdfAdapter = new DompdfAdapter();</span>
-<span class="x">$dompdfAdapter-&gt;convert(&#39;/path/to/extracted/epub&#39;, &#39;/path/to/output.pdf&#39;);</span>
-</code></pre></div>
+$dompdfAdapter = new DompdfAdapter();
+$dompdfAdapter-&gt;convert('/path/to/extracted/epub', '/path/to/output.pdf');
+</code></pre>
 
 <h3 id="convert-to-pdf-using-tcpdfadapter">Convert to PDF Using TCPDFAdapter<a class="headerlink" href="#convert-to-pdf-using-tcpdfadapter" title="Permanent link">&para;</a></h3>
 <p>To convert using TCPDF:</p>
-<div class="codehilite"><pre><span></span><code><span class="x">use PhpEpub\Converters\TCPDFAdapter;</span>
+<pre class="codehilite"><code class="language-php">use PhpEpub\Converters\TCPDFAdapter;
 
-<span class="x">$tcpdfAdapter = new TCPDFAdapter();</span>
-<span class="x">$tcpdfAdapter-&gt;convert(&#39;/path/to/extracted/epub&#39;, &#39;/path/to/output.pdf&#39;);</span>
-</code></pre></div>
+$tcpdfAdapter = new TCPDFAdapter();
+$tcpdfAdapter-&gt;convert('/path/to/extracted/epub', '/path/to/output.pdf');
+</code></pre>
 
 <h3 id="convert-to-mobi-using-calibreadapter">Convert to MOBI Using CalibreAdapter<a class="headerlink" href="#convert-to-mobi-using-calibreadapter" title="Permanent link">&para;</a></h3>
 <p>To convert using Calibre:</p>
-<div class="codehilite"><pre><span></span><code><span class="x">use PhpEpub\Converters\CalibreAdapter;</span>
+<pre class="codehilite"><code class="language-php">use PhpEpub\Converters\CalibreAdapter;
 
-<span class="x">$options = [</span>
-<span class="x">    &#39;calibre_path&#39; =&gt; &#39;/usr/bin/ebook-convert&#39;,</span>
-<span class="x">    &#39;extra_args&#39; =&gt; &#39;--output-profile kindle&#39;,</span>
-<span class="x">];</span>
+$options = [
+    'calibre_path' =&gt; '/usr/bin/ebook-convert',
+    'extra_args' =&gt; '--output-profile kindle',
+];
 
-<span class="x">$calibreAdapter = new CalibreAdapter($options);</span>
-<span class="x">$calibreAdapter-&gt;convert(&#39;/path/to/input.epub&#39;, &#39;/path/to/output.mobi&#39;);</span>
-</code></pre></div>
+$calibreAdapter = new CalibreAdapter($options);
+$calibreAdapter-&gt;convert('/path/to/input.epub', '/path/to/output.mobi');
+</code></pre>
               
             </div>
           </div><footer>

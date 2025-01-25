@@ -126,25 +126,25 @@ It provides methods to load and save XML files, ensuring that the XML data is co
 </li>
 </ul>
 <h2 id="usage-example">Usage Example<a class="headerlink" href="#usage-example" title="Permanent link">&para;</a></h2>
-<div class="codehilite"><pre><span></span><code><span class="x">use PhpEpub\XmlParser;</span>
+<pre class="codehilite"><code class="language-php">use PhpEpub\XmlParser;
 
-<span class="x">$xmlParser = new XmlParser();</span>
+$xmlParser = new XmlParser();
 
-<span class="x">try {</span>
-<span class="x">    // Load an XML file</span>
-<span class="x">    $xml = $xmlParser-&gt;parse(&#39;/path/to/file.xml&#39;);</span>
-<span class="x">    echo &quot;XML loaded successfully.&quot;;</span>
+try {
+    // Load an XML file
+    $xml = $xmlParser-&gt;parse('/path/to/file.xml');
+    echo &quot;XML loaded successfully.&quot;;
 
-<span class="x">    // Modify the XML as needed</span>
-<span class="x">    $xml-&gt;addChild(&#39;newElement&#39;, &#39;value&#39;);</span>
+    // Modify the XML as needed
+    $xml-&gt;addChild('newElement', 'value');
 
-<span class="x">    // Save the modified XML back to a file</span>
-<span class="x">    $xmlParser-&gt;save($xml, &#39;/path/to/modified_file.xml&#39;);</span>
-<span class="x">    echo &quot;XML saved successfully.&quot;;</span>
-<span class="x">} catch (Exception $e) {</span>
-<span class="x">    echo &quot;Error handling XML: &quot; . $e-&gt;getMessage();</span>
-<span class="x">}</span>
-</code></pre></div>
+    // Save the modified XML back to a file
+    $xmlParser-&gt;save($xml, '/path/to/modified_file.xml');
+    echo &quot;XML saved successfully.&quot;;
+} catch (Exception $e) {
+    echo &quot;Error handling XML: &quot; . $e-&gt;getMessage();
+}
+</code></pre>
               
             </div>
           </div><footer>

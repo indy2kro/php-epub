@@ -126,28 +126,28 @@ It utilizes different converter adapters to handle specific formats, such as PDF
 </li>
 </ul>
 <h2 id="usage-example">Usage Example<a class="headerlink" href="#usage-example" title="Permanent link">&para;</a></h2>
-<div class="codehilite"><pre><span></span><code><span class="x">use PhpEpub\Converter;</span>
-<span class="x">use PhpEpub\Converters\CalibreAdapter;</span>
-<span class="x">use PhpEpub\Converters\DompdfAdapter;</span>
+<pre class="codehilite"><code class="language-php">use PhpEpub\Converter;
+use PhpEpub\Converters\CalibreAdapter;
+use PhpEpub\Converters\DompdfAdapter;
 
-<span class="x">$epubDirectory = &#39;/path/to/extracted/epub&#39;;</span>
-<span class="x">$adapters = [</span>
-<span class="x">    &#39;pdf&#39; =&gt; new DompdfAdapter(),</span>
-<span class="x">    &#39;mobi&#39; =&gt; new CalibreAdapter(),</span>
-<span class="x">];</span>
+$epubDirectory = '/path/to/extracted/epub';
+$adapters = [
+    'pdf' =&gt; new DompdfAdapter(),
+    'mobi' =&gt; new CalibreAdapter(),
+];
 
-<span class="x">$converter = new Converter($epubDirectory, $adapters);</span>
+$converter = new Converter($epubDirectory, $adapters);
 
-<span class="x">try {</span>
-<span class="x">    $converter-&gt;convert(&#39;pdf&#39;, &#39;/path/to/output.pdf&#39;);</span>
-<span class="x">    echo &quot;EPUB successfully converted to PDF.&quot;;</span>
+try {
+    $converter-&gt;convert('pdf', '/path/to/output.pdf');
+    echo &quot;EPUB successfully converted to PDF.&quot;;
 
-<span class="x">    $converter-&gt;convert(&#39;mobi&#39;, &#39;/path/to/output.mobi&#39;);</span>
-<span class="x">    echo &quot;EPUB successfully converted to PDF.&quot;;</span>
-<span class="x">} catch (Exception $e) {</span>
-<span class="x">    echo &quot;Conversion failed: &quot; . $e-&gt;getMessage();</span>
-<span class="x">}</span>
-</code></pre></div>
+    $converter-&gt;convert('mobi', '/path/to/output.mobi');
+    echo &quot;EPUB successfully converted to PDF.&quot;;
+} catch (Exception $e) {
+    echo &quot;Conversion failed: &quot; . $e-&gt;getMessage();
+}
+</code></pre>
               
             </div>
           </div><footer>

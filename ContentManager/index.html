@@ -138,28 +138,28 @@ It provides methods to list, add, update, delete, and retrieve content files, en
 </li>
 </ul>
 <h2 id="usage-example">Usage Example<a class="headerlink" href="#usage-example" title="Permanent link">&para;</a></h2>
-<div class="codehilite"><pre><span></span><code><span class="x">use PhpEpub\ContentManager;</span>
+<pre class="codehilite"><code class="language-php">use PhpEpub\ContentManager;
 
-<span class="x">$contentDirectory = &#39;/path/to/extracted/epub/content&#39;;</span>
-<span class="x">$contentManager = new ContentManager($contentDirectory);</span>
+$contentDirectory = '/path/to/extracted/epub/content';
+$contentManager = new ContentManager($contentDirectory);
 
-<span class="x">// List all content files</span>
-<span class="x">$contentFiles = $contentManager-&gt;getContentList();</span>
-<span class="x">print_r($contentFiles);</span>
+// List all content files
+$contentFiles = $contentManager-&gt;getContentList();
+print_r($contentFiles);
 
-<span class="x">// Add a new content file</span>
-<span class="x">$contentManager-&gt;addContent(&#39;new-chapter.xhtml&#39;, &#39;&amp;lt;h1&amp;gt;New Chapter&amp;lt;/h1&amp;gt;&lt;p&gt;This is a new chapter.&lt;/p&gt;&#39;);</span>
+// Add a new content file
+$contentManager-&gt;addContent('new-chapter.xhtml', '&amp;lt;h1&amp;gt;New Chapter&amp;lt;/h1&amp;gt;&lt;p&gt;This is a new chapter.&lt;/p&gt;');
 
-<span class="x">// Update an existing content file</span>
-<span class="x">$contentManager-&gt;updateContent(&#39;existing-chapter.xhtml&#39;, &#39;&amp;lt;h1&amp;gt;Updated Chapter&amp;lt;/h1&amp;gt;&lt;p&gt;Updated content.&lt;/p&gt;&#39;);</span>
+// Update an existing content file
+$contentManager-&gt;updateContent('existing-chapter.xhtml', '&amp;lt;h1&amp;gt;Updated Chapter&amp;lt;/h1&amp;gt;&lt;p&gt;Updated content.&lt;/p&gt;');
 
-<span class="x">// Delete a content file</span>
-<span class="x">$contentManager-&gt;deleteContent(&#39;old-chapter.xhtml&#39;);</span>
+// Delete a content file
+$contentManager-&gt;deleteContent('old-chapter.xhtml');
 
-<span class="x">// Retrieve content from a file</span>
-<span class="x">$content = $contentManager-&gt;getContent(&#39;chapter1.xhtml&#39;);</span>
-<span class="x">echo $content;</span>
-</code></pre></div>
+// Retrieve content from a file
+$content = $contentManager-&gt;getContent('chapter1.xhtml');
+echo $content;
+</code></pre>
               
             </div>
           </div><footer>
