@@ -14,6 +14,7 @@ use PHPUnit\Framework\TestCase;
 class EpubFileTest extends TestCase
 {
     private string $outputEpubPath;
+    private string $tempEpubFilePath;
     private string $tempDir;
     private FileSystemHelper $fileSystemHelper;
 
@@ -21,6 +22,7 @@ class EpubFileTest extends TestCase
     {
         $this->fileSystemHelper = new FileSystemHelper();
         $this->outputEpubPath = __DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'output' . DIRECTORY_SEPARATOR . 'output.epub';
+        $this->tempEpubFilePath = __DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'tmp' . DIRECTORY_SEPARATOR . 'temp_epub.epub';
         $this->tempDir = __DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'tmp' . DIRECTORY_SEPARATOR;
 
         // Ensure the output and temp directories exist
@@ -39,6 +41,10 @@ class EpubFileTest extends TestCase
             unlink($this->outputEpubPath);
         }
 
+        if (file_exists($this->tempEpubFilePath)) {
+            unlink($this->tempEpubFilePath);
+        }
+
         if (is_dir($this->tempDir)) {
             $this->fileSystemHelper->deleteDirectory($this->tempDir);
         }
@@ -54,7 +60,12 @@ class EpubFileTest extends TestCase
             $this->expectException(Exception::class);
         }
 
-        $epubFile = new EpubFile($epubPath);
+        if ($shouldLoad) {
+            $copyResult = copy($epubPath, $this->tempEpubFilePath);
+            $this->assertTrue($copyResult);
+        }
+
+        $epubFile = new EpubFile($this->tempEpubFilePath);
         $epubFile->load();
 
         if ($shouldLoad) {
@@ -85,7 +96,12 @@ class EpubFileTest extends TestCase
             $this->expectException(Exception::class);
         }
 
-        $epubFile = new EpubFile($epubPath);
+        if ($shouldLoad) {
+            $copyResult = copy($epubPath, $this->tempEpubFilePath);
+            $this->assertTrue($copyResult);
+        }
+
+        $epubFile = new EpubFile($this->tempEpubFilePath);
         $epubFile->load();
         $epubFile->save();
 
@@ -101,7 +117,12 @@ class EpubFileTest extends TestCase
             $this->expectException(Exception::class);
         }
 
-        $epubFile = new EpubFile($epubPath);
+        if ($shouldLoad) {
+            $copyResult = copy($epubPath, $this->tempEpubFilePath);
+            $this->assertTrue($copyResult);
+        }
+
+        $epubFile = new EpubFile($this->tempEpubFilePath);
         $epubFile->load();
 
         $epubFile->save($this->outputEpubPath);
