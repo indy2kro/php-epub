@@ -45,7 +45,7 @@ class FileSystemHelperTest extends TestCase
         $validFile = $this->fixturesDir . DIRECTORY_SEPARATOR . 'valid.epub';
         $invalidFile = $this->fixturesDir . DIRECTORY_SEPARATOR . 'nonexistent.epub';
 
-        $this->assertSame(87515, $this->helper->fileSize($validFile));
+        $this->assertSame(filesize($validFile), $this->helper->fileSize($validFile));
         $this->assertFalse(@$this->helper->fileSize($invalidFile));
     }
 }

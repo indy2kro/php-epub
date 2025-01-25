@@ -10,7 +10,6 @@ use PhpEpub\Exception;
 use PhpEpub\Util\FileSystemHelper;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 
 class EpubFileTest extends TestCase
 {
@@ -59,6 +58,9 @@ class EpubFileTest extends TestCase
         $epubFile->load();
 
         if ($shouldLoad) {
+            $tempDir = $epubFile->getTempDir();
+            $this->assertNotNull($tempDir);
+
             $metadata = $epubFile->getMetadata();
             $this->assertNotNull($metadata);
             $this->assertSame($expectedMetadata['title'], $metadata->getTitle());
@@ -85,6 +87,23 @@ class EpubFileTest extends TestCase
 
         $epubFile = new EpubFile($epubPath);
         $epubFile->load();
+        $epubFile->save();
+
+        if ($shouldLoad) {
+            $this->assertFileExists($epubPath);
+        }
+    }
+
+    #[DataProvider('epubFileProvider')]
+    public function testSaveEpubToNewFile(string $epubPath, bool $shouldLoad): void
+    {
+        if (! $shouldLoad) {
+            $this->expectException(Exception::class);
+        }
+
+        $epubFile = new EpubFile($epubPath);
+        $epubFile->load();
+
         $epubFile->save($this->outputEpubPath);
 
         if ($shouldLoad) {
@@ -319,7 +338,7 @@ class EpubFileTest extends TestCase
     {
         $this->expectException(Exception::class);
 
-        $epubFile = new EpubFile(__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'valid.epub', new NullLogger());
+        $epubFile = new EpubFile(__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'valid.epub');
         $epubFile->save($this->outputEpubPath);
     }
 }

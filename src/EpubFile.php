@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace PhpEpub;
 
 use PhpEpub\Util\FileSystemHelper;
-use Psr\Log\LoggerInterface;
-use Psr\Log\NullLogger;
 use SimpleXMLElement;
 
 class EpubFile
@@ -19,7 +17,7 @@ class EpubFile
     private ?Spine $spine = null;
     private ?SimpleXMLElement $opfXml = null;
 
-    public function __construct(private readonly string $filePath, private readonly LoggerInterface $logger = new NullLogger())
+    public function __construct(private readonly string $filePath)
     {
         $this->zipHandler = new ZipHandler();
         $this->xmlParser = new XmlParser();
@@ -31,40 +29,43 @@ class EpubFile
         if ($this->tempDir !== null && is_dir($this->tempDir)) {
             $helper = new FileSystemHelper();
             $helper->deleteDirectory($this->tempDir);
-            $this->logger->info("Temporary directory {$this->tempDir} deleted.");
         }
     }
 
     public function load(): void
     {
-        $this->logger->info("Loading EPUB file from {$this->filePath}");
-
         $this->tempDir = sys_get_temp_dir() . DIRECTORY_SEPARATOR . uniqid('epub_', true);
         if (! mkdir($this->tempDir) && ! is_dir($this->tempDir)) {
             throw new Exception("Failed to create temporary directory: {$this->tempDir}");
         }
 
         $this->zipHandler->extract($this->filePath, $this->tempDir);
-        $this->logger->info("EPUB file extracted to temporary directory {$this->tempDir}");
 
         $opfFilePath = $this->parser->parse($this->tempDir);
         $opfFileFullPath = $this->tempDir . DIRECTORY_SEPARATOR . $opfFilePath;
 
         $this->opfXml = $this->xmlParser->parse($opfFileFullPath);
 
-        $this->metadata = new Metadata($this->opfXml);
+        $this->metadata = new Metadata($this->opfXml, $opfFileFullPath);
         $this->spine = new Spine($this->opfXml);
     }
 
-    public function save(string $filePath): void
+    public function save(?string $filePath = null): void
     {
         if ($this->tempDir === null) {
             throw new Exception('EPUB file must be loaded before saving.');
         }
 
-        $this->logger->info("Saving EPUB file to {$filePath}");
+        if ($filePath === null) {
+            $filePath = $this->filePath;
+        }
+
         $this->zipHandler->compress($this->tempDir, $filePath);
-        $this->logger->info('EPUB file saved successfully.');
+    }
+
+    public function getTempDir(): ?string
+    {
+        return $this->tempDir;
     }
 
     public function getMetadata(): ?Metadata

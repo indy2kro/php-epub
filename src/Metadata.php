@@ -22,7 +22,7 @@ class Metadata
     /**
      * Metadata constructor.
      */
-    public function __construct(private readonly SimpleXMLElement $opfXml)
+    public function __construct(private readonly SimpleXMLElement $opfXml, private string $opfFilePath)
     {
         $namespaces = $this->opfXml->getNamespaces(true);
 
@@ -36,16 +36,19 @@ class Metadata
     /**
      * Saves the updated OPF file.
      *
-     * @param string $opfFilePath The path to save the OPF file.
-     *
      * @throws Exception If the OPF file cannot be saved.
      */
-    public function save(string $opfFilePath): void
+    public function save(): void
     {
-        $result = $this->opfXml->asXML($opfFilePath);
+        $result = $this->opfXml->asXML($this->opfFilePath);
 
         if ($result === false) {
-            throw new Exception("Failed to save OPF file: {$opfFilePath}");
+            throw new Exception("Failed to save OPF file: {$this->opfFilePath}");
         }
+    }
+
+    public function getOpfFilePath(): string
+    {
+        return $this->opfFilePath;
     }
 }

@@ -11,7 +11,6 @@ A PHP library for processing EPUB files, including parsing, metadata manipulatio
 - **Content Management**: Add, update, and delete content files within an EPUB.
 - **Validation**: Validate the structure and content of EPUB files.
 - **Conversion**: Convert EPUB files to PDF and other formats using adapters for TCPDF, Dompdf, and Calibre.
-- **Logging**: Integrated logging using PSR-3 compliant loggers.
 
 ## Installation
 
@@ -37,17 +36,6 @@ $epubFile = new EpubFile('/path/to/your.epub');
 $epubFile->load();
 ```
 
-Validating an EPUB File
-
-```php
-$isValid = $epubFile->validate();
-if ($isValid) {
-    echo "EPUB is valid.";
-} else {
-    echo "EPUB is invalid.";
-}
-```
-
 ## Converting to PDF
 
 Using TCPDF:
@@ -63,11 +51,19 @@ $adapter->convert('/path/to/extracted/epub', '/path/to/output.pdf');
 
 ```php
 use PhpEpub\Metadata;
+use PhpEpub\EpubFile;
 
-$metadata = new Metadata('/path/to/opf/file.opf');
+$epubFilePath = '/path/to/your.epub';
+
+$epubFile = new EpubFile($epubFilePath);
+$epubFile->load();
+
+$metadata = $epubFile->getMetadata();
 $title = $metadata->getTitle();
 $metadata->setTitle('New Title');
-$metadata->save('/path/to/opf/file.opf');
+$metadata->save();
+
+$epubFile->save();
 ```
 
 ## Code Quality
