@@ -7,7 +7,7 @@ namespace PhpEpub\Test;
 use Iterator;
 use PhpEpub\EpubFile;
 use PhpEpub\Exception;
-use PhpEpub\Util\FileUtil;
+use PhpEpub\Util\FileSystemHelper;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -16,9 +16,11 @@ class EpubFileTest extends TestCase
 {
     private string $outputEpubPath;
     private string $tempDir;
+    private FileSystemHelper $fileSystemHelper;
 
     protected function setUp(): void
     {
+        $this->fileSystemHelper = new FileSystemHelper();
         $this->outputEpubPath = __DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'output' . DIRECTORY_SEPARATOR . 'output.epub';
         $this->tempDir = __DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'tmp' . DIRECTORY_SEPARATOR;
 
@@ -39,7 +41,7 @@ class EpubFileTest extends TestCase
         }
 
         if (is_dir($this->tempDir)) {
-            FileUtil::deleteDirectory($this->tempDir);
+            $this->fileSystemHelper->deleteDirectory($this->tempDir);
         }
     }
 

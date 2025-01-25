@@ -6,16 +6,18 @@ namespace PhpEpub\Test;
 
 use PhpEpub\ContentManager;
 use PhpEpub\Exception;
-use PhpEpub\Util\FileUtil;
+use PhpEpub\Util\FileSystemHelper;
 use PHPUnit\Framework\TestCase;
 
 class ContentManagerTest extends TestCase
 {
     private string $contentDir;
     private string $sampleFilePath;
+    private FileSystemHelper $fileSystemHelper;
 
     protected function setUp(): void
     {
+        $this->fileSystemHelper = new FileSystemHelper();
         $this->contentDir = __DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'tmp' . DIRECTORY_SEPARATOR . 'content';
         $this->sampleFilePath = $this->contentDir . DIRECTORY_SEPARATOR . 'sample.txt';
 
@@ -29,7 +31,7 @@ class ContentManagerTest extends TestCase
     {
         // Clean up any files or directories created during tests
         if (is_dir($this->contentDir)) {
-            FileUtil::deleteDirectory($this->contentDir);
+            $this->fileSystemHelper->deleteDirectory($this->contentDir);
         }
     }
 

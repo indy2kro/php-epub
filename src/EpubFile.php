@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace PhpEpub;
 
-use PhpEpub\Util\FileUtil;
+use PhpEpub\Util\FileSystemHelper;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use SimpleXMLElement;
@@ -29,7 +29,8 @@ class EpubFile
     public function __destruct()
     {
         if ($this->tempDir !== null && is_dir($this->tempDir)) {
-            FileUtil::deleteDirectory($this->tempDir);
+            $helper = new FileSystemHelper();
+            $helper->deleteDirectory($this->tempDir);
             $this->logger->info("Temporary directory {$this->tempDir} deleted.");
         }
     }

@@ -6,7 +6,7 @@ namespace PhpEpub\Test;
 
 use PhpEpub\Exception;
 use PhpEpub\Parser;
-use PhpEpub\Util\FileUtil;
+use PhpEpub\Util\FileSystemHelper;
 use PhpEpub\XmlParser;
 use PHPUnit\Framework\TestCase;
 
@@ -15,9 +15,11 @@ class ParserTest extends TestCase
     private Parser $parser;
     private string $fixturesDir;
     private string $tmpDir;
+    private FileSystemHelper $fileSystemHelper;
 
     protected function setUp(): void
     {
+        $this->fileSystemHelper = new FileSystemHelper();
         $this->fixturesDir = __DIR__ . DIRECTORY_SEPARATOR . 'fixtures';
         $this->tmpDir = $this->fixturesDir . DIRECTORY_SEPARATOR . 'tmp' . DIRECTORY_SEPARATOR . 'temp_epub';
 
@@ -30,7 +32,7 @@ class ParserTest extends TestCase
 
     protected function tearDown(): void
     {
-        FileUtil::deleteDirectory($this->tmpDir);
+        $this->fileSystemHelper->deleteDirectory($this->tmpDir);
     }
 
     public function testParseValidEpub(): void

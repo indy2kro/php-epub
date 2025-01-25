@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PhpEpub\Test;
 
 use PhpEpub\Exception;
-use PhpEpub\Util\FileUtil;
+use PhpEpub\Util\FileSystemHelper;
 use PhpEpub\ZipHandler;
 use PHPUnit\Framework\TestCase;
 
@@ -16,9 +16,11 @@ class ZipHandlerTest extends TestCase
     private string $extractDir;
     private string $compressDir;
     private string $outputZipPath;
+    private FileSystemHelper $fileSystemHelper;
 
     protected function setUp(): void
     {
+        $this->fileSystemHelper = new FileSystemHelper();
         $this->validZipPath = __DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'valid.zip';
         $this->invalidZipPath = __DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'invalid.zip';
         $this->extractDir = __DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'tmp' . DIRECTORY_SEPARATOR . 'extracted';
@@ -42,11 +44,11 @@ class ZipHandlerTest extends TestCase
         }
 
         if (is_dir($this->extractDir)) {
-            FileUtil::deleteDirectory($this->extractDir);
+            $this->fileSystemHelper->deleteDirectory($this->extractDir);
         }
 
         if (is_dir($this->compressDir)) {
-            FileUtil::deleteDirectory($this->compressDir);
+            $this->fileSystemHelper->deleteDirectory($this->compressDir);
         }
     }
 

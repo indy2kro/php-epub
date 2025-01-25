@@ -6,16 +6,18 @@ namespace PhpEpub\Test\Converters;
 
 use PhpEpub\Converters\DompdfAdapter;
 use PhpEpub\Exception;
-use PhpEpub\Util\FileUtil;
+use PhpEpub\Util\FileSystemHelper;
 use PHPUnit\Framework\TestCase;
 
 class DompdfAdapterTest extends TestCase
 {
     private string $epubDirectory;
     private string $outputPdfPath;
+    private FileSystemHelper $fileSystemHelper;
 
     protected function setUp(): void
     {
+        $this->fileSystemHelper = new FileSystemHelper();
         $this->epubDirectory = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'epub_content';
         $this->outputPdfPath = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'output' . DIRECTORY_SEPARATOR . 'output.pdf';
 
@@ -39,7 +41,7 @@ class DompdfAdapterTest extends TestCase
         }
 
         if (is_dir($this->epubDirectory)) {
-            FileUtil::deleteDirectory($this->epubDirectory);
+            $this->fileSystemHelper->deleteDirectory($this->epubDirectory);
         }
     }
 
