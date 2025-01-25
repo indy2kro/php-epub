@@ -3,9 +3,6 @@ site_name: PHP EPUB
 site_description: A PHP library for processing EPUB files, including parsing, metadata manipulation, and format conversion.
 site_author: indy2kro
 
-# Site URL (optional, useful for SEO and social sharing)
-site_url: https://github.com/indy2kro/php-epub
-
 # Theme configuration
 theme:
   name: readthedocs
