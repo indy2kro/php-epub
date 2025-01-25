@@ -1,23 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
-         <loc>https://indy2kro.github.io/php-epub/AdvancedUsage/</loc>
-         <lastmod>2025-01-25</lastmod>
-    </url>
-    <url>
-         <loc>https://indy2kro.github.io/php-epub/BasicUsage/</loc>
-         <lastmod>2025-01-25</lastmod>
-    </url>
-    <url>
-         <loc>https://indy2kro.github.io/php-epub/ContentManager/</loc>
-         <lastmod>2025-01-25</lastmod>
-    </url>
-    <url>
          <loc>https://indy2kro.github.io/php-epub/Converter/</loc>
-         <lastmod>2025-01-25</lastmod>
-    </url>
-    <url>
-         <loc>https://indy2kro.github.io/php-epub/EpubFile/</loc>
          <lastmod>2025-01-25</lastmod>
     </url>
     <url>
@@ -41,23 +25,39 @@
          <lastmod>2025-01-25</lastmod>
     </url>
     <url>
-         <loc>https://indy2kro.github.io/php-epub/XmlParser/</loc>
+         <loc>https://indy2kro.github.io/php-epub/advanced-usage/</loc>
          <lastmod>2025-01-25</lastmod>
     </url>
     <url>
-         <loc>https://indy2kro.github.io/php-epub/ZipHandler/</loc>
+         <loc>https://indy2kro.github.io/php-epub/basic-usage/</loc>
          <lastmod>2025-01-25</lastmod>
     </url>
     <url>
-         <loc>https://indy2kro.github.io/php-epub/Converters/CalibreAdapter/</loc>
+         <loc>https://indy2kro.github.io/php-epub/content-manager/</loc>
          <lastmod>2025-01-25</lastmod>
     </url>
     <url>
-         <loc>https://indy2kro.github.io/php-epub/Converters/DompdfAdapter/</loc>
+         <loc>https://indy2kro.github.io/php-epub/epub-file/</loc>
          <lastmod>2025-01-25</lastmod>
     </url>
     <url>
-         <loc>https://indy2kro.github.io/php-epub/Converters/TCPDFAdapter/</loc>
+         <loc>https://indy2kro.github.io/php-epub/xml-parser/</loc>
+         <lastmod>2025-01-25</lastmod>
+    </url>
+    <url>
+         <loc>https://indy2kro.github.io/php-epub/zip-handler/</loc>
+         <lastmod>2025-01-25</lastmod>
+    </url>
+    <url>
+         <loc>https://indy2kro.github.io/php-epub/converters/calibre-adapter/</loc>
+         <lastmod>2025-01-25</lastmod>
+    </url>
+    <url>
+         <loc>https://indy2kro.github.io/php-epub/converters/dompdf-adapter/</loc>
+         <lastmod>2025-01-25</lastmod>
+    </url>
+    <url>
+         <loc>https://indy2kro.github.io/php-epub/converters/tcpdf-adapter/</loc>
          <lastmod>2025-01-25</lastmod>
     </url>
 </urlset>

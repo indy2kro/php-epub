@@ -3,18 +3,18 @@
 <head>
     <meta charset="utf-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="author" content="indy2kro" /><link rel="canonical" href="https://indy2kro.github.io/php-epub/Converters/TCPDFAdapter/" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="author" content="indy2kro" /><link rel="canonical" href="https://indy2kro.github.io/php-epub/converters/calibre-adapter/" />
       <link rel="shortcut icon" href="../../img/favicon.ico" />
-    <title>TCPDF Adapter - PHP EPUB</title>
+    <title>Calibre Adapter - PHP EPUB</title>
     <link rel="stylesheet" href="../../css/theme.css" />
     <link rel="stylesheet" href="../../css/theme_extra.css" />
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
     
       <script>
         // Current page data
-        var mkdocs_page_name = "TCPDF Adapter";
-        var mkdocs_page_input_path = "Converters/TCPDFAdapter.md";
-        var mkdocs_page_url = "/php-epub/Converters/TCPDFAdapter/";
+        var mkdocs_page_name = "Calibre Adapter";
+        var mkdocs_page_input_path = "converters/calibre-adapter.md";
+        var mkdocs_page_url = "/php-epub/converters/calibre-adapter/";
       </script>
     
     <!--[if lt IE 9]>
@@ -44,47 +44,47 @@
                 </li>
               </ul>
               <ul>
-                <li class="toctree-l1"><a class="reference internal" href="../../Installation/">Installation</a>
+                <li class="toctree-l1"><a class="" href="../../installation.md">Installation</a>
                 </li>
               </ul>
               <p class="caption"><span class="caption-text">Usage</span></p>
               <ul>
-                  <li class="toctree-l1"><a class="reference internal" href="../../BasicUsage/">Basic Usage</a>
+                  <li class="toctree-l1"><a class="reference internal" href="../../basic-usage/">Basic Usage</a>
                   </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../AdvancedUsage/">Advanced Features</a>
+                  <li class="toctree-l1"><a class="reference internal" href="../../advanced-usage/">Advanced Features</a>
                   </li>
               </ul>
               <p class="caption"><span class="caption-text">Classes</span></p>
               <ul class="current">
-                  <li class="toctree-l1"><a class="reference internal" href="../../EpubFile/">EpubFile</a>
+                  <li class="toctree-l1"><a class="reference internal" href="../../epub-file/">EpubFile</a>
                   </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../ContentManager/">ContentManager</a>
+                  <li class="toctree-l1"><a class="reference internal" href="../../content-manager/">ContentManager</a>
                   </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../Metadata/">Metadata</a>
+                  <li class="toctree-l1"><a class="" href="../../metadata.md">Metadata</a>
                   </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../Spine/">Spine</a>
+                  <li class="toctree-l1"><a class="" href="../../spine.md">Spine</a>
                   </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../Parser/">Parser</a>
+                  <li class="toctree-l1"><a class="" href="../../parser.md">Parser</a>
                   </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../XmlParser/">XmlParser</a>
+                  <li class="toctree-l1"><a class="reference internal" href="../../xml-parser/">XmlParser</a>
                   </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../ZipHandler/">ZipHandler</a>
+                  <li class="toctree-l1"><a class="reference internal" href="../../zip-handler/">ZipHandler</a>
                   </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../../Converter/">Converter</a>
+                  <li class="toctree-l1"><a class="" href="../../converter.md">Converter</a>
                   </li>
                   <li class="toctree-l1 current"><a class="reference internal current" >Converters</a>
     <ul class="current">
-                <li class="toctree-l2"><a class="reference internal" href="../CalibreAdapter/">Calibre Adapter</a>
-                </li>
-                <li class="toctree-l2"><a class="reference internal" href="../DompdfAdapter/">Dompdf Adapter</a>
-                </li>
-                <li class="toctree-l2 current"><a class="reference internal current" href="#">TCPDF Adapter</a>
+                <li class="toctree-l2 current"><a class="reference internal current" href="#">Calibre Adapter</a>
     <ul class="current">
     <li class="toctree-l3"><a class="reference internal" href="#key-methods">Key Methods</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#usage-example">Usage Example</a>
     </li>
     </ul>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../dompdf-adapter/">Dompdf Adapter</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../tcpdf-adapter/">TCPDF Adapter</a>
                 </li>
     </ul>
                   </li>
@@ -105,7 +105,7 @@
     <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
           <li class="breadcrumb-item">Classes</li>
           <li class="breadcrumb-item">Converters</li>
-      <li class="breadcrumb-item active">TCPDF Adapter</li>
+      <li class="breadcrumb-item active">Calibre Adapter</li>
     <li class="wy-breadcrumbs-aside">
     </li>
   </ul>
@@ -114,46 +114,41 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
             <div class="section" itemprop="articleBody">
               
-                <h1 id="tcpdfadapter">TCPDFAdapter<a class="headerlink" href="#tcpdfadapter" title="Permanent link">&para;</a></h1>
-<p>The <code>TCPDFAdapter</code> class in the PHP EPUB Processor library is responsible for converting EPUB content into PDF format using the TCPDF library.
-It provides a flexible interface to customize the PDF output through various styling options.</p>
+                <h1 id="calibreadapter">CalibreAdapter<a class="headerlink" href="#calibreadapter" title="Permanent link">&para;</a></h1>
+<p>The <code>CalibreAdapter</code> class in the PHP EPUB Processor library is responsible for converting EPUB files to other formats using the Calibre command-line tool.
+It provides a flexible interface to execute conversions by leveraging Calibre's powerful ebook-convert utility.</p>
 <h2 id="key-methods">Key Methods<a class="headerlink" href="#key-methods" title="Permanent link">&para;</a></h2>
 <ul>
 <li>
-<p><strong><code>__construct(array $styles = [])</code></strong>: Initializes the <code>TCPDFAdapter</code> with optional styling parameters, such as font, font size, margins, and whether to include headers and footers. These parameters can be customized to alter the appearance of the generated PDF.</p>
+<p><strong><code>__construct(array $options = [], FileSystemHelper $helper = new FileSystemHelper())</code></strong>: Initializes the <code>CalibreAdapter</code> with optional command-line options for Calibre and a file system helper. Default options include the path to the Calibre executable and any extra arguments.</p>
 </li>
 <li>
-<p><strong><code>convert(string $epubDirectory, string $outputPath): void</code></strong>: Converts the EPUB content to a PDF using TCPDF. It sets document information, applies styles, adds pages, writes content, and saves the PDF to the specified output path. Throws an exception if the conversion fails.</p>
+<p><strong><code>convert(string $inputFile, string $outputPath): void</code></strong>: Converts an EPUB file to another format using Calibre. It constructs and executes a command-line call to <code>ebook-convert</code>. Throws an exception if the conversion fails or if the Calibre tool or input file is not found.</p>
 </li>
 </ul>
 <h2 id="usage-example">Usage Example<a class="headerlink" href="#usage-example" title="Permanent link">&para;</a></h2>
-<pre class="codehilite"><code class="language-php">use PhpEpub\Converters\TCPDFAdapter;
+<pre class="codehilite"><code class="language-php">use PhpEpub\Converters\CalibreAdapter;
+use PhpEpub\Util\FileSystemHelper;
 
-$styles = [
-    'font' =&gt; 'times',
-    'font_size' =&gt; 14,
-    'margin_left' =&gt; 20,
-    'margin_top' =&gt; 30,
-    'margin_right' =&gt; 20,
-    'margin_bottom' =&gt; 30,
-    'header' =&gt; true,
-    'footer' =&gt; false,
+$options = [
+    'calibre_path' =&gt; '/usr/local/bin/ebook-convert',
+    'extra_args' =&gt; '--output-profile kindle',
 ];
 
-$tcpdfAdapter = new TCPDFAdapter($styles);
+$calibreAdapter = new CalibreAdapter($options, new FileSystemHelper());
 
 try {
-    $tcpdfAdapter-&gt;convert('/path/to/extracted/epub', '/path/to/output.pdf');
-    echo &quot;EPUB successfully converted to PDF.&quot;;
+    $calibreAdapter-&gt;convert('/path/to/input.epub', '/path/to/output.mobi');
+    echo &quot;EPUB successfully converted to MOBI.&quot;;
 } catch (Exception $e) {
     echo &quot;Conversion failed: &quot; . $e-&gt;getMessage();
-}
 </code></pre>
               
             </div>
           </div><footer>
     <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
-        <a href="../DompdfAdapter/" class="btn btn-neutral float-left" title="Dompdf Adapter"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../../zip-handler/" class="btn btn-neutral float-left" title="ZipHandler"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../dompdf-adapter/" class="btn btn-neutral float-right" title="Dompdf Adapter">Next <span class="icon icon-circle-arrow-right"></span></a>
     </div>
 
   <hr/>
@@ -176,8 +171,10 @@ try {
   <span class="rst-current-version" data-toggle="rst-current-version">
     
     
-      <span><a href="../DompdfAdapter/" style="color: #fcfcfc">&laquo; Previous</a></span>
+      <span><a href="../../zip-handler/" style="color: #fcfcfc">&laquo; Previous</a></span>
     
+    
+      <span><a href="../dompdf-adapter/" style="color: #fcfcfc">Next &raquo;</a></span>
     
   </span>
 </div>
