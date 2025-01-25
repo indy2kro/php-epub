@@ -3,18 +3,18 @@
 <head>
     <meta charset="utf-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="author" content="indy2kro" /><link rel="canonical" href="https://indy2kro.github.io/php-epub/Installation/" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="author" content="indy2kro" /><link rel="canonical" href="https://indy2kro.github.io/php-epub/metadata/" />
       <link rel="shortcut icon" href="../img/favicon.ico" />
-    <title>Installation - PHP EPUB</title>
+    <title>Metadata - PHP EPUB</title>
     <link rel="stylesheet" href="../css/theme.css" />
     <link rel="stylesheet" href="../css/theme_extra.css" />
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
     
       <script>
         // Current page data
-        var mkdocs_page_name = "Installation";
-        var mkdocs_page_input_path = "Installation.md";
-        var mkdocs_page_url = "/php-epub/Installation/";
+        var mkdocs_page_name = "Metadata";
+        var mkdocs_page_input_path = "metadata.md";
+        var mkdocs_page_url = "/php-epub/metadata/";
       </script>
     
     <!--[if lt IE 9]>
@@ -40,11 +40,11 @@
 
       <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <ul>
-                <li class="toctree-l1"><a class="" href="../index.md">Index</a>
+                <li class="toctree-l1"><a class="reference internal" href="..">Index</a>
                 </li>
               </ul>
               <ul>
-                <li class="toctree-l1"><a class="" href="../installation.md">Installation</a>
+                <li class="toctree-l1"><a class="reference internal" href="../installation/">Installation</a>
                 </li>
               </ul>
               <p class="caption"><span class="caption-text">Usage</span></p>
@@ -55,22 +55,30 @@
                   </li>
               </ul>
               <p class="caption"><span class="caption-text">Classes</span></p>
-              <ul>
+              <ul class="current">
                   <li class="toctree-l1"><a class="reference internal" href="../epub-file/">EpubFile</a>
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../content-manager/">ContentManager</a>
                   </li>
-                  <li class="toctree-l1"><a class="" href="../metadata.md">Metadata</a>
+                  <li class="toctree-l1 current"><a class="reference internal current" href="#">Metadata</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#key-methods">Key Methods</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#traits">Traits</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#usage-example">Usage Example</a>
+    </li>
+    </ul>
                   </li>
-                  <li class="toctree-l1"><a class="" href="../spine.md">Spine</a>
+                  <li class="toctree-l1"><a class="reference internal" href="../spine/">Spine</a>
                   </li>
-                  <li class="toctree-l1"><a class="" href="../parser.md">Parser</a>
+                  <li class="toctree-l1"><a class="reference internal" href="../parser/">Parser</a>
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../xml-parser/">XmlParser</a>
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../zip-handler/">ZipHandler</a>
                   </li>
-                  <li class="toctree-l1"><a class="" href="../converter.md">Converter</a>
+                  <li class="toctree-l1"><a class="reference internal" href="../converter/">Converter</a>
                   </li>
                   <li class="toctree-l1"><a class="reference internal" >Converters</a>
     <ul>
@@ -97,7 +105,8 @@
         <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
   <ul class="wy-breadcrumbs">
     <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
-      <li class="breadcrumb-item active">Installation</li>
+          <li class="breadcrumb-item">Classes</li>
+      <li class="breadcrumb-item active">Metadata</li>
     <li class="wy-breadcrumbs-aside">
     </li>
   </ul>
@@ -106,13 +115,55 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
             <div class="section" itemprop="articleBody">
               
-                <h1 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">&para;</a></h1>
-<p>Use Composer to install the PHP EPUB Processor library by running the following command:</p>
-<pre class="codehilite"><code>composer require indy2kro/php-epub
+                <h1 id="metadata">Metadata<a class="headerlink" href="#metadata" title="Permanent link">&para;</a></h1>
+<p>The <code>Metadata</code> class in the PHP EPUB Processor library is responsible for managing the metadata of an EPUB file.
+This includes operations such as reading and updating the title, authors, language, and other metadata fields.</p>
+<h2 id="key-methods">Key Methods<a class="headerlink" href="#key-methods" title="Permanent link">&para;</a></h2>
+<ul>
+<li>
+<p><strong><code>__construct(SimpleXMLElement $opfXml, string $opfFilePath)</code></strong>: Initializes the <code>Metadata</code> object with the OPF XML data and its file path. It also identifies the Dublin Core (dc) namespace used for metadata.</p>
+</li>
+<li>
+<p><strong><code>save(): void</code></strong>: Saves the updated OPF file back to disk. Throws an exception if the file cannot be saved.</p>
+</li>
+<li>
+<p><strong><code>getOpfFilePath(): string</code></strong>: Returns the file path of the OPF file.</p>
+</li>
+</ul>
+<h2 id="traits">Traits<a class="headerlink" href="#traits" title="Permanent link">&para;</a></h2>
+<p>The <code>Metadata</code> class uses several traits to interact with specific metadata fields:</p>
+<ul>
+<li><strong><code>InteractsWithTitle</code></strong>: Methods for getting and setting the title.</li>
+<li><strong><code>InteractsWithDescription</code></strong>: Methods for managing the description.</li>
+<li><strong><code>InteractsWithDate</code></strong>: Methods for handling date-related metadata.</li>
+<li><strong><code>InteractsWithAuthors</code></strong>: Methods for managing author information.</li>
+<li><strong><code>InteractsWithPublisher</code></strong>: Methods for handling publisher details.</li>
+<li><strong><code>InteractsWithLanguage</code></strong>: Methods for managing language metadata.</li>
+<li><strong><code>InteractsWithSubject</code></strong>: Methods for handling subject-related metadata.</li>
+<li><strong><code>InteractsWithIdentifier</code></strong>: Methods for managing identifiers like ISBN.</li>
+</ul>
+<h2 id="usage-example">Usage Example<a class="headerlink" href="#usage-example" title="Permanent link">&para;</a></h2>
+<pre class="codehilite"><code class="language-php">use PhpEpub\EpubFile;
+
+$epubFilePath = '/path/to/your.epub';
+
+$epubFile = new EpubFile($epubFilePath);
+$epubFile-&gt;load();
+
+$metadata = $epubFile-&gt;getMetadata();
+$title = $metadata-&gt;getTitle();
+$metadata-&gt;setTitle('New Title');
+$metadata-&gt;save();
+
+$epubFile-&gt;save();
 </code></pre>
               
             </div>
           </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href="../content-manager/" class="btn btn-neutral float-left" title="ContentManager"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../spine/" class="btn btn-neutral float-right" title="Spine">Next <span class="icon icon-circle-arrow-right"></span></a>
+    </div>
 
   <hr/>
 
@@ -134,6 +185,10 @@
   <span class="rst-current-version" data-toggle="rst-current-version">
     
     
+      <span><a href="../content-manager/" style="color: #fcfcfc">&laquo; Previous</a></span>
+    
+    
+      <span><a href="../spine/" style="color: #fcfcfc">Next &raquo;</a></span>
     
   </span>
 </div>

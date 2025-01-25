@@ -1,27 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
-         <loc>https://indy2kro.github.io/php-epub/Converter/</loc>
-         <lastmod>2025-01-25</lastmod>
-    </url>
-    <url>
-         <loc>https://indy2kro.github.io/php-epub/Index/</loc>
-         <lastmod>2025-01-25</lastmod>
-    </url>
-    <url>
-         <loc>https://indy2kro.github.io/php-epub/Installation/</loc>
-         <lastmod>2025-01-25</lastmod>
-    </url>
-    <url>
-         <loc>https://indy2kro.github.io/php-epub/Metadata/</loc>
-         <lastmod>2025-01-25</lastmod>
-    </url>
-    <url>
-         <loc>https://indy2kro.github.io/php-epub/Parser/</loc>
-         <lastmod>2025-01-25</lastmod>
-    </url>
-    <url>
-         <loc>https://indy2kro.github.io/php-epub/Spine/</loc>
+         <loc>https://indy2kro.github.io/php-epub/</loc>
          <lastmod>2025-01-25</lastmod>
     </url>
     <url>
@@ -37,7 +17,27 @@
          <lastmod>2025-01-25</lastmod>
     </url>
     <url>
+         <loc>https://indy2kro.github.io/php-epub/converter/</loc>
+         <lastmod>2025-01-25</lastmod>
+    </url>
+    <url>
          <loc>https://indy2kro.github.io/php-epub/epub-file/</loc>
+         <lastmod>2025-01-25</lastmod>
+    </url>
+    <url>
+         <loc>https://indy2kro.github.io/php-epub/installation/</loc>
+         <lastmod>2025-01-25</lastmod>
+    </url>
+    <url>
+         <loc>https://indy2kro.github.io/php-epub/metadata/</loc>
+         <lastmod>2025-01-25</lastmod>
+    </url>
+    <url>
+         <loc>https://indy2kro.github.io/php-epub/parser/</loc>
+         <lastmod>2025-01-25</lastmod>
+    </url>
+    <url>
+         <loc>https://indy2kro.github.io/php-epub/spine/</loc>
          <lastmod>2025-01-25</lastmod>
     </url>
     <url>

@@ -3,18 +3,18 @@
 <head>
     <meta charset="utf-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="author" content="indy2kro" /><link rel="canonical" href="https://indy2kro.github.io/php-epub/Spine/" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="author" content="indy2kro" /><link rel="canonical" href="https://indy2kro.github.io/php-epub/converter/" />
       <link rel="shortcut icon" href="../img/favicon.ico" />
-    <title>Spine - PHP EPUB</title>
+    <title>Converter - PHP EPUB</title>
     <link rel="stylesheet" href="../css/theme.css" />
     <link rel="stylesheet" href="../css/theme_extra.css" />
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
     
       <script>
         // Current page data
-        var mkdocs_page_name = "Spine";
-        var mkdocs_page_input_path = "Spine.md";
-        var mkdocs_page_url = "/php-epub/Spine/";
+        var mkdocs_page_name = "Converter";
+        var mkdocs_page_input_path = "converter.md";
+        var mkdocs_page_url = "/php-epub/converter/";
       </script>
     
     <!--[if lt IE 9]>
@@ -40,11 +40,11 @@
 
       <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <ul>
-                <li class="toctree-l1"><a class="" href="../index.md">Index</a>
+                <li class="toctree-l1"><a class="reference internal" href="..">Index</a>
                 </li>
               </ul>
               <ul>
-                <li class="toctree-l1"><a class="" href="../installation.md">Installation</a>
+                <li class="toctree-l1"><a class="reference internal" href="../installation/">Installation</a>
                 </li>
               </ul>
               <p class="caption"><span class="caption-text">Usage</span></p>
@@ -55,22 +55,28 @@
                   </li>
               </ul>
               <p class="caption"><span class="caption-text">Classes</span></p>
-              <ul>
+              <ul class="current">
                   <li class="toctree-l1"><a class="reference internal" href="../epub-file/">EpubFile</a>
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../content-manager/">ContentManager</a>
                   </li>
-                  <li class="toctree-l1"><a class="" href="../metadata.md">Metadata</a>
+                  <li class="toctree-l1"><a class="reference internal" href="../metadata/">Metadata</a>
                   </li>
-                  <li class="toctree-l1"><a class="" href="../spine.md">Spine</a>
+                  <li class="toctree-l1"><a class="reference internal" href="../spine/">Spine</a>
                   </li>
-                  <li class="toctree-l1"><a class="" href="../parser.md">Parser</a>
+                  <li class="toctree-l1"><a class="reference internal" href="../parser/">Parser</a>
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../xml-parser/">XmlParser</a>
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../zip-handler/">ZipHandler</a>
                   </li>
-                  <li class="toctree-l1"><a class="" href="../converter.md">Converter</a>
+                  <li class="toctree-l1 current"><a class="reference internal current" href="#">Converter</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#key-methods">Key Methods</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#usage-example">Usage Example</a>
+    </li>
+    </ul>
                   </li>
                   <li class="toctree-l1"><a class="reference internal" >Converters</a>
     <ul>
@@ -97,7 +103,8 @@
         <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
   <ul class="wy-breadcrumbs">
     <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
-      <li class="breadcrumb-item active">Spine</li>
+          <li class="breadcrumb-item">Classes</li>
+      <li class="breadcrumb-item active">Converter</li>
     <li class="wy-breadcrumbs-aside">
     </li>
   </ul>
@@ -106,36 +113,48 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
             <div class="section" itemprop="articleBody">
               
-                <h1 id="spine">Spine<a class="headerlink" href="#spine" title="Permanent link">&para;</a></h1>
-<p>The <code>Spine</code> class in the PHP EPUB Processor library is responsible for managing the reading order of the content within an EPUB file.
-It parses the spine section of the OPF file to determine the sequence in which the content should be presented to the reader.</p>
+                <h1 id="converter">Converter<a class="headerlink" href="#converter" title="Permanent link">&para;</a></h1>
+<p>The <code>Converter</code> class in the PHP EPUB Processor library is responsible for converting EPUB files into various formats.
+It utilizes different converter adapters to handle specific formats, such as PDF or MOBI, providing a flexible and extensible conversion system.</p>
 <h2 id="key-methods">Key Methods<a class="headerlink" href="#key-methods" title="Permanent link">&para;</a></h2>
 <ul>
 <li>
-<p><strong><code>__construct(SimpleXMLElement $opfXml)</code></strong>: Initializes the <code>Spine</code> object with the OPF XML data. It parses the spine section to extract the reading order of the content items.</p>
+<p><strong><code>__construct(string $epubDirectory, array $adapters)</code></strong>: Initializes the <code>Converter</code> with the directory containing the EPUB contents and a map of format-specific converter adapters. Throws an exception if the directory does not exist.</p>
 </li>
 <li>
-<p><strong><code>get(): array</code></strong>: Returns an array of item IDs that represent the reading order of the EPUB content. Each ID corresponds to a content item defined in the manifest section of the OPF file.</p>
+<p><strong><code>convert(string $format, string $outputPath): void</code></strong>: Converts the EPUB to the specified format using the appropriate adapter. Throws an exception if the format is not supported or if the conversion fails.</p>
 </li>
 </ul>
 <h2 id="usage-example">Usage Example<a class="headerlink" href="#usage-example" title="Permanent link">&para;</a></h2>
-<pre class="codehilite"><code class="language-php">use PhpEpub\EpubFile;
+<pre class="codehilite"><code class="language-php">use PhpEpub\Converter;
+use PhpEpub\Converters\CalibreAdapter;
+use PhpEpub\Converters\DompdfAdapter;
 
-$epubFilePath = '/path/to/your.epub';
+$epubDirectory = '/path/to/extracted/epub';
+$adapters = [
+    'pdf' =&gt; new DompdfAdapter(),
+    'mobi' =&gt; new CalibreAdapter(),
+];
 
-$epubFile = new EpubFile($epubFilePath);
-$epubFile-&gt;load();
+$converter = new Converter($epubDirectory, $adapters);
 
-$spine = $epubFile-&gt;getSpine();
-$readingOrder = $spine-&gt;get();
+try {
+    $converter-&gt;convert('pdf', '/path/to/output.pdf');
+    echo &quot;EPUB successfully converted to PDF.&quot;;
 
-foreach ($readingOrder as $itemId) {
-    echo &quot;Content item ID in reading order: $itemId\n&quot;;
+    $converter-&gt;convert('mobi', '/path/to/output.mobi');
+    echo &quot;EPUB successfully converted to PDF.&quot;;
+} catch (Exception $e) {
+    echo &quot;Conversion failed: &quot; . $e-&gt;getMessage();
 }
 </code></pre>
               
             </div>
           </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href="../zip-handler/" class="btn btn-neutral float-left" title="ZipHandler"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../converters/calibre-adapter/" class="btn btn-neutral float-right" title="Calibre Adapter">Next <span class="icon icon-circle-arrow-right"></span></a>
+    </div>
 
   <hr/>
 
@@ -157,6 +176,10 @@ foreach ($readingOrder as $itemId) {
   <span class="rst-current-version" data-toggle="rst-current-version">
     
     
+      <span><a href="../zip-handler/" style="color: #fcfcfc">&laquo; Previous</a></span>
+    
+    
+      <span><a href="../converters/calibre-adapter/" style="color: #fcfcfc">Next &raquo;</a></span>
     
   </span>
 </div>

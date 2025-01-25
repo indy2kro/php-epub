@@ -3,18 +3,18 @@
 <head>
     <meta charset="utf-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="author" content="indy2kro" /><link rel="canonical" href="https://indy2kro.github.io/php-epub/Index/" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="author" content="indy2kro" /><link rel="canonical" href="https://indy2kro.github.io/php-epub/parser/" />
       <link rel="shortcut icon" href="../img/favicon.ico" />
-    <title>PHP EPUB Processor - PHP EPUB</title>
+    <title>Parser - PHP EPUB</title>
     <link rel="stylesheet" href="../css/theme.css" />
     <link rel="stylesheet" href="../css/theme_extra.css" />
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
     
       <script>
         // Current page data
-        var mkdocs_page_name = "PHP EPUB Processor";
-        var mkdocs_page_input_path = "Index.md";
-        var mkdocs_page_url = "/php-epub/Index/";
+        var mkdocs_page_name = "Parser";
+        var mkdocs_page_input_path = "parser.md";
+        var mkdocs_page_url = "/php-epub/parser/";
       </script>
     
     <!--[if lt IE 9]>
@@ -40,11 +40,11 @@
 
       <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <ul>
-                <li class="toctree-l1"><a class="" href="../index.md">Index</a>
+                <li class="toctree-l1"><a class="reference internal" href="..">Index</a>
                 </li>
               </ul>
               <ul>
-                <li class="toctree-l1"><a class="" href="../installation.md">Installation</a>
+                <li class="toctree-l1"><a class="reference internal" href="../installation/">Installation</a>
                 </li>
               </ul>
               <p class="caption"><span class="caption-text">Usage</span></p>
@@ -55,22 +55,28 @@
                   </li>
               </ul>
               <p class="caption"><span class="caption-text">Classes</span></p>
-              <ul>
+              <ul class="current">
                   <li class="toctree-l1"><a class="reference internal" href="../epub-file/">EpubFile</a>
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../content-manager/">ContentManager</a>
                   </li>
-                  <li class="toctree-l1"><a class="" href="../metadata.md">Metadata</a>
+                  <li class="toctree-l1"><a class="reference internal" href="../metadata/">Metadata</a>
                   </li>
-                  <li class="toctree-l1"><a class="" href="../spine.md">Spine</a>
+                  <li class="toctree-l1"><a class="reference internal" href="../spine/">Spine</a>
                   </li>
-                  <li class="toctree-l1"><a class="" href="../parser.md">Parser</a>
+                  <li class="toctree-l1 current"><a class="reference internal current" href="#">Parser</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#key-methods">Key Methods</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#usage-example">Usage Example</a>
+    </li>
+    </ul>
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../xml-parser/">XmlParser</a>
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../zip-handler/">ZipHandler</a>
                   </li>
-                  <li class="toctree-l1"><a class="" href="../converter.md">Converter</a>
+                  <li class="toctree-l1"><a class="reference internal" href="../converter/">Converter</a>
                   </li>
                   <li class="toctree-l1"><a class="reference internal" >Converters</a>
     <ul>
@@ -97,7 +103,8 @@
         <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
   <ul class="wy-breadcrumbs">
     <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
-      <li class="breadcrumb-item active">PHP EPUB Processor</li>
+          <li class="breadcrumb-item">Classes</li>
+      <li class="breadcrumb-item active">Parser</li>
     <li class="wy-breadcrumbs-aside">
     </li>
   </ul>
@@ -106,29 +113,52 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
             <div class="section" itemprop="articleBody">
               
-                <h1 id="php-epub-processor">PHP EPUB Processor<a class="headerlink" href="#php-epub-processor" title="Permanent link">&para;</a></h1>
-<p>A PHP library for processing EPUB files, including parsing, metadata manipulation, and format conversion. This library provides tools to handle EPUB files efficiently, offering features like validation, content management, and conversion to other formats using various adapters.</p>
-<h2 id="features">Features<a class="headerlink" href="#features" title="Permanent link">&para;</a></h2>
+                <h1 id="parser">Parser<a class="headerlink" href="#parser" title="Permanent link">&para;</a></h1>
+<p>The <code>Parser</code> class in the PHP EPUB Processor library is responsible for parsing the structure of an EPUB file.
+It validates the essential components of the EPUB, such as the mimetype, OPF, and NCX files,
+ensuring that the EPUB file is correctly structured and ready for further processing.</p>
+<h2 id="key-methods">Key Methods<a class="headerlink" href="#key-methods" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong>EPUB Loading and Saving</strong>: Easily load and save EPUB files.</li>
-<li><strong>Metadata Management</strong>: Read and update metadata such as title, authors, and language.</li>
-<li><strong>Content Management</strong>: Add, update, and delete content files within an EPUB.</li>
-<li><strong>Validation</strong>: Validate the structure and content of EPUB files.</li>
-<li><strong>Conversion</strong>: Convert EPUB files to PDF and other formats using adapters for TCPDF, Dompdf, and Calibre.</li>
+<li>
+<p><strong><code>__construct(XmlParser $xmlParser = new XmlParser())</code></strong>: Initializes the <code>Parser</code> with an <code>XmlParser</code> instance, which is used for XML parsing tasks.</p>
+</li>
+<li>
+<p><strong><code>parse(string $directory): string</code></strong>: Parses the EPUB file structure within the specified directory. It validates the mimetype, extracts the OPF path from the container, and validates the OPF file. Returns the path to the OPF file.</p>
+</li>
+<li>
+<p><strong><code>validateMimetype(string $directory): void</code></strong>: Validates the presence and content of the mimetype file, ensuring it is correctly set to <code>application/epub+zip</code>.</p>
+</li>
+<li>
+<p><strong><code>extractOpfPath(string $containerPath): string</code></strong>: Extracts the OPF file path from the <code>container.xml</code> file, which defines the location of the OPF file within the EPUB.</p>
+</li>
+<li>
+<p><strong><code>validateOpf(string $opfPath): void</code></strong>: Validates the OPF file and checks for the presence of the NCX file, ensuring the EPUB's manifest and navigation are correctly defined.</p>
+</li>
+<li>
+<p><strong><code>validateNcx(string $ncxPath): void</code></strong>: Validates the NCX file, ensuring it contains a valid <code>navMap</code> element for navigation.</p>
+</li>
 </ul>
-<h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
-<p>Before you begin, ensure you have the following installed on your system:</p>
-<ul>
-<li><strong>PHP</strong>: Version 8.2 or higher.</li>
-<li><strong>PHP Extensions</strong>: <code>ext-xml</code>, <code>ext-zip</code>.</li>
-<li><strong>Composer</strong>: For managing PHP dependencies.</li>
-<li><strong>Calibre</strong>: If you plan to use the CalibreAdapter for conversions.</li>
-<li><strong>Dompdf</strong>: If you plan to use the DompdfAdapter for PDF conversions.</li>
-<li><strong>TCPDF</strong>: If you plan to use the TCPDFAdapter for PDF conversions.</li>
-</ul>
+<h2 id="usage-example">Usage Example<a class="headerlink" href="#usage-example" title="Permanent link">&para;</a></h2>
+<pre class="codehilite"><code class="language-php">use PhpEpub\Parser;
+use PhpEpub\XmlParser;
+
+$directory = '/path/to/extracted/epub';
+$parser = new Parser(new XmlParser());
+
+try {
+    $opfPath = $parser-&gt;parse($directory);
+    echo &quot;OPF file located at: $opfPath&quot;;
+} catch (Exception $e) {
+    echo &quot;Error parsing EPUB: &quot; . $e-&gt;getMessage();
+}
+</code></pre>
               
             </div>
           </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href="../spine/" class="btn btn-neutral float-left" title="Spine"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../xml-parser/" class="btn btn-neutral float-right" title="XmlParser">Next <span class="icon icon-circle-arrow-right"></span></a>
+    </div>
 
   <hr/>
 
@@ -150,6 +180,10 @@
   <span class="rst-current-version" data-toggle="rst-current-version">
     
     
+      <span><a href="../spine/" style="color: #fcfcfc">&laquo; Previous</a></span>
+    
+    
+      <span><a href="../xml-parser/" style="color: #fcfcfc">Next &raquo;</a></span>
     
   </span>
 </div>
