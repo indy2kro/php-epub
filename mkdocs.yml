@@ -1,0 +1,48 @@
+# Project information
+site_name: PHP EPUB
+site_description: A PHP library for processing EPUB files, including parsing, metadata manipulation, and format conversion.
+site_author: indy2kro
+
+# Site URL (optional, useful for SEO and social sharing)
+site_url: https://github.com/indy2kro/php-epub
+
+# Theme configuration
+theme:
+  name: readthedocs
+  # You can customize the theme further with additional options
+  palette:
+    primary: 'indigo'
+    accent: 'indigo'
+  font:
+    text: 'Roboto'
+    code: 'Roboto Mono'
+
+# Navigation structure
+nav:
+  - Installation: Installation.md
+  - Usage:
+    - Basic Usage: BasicUsage.md
+    - Advanced Features: AdvancedUsage.md
+  - Classes:
+    - EpubFile: EpubFile.md
+    - Metadata: Metadata.md
+    - Spine: Spine.md
+    - Parser: Parser.md
+    - XmlParser: XmlParser.md
+    - ZipHandler: ZipHandler.md
+    - Converter: Converter.md
+    - Converters:
+      - Calibre Adapter: Converters/CalibreAdapter.md
+      - Dompdf Adapter: Converters/DompdfAdapter.md
+      - TCPDF Adapter: Converters/TCPDFAdapter.md
+
+# Markdown extensions
+markdown_extensions:
+  - admonition
+  - codehilite
+  - toc:
+      permalink: true
+
+# Plugins
+plugins:
+  - search
