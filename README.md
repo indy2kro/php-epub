@@ -4,6 +4,8 @@
 
 A PHP library for processing EPUB files, including parsing, metadata manipulation, and format conversion. This library provides tools to handle EPUB files efficiently, offering features like validation, content management, and conversion to other formats using various adapters.
 
+- [Documentation](https://indy2kro.github.io/php-epub/)
+
 ## Features
 
 - **EPUB Loading and Saving**: Easily load and save EPUB files.
