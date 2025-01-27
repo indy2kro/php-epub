@@ -2,62 +2,62 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://indy2kro.github.io/php-epub/</loc>
-         <lastmod>2025-01-25</lastmod>
+         <lastmod>2025-01-27</lastmod>
     </url>
     <url>
          <loc>https://indy2kro.github.io/php-epub/advanced-usage/</loc>
-         <lastmod>2025-01-25</lastmod>
+         <lastmod>2025-01-27</lastmod>
     </url>
     <url>
          <loc>https://indy2kro.github.io/php-epub/basic-usage/</loc>
-         <lastmod>2025-01-25</lastmod>
+         <lastmod>2025-01-27</lastmod>
     </url>
     <url>
          <loc>https://indy2kro.github.io/php-epub/content-manager/</loc>
-         <lastmod>2025-01-25</lastmod>
+         <lastmod>2025-01-27</lastmod>
     </url>
     <url>
          <loc>https://indy2kro.github.io/php-epub/converter/</loc>
-         <lastmod>2025-01-25</lastmod>
+         <lastmod>2025-01-27</lastmod>
     </url>
     <url>
          <loc>https://indy2kro.github.io/php-epub/epub-file/</loc>
-         <lastmod>2025-01-25</lastmod>
+         <lastmod>2025-01-27</lastmod>
     </url>
     <url>
          <loc>https://indy2kro.github.io/php-epub/installation/</loc>
-         <lastmod>2025-01-25</lastmod>
+         <lastmod>2025-01-27</lastmod>
     </url>
     <url>
          <loc>https://indy2kro.github.io/php-epub/metadata/</loc>
-         <lastmod>2025-01-25</lastmod>
+         <lastmod>2025-01-27</lastmod>
     </url>
     <url>
          <loc>https://indy2kro.github.io/php-epub/parser/</loc>
-         <lastmod>2025-01-25</lastmod>
+         <lastmod>2025-01-27</lastmod>
     </url>
     <url>
          <loc>https://indy2kro.github.io/php-epub/spine/</loc>
-         <lastmod>2025-01-25</lastmod>
+         <lastmod>2025-01-27</lastmod>
     </url>
     <url>
          <loc>https://indy2kro.github.io/php-epub/xml-parser/</loc>
-         <lastmod>2025-01-25</lastmod>
+         <lastmod>2025-01-27</lastmod>
     </url>
     <url>
          <loc>https://indy2kro.github.io/php-epub/zip-handler/</loc>
-         <lastmod>2025-01-25</lastmod>
+         <lastmod>2025-01-27</lastmod>
     </url>
     <url>
          <loc>https://indy2kro.github.io/php-epub/converters/calibre-adapter/</loc>
-         <lastmod>2025-01-25</lastmod>
+         <lastmod>2025-01-27</lastmod>
     </url>
     <url>
          <loc>https://indy2kro.github.io/php-epub/converters/dompdf-adapter/</loc>
-         <lastmod>2025-01-25</lastmod>
+         <lastmod>2025-01-27</lastmod>
     </url>
     <url>
          <loc>https://indy2kro.github.io/php-epub/converters/tcpdf-adapter/</loc>
-         <lastmod>2025-01-25</lastmod>
+         <lastmod>2025-01-27</lastmod>
     </url>
 </urlset>
