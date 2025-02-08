@@ -7,6 +7,8 @@ namespace PhpEpub\Test;
 use Iterator;
 use PhpEpub\EpubFile;
 use PhpEpub\Exception;
+use PhpEpub\Metadata;
+use PhpEpub\Spine;
 use PhpEpub\Util\FileSystemHelper;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -73,7 +75,7 @@ class EpubFileTest extends TestCase
             $this->assertNotNull($tempDir);
 
             $metadata = $epubFile->getMetadata();
-            $this->assertNotNull($metadata);
+            $this->assertInstanceOf(Metadata::class, $metadata);
             $this->assertSame($expectedMetadata['title'], $metadata->getTitle());
             $this->assertSame($expectedMetadata['authors'], $metadata->getAuthors());
             $this->assertSame($expectedMetadata['description'], $metadata->getDescription());
@@ -84,7 +86,7 @@ class EpubFileTest extends TestCase
             $this->assertSame($expectedMetadata['identifiers'], $metadata->getIdentifiers());
 
             $spine = $epubFile->getSpine();
-            $this->assertNotNull($spine);
+            $this->assertInstanceOf(Spine::class, $spine);
             $this->assertSame($expectedMetadata['spine'], $spine->get());
         }
     }
