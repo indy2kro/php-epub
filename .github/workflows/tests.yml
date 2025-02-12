@@ -56,8 +56,8 @@ jobs:
             path: vendor
             key: ${{ runner.os }}-build-${{ matrix.php-version }}-${{ hashFiles('**/composer.lock') }}
 
-        - name: Install Composer dependencies
-          run: composer install --no-progress
+        - name: Update Dependencies with latest stable
+          run: composer update --no-progress
 
         - name: Code style test
           run: ./vendor/bin/phpcs
