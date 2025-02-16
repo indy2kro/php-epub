@@ -1,4 +1,4 @@
-[![Scrutinizer Code Quality](https://scrutinizer-ci.com/g/indy2kro/php-iso/badges/quality-score.png?b=main)](https://scrutinizer-ci.com/g/indy2kro/php-iso/?branch=main) [![codecov](https://codecov.io/gh/indy2kro/php-epub/graph/badge.svg?token=tg1ntQtebI)](https://codecov.io/gh/indy2kro/php-epub) [![Tests](https://github.com/indy2kro/php-epub/actions/workflows/tests.yml/badge.svg)](https://github.com/indy2kro/php-epub/actions/workflows/tests.yml)
+[![Code Coverage](https://scrutinizer-ci.com/g/indy2kro/php-epub/badges/coverage.png?b=main)](https://scrutinizer-ci.com/g/indy2kro/php-epub/?branch=main) [![codecov](https://codecov.io/gh/indy2kro/php-epub/graph/badge.svg?token=tg1ntQtebI)](https://codecov.io/gh/indy2kro/php-epub) [![Tests](https://github.com/indy2kro/php-epub/actions/workflows/tests.yml/badge.svg)](https://github.com/indy2kro/php-epub/actions/workflows/tests.yml)
 
 # PHP EPUB Processor
 
