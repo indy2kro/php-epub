@@ -3,4 +3,5 @@
 /junit.xml
 /coverage.xml
 /.phpunit.result.cache
+/.phpunit.cache
 /.phpcs-cache
