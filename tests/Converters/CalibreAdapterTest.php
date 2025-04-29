@@ -74,7 +74,7 @@ class CalibreAdapterTest extends TestCase
     public function testConvertFailsWhenExecFails(): void
     {
         $this->helperMock->method('fileExists')->willReturn(true);
-        $this->helperMock->method('exec')->willReturnCallback(static function ($command, &$output, &$returnVar): void {
+        $this->helperMock->method('exec')->willReturnCallback(static function (string $command, array &$output, int &$returnVar): void {
             $output = ['Error executing command'];
             $returnVar = 1;
         });
