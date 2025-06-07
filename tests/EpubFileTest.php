@@ -91,8 +91,11 @@ class EpubFileTest extends TestCase
         }
     }
 
+    /**
+     * @param array<string, string> $metadata
+     */
     #[DataProvider('epubFileProvider')]
-    public function testSaveEpub(string $epubPath, bool $shouldLoad): void
+    public function testSaveEpub(string $epubPath, bool $shouldLoad, array $metadata): void
     {
         if (! $shouldLoad) {
             $this->expectException(Exception::class);
@@ -112,8 +115,11 @@ class EpubFileTest extends TestCase
         }
     }
 
+    /**
+     * @param array<string, string> $metadata
+     */
     #[DataProvider('epubFileProvider')]
-    public function testSaveEpubToNewFile(string $epubPath, bool $shouldLoad): void
+    public function testSaveEpubToNewFile(string $epubPath, bool $shouldLoad, array $metadata): void
     {
         if (! $shouldLoad) {
             $this->expectException(Exception::class);
