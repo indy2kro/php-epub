@@ -5,7 +5,10 @@
 
 version: 2
 updates:
-  - package-ecosystem: "composer" # See documentation for possible values
-    directory: "/" # Location of package manifests
+  - package-ecosystem: "composer"
+    directory: "/" # Location of your composer.json and composer.lock
     schedule:
-      interval: "daily"
+      interval: "daily" # or "weekly", "monthly"
+    commit-message:
+      prefix: "chore"
+    open-pull-requests-limit: 5
