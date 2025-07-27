@@ -7,7 +7,7 @@
         "library"
     ],
     "homepage" : "https://github.com/indy2kro/php-epub",
-    "license" : "GPL-2.0",
+    "license" : "GPL-2.0-or-later",
     "require": {
         "php": ">=8.2",
         "ext-xml": "*",
