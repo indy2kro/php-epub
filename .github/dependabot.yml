@@ -6,9 +6,11 @@
 version: 2
 updates:
   - package-ecosystem: "composer"
-    directory: "/" # Location of your composer.json and composer.lock
+    directory: "/"
     schedule:
-      interval: "daily" # or "weekly", "monthly"
-    commit-message:
-      prefix: "chore"
-    open-pull-requests-limit: 5
+      interval: "daily"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "daily"
