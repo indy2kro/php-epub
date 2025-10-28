@@ -10,7 +10,7 @@ use PhpEpub\Util\FileSystemHelper;
 use PhpEpub\XmlParser;
 use PHPUnit\Framework\TestCase;
 
-class ParserTest extends TestCase
+final class ParserTest extends TestCase
 {
     private Parser $parser;
     private string $fixturesDir;

@@ -9,7 +9,7 @@ use PhpEpub\Exception;
 use PhpEpub\Util\FileSystemHelper;
 use PHPUnit\Framework\TestCase;
 
-class TCPDFAdapterTest extends TestCase
+final class TCPDFAdapterTest extends TestCase
 {
     private string $epubDirectory;
     private string $outputPdfPath;

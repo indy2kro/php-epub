@@ -9,7 +9,7 @@ use PhpEpub\Exception;
 use PhpEpub\Util\FileSystemHelper;
 use PHPUnit\Framework\TestCase;
 
-class DompdfAdapterTest extends TestCase
+final class DompdfAdapterTest extends TestCase
 {
     private string $epubDirectory;
     private string $outputPdfPath;

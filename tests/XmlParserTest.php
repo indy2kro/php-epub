@@ -9,7 +9,7 @@ use PhpEpub\XmlParser;
 use PHPUnit\Framework\TestCase;
 use SimpleXMLElement;
 
-class XmlParserTest extends TestCase
+final class XmlParserTest extends TestCase
 {
     private string $xmlFilePath;
     private string $invalidXmlFilePath;

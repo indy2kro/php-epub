@@ -10,7 +10,7 @@ use PhpEpub\Util\FileSystemHelper;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
-class CalibreAdapterTest extends TestCase
+final class CalibreAdapterTest extends TestCase
 {
     /**
      * @var MockObject&FileSystemHelper

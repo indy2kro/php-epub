@@ -9,7 +9,7 @@ use PhpEpub\Util\FileSystemHelper;
 use PhpEpub\ZipHandler;
 use PHPUnit\Framework\TestCase;
 
-class ZipHandlerTest extends TestCase
+final class ZipHandlerTest extends TestCase
 {
     private string $validZipPath;
     private string $invalidZipPath;

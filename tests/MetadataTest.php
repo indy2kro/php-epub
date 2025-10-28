@@ -10,7 +10,7 @@ use PhpEpub\XmlParser;
 use PHPUnit\Framework\TestCase;
 use SimpleXMLElement;
 
-class MetadataTest extends TestCase
+final class MetadataTest extends TestCase
 {
     private string $tempOpfFilePath;
     private SimpleXMLElement $opfXml;
