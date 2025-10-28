@@ -8,7 +8,7 @@ use PhpEpub\Converters\CalibreAdapter;
 use PhpEpub\Exception;
 use PHPUnit\Framework\TestCase;
 
-class CalibreAdapterRealTest extends TestCase
+final class CalibreAdapterRealTest extends TestCase
 {
     private string $validFile;
     private string $invalidFile;

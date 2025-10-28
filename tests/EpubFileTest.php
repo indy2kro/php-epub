@@ -13,7 +13,7 @@ use PhpEpub\Util\FileSystemHelper;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
-class EpubFileTest extends TestCase
+final class EpubFileTest extends TestCase
 {
     private string $outputEpubPath;
     private string $tempEpubFilePath;

@@ -7,7 +7,7 @@ namespace PhpEpub\Test;
 use PhpEpub\Exception;
 use PHPUnit\Framework\TestCase;
 
-class ExceptionTest extends TestCase
+final class ExceptionTest extends TestCase
 {
     public function testExceptionMessage(): void
     {

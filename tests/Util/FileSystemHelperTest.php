@@ -7,7 +7,7 @@ namespace PhpEpub\Test\Util;
 use PhpEpub\Util\FileSystemHelper;
 use PHPUnit\Framework\TestCase;
 
-class FileSystemHelperTest extends TestCase
+final class FileSystemHelperTest extends TestCase
 {
     private FileSystemHelper $helper;
     private string $fixturesDir;

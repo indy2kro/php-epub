@@ -9,7 +9,7 @@ use PhpEpub\Exception;
 use PhpEpub\Util\FileSystemHelper;
 use PHPUnit\Framework\TestCase;
 
-class ContentManagerTest extends TestCase
+final class ContentManagerTest extends TestCase
 {
     private string $contentDir;
     private string $sampleFilePath;
