@@ -53,7 +53,12 @@ jobs:
           uses: actions/cache@v4
           id: vendor-cache
           with:
-            path: vendor
+            path: |
+              vendor
+              .phpcs-cache
+              .phpunit.result.cache
+              .rector.cache
+              .phpstan.cache
             key: ${{ runner.os }}-build-${{ matrix.php-version }}-${{ hashFiles('**/composer.lock') }}
 
         - name: Validate composer.json
@@ -63,7 +68,7 @@ jobs:
           run: composer update --no-progress
 
         - name: Code style test
-          run: ./vendor/bin/phpcs
+          run: vendor/bin/phpcs
 
         - name: PHPStan code analysis
           run: php vendor/bin/phpstan analyze
@@ -72,7 +77,7 @@ jobs:
           run: vendor/bin/rector --dry-run
 
         - name: Run tests
-          run: ./vendor/bin/phpunit --coverage-clover=coverage.xml --log-junit=junit.xml
+          run: vendor/bin/phpunit --coverage-clover=coverage.xml --log-junit=junit.xml
 
         - name: Upload test results to Codecov
           if: ${{ !cancelled() }}
