@@ -27,7 +27,7 @@ final class CalibreAdapterTest extends TestCase
 
     public function testConvertSuccessful(): void
     {
-        $this->helperMock->method('fileExists')->willReturnMap([
+        $this->helperMock->expects($this->exactly(3))->method('fileExists')->willReturnMap([
             [$this->fakeCalibrePath, true],
             [$this->fakeInputFile, true],
             [$this->fakeOutputFile, true],
@@ -58,7 +58,7 @@ final class CalibreAdapterTest extends TestCase
 
     public function testConvertFailsWhenInputFileNotFound(): void
     {
-        $this->helperMock->method('fileExists')->willReturnMap([
+        $this->helperMock->expects($this->exactly(2))->method('fileExists')->willReturnMap([
             [$this->fakeCalibrePath, true],
             [$this->fakeInputFile, false],
         ]);
@@ -89,7 +89,7 @@ final class CalibreAdapterTest extends TestCase
 
     public function testConvertFailsWhenOutputFileMissing(): void
     {
-        $this->helperMock->method('fileExists')->willReturnMap([
+        $this->helperMock->expects($this->exactly(3))->method('fileExists')->willReturnMap([
             [$this->fakeCalibrePath, true],
             [$this->fakeInputFile, true],
             [$this->fakeOutputFile, false],
