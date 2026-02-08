@@ -9,7 +9,7 @@
     "homepage" : "https://github.com/indy2kro/php-epub",
     "license" : "GPL-2.0-or-later",
     "require": {
-        "php": ">=8.2",
+        "php": ">=8.3",
         "ext-xml": "*",
         "ext-zip": "*"
     },
@@ -43,7 +43,7 @@
             "dealerdirect/phpcodesniffer-composer-installer": true
         },
         "platform": {
-          "php": "8.2.0"
+          "php": "8.3.0"
         }
     }
 }
