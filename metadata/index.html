@@ -62,11 +62,43 @@
                   </li>
                   <li class="toctree-l1 current"><a class="reference internal current" href="#">Metadata</a>
     <ul class="current">
-    <li class="toctree-l2"><a class="reference internal" href="#key-methods">Key Methods</a>
+    <li class="toctree-l2"><a class="reference internal" href="#overview">Overview</a>
     </li>
-    <li class="toctree-l2"><a class="reference internal" href="#traits">Traits</a>
+    <li class="toctree-l2"><a class="reference internal" href="#key-methods">Key Methods</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#constructor">Constructor</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#saving-changes">Saving Changes</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#metadata-fields">Metadata Fields</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#title">Title</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#authors">Authors</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#description">Description</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#publisher">Publisher</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#date">Date</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#language">Language</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#subject">Subject</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#identifier">Identifier</a>
+    </li>
+        </ul>
     </li>
     <li class="toctree-l2"><a class="reference internal" href="#usage-example">Usage Example</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#internal-implementation">Internal Implementation</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#error-handling">Error Handling</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#xml-namespace">XML Namespace</a>
     </li>
     </ul>
                   </li>
@@ -116,47 +148,119 @@
             <div class="section" itemprop="articleBody">
               
                 <h1 id="metadata">Metadata<a class="headerlink" href="#metadata" title="Permanent link">&para;</a></h1>
-<p>The <code>Metadata</code> class in the PHP EPUB Processor library is responsible for managing the metadata of an EPUB file.
-This includes operations such as reading and updating the title, authors, language, and other metadata fields.</p>
+<p>The <code>Metadata</code> class provides comprehensive management of Dublin Core metadata within an EPUB file. It uses a trait-based approach to organize metadata operations, with each trait handling a specific metadata field.</p>
+<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
+<p>EPUB files use Dublin Core metadata elements (dc:) defined in the OPF (Open Packaging Format) file. The Metadata class provides get/set methods for all commonly used Dublin Core elements, along with persistence to save changes back to the OPF XML file.</p>
 <h2 id="key-methods">Key Methods<a class="headerlink" href="#key-methods" title="Permanent link">&para;</a></h2>
-<ul>
-<li>
-<p><strong><code>__construct(SimpleXMLElement $opfXml, string $opfFilePath)</code></strong>: Initializes the <code>Metadata</code> object with the OPF XML data and its file path. It also identifies the Dublin Core (dc) namespace used for metadata.</p>
-</li>
-<li>
-<p><strong><code>save(): void</code></strong>: Saves the updated OPF file back to disk. Throws an exception if the file cannot be saved.</p>
-</li>
-<li>
-<p><strong><code>getOpfFilePath(): string</code></strong>: Returns the file path of the OPF file.</p>
-</li>
-</ul>
-<h2 id="traits">Traits<a class="headerlink" href="#traits" title="Permanent link">&para;</a></h2>
-<p>The <code>Metadata</code> class uses several traits to interact with specific metadata fields:</p>
-<ul>
-<li><strong><code>InteractsWithTitle</code></strong>: Methods for getting and setting the title.</li>
-<li><strong><code>InteractsWithDescription</code></strong>: Methods for managing the description.</li>
-<li><strong><code>InteractsWithDate</code></strong>: Methods for handling date-related metadata.</li>
-<li><strong><code>InteractsWithAuthors</code></strong>: Methods for managing author information.</li>
-<li><strong><code>InteractsWithPublisher</code></strong>: Methods for handling publisher details.</li>
-<li><strong><code>InteractsWithLanguage</code></strong>: Methods for managing language metadata.</li>
-<li><strong><code>InteractsWithSubject</code></strong>: Methods for handling subject-related metadata.</li>
-<li><strong><code>InteractsWithIdentifier</code></strong>: Methods for managing identifiers like ISBN.</li>
-</ul>
+<h3 id="constructor">Constructor<a class="headerlink" href="#constructor" title="Permanent link">&para;</a></h3>
+<pre class="codehilite"><code class="language-php">public function __construct(SimpleXMLElement $opfXml, string $opfFilePath)
+</code></pre>
+
+<p>Initializes the Metadata object. The OPF XML element is typically obtained from parsing the EPUB's OPF file. The <code>$opfFilePath</code> is needed to save changes back to disk.</p>
+<h3 id="saving-changes">Saving Changes<a class="headerlink" href="#saving-changes" title="Permanent link">&para;</a></h3>
+<pre class="codehilite"><code class="language-php">public function save(): void
+</code></pre>
+
+<p>Serializes the modified OPF XML back to disk. Must be called after making any metadata changes. Throws an exception if the file cannot be written.</p>
+<pre class="codehilite"><code class="language-php">public function getOpfFilePath(): string
+</code></pre>
+
+<p>Returns the file path of the OPF file for reference.</p>
+<h2 id="metadata-fields">Metadata Fields<a class="headerlink" href="#metadata-fields" title="Permanent link">&para;</a></h2>
+<p>The following Dublin Core elements are supported:</p>
+<h3 id="title">Title<a class="headerlink" href="#title" title="Permanent link">&para;</a></h3>
+<pre class="codehilite"><code class="language-php">public function getTitle(): string
+public function setTitle(string $title): void
+</code></pre>
+
+<p>The name given to the resource (dc:title).</p>
+<h3 id="authors">Authors<a class="headerlink" href="#authors" title="Permanent link">&para;</a></h3>
+<pre class="codehilite"><code class="language-php">public function getAuthors(): array&lt;int, string&gt;
+public function setAuthors(array&lt;int, string&gt; $authors): void
+</code></pre>
+
+<p>The creators of the resource (dc:creator). Multiple authors are supported.</p>
+<h3 id="description">Description<a class="headerlink" href="#description" title="Permanent link">&para;</a></h3>
+<pre class="codehilite"><code class="language-php">public function getDescription(): string
+public function setDescription(string $description): void
+</code></pre>
+
+<p>An account of the resource (dc:description).</p>
+<h3 id="publisher">Publisher<a class="headerlink" href="#publisher" title="Permanent link">&para;</a></h3>
+<pre class="codehilite"><code class="language-php">public function getPublisher(): string
+public function setPublisher(string $publisher): void
+</code></pre>
+
+<p>The entity that made the resource available (dc:publisher).</p>
+<h3 id="date">Date<a class="headerlink" href="#date" title="Permanent link">&para;</a></h3>
+<pre class="codehilite"><code class="language-php">public function getDate(): string
+public function setDate(string $date): void
+</code></pre>
+
+<p>Date of publication (dc:date). Should be in a valid date format (preferably ISO 8601).</p>
+<h3 id="language">Language<a class="headerlink" href="#language" title="Permanent link">&para;</a></h3>
+<pre class="codehilite"><code class="language-php">public function getLanguage(): string
+public function setLanguage(string $language): void
+</code></pre>
+
+<p>The language of the resource (dc:language). Use RFC 3066 language codes (e.g., "en", "fr").</p>
+<h3 id="subject">Subject<a class="headerlink" href="#subject" title="Permanent link">&para;</a></h3>
+<pre class="codehilite"><code class="language-php">public function getSubject(): string
+public function setSubject(string $subject): void
+</code></pre>
+
+<p>The topic of the resource (dc:subject). Can be used for keywords or topics.</p>
+<h3 id="identifier">Identifier<a class="headerlink" href="#identifier" title="Permanent link">&para;</a></h3>
+<pre class="codehilite"><code class="language-php">public function getIdentifier(): string
+public function setIdentifier(string $identifier): void
+</code></pre>
+
+<p>An unambiguous reference to the resource (dc:identifier). Often an ISBN or UUID.</p>
 <h2 id="usage-example">Usage Example<a class="headerlink" href="#usage-example" title="Permanent link">&para;</a></h2>
 <pre class="codehilite"><code class="language-php">use PhpEpub\EpubFile;
 
-$epubFilePath = '/path/to/your.epub';
-
-$epubFile = new EpubFile($epubFilePath);
+$epubFile = new EpubFile('/path/to/your.epub');
 $epubFile-&gt;load();
 
 $metadata = $epubFile-&gt;getMetadata();
-$title = $metadata-&gt;getTitle();
-$metadata-&gt;setTitle('New Title');
+
+// Read metadata
+echo &quot;Title: &quot; . $metadata-&gt;getTitle();
+echo &quot;Authors: &quot; . implode(', ', $metadata-&gt;getAuthors());
+echo &quot;Language: &quot; . $metadata-&gt;getLanguage();
+
+// Update metadata
+$metadata-&gt;setTitle('My New Title');
+$metadata-&gt;setAuthors(['John Doe', 'Jane Smith']);
+$metadata-&gt;setPublisher('My Publishing House');
+$metadata-&gt;setLanguage('en');
+
+// Save metadata changes to OPF file
 $metadata-&gt;save();
 
+// Save the complete EPUB
 $epubFile-&gt;save();
 </code></pre>
+
+<h2 id="internal-implementation">Internal Implementation<a class="headerlink" href="#internal-implementation" title="Permanent link">&para;</a></h2>
+<p>The Metadata class uses PHP traits to organize code:</p>
+<ul>
+<li><code>InteractsWithTitle</code> - Title handling</li>
+<li><code>InteractsWithDescription</code> - Description handling</li>
+<li><code>InteractsWithDate</code> - Date handling</li>
+<li><code>InteractsWithAuthors</code> - Author handling</li>
+<li><code>InteractsWithPublisher</code> - Publisher handling</li>
+<li><code>InteractsWithLanguage</code> - Language handling</li>
+<li><code>InteractsWithSubject</code> - Subject handling</li>
+<li><code>InteractsWithIdentifier</code> - Identifier handling</li>
+</ul>
+<p>Each trait provides the get/set methods for a specific field and uses the protected <code>$opfXml</code> and <code>$dcNamespace</code> properties to interact with the OPF XML structure.</p>
+<h2 id="error-handling">Error Handling<a class="headerlink" href="#error-handling" title="Permanent link">&para;</a></h2>
+<p>The <code>save()</code> method throws an exception if:
+- The OPF file cannot be written
+- The XML cannot be serialized</p>
+<h2 id="xml-namespace">XML Namespace<a class="headerlink" href="#xml-namespace" title="Permanent link">&para;</a></h2>
+<p>The class automatically detects the Dublin Core namespace from the OPF XML on construction. This is necessary because different EPUB files may use different namespace prefixes.</p>
               
             </div>
           </div><footer>

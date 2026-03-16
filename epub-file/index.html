@@ -58,11 +58,27 @@
               <ul class="current">
                   <li class="toctree-l1 current"><a class="reference internal current" href="#">EpubFile</a>
     <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#overview">Overview</a>
+    </li>
     <li class="toctree-l2"><a class="reference internal" href="#key-methods">Key Methods</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#constructor">Constructor</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#loading-and-saving">Loading and Saving</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#accessing-components">Accessing Components</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#cleanup">Cleanup</a>
+    </li>
+        </ul>
     </li>
     <li class="toctree-l2"><a class="reference internal" href="#usage-example">Usage Example</a>
     </li>
-    <li class="toctree-l2"><a class="reference internal" href="#destruction">Destruction</a>
+    <li class="toctree-l2"><a class="reference internal" href="#dependency-injection">Dependency Injection</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#error-handling">Error Handling</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#file-structure">File Structure</a>
     </li>
     </ul>
                   </li>
@@ -116,44 +132,121 @@
             <div class="section" itemprop="articleBody">
               
                 <h1 id="epubfile">EpubFile<a class="headerlink" href="#epubfile" title="Permanent link">&para;</a></h1>
-<p>The <code>EpubFile</code> class is a core component of the PHP EPUB Processor library.
-It provides functionality to load, manipulate, and save EPUB files.
-This class handles the extraction of EPUB contents, parsing of metadata, and management of the EPUB file structure.</p>
+<p>The <code>EpubFile</code> class is the main entry point for the PHP EPUB Processor library. It provides a facade for loading, manipulating, and saving EPUB files, coordinating between metadata, spine, and content management components.</p>
+<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
+<p>EpubFile handles the complete lifecycle of working with EPUB files:</p>
+<ol>
+<li><strong>Loading</strong>: Extracts the ZIP archive to a temporary directory</li>
+<li><strong>Parsing</strong>: Locates and parses the OPF file, extracting metadata and spine information</li>
+<li><strong>Manipulation</strong>: Provides access to modify metadata, content, and structure</li>
+<li><strong>Saving</strong>: Compresses the modified contents back into an EPUB file</li>
+</ol>
 <h2 id="key-methods">Key Methods<a class="headerlink" href="#key-methods" title="Permanent link">&para;</a></h2>
-<ul>
-<li>
-<p><strong><code>__construct(string $filePath)</code></strong>: Initializes the <code>EpubFile</code> object with the path to the EPUB file.</p>
-</li>
-<li>
-<p><strong><code>load(): void</code></strong>: Loads the EPUB file, extracting its contents to a temporary directory and parsing its metadata and spine.</p>
-</li>
-<li>
-<p><strong><code>save(?string $filePath = null): void</code></strong>: Saves the current state of the EPUB file back to disk. If no file path is provided, it overwrites the original file.</p>
-</li>
-<li>
-<p><strong><code>getTempDir(): ?string</code></strong>: Returns the path to the temporary directory where the EPUB contents are extracted.</p>
-</li>
-<li>
-<p><strong><code>getMetadata(): ?Metadata</code></strong>: Retrieves the metadata object associated with the EPUB file.</p>
-</li>
-<li>
-<p><strong><code>getSpine(): ?Spine</code></strong>: Retrieves the spine object, which represents the reading order of the EPUB content.</p>
-</li>
-</ul>
+<h3 id="constructor">Constructor<a class="headerlink" href="#constructor" title="Permanent link">&para;</a></h3>
+<pre class="codehilite"><code class="language-php">public function __construct(
+    string $filePath,
+    ?ZipHandler $zipHandler = null,
+    ?XmlParser $xmlParser = null
+)
+</code></pre>
+
+<p>Initializes the EpubFile with the path to an EPUB file. The optional <code>$zipHandler</code> and <code>$xmlParser</code> parameters allow dependency injection for testing.</p>
+<h3 id="loading-and-saving">Loading and Saving<a class="headerlink" href="#loading-and-saving" title="Permanent link">&para;</a></h3>
+<pre class="codehilite"><code class="language-php">public function load(): void
+</code></pre>
+
+<p>Loads the EPUB file:
+- Extracts ZIP contents to a temporary directory
+- Parses <code>container.xml</code> to locate the OPF file
+- Parses the OPF file to extract metadata and spine
+- Initializes the ContentManager for file operations</p>
+<p>Throws an exception if the file cannot be opened or the EPUB structure is invalid.</p>
+<pre class="codehilite"><code class="language-php">public function save(?string $filePath = null): void
+</code></pre>
+
+<p>Saves the modified EPUB back to disk. If <code>$filePath</code> is null, overwrites the original file. Throws an exception if called before <code>load()</code>.</p>
+<h3 id="accessing-components">Accessing Components<a class="headerlink" href="#accessing-components" title="Permanent link">&para;</a></h3>
+<pre class="codehilite"><code class="language-php">public function getMetadata(): Metadata
+</code></pre>
+
+<p>Returns the Metadata object for reading/updating EPUB metadata (title, authors, language, etc.). Throws an exception if called before <code>load()</code>.</p>
+<pre class="codehilite"><code class="language-php">public function getSpine(): Spine
+</code></pre>
+
+<p>Returns the Spine object representing the reading order of content. Throws an exception if called before <code>load()</code>.</p>
+<pre class="codehilite"><code class="language-php">public function getContentManager(): ContentManager
+</code></pre>
+
+<p>Returns the ContentManager for adding/updating/deleting content files. Throws an exception if called before <code>load()</code>.</p>
+<h3 id="cleanup">Cleanup<a class="headerlink" href="#cleanup" title="Permanent link">&para;</a></h3>
+<pre class="codehilite"><code class="language-php">public function cleanup(): void
+</code></pre>
+
+<p>Manually cleans up the temporary directory. Called automatically by <code>__destruct()</code>, but can be called explicitly to release resources earlier.</p>
+<pre class="codehilite"><code class="language-php">public function getTempDir(): ?string
+</code></pre>
+
+<p>Returns the path to the temporary directory where EPUB contents are extracted. Returns null before <code>load()</code> is called.</p>
 <h2 id="usage-example">Usage Example<a class="headerlink" href="#usage-example" title="Permanent link">&para;</a></h2>
 <pre class="codehilite"><code class="language-php">use PhpEpub\EpubFile;
 
 $epubFile = new EpubFile('/path/to/your.epub');
 $epubFile-&gt;load();
 
-// make changes
+// Access and modify metadata
+$metadata = $epubFile-&gt;getMetadata();
+echo $metadata-&gt;getTitle();
+$metadata-&gt;setTitle('New Title');
+$metadata-&gt;save();
 
-// Save changes
+// Access the spine (reading order)
+$spine = $epubFile-&gt;getSpine();
+
+// Manage content files
+$content = $epubFile-&gt;getContentManager();
+
+// Save changes (overwrites original)
 $epubFile-&gt;save();
+
+// Or save to a new file
+$epubFile-&gt;save('/path/to/new.epub');
+
+// Cleanup (optional - called automatically)
+$epubFile-&gt;cleanup();
 </code></pre>
 
-<h2 id="destruction">Destruction<a class="headerlink" href="#destruction" title="Permanent link">&para;</a></h2>
-<p>The <code>__destruct()</code> method ensures that the temporary directory used during processing is cleaned up, preventing any leftover files from occupying disk space.</p>
+<h2 id="dependency-injection">Dependency Injection<a class="headerlink" href="#dependency-injection" title="Permanent link">&para;</a></h2>
+<p>The constructor accepts optional <code>ZipHandler</code> and <code>XmlParser</code> instances, making it easy to mock these dependencies in tests:</p>
+<pre class="codehilite"><code class="language-php">use PhpEpub\EpubFile;
+use PhpEpub\ZipHandler;
+use PhpEpub\XmlParser;
+
+// Using custom dependencies
+$mockZipHandler = new MockZipHandler();
+$mockXmlParser = new MockXmlParser();
+$epubFile = new EpubFile('/path/to/file.epub', $mockZipHandler, $mockXmlParser);
+</code></pre>
+
+<h2 id="error-handling">Error Handling<a class="headerlink" href="#error-handling" title="Permanent link">&para;</a></h2>
+<p>The class throws <code>Exception</code> in the following cases:
+- File not found or cannot be opened
+- Invalid EPUB structure
+- Calling <code>load()</code>, <code>save()</code>, <code>getMetadata()</code>, <code>getSpine()</code>, or <code>getContentManager()</code> before <code>load()</code>
+- Temporary directory creation or cleanup failures</p>
+<h2 id="file-structure">File Structure<a class="headerlink" href="#file-structure" title="Permanent link">&para;</a></h2>
+<p>When loaded, the EPUB is extracted to a temporary directory with the following structure:</p>
+<pre class="codehilite"><code>temp_dir/
+├── mimetype
+├── META-INF/
+│   └── container.xml
+└── EPUB/
+    ├── package.opf
+    ├── toc.ncx
+    └── content/
+        ├── chapter1.xhtml
+        ├── chapter2.xhtml
+        └── images/
+</code></pre>
               
             </div>
           </div><footer>
