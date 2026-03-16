@@ -30,7 +30,11 @@ final class FileSystemHelperTest extends TestCase
 
     public function testExecSuccessful(): void
     {
-        $command = PHP_BINARY . ' -r "echo \"Hello, world!\";"';
+        $phpBinary = PHP_BINARY;
+        if (DIRECTORY_SEPARATOR === '\\') {
+            $phpBinary = '"' . $phpBinary . '"';
+        }
+        $command = $phpBinary . ' -r "echo \"Hello, world!\";"';
         $output = [];
         $returnVar = 0;
 

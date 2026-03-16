@@ -72,23 +72,46 @@ $epubFile->save();
 
 To maintain high standards of code quality, this project uses several tools:
 
-- **PHP CodeSniffer (PHPCS**): Ensures your code adheres to a set of coding standards. Check the code with:
+- **PHPUnit**: Run tests with `vendor/bin/phpunit`
+
+- **PHP CodeSniffer (PHPCS)**: Ensures code adheres to coding standards:
 
 ```bash
-vendor/bin/phpcs
+vendor/bin/phpcs src/ tests/
 ```
 
-- **PHPStan**: A static analysis tool for finding bugs in your code. Run it using:
+- **PHPStan**: Static analysis tool for finding bugs:
 
 ```bash
-vendor/bin/phpstan
+php -d memory_limit=512M vendor/bin/phpstan analyse --no-progress
 ```
 
-- **Rector**: A tool for automated code refactoring. Use it to apply coding standards and upgrade code:
+- **Rector**: Automated code refactoring and upgrades:
 
 ```bash
 vendor/bin/rector
 ```
+
+### Running All Code Quality Checks
+
+Run all code quality tools at once:
+
+```bash
+# Using composer script (recommended)
+composer quality
+
+# Or run individually
+vendor/bin/phpunit && vendor/bin/phpcs src/ tests/ && php -d memory_limit=512M vendor/bin/phpstan analyse --no-progress
+```
+
+## AI Integration
+
+This project is designed for easy integration with AI coding assistants:
+
+- **AGENTS.md**: Contains instructions for AI agents working on this codebase
+- **Consistent class structure**: Key classes (`EpubFile`, `Metadata`, `ContentManager`, etc.) follow predictable patterns
+- **Dependency injection**: Core classes accept optional dependencies in constructors for easier mocking
+- **Type hints**: All methods use PHP 8+ type hints for better AI understanding
 
 ## Testing
 

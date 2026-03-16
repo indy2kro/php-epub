@@ -8,9 +8,6 @@ use SimpleXMLElement;
 
 trait InteractsWithDate
 {
-    private readonly SimpleXMLElement $opfXml;
-    private readonly string $dcNamespace;
-
     /**
      * Gets the date of the EPUB.
      */

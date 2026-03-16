@@ -8,9 +8,6 @@ use SimpleXMLElement;
 
 trait InteractsWithSubject
 {
-    private readonly SimpleXMLElement $opfXml;
-    private readonly string $dcNamespace;
-
     /**
      * Gets the subject of the EPUB.
      */

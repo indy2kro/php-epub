@@ -10,25 +10,35 @@ use SimpleXMLElement;
 class EpubFile
 {
     private ?string $tempDir = null;
-    private readonly XmlParser $xmlParser;
     private readonly ZipHandler $zipHandler;
+    private readonly XmlParser $xmlParser;
     private readonly Parser $parser;
     private ?Metadata $metadata = null;
     private ?Spine $spine = null;
     private ?SimpleXMLElement $opfXml = null;
+    private ?ContentManager $contentManager = null;
 
-    public function __construct(private readonly string $filePath)
-    {
-        $this->zipHandler = new ZipHandler();
-        $this->xmlParser = new XmlParser();
+    public function __construct(
+        private readonly string $filePath,
+        ?ZipHandler $zipHandler = null,
+        ?XmlParser $xmlParser = null
+    ) {
+        $this->zipHandler = $zipHandler ?? new ZipHandler();
+        $this->xmlParser = $xmlParser ?? new XmlParser();
         $this->parser = new Parser($this->xmlParser);
     }
 
     public function __destruct()
     {
+        $this->cleanup();
+    }
+
+    public function cleanup(): void
+    {
         if ($this->tempDir !== null && is_dir($this->tempDir)) {
             $helper = new FileSystemHelper();
             $helper->deleteDirectory($this->tempDir);
+            $this->tempDir = null;
         }
     }
 
@@ -48,6 +58,7 @@ class EpubFile
 
         $this->metadata = new Metadata($this->opfXml, $opfFileFullPath);
         $this->spine = new Spine($this->opfXml);
+        $this->contentManager = new ContentManager($this->tempDir);
     }
 
     public function save(?string $filePath = null): void
@@ -68,13 +79,30 @@ class EpubFile
         return $this->tempDir;
     }
 
-    public function getMetadata(): ?Metadata
+    public function getMetadata(): Metadata
     {
+        if ($this->metadata === null) {
+            throw new Exception('EPUB file must be loaded before accessing metadata.');
+        }
+
         return $this->metadata;
     }
 
-    public function getSpine(): ?Spine
+    public function getSpine(): Spine
     {
+        if ($this->spine === null) {
+            throw new Exception('EPUB file must be loaded before accessing spine.');
+        }
+
         return $this->spine;
+    }
+
+    public function getContentManager(): ContentManager
+    {
+        if ($this->contentManager === null) {
+            throw new Exception('EPUB file must be loaded before accessing content manager.');
+        }
+
+        return $this->contentManager;
     }
 }

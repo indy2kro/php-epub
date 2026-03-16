@@ -46,7 +46,10 @@ final class CalibreAdapterTest extends TestCase
 
     public function testConvertFailsWhenCalibreNotFound(): void
     {
-        $this->helperMock->method('fileExists')->willReturn(false);
+        $this->helperMock->expects($this->once())
+            ->method('fileExists')
+            ->with('/invalid/path/to/ebook-convert')
+            ->willReturn(false);
 
         $adapter = new CalibreAdapter(['calibre_path' => '/invalid/path/to/ebook-convert'], $this->helperMock);
 
@@ -73,11 +76,15 @@ final class CalibreAdapterTest extends TestCase
 
     public function testConvertFailsWhenExecFails(): void
     {
-        $this->helperMock->method('fileExists')->willReturn(true);
-        $this->helperMock->method('exec')->willReturnCallback(static function (string $command, array &$output, int &$returnVar): void {
-            $output = ['Error executing command'];
-            $returnVar = 1;
-        });
+        $this->helperMock->expects($this->exactly(2))
+            ->method('fileExists')
+            ->willReturn(true);
+        $this->helperMock->expects($this->once())
+            ->method('exec')
+            ->willReturnCallback(static function (string $command, array &$output, int &$returnVar): void {
+                $output = ['Error executing command'];
+                $returnVar = 1;
+            });
 
         $adapter = new CalibreAdapter(['calibre_path' => $this->fakeCalibrePath], $this->helperMock);
 

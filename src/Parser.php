@@ -90,13 +90,13 @@ class Parser
 
         $namespaces = $xml->getNamespaces(true);
 
-        $containerNamespace = $namespaces[''] ?? null;
+        $opfNamespace = $namespaces[''] ?? null;
 
-        if ($containerNamespace === null) {
-            throw new Exception('No container namespace found in container.xml');
+        if ($opfNamespace === null) {
+            throw new Exception('No OPF namespace found in OPF file');
         }
 
-        $xml->registerXPathNamespace('opf', $containerNamespace);
+        $xml->registerXPathNamespace('opf', $opfNamespace);
 
         $items = $xml->xpath('//opf:manifest/opf:item');
 

@@ -8,9 +8,6 @@ use SimpleXMLElement;
 
 trait InteractsWithLanguage
 {
-    private readonly SimpleXMLElement $opfXml;
-    private readonly string $dcNamespace;
-
     /**
      * Gets the language of the EPUB.
      */

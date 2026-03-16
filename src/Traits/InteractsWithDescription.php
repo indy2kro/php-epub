@@ -8,9 +8,6 @@ use SimpleXMLElement;
 
 trait InteractsWithDescription
 {
-    private readonly SimpleXMLElement $opfXml;
-    private readonly string $dcNamespace;
-
     /**
      * Gets the description of the EPUB.
      */
