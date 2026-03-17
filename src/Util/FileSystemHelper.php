@@ -14,6 +14,10 @@ class FileSystemHelper
     /**
      * @param array<int, mixed> $output
      */
+    /**
+     * @param array<int, mixed> $output
+     * @param-out list<string> $output
+     */
     public function exec(string $command, array &$output, int &$returnVar): void
     {
         exec($command, $output, $returnVar);

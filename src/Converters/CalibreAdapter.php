@@ -55,7 +55,9 @@ class CalibreAdapter implements ConverterInterface
         $this->helper->exec($command, $output, $returnVar);
 
         if ($returnVar !== 0) {
-            throw new Exception('Calibre conversion failed: ' . implode("\n", $output));
+            $outputLines = array_map(static fn (mixed $line): string => (string) $line, $output);
+
+            throw new Exception('Calibre conversion failed: ' . implode("\n", $outputLines));
         }
 
         if (! $this->helper->fileExists($outputPath) || $this->helper->fileSize($outputPath) === 0) {
