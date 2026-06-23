@@ -29,7 +29,7 @@
         "phpstan/phpstan": "^2",
         "phpstan/phpstan-phpunit": "^2",
         "rector/rector": "^2",
-        "tecnickcom/tcpdf": "^6.8",
+        "tecnickcom/tcpdf": "^6.8 || ^7.0",
         "dompdf/dompdf": "^3.1"
     },
     "suggest": {
@@ -52,6 +52,12 @@
             "vendor/bin/phpcs src/ tests/ docs/",
             "php -d memory_limit=512M vendor/bin/phpstan analyse --no-progress",
             "vendor/bin/rector --dry-run"
+        ],
+        "post-install-cmd": [
+            "@php scripts/generate-core-fonts.php"
+        ],
+        "post-update-cmd": [
+            "@php scripts/generate-core-fonts.php"
         ]
     }
 }

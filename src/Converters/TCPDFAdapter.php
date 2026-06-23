@@ -47,6 +47,10 @@ class TCPDFAdapter implements ConverterInterface
      */
     public function convert(string $epubDirectory, string $outputPath): void
     {
+        if (!defined('K_PATH_FONTS')) {
+            define('K_PATH_FONTS', dirname(__DIR__, 2) . '/vendor/tecnickcom/tc-lib-pdf-font/target/fonts/');
+        }
+
         // Initialize TCPDF
         $pdf = new TCPDF();
 
@@ -119,7 +123,8 @@ class TCPDFAdapter implements ConverterInterface
         $pdf->writeHTML($content, true, false, true, false, '');
 
         // Output PDF to file
-        $pdf->Output($outputPath, 'F');
+        $pdfData = $pdf->Output('', 'S');
+        file_put_contents($outputPath, $pdfData);
     }
 
     /**
