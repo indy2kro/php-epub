@@ -52,6 +52,12 @@
             "vendor/bin/phpcs src/ tests/ docs/",
             "php -d memory_limit=512M vendor/bin/phpstan analyse --no-progress",
             "vendor/bin/rector --dry-run"
+        ],
+        "post-install-cmd": [
+            "@php scripts/generate-core-fonts.php"
+        ],
+        "post-update-cmd": [
+            "@php scripts/generate-core-fonts.php"
         ]
     }
 }
