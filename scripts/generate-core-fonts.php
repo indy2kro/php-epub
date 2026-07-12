@@ -122,8 +122,13 @@ foreach ($afmFiles as $afmFile) {
         echo "  -> Generated: {$fontName}.json\n";
         $success++;
     } catch (\Exception $e) {
-        echo "  -> ERROR: {$e->getMessage()}\n";
-        $errors++;
+        $msg = $e->getMessage();
+        if (str_contains($msg, 'already imported')) {
+            echo "  -> SKIP: {$msg}\n";
+        } else {
+            echo "  -> ERROR: {$msg}\n";
+            $errors++;
+        }
     }
 }
 
