@@ -13,10 +13,7 @@ return RectorConfig::configure()
     ])
     ->withSets([
         PHPUnitSetList::ANNOTATIONS_TO_ATTRIBUTES,
-        PHPUnitSetList::PHPUNIT_80,
-        PHPUnitSetList::PHPUNIT_90,
-        PHPUnitSetList::PHPUNIT_100,
-        PHPUnitSetList::PHPUNIT_110,
+        PHPUnitSetList::COMPOSER_BASED,
         PHPUnitSetList::PHPUNIT_CODE_QUALITY,
     ])
     ->withPhpSets()
