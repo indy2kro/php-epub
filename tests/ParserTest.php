@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PhpEpub\Test;
 
 use PhpEpub\Exception;
+use PhpEpub\InvalidEpubException;
 use PhpEpub\Parser;
 use PhpEpub\Test\Support\EpubBuilder;
 use PhpEpub\Util\FileSystemHelper;
@@ -165,6 +166,57 @@ final class ParserTest extends TestCase
 
         $this->expectException(Exception::class);
         $this->expectExceptionMessage('Missing manifest in OPF file');
+
+        $this->parser->parse($directory);
+    }
+
+    public function testParseContainerWithoutNamespaceThrowsException(): void
+    {
+        $directory = EpubBuilder::minimal()
+            ->withFile('META-INF/container.xml', '<container version="1.0"><rootfiles><rootfile full-path="EPUB/package.opf"/></rootfiles></container>')
+            ->writeTo($this->tmpDir . '/book');
+
+        $this->expectException(InvalidEpubException::class);
+        $this->expectExceptionMessage('No container namespace found in container.xml');
+
+        $this->parser->parse($directory);
+    }
+
+    public function testParseRootfileWithoutFullPathThrowsException(): void
+    {
+        $directory = EpubBuilder::minimal()
+            ->withFile('META-INF/container.xml', '<container xmlns="urn:oasis:names:tc:opendocument:xmlns:container" version="1.0"><rootfiles><rootfile/></rootfiles></container>')
+            ->writeTo($this->tmpDir . '/book');
+
+        $this->expectException(InvalidEpubException::class);
+        $this->expectExceptionMessage('Missing full-path attribute in rootfile element');
+
+        $this->parser->parse($directory);
+    }
+
+    public function testParseOpfWithoutNamespaceThrowsException(): void
+    {
+        $directory = EpubBuilder::minimal()
+            ->withFile('EPUB/package.opf', '<package version="3.0"><metadata/><manifest/><spine/></package>')
+            ->writeTo($this->tmpDir . '/book');
+
+        $this->expectException(InvalidEpubException::class);
+        $this->expectExceptionMessage('No OPF namespace found in OPF file');
+
+        $this->parser->parse($directory);
+    }
+
+    public function testParseNcxWithoutNavMapThrowsException(): void
+    {
+        $directory = EpubBuilder::minimal()
+            ->withFile('EPUB/package.opf', EpubBuilder::opf(
+                '<item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>'
+            ))
+            ->withFile('EPUB/toc.ncx', '<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1"/>')
+            ->writeTo($this->tmpDir . '/book');
+
+        $this->expectException(InvalidEpubException::class);
+        $this->expectExceptionMessage('Missing navMap in NCX file');
 
         $this->parser->parse($directory);
     }

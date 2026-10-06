@@ -6,6 +6,7 @@ namespace PhpEpub\Test;
 
 use PhpEpub\Exception;
 use PhpEpub\Util\FileSystemHelper;
+use PhpEpub\ZipException;
 use PhpEpub\ZipHandler;
 use PHPUnit\Framework\TestCase;
 use ZipArchive;
@@ -44,6 +45,11 @@ final class ZipHandlerTest extends TestCase
             unlink($this->outputZipPath);
         }
 
+        $builtZipPath = dirname($this->extractDir) . DIRECTORY_SEPARATOR . 'built.zip';
+        if (file_exists($builtZipPath)) {
+            unlink($builtZipPath);
+        }
+
         if (is_dir($this->extractDir)) {
             $this->fileSystemHelper->deleteDirectory($this->extractDir);
         }
@@ -64,7 +70,7 @@ final class ZipHandlerTest extends TestCase
 
     public function testExtractInvalidZipThrowsException(): void
     {
-        $this->expectException(Exception::class);
+        $this->expectException(ZipException::class);
         $this->expectExceptionMessage('Failed to open ZIP file:');
 
         $zipHandler = new ZipHandler();
@@ -78,6 +84,116 @@ final class ZipHandlerTest extends TestCase
 
         $zipHandler = new ZipHandler();
         $zipHandler->extract(__DIR__ . DIRECTORY_SEPARATOR . 'nonexistent.zip', $this->extractDir);
+    }
+
+    public function testExtractKeepsNestedEntriesAndDirectories(): void
+    {
+        $zipPath = $this->buildZip(['a/b/c.txt' => 'nested', 'd/' => null, 'top.txt' => 'top']);
+
+        (new ZipHandler())->extract($zipPath, $this->extractDir);
+
+        $this->assertStringEqualsFile($this->extractDir . '/a/b/c.txt', 'nested');
+        $this->assertStringEqualsFile($this->extractDir . '/top.txt', 'top');
+        $this->assertDirectoryExists($this->extractDir . '/d');
+    }
+
+    public function testExtractRejectsEntryNamesOutsideTheDestination(): void
+    {
+        $zipPath = $this->buildZip(['../evil.txt' => 'planted']);
+        $outside = dirname($this->extractDir) . DIRECTORY_SEPARATOR . 'evil.txt';
+
+        try {
+            (new ZipHandler())->extract($zipPath, $this->extractDir);
+            $this->fail('Expected an exception for an entry outside the destination.');
+        } catch (ZipException $exception) {
+            $this->assertStringContainsString('outside the EPUB', $exception->getMessage());
+        }
+
+        $this->assertFileDoesNotExist($outside);
+        $this->assertFileDoesNotExist($this->extractDir . DIRECTORY_SEPARATOR . 'evil.txt');
+    }
+
+    public function testExtractRejectsTooManyEntries(): void
+    {
+        $zipPath = $this->buildZip(['1.txt' => '1', '2.txt' => '2', '3.txt' => '3', '4.txt' => '4']);
+
+        $this->expectException(ZipException::class);
+        $this->expectExceptionMessage('too many entries');
+
+        (new ZipHandler(maxEntries: 3))->extract($zipPath, $this->extractDir);
+    }
+
+    public function testExtractRejectsArchivesLargerThanTheSizeLimit(): void
+    {
+        $zipPath = $this->buildZip(['big.txt' => random_bytes(5000)]);
+
+        $this->expectException(ZipException::class);
+        $this->expectExceptionMessage('exceeds the maximum uncompressed size');
+
+        (new ZipHandler(maxUncompressedBytes: 1000))->extract($zipPath, $this->extractDir);
+    }
+
+    public function testExtractRejectsZipBombCompressionRatio(): void
+    {
+        // 8 MiB of zeros deflates to a few KiB.
+        $zipPath = $this->buildZip(['bomb.txt' => str_repeat("\0", 8 * 1024 * 1024)]);
+
+        $this->expectException(ZipException::class);
+        $this->expectExceptionMessage('compression ratio');
+
+        (new ZipHandler())->extract($zipPath, $this->extractDir);
+    }
+
+    public function testExtractRejectsCorruptedEntryData(): void
+    {
+        $zipPath = $this->buildZip(['a.txt' => str_repeat('hello world ', 5000)]);
+        $bytes = (string) file_get_contents($zipPath);
+        // Flip bytes inside the deflated data of the first entry (after its 30-byte header and name).
+        for ($i = 40; $i < 60; $i++) {
+            $bytes[$i] = chr(ord($bytes[$i]) ^ 0xFF);
+        }
+        file_put_contents($zipPath, $bytes);
+
+        $this->expectException(ZipException::class);
+        $this->expectExceptionMessage('Failed to read ZIP entry: a.txt');
+
+        (new ZipHandler())->extract($zipPath, $this->extractDir);
+    }
+
+    public function testExtractRejectsUnsupportedCompressionMethod(): void
+    {
+        $zipPath = $this->buildZip(['b.txt' => 'data'], ZipArchive::CM_STORE);
+        $bytes = (string) file_get_contents($zipPath);
+        // Method 1 ("shrink") is not supported by libzip: patch the local and central headers.
+        $bytes[8] = chr(1);
+        $centralDirectory = (int) strpos($bytes, "PK\x01\x02");
+        $bytes[$centralDirectory + 10] = chr(1);
+        file_put_contents($zipPath, $bytes);
+
+        $this->expectException(ZipException::class);
+        $this->expectExceptionMessage('Failed to read ZIP entry: b.txt');
+
+        (new ZipHandler())->extract($zipPath, $this->extractDir);
+    }
+
+    public function testExtractRejectsFileEntryWhereADirectoryExists(): void
+    {
+        $zipPath = $this->buildZip(['a/' => null, 'a' => 'file over directory']);
+
+        $this->expectException(ZipException::class);
+        $this->expectExceptionMessage('Failed to create file for ZIP entry: a');
+
+        (new ZipHandler())->extract($zipPath, $this->extractDir);
+    }
+
+    public function testExtractRejectsDirectoryBlockedByAFile(): void
+    {
+        $zipPath = $this->buildZip(['a' => 'file', 'a/b.txt' => 'needs a/ to be a directory']);
+
+        $this->expectException(ZipException::class);
+        $this->expectExceptionMessage('Failed to create directory:');
+
+        (new ZipHandler())->extract($zipPath, $this->extractDir);
     }
 
     public function testCompressDirectory(): void
@@ -150,6 +266,25 @@ final class ZipHandlerTest extends TestCase
 
         $zipHandler = new ZipHandler();
         @$zipHandler->compress($this->compressDir, __DIR__ . DIRECTORY_SEPARATOR . 'nonexistent' . DIRECTORY_SEPARATOR . 'output.zip');
+    }
+
+    /**
+     * @param array<string, string|null> $entries entry name => content (null for a directory)
+     */
+    private function buildZip(array $entries, ?int $compression = null): string
+    {
+        $zipPath = dirname($this->extractDir) . DIRECTORY_SEPARATOR . 'built.zip';
+        $zip = new ZipArchive();
+        $zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+        foreach ($entries as $name => $content) {
+            $content === null ? $zip->addEmptyDir($name) : $zip->addFromString($name, $content);
+            if ($compression !== null) {
+                $zip->setCompressionName($name, $compression);
+            }
+        }
+        $zip->close();
+
+        return $zipPath;
     }
 
     /**

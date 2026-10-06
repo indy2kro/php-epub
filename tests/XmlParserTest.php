@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PhpEpub\Test;
 
 use PhpEpub\Exception;
+use PhpEpub\XmlException;
 use PhpEpub\XmlParser;
 use PHPUnit\Framework\TestCase;
 use SimpleXMLElement;
@@ -47,6 +48,51 @@ final class XmlParserTest extends TestCase
         if (file_exists($this->invalidXmlFilePath)) {
             unlink($this->invalidXmlFilePath);
         }
+    }
+
+    public function testParseRejectsEntityDeclarations(): void
+    {
+        file_put_contents($this->xmlFilePath, '<?xml version="1.0"?><!DOCTYPE root [<!ENTITY x "expanded">]><root>&x;</root>');
+
+        $this->expectException(XmlException::class);
+        $this->expectExceptionMessage('entity declarations');
+
+        (new XmlParser())->parse($this->xmlFilePath);
+    }
+
+    public function testParseAcceptsPublicDoctypeWithoutEntities(): void
+    {
+        // EPUB 2 NCX files commonly carry a DOCTYPE; it must not be fetched or rejected.
+        file_put_contents(
+            $this->xmlFilePath,
+            '<?xml version="1.0"?><!DOCTYPE ncx PUBLIC "-//NISO//DTD ncx 2005-1//EN" "http://www.daisy.org/z3986/2005/ncx-2005-1.dtd"><ncx><navMap/></ncx>'
+        );
+
+        $xml = (new XmlParser())->parse($this->xmlFilePath);
+
+        $this->assertSame('ncx', $xml->getName());
+    }
+
+    public function testParseInvalidXmlReportsLibxmlError(): void
+    {
+        try {
+            (new XmlParser())->parse($this->invalidXmlFilePath);
+            $this->fail('Expected an exception for malformed XML.');
+        } catch (XmlException $exception) {
+            $this->assertStringContainsString('Failed to load XML file:', $exception->getMessage());
+            $this->assertMatchesRegularExpression('/line \d+/', $exception->getMessage());
+        }
+
+        $this->assertSame([], libxml_get_errors());
+    }
+
+    public function testParseUnreadablePathThrowsException(): void
+    {
+        $this->expectException(XmlException::class);
+        $this->expectExceptionMessage('Failed to read XML file:');
+
+        // A directory exists but cannot be read as a file.
+        (new XmlParser())->parse(__DIR__ . DIRECTORY_SEPARATOR . 'fixtures');
     }
 
     public function testParseValidXml(): void

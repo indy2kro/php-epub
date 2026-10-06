@@ -61,7 +61,7 @@ Effort: S = one file, under 30 min · M = one class plus tests · L = cross-cutt
   The path from the untrusted book is concatenated onto the temp dir without normalisation, so `../` segments make `load()` parse XML outside the extraction dir and `Metadata::save()` overwrite it.
 - [x] **SEC-02** Reject `ContentManager` paths that resolve outside the content directory — `src/ContentManager.php:56-125` — S · med
   Callers typically pass manifest hrefs from the book, and `../` lets `add/update/delete/getContent` touch arbitrary files.
-- [ ] **SEC-03** Cap total uncompressed size, entry count and compression ratio before extracting — `src/ZipHandler.php:21-38` — M · med
+- [x] **SEC-03** Cap total uncompressed size, entry count and compression ratio before extracting — `src/ZipHandler.php:21-38` — M · med
   `extractTo()` inflates every entry without limits, so a small zip bomb fills the temp disk (PHP already strips `../` from entry names).
 - [ ] **SEC-04** Stop disabling TLS verification when downloading AFM fonts — `scripts/generate-core-fonts.php:83-86` — S · med
   `verify_peer => false` on a script that Composer runs on every install/update lets a network attacker substitute font data.
@@ -69,11 +69,11 @@ Effort: S = one file, under 30 min · M = one class plus tests · L = cross-cutt
   `extra_args` is appended raw to the shell command, so any user-influenced option becomes shell injection.
 - [ ] **SEC-06** Lock down HTML renderers for untrusted book content (Dompdf `chroot` to the book dir, remote/PHP off; TCPDF image paths confined) — `src/Converters/DompdfAdapter.php:47-50`, `src/Converters/TCPDFAdapter.php:127-130` — M · med
   Book XHTML can reference local files or URLs that the renderer would read into the PDF.
-- [ ] **SEC-07** Create the temp dir with mode `0700` and a `random_bytes` name — `src/EpubFile.php:47-50` — S · low
+- [x] **SEC-07** Create the temp dir with mode `0700` and a `random_bytes` name — `src/EpubFile.php:47-50` — S · low
   `uniqid()` plus the default `0777` mode leaves extracted content readable by other local users.
 - [x] **SEC-08** Do not follow symlinks in `deleteDirectory()` — `src/Util/FileSystemHelper.php:36-55` — S · low
   `is_dir()` is true for a symlink to a directory, so cleanup would recurse into and delete the link target.
-- [ ] **SEC-09** Parse XML with explicit `LIBXML_NONET`, reject DOCTYPEs in package files, and report libxml errors instead of `@` — `src/XmlParser.php:18-30` — S · low
+- [x] **SEC-09** Parse XML with explicit `LIBXML_NONET`, reject DOCTYPEs in package files, and report libxml errors instead of `@` — `src/XmlParser.php:18-30` — S · low
   Relies on libxml defaults for XXE safety and the `@` hides why a book failed to load.
 
 ### Bugs
@@ -122,7 +122,7 @@ Effort: S = one file, under 30 min · M = one class plus tests · L = cross-cutt
   It returns absolute temp paths while every other method takes relative ones, so its output cannot be fed back in.
 - [ ] **UX-02** Add list-valued `getSubjects()`/`setSubjects()` (and titles) — `src/Traits/InteractsWithSubject.php:13-40` — S · low
   Books usually have several subjects; only the first is reachable.
-- [ ] **UX-03** Introduce specific exception subclasses (invalid book, ZIP, conversion) — `src/Exception.php` — M · low
+- [x] **UX-03** Introduce specific exception subclasses (invalid book, ZIP, conversion) — `src/Exception.php` — M · low
   Callers cannot tell a corrupt book from an I/O failure.
 - [ ] **UX-04** Add `EpubFile::open()` and a convenience `convert()` — `src/EpubFile.php:21-61` — S · low
   Removes the "must be loaded before…" class of misuse and the manual temp-dir plumbing for conversion.
