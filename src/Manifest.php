@@ -18,22 +18,34 @@ class Manifest
         'html' => 'application/xhtml+xml',
         'htm' => 'application/xhtml+xml',
         'css' => 'text/css',
-        'js' => 'application/javascript',
+        // EPUB 3.3 lists text/javascript as the core media type for scripts.
+        'js' => 'text/javascript',
         'ncx' => 'application/x-dtbncx+xml',
         'smil' => 'application/smil+xml',
+        'pls' => 'application/pls+xml',
+        'xml' => 'application/xml',
+        'json' => 'application/json',
+        'txt' => 'text/plain',
+        'vtt' => 'text/vtt',
         'svg' => 'image/svg+xml',
         'jpg' => 'image/jpeg',
         'jpeg' => 'image/jpeg',
         'png' => 'image/png',
         'gif' => 'image/gif',
         'webp' => 'image/webp',
+        'avif' => 'image/avif',
         'otf' => 'font/otf',
         'ttf' => 'font/ttf',
         'woff' => 'font/woff',
         'woff2' => 'font/woff2',
         'mp3' => 'audio/mpeg',
-        'mp4' => 'video/mp4',
         'm4a' => 'audio/mp4',
+        'aac' => 'audio/aac',
+        'ogg' => 'audio/ogg',
+        'opus' => 'audio/opus',
+        'mp4' => 'video/mp4',
+        'm4v' => 'video/mp4',
+        'webm' => 'video/webm',
     ];
 
     private readonly SimpleXMLElement $manifestNode;
@@ -147,6 +159,48 @@ class Manifest
         unset($node[0]);
         $this->removeReferences($id, $href);
         $this->modified = true;
+    }
+
+    /**
+     * Changes the media type of an item, e.g. after its file was replaced with another format.
+     *
+     * @throws Exception If no item has this id, or the media type is not valid XML text.
+     */
+    public function setMediaType(string $id, string $mediaType): void
+    {
+        XmlText::assertValid($mediaType);
+        $node = $this->requireNode($id);
+
+        if ((string) $node['media-type'] !== $mediaType) {
+            $node['media-type'] = $mediaType;
+            $this->modified = true;
+        }
+    }
+
+    /**
+     * Finds the item for an href relative to the OPF file (fragments are ignored);
+     * null when no item matches or the href points outside the book.
+     */
+    public function findByHref(string $href): ?ManifestItem
+    {
+        $path = $this->tryHrefToPath($href);
+
+        return $path === null ? null : $this->findByPath($path);
+    }
+
+    /**
+     * The file path (relative to the book root) of the EPUB 2 <guide> reference of the
+     * given type, e.g. "cover" or "toc"; null when there is none or it points outside the book.
+     */
+    public function getGuidePath(string $type): ?string
+    {
+        foreach ($this->query('/opf:package/opf:guide/opf:reference') as $reference) {
+            if (strcasecmp((string) $reference['type'], $type) === 0) {
+                return $this->tryHrefToPath((string) $reference['href']);
+            }
+        }
+
+        return null;
     }
 
     /**

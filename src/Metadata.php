@@ -13,6 +13,7 @@ class Metadata
     use Traits\InteractsWithDescription;
     use Traits\InteractsWithDate;
     use Traits\InteractsWithAuthors;
+    use Traits\InteractsWithContributors;
     use Traits\InteractsWithPublisher;
     use Traits\InteractsWithLanguage;
     use Traits\InteractsWithSubject;
@@ -106,23 +107,45 @@ class Metadata
 
     /**
      * Sets an EPUB 2 style <meta name="…" content="…"/> value; null removes it.
+     * Duplicates with the same name are replaced by this single value.
      */
     public function setMeta(string $name, ?string $content): void
     {
-        XmlText::assertValid($name, $content ?? '');
+        $this->setMetaValues($name, $content === null ? [] : [$content]);
+    }
 
+    /**
+     * Gets every <meta name="…" content="…"/> value with this name, in document order.
+     *
+     * @return list<string>
+     */
+    public function getMetaValues(string $name): array
+    {
+        return array_map(static fn (SimpleXMLElement $meta): string => (string) $meta['content'], $this->namedMetas($name));
+    }
+
+    /**
+     * Replaces every <meta name="…"> with this name by one element per value; [] removes them all.
+     *
+     * @param list<string> $values
+     */
+    public function setMetaValues(string $name, array $values): void
+    {
+        XmlText::assertValid($name, ...$values);
         $metas = $this->namedMetas($name);
 
-        if ($content === null) {
-            foreach ($metas as $meta) {
-                unset($meta[0]);
+        foreach ($values as $index => $value) {
+            if (isset($metas[$index])) {
+                $metas[$index]['content'] = $value;
+            } else {
+                $meta = $this->metadataNode->addChild('meta', null, self::OPF_NAMESPACE);
+                $meta->addAttribute('name', $name);
+                $meta->addAttribute('content', $value);
             }
-        } elseif ($metas === []) {
-            $meta = $this->metadataNode->addChild('meta', null, self::OPF_NAMESPACE);
-            $meta->addAttribute('name', $name);
-            $meta->addAttribute('content', $content);
-        } else {
-            $metas[0]['content'] = $content;
+        }
+
+        foreach (array_slice($metas, count($values)) as $meta) {
+            unset($meta[0]);
         }
 
         $this->modified = true;
@@ -141,22 +164,46 @@ class Metadata
 
     /**
      * Sets an EPUB 3 <meta property="…">value</meta> for the whole book; null removes it.
+     * Duplicates with the same property are replaced by this single value.
      */
     public function setProperty(string $property, ?string $value): void
     {
-        XmlText::assertValid($property, $value ?? '');
+        $this->setPropertyValues($property, $value === null ? [] : [$value]);
+    }
 
+    /**
+     * Gets every book-level <meta property="…"> value with this property, in document order
+     * (refinements of other elements are ignored).
+     *
+     * @return list<string>
+     */
+    public function getPropertyValues(string $property): array
+    {
+        return array_map(static fn (SimpleXMLElement $meta): string => (string) $meta, $this->propertyMetas($property));
+    }
+
+    /**
+     * Replaces every book-level <meta property="…"> with this property by one element per
+     * value; [] removes them all. Refinements of other elements are not touched.
+     *
+     * @param list<string> $values
+     */
+    public function setPropertyValues(string $property, array $values): void
+    {
+        XmlText::assertValid($property, ...$values);
         $metas = $this->propertyMetas($property);
 
-        if ($value === null) {
-            foreach ($metas as $meta) {
-                unset($meta[0]);
+        foreach ($values as $index => $value) {
+            if (isset($metas[$index])) {
+                $this->setText($metas[$index], $value);
+            } else {
+                $meta = $this->metadataNode->addChild('meta', htmlspecialchars($value, ENT_XML1), self::OPF_NAMESPACE);
+                $meta->addAttribute('property', $property);
             }
-        } elseif ($metas === []) {
-            $meta = $this->metadataNode->addChild('meta', htmlspecialchars($value, ENT_XML1), self::OPF_NAMESPACE);
-            $meta->addAttribute('property', $property);
-        } else {
-            $this->setText($metas[0], $value);
+        }
+
+        foreach (array_slice($metas, count($values)) as $meta) {
+            unset($meta[0]);
         }
 
         $this->modified = true;
@@ -266,6 +313,20 @@ class Metadata
     }
 
     /**
+     * The value of the EPUB 3 refinement (<meta refines="#id" property="…">) of an element, if any.
+     */
+    protected function refinementValue(SimpleXMLElement $element, string $property): ?string
+    {
+        foreach ($this->refinements($element) as $refinement) {
+            if ((string) $refinement['property'] === $property) {
+                return trim((string) $refinement);
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * @param list<string> $values
      *
      * @throws Exception If a value is not valid XML text, or empty for an element every package needs.
@@ -275,6 +336,10 @@ class Metadata
         XmlText::assertValid(...$values);
 
         if (in_array($name, self::REQUIRED_ELEMENTS, true)) {
+            if ($values === []) {
+                throw new Exception("dc:{$name} cannot be empty: every EPUB package needs one");
+            }
+
             foreach ($values as $value) {
                 if (trim($value) === '') {
                     throw new Exception("dc:{$name} cannot be empty: every EPUB package needs one");
@@ -283,10 +348,86 @@ class Metadata
         }
     }
 
-    private function addDcElement(string $name, string $value): void
+    private function addDcElement(string $name, string $value): SimpleXMLElement
     {
         // addChild() does not escape "&", so pass the value pre-escaped.
-        $this->metadataNode->addChild('dc:' . $name, htmlspecialchars($value, ENT_XML1), self::DC_NAMESPACE);
+        return $this->metadataNode->addChild('dc:' . $name, htmlspecialchars($value, ENT_XML1), self::DC_NAMESPACE);
+    }
+
+    /**
+     * The role (MARC relator code) of a dc:creator / dc:contributor: the EPUB 2 opf:role
+     * attribute or the EPUB 3 role refinement; null when there is none.
+     */
+    protected function personRole(SimpleXMLElement $element): ?string
+    {
+        return $this->personDetail($element, 'role');
+    }
+
+    protected function toContributor(SimpleXMLElement $element): Contributor
+    {
+        return new Contributor((string) $element, $this->personRole($element), $this->personDetail($element, 'file-as'));
+    }
+
+    /**
+     * Adds a dc:creator or dc:contributor with an optional role and sort key.
+     *
+     * @throws Exception If a value is not valid XML text or the name is empty.
+     */
+    protected function addPerson(string $element, string $name, ?string $role, ?string $fileAs): void
+    {
+        XmlText::assertValid($name, $role ?? '', $fileAs ?? '');
+        if (trim($name) === '') {
+            throw new Exception("dc:{$element} cannot be empty");
+        }
+
+        $node = $this->addDcElement($element, $name);
+        $details = array_filter(['role' => $role, 'file-as' => $fileAs], static fn (?string $value): bool => $value !== null && $value !== '');
+
+        if ($details !== [] && $this->isEpub3()) {
+            $id = $this->unusedId($element);
+            $node->addAttribute('id', $id);
+
+            foreach ($details as $property => $value) {
+                $meta = $this->metadataNode->addChild('meta', htmlspecialchars($value, ENT_XML1), self::OPF_NAMESPACE);
+                $meta->addAttribute('refines', '#' . $id);
+                $meta->addAttribute('property', $property);
+                if ($property === 'role') {
+                    $meta->addAttribute('scheme', 'marc:relators');
+                }
+            }
+        } else {
+            foreach ($details as $property => $value) {
+                $node->addAttribute('opf:' . $property, $value, self::OPF_NAMESPACE);
+            }
+        }
+
+        $this->modified = true;
+    }
+
+    /**
+     * An EPUB 2 opf:* attribute of a person, or else its EPUB 3 refinement; null when absent or empty.
+     */
+    private function personDetail(SimpleXMLElement $element, string $property): ?string
+    {
+        $attributes = $element->attributes(self::OPF_NAMESPACE);
+        $value = $attributes !== null && isset($attributes[$property])
+            ? trim((string) $attributes[$property])
+            : $this->refinementValue($element, $property);
+
+        return $value === null || $value === '' ? null : $value;
+    }
+
+    /**
+     * An id not used anywhere in the package, e.g. "creator-2".
+     */
+    private function unusedId(string $prefix): string
+    {
+        $used = array_map(static fn (SimpleXMLElement $attribute): string => (string) $attribute, $this->opfXml->xpath('//@id') ?: []);
+
+        for ($suffix = 1; in_array("{$prefix}-{$suffix}", $used, true); $suffix++) {
+        }
+
+        return "{$prefix}-{$suffix}";
     }
 
     private function setText(SimpleXMLElement $element, string $value): void

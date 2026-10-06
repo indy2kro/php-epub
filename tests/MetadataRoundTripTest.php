@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PhpEpub\Test;
 
+use PhpEpub\Contributor;
 use PhpEpub\EpubFile;
 use PhpEpub\Exception;
 use PhpEpub\Metadata;
@@ -119,9 +120,111 @@ XML));
 
         $xml = $this->reloadXml();
         $this->assertSame(['John Doe', 'Jane Roe'], $this->reload()->getAuthors());
+        // The illustrator is not an author: it is kept as it was, and Jane Roe is a new creator.
+        $this->assertSame(['John Doe', 'Ann Smith', 'Jane Roe'], $this->values($xml, '//dc:creator'));
         $this->assertSame(['aut', 'ill'], $this->values($xml, '//dc:creator/@opf:role'));
-        // Only the unchanged name keeps its sort key.
-        $this->assertSame(['Doe, John'], $this->values($xml, '//dc:creator/@opf:file-as'));
+        $this->assertSame(['Doe, John', 'Smith, Ann'], $this->values($xml, '//dc:creator/@opf:file-as'));
+    }
+
+    public function testAuthorsAreCreatorsWithTheAuthorRoleOrNoRole(): void
+    {
+        $metadata = $this->load(EpubBuilder::opf(metadata: <<<'XML'
+<dc:creator id="c1">Ann Author</dc:creator>
+    <meta refines="#c1" property="role" scheme="marc:relators">aut</meta>
+    <meta refines="#c1" property="file-as">Author, Ann</meta>
+    <dc:creator id="c2">Ivan Illustrator</dc:creator>
+    <meta refines="#c2" property="role" scheme="marc:relators">ill</meta>
+    <dc:creator>Plain Creator</dc:creator>
+XML));
+
+        $this->assertSame(['Ann Author', 'Plain Creator'], $metadata->getAuthors());
+        $this->assertEquals(
+            [new Contributor('Ann Author', 'aut', 'Author, Ann'), new Contributor('Ivan Illustrator', 'ill', null), new Contributor('Plain Creator', null, null)],
+            $metadata->getCreators()
+        );
+
+        $metadata->setAuthors(['New Author']);
+        $metadata->save();
+
+        $reloaded = $this->reload();
+        $this->assertSame(['New Author'], $reloaded->getAuthors());
+        $this->assertEquals(
+            [new Contributor('New Author', 'aut', null), new Contributor('Ivan Illustrator', 'ill', null)],
+            $reloaded->getCreators()
+        );
+    }
+
+    public function testAddCreatorAndContributorsInEpub3(): void
+    {
+        $metadata = $this->load(EpubBuilder::opf(metadata: '<dc:contributor>Old Editor</dc:contributor>'));
+        $this->assertEquals([new Contributor('Old Editor', null, null)], $metadata->getContributors());
+
+        $metadata->addCreator('Ivan Illustrator', 'ill', 'Illustrator, Ivan');
+        $metadata->addCreator('Ann Author');
+        $metadata->addContributor('Ed Editor', 'edt', 'Editor, Ed');
+        $metadata->save();
+
+        $reloaded = $this->reload();
+        $this->assertSame(['Ann Author'], $reloaded->getAuthors());
+        $this->assertEquals(
+            [new Contributor('Ivan Illustrator', 'ill', 'Illustrator, Ivan'), new Contributor('Ann Author', 'aut', null)],
+            $reloaded->getCreators()
+        );
+        $this->assertEquals(
+            [new Contributor('Old Editor', null, null), new Contributor('Ed Editor', 'edt', 'Editor, Ed')],
+            $reloaded->getContributors()
+        );
+        $xml = $this->reloadXml();
+        $this->assertSame(['ill', 'aut', 'edt'], $this->values($xml, "//opf:meta[@property='role']"));
+        $this->assertSame(['marc:relators', 'marc:relators', 'marc:relators'], $this->values($xml, "//opf:meta[@property='role']/@scheme"));
+
+        $reloaded->setContributors(['Only Contributor']);
+        $this->assertEquals([new Contributor('Only Contributor', null, null)], $reloaded->getContributors());
+    }
+
+    public function testAddCreatorAndContributorInEpub2(): void
+    {
+        $metadata = $this->load($this->epub2Opf(''));
+
+        $metadata->addCreator('Ann Author', 'aut', 'Author, Ann');
+        $metadata->addContributor('Ed Editor', 'edt');
+        $metadata->save();
+
+        $xml = $this->reloadXml();
+        $this->assertSame(['aut'], $this->values($xml, '//dc:creator/@opf:role'));
+        $this->assertSame(['Author, Ann'], $this->values($xml, '//dc:creator/@opf:file-as'));
+        $this->assertSame(['edt'], $this->values($xml, '//dc:contributor/@opf:role'));
+        $this->assertEquals([new Contributor('Ed Editor', 'edt', null)], $this->reload()->getContributors());
+    }
+
+    public function testRenamedEpub2AuthorLosesItsSortKeyButKeepsItsRole(): void
+    {
+        $metadata = $this->load($this->epub2Opf('<dc:creator opf:role="aut" opf:file-as="Doe, John">John Doe</dc:creator>'));
+
+        $metadata->setAuthors(['Johnny Doe']);
+        $metadata->save();
+
+        $this->assertEquals([new Contributor('Johnny Doe', 'aut', null)], $this->reload()->getCreators());
+    }
+
+    public function testAddCreatorRejectsAnEmptyName(): void
+    {
+        $metadata = $this->load(EpubBuilder::opf());
+
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('dc:creator cannot be empty');
+
+        $metadata->addCreator(' ');
+    }
+
+    public function testAddCreatorRejectsInvalidText(): void
+    {
+        $metadata = $this->load(EpubBuilder::opf());
+
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('not valid XML text');
+
+        $metadata->addCreator('Ann', "aut\x01");
     }
 
     public function testSaveUpdatesEpub3ModifiedDateAfterAnEdit(): void
