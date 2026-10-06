@@ -10,6 +10,7 @@ use PhpEpub\Metadata;
 use PhpEpub\Spine;
 use PhpEpub\Test\Support\EpubBuilder;
 use PhpEpub\XmlParser;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use SimpleXMLElement;
 
@@ -228,6 +229,89 @@ XML;
         $reloaded = $this->reload();
         $this->assertSame('Pride & Prejudice <Annotated>', $reloaded->getTitle());
         $this->assertSame(['Tom & Jerry'], $reloaded->getAuthors());
+    }
+
+    /**
+     * @param \Closure(Metadata): void $edit
+     */
+    #[DataProvider('invalidValueEdits')]
+    public function testValuesThatAreNotValidXmlTextAreRejected(\Closure $edit): void
+    {
+        $opf = EpubBuilder::opf();
+        $metadata = $this->load($opf);
+
+        try {
+            $edit($metadata);
+            $this->fail('Expected an exception for a value that cannot be stored in XML.');
+        } catch (Exception $exception) {
+            $this->assertStringContainsString('not valid XML text', $exception->getMessage());
+        }
+
+        // Nothing was written into the package, so it still saves and reloads.
+        $metadata->save();
+        $this->assertSame('Minimal', $this->reload()->getTitle());
+    }
+
+    /**
+     * @return iterable<string, array{\Closure(Metadata): void}>
+     */
+    public static function invalidValueEdits(): iterable
+    {
+        $latin1 = "Caf\xE9";
+        $control = "Bad\x01Value";
+
+        yield 'title latin-1' => [static fn (Metadata $metadata) => $metadata->setTitle($latin1)];
+        yield 'title control character' => [static fn (Metadata $metadata) => $metadata->setTitle($control)];
+        yield 'description' => [static fn (Metadata $metadata) => $metadata->setDescription($latin1)];
+        yield 'date' => [static fn (Metadata $metadata) => $metadata->setDate($control)];
+        yield 'publisher' => [static fn (Metadata $metadata) => $metadata->setPublisher($latin1)];
+        yield 'language' => [static fn (Metadata $metadata) => $metadata->setLanguage($control)];
+        yield 'subject' => [static fn (Metadata $metadata) => $metadata->setSubject($latin1)];
+        yield 'subjects' => [static fn (Metadata $metadata) => $metadata->setSubjects(['Fine', $control])];
+        yield 'authors' => [static fn (Metadata $metadata) => $metadata->setAuthors(['Fine', $latin1])];
+        yield 'identifiers' => [static fn (Metadata $metadata) => $metadata->setIdentifiers([$control])];
+        yield 'meta content' => [static fn (Metadata $metadata) => $metadata->setMeta('calibre:series', $latin1)];
+        yield 'meta name' => [static fn (Metadata $metadata) => $metadata->setMeta($control, 'Series')];
+        yield 'property value' => [static fn (Metadata $metadata) => $metadata->setProperty('belongs-to-collection', $control)];
+        yield 'property name' => [static fn (Metadata $metadata) => $metadata->setProperty($latin1, 'Value')];
+    }
+
+    /**
+     * @param \Closure(Metadata): void $edit
+     */
+    #[DataProvider('emptyRequiredValueEdits')]
+    public function testRequiredFieldsCannotBeEmptied(\Closure $edit): void
+    {
+        $metadata = $this->load(EpubBuilder::opf());
+
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('cannot be empty');
+
+        $edit($metadata);
+    }
+
+    /**
+     * @return iterable<string, array{\Closure(Metadata): void}>
+     */
+    public static function emptyRequiredValueEdits(): iterable
+    {
+        yield 'title' => [static fn (Metadata $metadata) => $metadata->setTitle('')];
+        yield 'title whitespace' => [static fn (Metadata $metadata) => $metadata->setTitle("  \n")];
+        yield 'language' => [static fn (Metadata $metadata) => $metadata->setLanguage('')];
+        yield 'identifier' => [static fn (Metadata $metadata) => $metadata->setIdentifiers(['urn:uuid:ok', ' '])];
+    }
+
+    public function testUnicodeAndWhitespaceValuesRoundTrip(): void
+    {
+        $metadata = $this->load(EpubBuilder::opf());
+        $title = "Ünïcødé 𝄞 title\twith\nwhitespace";
+
+        $metadata->setTitle($title);
+        $metadata->setMeta('calibre:series', '日本語');
+        $metadata->save();
+
+        $this->assertSame($title, $this->reload()->getTitle());
+        $this->assertSame('日本語', $this->reload()->getMeta('calibre:series'));
     }
 
     public function testSubjectsRoundTrip(): void

@@ -46,11 +46,26 @@ class XmlParser
                 throw new XmlException("Failed to load XML file: {$filePath}{$detail}");
             }
 
+            // The byte check above misses other encodings (e.g. UTF-16); the parsed DOCTYPE does not.
+            if ($this->declaresEntities($xml)) {
+                throw new XmlException("XML entity declarations are not allowed: {$filePath}");
+            }
+
             return $xml;
         } finally {
             libxml_clear_errors();
             libxml_use_internal_errors($useInternalErrors);
         }
+    }
+
+    /**
+     * Whether the document's internal DTD subset declares any (general or parameter) entity.
+     */
+    private function declaresEntities(SimpleXMLElement $xml): bool
+    {
+        $internalSubset = dom_import_simplexml($xml)->ownerDocument?->doctype?->internalSubset;
+
+        return $internalSubset !== null && stripos($internalSubset, '<!ENTITY') !== false;
     }
 
     /**

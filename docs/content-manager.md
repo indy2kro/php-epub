@@ -9,9 +9,11 @@ ContentManager operates on the extracted EPUB directory (accessible via `EpubFil
 When it is created by `EpubFile` (or given a `Manifest` and `Spine`), it keeps the OPF in sync:
 
 - `addContent()` adds new files to the manifest, with a media type guessed from the extension.
-- `deleteContent()` removes the file's manifest item and its spine entry.
+- `deleteContent()` removes the file's manifest item and its spine entry, plus package references to it (EPUB 2 cover meta, refinements, `spine@toc`, `fallback`/`media-overlay` of other items, `<guide>` references).
 
 Adding a file does not put it in the reading order; call `Spine::add()` for that.
+
+The package document (OPF) itself cannot be added, updated or deleted through `ContentManager`: `Metadata`, `Manifest` and `Spine` hold it in memory and `EpubFile::save()` writes it, so a direct write would be overwritten or leave them out of date. These methods throw an `Exception` for the OPF path.
 
 ## Key Methods
 
@@ -48,7 +50,7 @@ public function getContentList(): array
 public function addContent(string $filePath, string $content): void
 ```
 
-Creates (or overwrites) a file, creating missing directories. New files are added to the manifest, except container files (`mimetype`, `META-INF/…`, the OPF itself). Throws an exception if the file cannot be written.
+Creates (or overwrites) a file, creating missing directories. New files are added to the manifest, except container files (`mimetype`, `META-INF/…`). Throws an exception if the file cannot be written.
 
 ```php
 public function updateContent(string $filePath, string $newContent): void

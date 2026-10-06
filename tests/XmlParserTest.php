@@ -60,6 +60,26 @@ final class XmlParserTest extends TestCase
         (new XmlParser())->parse($this->xmlFilePath);
     }
 
+    public function testParseRejectsEntityDeclarationsInUtf16Documents(): void
+    {
+        // In UTF-16 every character is followed by a NUL byte, so a byte search for "<!ENTITY" misses it.
+        $xml = '<?xml version="1.0" encoding="UTF-16"?><!DOCTYPE root [<!ENTITY x "expanded">]><root>&x;</root>';
+        file_put_contents($this->xmlFilePath, "\xFF\xFE" . mb_convert_encoding($xml, 'UTF-16LE', 'UTF-8'));
+
+        $this->expectException(XmlException::class);
+        $this->expectExceptionMessage('entity declarations');
+
+        (new XmlParser())->parse($this->xmlFilePath);
+    }
+
+    public function testParseAcceptsUtf16DocumentsWithoutEntities(): void
+    {
+        $xml = '<?xml version="1.0" encoding="UTF-16"?><root><element>Value</element></root>';
+        file_put_contents($this->xmlFilePath, "\xFF\xFE" . mb_convert_encoding($xml, 'UTF-16LE', 'UTF-8'));
+
+        $this->assertSame('Value', (string) (new XmlParser())->parse($this->xmlFilePath)->element);
+    }
+
     public function testParseAcceptsPublicDoctypeWithoutEntities(): void
     {
         // EPUB 2 NCX files commonly carry a DOCTYPE; it must not be fetched or rejected.

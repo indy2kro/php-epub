@@ -121,3 +121,47 @@ jobs:
           with:
             token: ${{ secrets.CODECOV_TOKEN }}
             files: coverage.xml
+
+  epubcheck:
+
+    # Books saved by the library are checked with the W3C reference validator (tests/EpubCheckTest.php).
+    name: EPUBCheck
+
+    runs-on: ubuntu-latest
+
+    env:
+      EPUBCHECK_VERSION: "5.4.0"
+      EPUBCHECK_SHA256: "33350c61038e71dfb3d45a76aed04bf5481e6d5500cb780f6e98db8bbd15a28c"
+
+    steps:
+
+        - name: Checkout
+          uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+          with:
+            persist-credentials: false
+
+        - name: Install PHP
+          uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
+          with:
+            php-version: "8.5"
+            extensions: xml, zip, curl, dom, mbstring, gd, json
+            coverage: none
+
+        - name: Install Java
+          uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+          with:
+            distribution: temurin
+            java-version: "21"
+
+        - name: Install EPUBCheck
+          run: |
+            curl -fsSL -o epubcheck.zip "https://github.com/w3c/epubcheck/releases/download/v${EPUBCHECK_VERSION}/epubcheck-${EPUBCHECK_VERSION}.zip"
+            echo "${EPUBCHECK_SHA256}  epubcheck.zip" | sha256sum --check -
+            unzip -q epubcheck.zip -d "$RUNNER_TEMP"
+            echo "EPUBCHECK_JAR=$RUNNER_TEMP/epubcheck-${EPUBCHECK_VERSION}/epubcheck.jar" >> "$GITHUB_ENV"
+
+        - name: Update Dependencies with latest stable
+          run: composer update --no-progress
+
+        - name: Check saved books with EPUBCheck
+          run: vendor/bin/phpunit --group epubcheck

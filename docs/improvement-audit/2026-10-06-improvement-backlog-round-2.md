@@ -58,9 +58,9 @@ Effort: S = one file, under 30 min · M = one class plus tests · L = cross-cutt
 
 ### Security (untrusted input)
 
-- [ ] **SEC-01** Detect entity declarations on the parsed document, not by searching raw bytes — `src/XmlParser.php:33-41` — S · med
+- [x] **SEC-01** Detect entity declarations on the parsed document, not by searching raw bytes — `src/XmlParser.php:33-41` — S · med
   `preg_match('/<!ENTITY/')` runs on the file bytes, so a UTF-16 encoded container/OPF/NCX passes the guard and reaches libxml with its internal subset intact.
-- [ ] **SEC-02** Confine every resource reference the PDF renderers can follow (unquoted `src`, `srcset`, SVG `href`, `object`/`embed` `data`, CSS `url()`), ideally by parsing chapters with DOM — `src/Converters/EpubDocumentLoader.php:89-127` — M · med
+- [x] **SEC-02** Confine every resource reference the PDF renderers can follow (unquoted `src`, `srcset`, SVG `href`, `object`/`embed` `data`, CSS `url()`), ideally by parsing chapters with DOM — `src/Converters/EpubDocumentLoader.php:89-127` — M · med
   The rewrite only matches quoted values, but TCPDF 7 accepts unquoted attributes (`tc-lib-pdf/src/HTML.php:1811`), so book content can pull images from TCPDF's default read allowlist (system temp dir with other books, working dir, script dir) into the PDF.
 
 ### Bugs
@@ -69,7 +69,7 @@ Effort: S = one file, under 30 min · M = one class plus tests · L = cross-cutt
   `getNamespaces(true)` has no `''` key for `<opf:package xmlns:opf=…>`, so `load()` throws "No OPF namespace" and the prefixed-package support in `Metadata`/`Spine` is unreachable (its test bypasses `Parser`).
 - [ ] **BUG-02** Reset metadata/manifest/spine/content manager in `cleanup()` and when `load()` fails — `src/EpubFile.php:61-92` — S · med
   The getters keep returning objects bound to a deleted temp dir, so later edits and `save()` fail with confusing I/O errors.
-- [ ] **BUG-03** Clear dangling references when `deleteContent()`/`Manifest::remove()` drops an item (`<meta name="cover">`, `spine@toc`, `<guide>`) — `src/ContentManager.php:135-155`, `src/Manifest.php:136-142` — M · med
+- [x] **BUG-03** Clear dangling references when `deleteContent()`/`Manifest::remove()` drops an item (`<meta name="cover">`, `spine@toc`, `<guide>`) — `src/ContentManager.php:135-155`, `src/Manifest.php:136-142` — M · med
   Deleting the cover image or the NCX leaves references to an id/href that no longer exists, which readers and EPUBCheck reject.
 - [ ] **BUG-04** Do not let one bad manifest href make the whole manifest unreadable — `src/Manifest.php:74-100,225-238` — S · med
   `toItem()` throws for an href like `../x`, so `getItems()`, `findByPath()`, `getCoverImage()` and `addContent()` all fail instead of skipping or flagging that item.
@@ -83,11 +83,11 @@ Effort: S = one file, under 30 min · M = one class plus tests · L = cross-cutt
   Many EPUB 2 books name the cover that way, and `getCoverImage()` returns null for them.
 - [ ] **BUG-09** Report `deleteDirectory()` failures instead of emitting warnings from the destructor — `src/Util/FileSystemHelper.php:34-65` — S · low
   Recursive results are ignored, and a locked Windows file raises warnings from `__destruct` and leaks the temp dir silently.
-- [ ] **BUG-10** Keep `ContentManager` writes to the OPF consistent with the in-memory package (refuse them, or reload) — `src/ContentManager.php:89-126`, `src/EpubFile.php:193-204` — S · low
+- [x] **BUG-10** Keep `ContentManager` writes to the OPF consistent with the in-memory package (refuse them, or reload) — `src/ContentManager.php:89-126`, `src/EpubFile.php:193-204` — S · low
   `updateContent()` on the OPF is overwritten on the next `save()` when anything else changed, and kept otherwise.
-- [ ] **BUG-11** Make generated manifest ids unique across the whole OPF, not only among items — `src/Manifest.php:294-308` — S · low
+- [x] **BUG-11** Make generated manifest ids unique across the whole OPF, not only among items — `src/Manifest.php:294-308` — S · low
   A new file can get an id already used by a `dc:*` or `meta` element, producing duplicate XML ids.
-- [ ] **BUG-12** Reject empty values for required fields (title, language, identifier) — `src/Metadata.php:188-199`, `src/Traits/InteractsWithTitle.php`, `src/Traits/InteractsWithLanguage.php` — S · low
+- [x] **BUG-12** Reject empty values for required fields (title, language, identifier) — `src/Metadata.php:188-199`, `src/Traits/InteractsWithTitle.php`, `src/Traits/InteractsWithLanguage.php` — S · low
   `setTitle('')` writes an empty `dc:title`, which EPUBCheck reports as an error.
 
 ### Converters
@@ -134,7 +134,7 @@ Effort: S = one file, under 30 min · M = one class plus tests · L = cross-cutt
 
 ### Tests
 
-- [ ] **TEST-01** Run EPUBCheck in CI on books the library saved after edits (metadata, content, cover) — `.github/workflows/tests.yml`, `tests/EpubFileTest.php` — M · med
+- [x] **TEST-01** Run EPUBCheck in CI on books the library saved after edits (metadata, content, cover) — `.github/workflows/tests.yml`, `tests/EpubFileTest.php` — M · med
   Nothing checks saved books against the reference validator; BUG-03, BUG-11 and BUG-12 are exactly what it reports.
 
 ### CI and packaging
@@ -150,7 +150,7 @@ Effort: S = one file, under 30 min · M = one class plus tests · L = cross-cutt
 
 ### Sweeps
 
-- [ ] **SWEEP-01** Validate every string written into the OPF (metadata values, `setMeta`/`setProperty`, manifest ids and media types) as UTF-8 with only XML 1.0 characters, and throw otherwise — `src/Metadata.php:104-153,253-263`, `src/Manifest.php:110-129` — S · high
+- [x] **SWEEP-01** Validate every string written into the OPF (metadata values, `setMeta`/`setProperty`, manifest ids and media types) as UTF-8 with only XML 1.0 characters, and throw otherwise — `src/Metadata.php:104-153,253-263`, `src/Manifest.php:110-129` — S · high
   Probe: a Latin-1 title is written as raw bytes into the UTF-8 OPF, which then fails to parse, so the saved book cannot be reopened; control characters are stripped by `setText()` and make `addChild()` drop the whole value.
 - [ ] **SWEEP-02** Close the remaining coverage holes: `ZipHandler` (3/6 methods), `FileSystemHelper` (77.8% lines), `ContentManager` (6/8 methods), `TCPDFAdapter` (5/6), `EpubFile` (14/15) — `tests/` — M · low
   These are the error paths left after round one (failed writes, unreadable entries, cleanup failures).

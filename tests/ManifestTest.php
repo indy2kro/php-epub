@@ -91,6 +91,20 @@ final class ManifestTest extends TestCase
         $this->assertTrue($manifest->isModified());
     }
 
+    public function testIdsAreUniqueAcrossThePackageNotJustTheManifest(): void
+    {
+        $opf = EpubBuilder::opf(metadata: '<dc:creator id="cover-jpg">Ann</dc:creator>');
+        $manifest = new Manifest(new SimpleXMLElement($opf), 'EPUB/package.opf');
+
+        $this->assertSame('cover-jpg-2', $manifest->add('EPUB/cover.jpg')->id);
+
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('already in use');
+
+        // "uid" belongs to the dc:identifier.
+        $manifest->add('EPUB/other.xhtml', null, 'uid');
+    }
+
     public function testGeneratedIdsStartWithALetter(): void
     {
         $this->assertSame('item-01-xhtml', $this->manifest()->add('EPUB/01.xhtml')->id);
@@ -119,6 +133,85 @@ final class ManifestTest extends TestCase
         $this->expectExceptionMessage('already in use');
 
         $manifest->add('EPUB/other.xhtml', null, 'chapter');
+    }
+
+    public function testValuesThatAreNotValidXmlTextAreRejected(): void
+    {
+        $manifest = $this->manifest();
+        $attempts = [
+            'media type' => static fn () => $manifest->add('EPUB/a.xhtml', "application/xhtml+xml\x01"),
+            'id' => static fn () => $manifest->add('EPUB/b.xhtml', null, "caf\xE9"),
+            'property' => static fn () => $manifest->addProperty('chapter', "nav\x0B"),
+        ];
+
+        foreach ($attempts as $label => $attempt) {
+            try {
+                $attempt();
+                $this->fail("Expected an exception for an invalid {$label}.");
+            } catch (Exception $exception) {
+                $this->assertStringContainsString('not valid XML text', $exception->getMessage(), $label);
+            }
+        }
+
+        $this->assertCount(1, $manifest->getItems());
+        $this->assertFalse($manifest->isModified());
+    }
+
+    public function testRemoveClearsReferencesToTheItem(): void
+    {
+        $opf = '<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="uid">'
+            . '<metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:identifier id="uid">urn:x</dc:identifier>'
+            . '<meta name="cover" content="cover"/><meta name="calibre:series" content="Kept"/>'
+            . '<meta refines="#cover" property="alt-script">Cover</meta><meta refines="#uid" property="identifier-type">kept</meta>'
+            . '</metadata><manifest>'
+            . '<item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>'
+            . '<item id="cover" href="images/cover.jpg" media-type="image/jpeg"/>'
+            . '<item id="cover-page" href="cover.xhtml" media-type="application/xhtml+xml"/>'
+            . '<item id="alt" href="images/cover.webp" media-type="image/webp" fallback="cover"/>'
+            . '<item id="audio-page" href="a.xhtml" media-type="application/xhtml+xml" media-overlay="cover"/>'
+            . '</manifest><spine toc="ncx"><itemref idref="cover-page"/></spine>'
+            . '<guide><reference type="cover" href="images/cover.jpg"/><reference type="text" href="cover.xhtml#start"/></guide>'
+            . '</package>';
+        $xml = new SimpleXMLElement($opf);
+        $manifest = new Manifest($xml, 'EPUB/package.opf');
+
+        $manifest->remove('cover');
+        $manifest->remove('ncx');
+        $manifest->remove('cover-page');
+
+        $saved = (string) $xml->asXML();
+        $this->assertStringNotContainsString('name="cover"', $saved);
+        $this->assertStringNotContainsString('refines="#cover"', $saved);
+        $this->assertStringNotContainsString('fallback=', $saved);
+        $this->assertStringNotContainsString('media-overlay=', $saved);
+        $this->assertStringNotContainsString('toc=', $saved);
+        $this->assertStringNotContainsString('<reference', $saved);
+        // Unrelated metadata and spine entries stay; spine itemrefs are Spine's job.
+        $this->assertStringContainsString('content="Kept"', $saved);
+        $this->assertStringContainsString('refines="#uid"', $saved);
+        $this->assertStringContainsString('<itemref idref="cover-page"/>', $saved);
+    }
+
+    public function testRemoveCopesWithHrefsOutsideTheBook(): void
+    {
+        $opf = '<package xmlns="http://www.idpf.org/2007/opf" version="2.0"><metadata/><manifest>'
+            . '<item id="escape" href="../../outside.xhtml" media-type="application/xhtml+xml"/>'
+            . '<item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml"/>'
+            . '</manifest><spine/>'
+            . '<guide><reference type="text" href="../../elsewhere.xhtml"/><reference type="toc" href="chapter.xhtml"/></guide>'
+            . '</package>';
+        $xml = new SimpleXMLElement($opf);
+        $manifest = new Manifest($xml, 'EPUB/package.opf');
+
+        // An item with no file in the book has no guide references to clear.
+        $manifest->remove('escape');
+        $this->assertSame(2, substr_count((string) $xml->asXML(), '<reference'));
+
+        // A guide reference pointing outside the book never matches a removed item.
+        $manifest->remove('chapter');
+        $saved = (string) $xml->asXML();
+        $this->assertStringContainsString('elsewhere.xhtml', $saved);
+        $this->assertStringNotContainsString('type="toc"', $saved);
     }
 
     public function testRemove(): void
