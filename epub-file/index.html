@@ -68,6 +68,10 @@
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#accessing-components">Accessing Components</a>
     </li>
+    <li class="toctree-l3"><a class="reference internal" href="#cover-image">Cover Image</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#converting">Converting</a>
+    </li>
     <li class="toctree-l3"><a class="reference internal" href="#cleanup">Cleanup</a>
     </li>
         </ul>
@@ -152,7 +156,11 @@
 )
 </code></pre>
 
-<p>Initializes the EpubFile with the path to an EPUB file. The optional <code>$zipHandler</code> and <code>$xmlParser</code> parameters allow dependency injection for testing.</p>
+<p>Initializes the EpubFile with the path to an EPUB file. The optional <code>$zipHandler</code> and <code>$xmlParser</code> parameters allow dependency injection, e.g. a <code>ZipHandler</code> with tighter extraction limits.</p>
+<pre class="codehilite"><code class="language-php">public static function open(string $filePath, ?ZipHandler $zipHandler = null, ?XmlParser $xmlParser = null): EpubFile
+</code></pre>
+
+<p>Shortcut for <code>new EpubFile(...)</code> followed by <code>load()</code>.</p>
 <h3 id="loading-and-saving">Loading and Saving<a class="headerlink" href="#loading-and-saving" title="Permanent link">&para;</a></h3>
 <pre class="codehilite"><code class="language-php">public function load(): void
 </code></pre>
@@ -185,6 +193,20 @@
 </code></pre>
 
 <p>Returns the ContentManager for adding/updating/deleting content files. Throws an exception if called before <code>load()</code>.</p>
+<h3 id="cover-image">Cover Image<a class="headerlink" href="#cover-image" title="Permanent link">&para;</a></h3>
+<pre class="codehilite"><code class="language-php">public function getCoverImage(): ?ManifestItem
+</code></pre>
+
+<p>Returns the cover: the manifest item with the EPUB 3 <code>cover-image</code> property, or else the item named by the EPUB 2 <code>&lt;meta name="cover"&gt;</code>. Returns <code>null</code> when the book has no cover. Read the bytes with <code>getContentManager()-&gt;getContent($cover-&gt;path)</code>.</p>
+<pre class="codehilite"><code class="language-php">public function setCoverImage(string $imageData, string $mediaType, ?string $path = null): ManifestItem
+</code></pre>
+
+<p>Stores the image (by default as <code>images/cover.&lt;ext&gt;</code> next to the OPF file), adds it to the manifest and marks it as the cover: the <code>cover-image</code> property for EPUB 3 (removed from any previous cover) and <code>&lt;meta name="cover"&gt;</code> for EPUB 2 compatibility. The previous image file stays in the book. Throws if <code>$mediaType</code> is not an <code>image/…</code> type.</p>
+<h3 id="converting">Converting<a class="headerlink" href="#converting" title="Permanent link">&para;</a></h3>
+<pre class="codehilite"><code class="language-php">public function convert(ConverterInterface $converter, string $outputPath): void
+</code></pre>
+
+<p>Writes pending changes to the extracted book and converts it with the given adapter (<code>DompdfAdapter</code>, <code>TCPDFAdapter</code>, <code>CalibreAdapter</code>, …), so unsaved edits are included. Throws if called before <code>load()</code>.</p>
 <h3 id="cleanup">Cleanup<a class="headerlink" href="#cleanup" title="Permanent link">&para;</a></h3>
 <pre class="codehilite"><code class="language-php">public function cleanup(): void
 </code></pre>

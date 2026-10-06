@@ -326,16 +326,16 @@ at <code>af4bbcc</code> (main). No source changes were made while compiling this
   Books usually have several subjects; only the first is reachable. <em>Done for subjects; multiple titles deferred.</em></li>
 <li>[x] <strong>UX-03</strong> Introduce specific exception subclasses (invalid book, ZIP, conversion) — <code>src/Exception.php</code> — M · low
   Callers cannot tell a corrupt book from an I/O failure.</li>
-<li>[ ] <strong>UX-04</strong> Add <code>EpubFile::open()</code> and a convenience <code>convert()</code> — <code>src/EpubFile.php:21-61</code> — S · low
+<li>[x] <strong>UX-04</strong> Add <code>EpubFile::open()</code> and a convenience <code>convert()</code> — <code>src/EpubFile.php:21-61</code> — S · low
   Removes the "must be loaded before…" class of misuse and the manual temp-dir plumbing for conversion.</li>
 </ul>
 <h3 id="features">Features<a class="headerlink" href="#features" title="Permanent link">&para;</a></h3>
 <ul>
 <li>[x] <strong>FEAT-01</strong> Richer spine: <code>linear</code> flag, idref→href resolution, add/remove/reorder — <code>src/Spine.php</code> — M · med
   The spine is a read-only list of idrefs that callers must resolve by hand.</li>
-<li>[ ] <strong>FEAT-02</strong> Cover image get/set (EPUB 2 <code>meta name="cover"</code> and EPUB 3 <code>cover-image</code>) — new — M · med
+<li>[x] <strong>FEAT-02</strong> Cover image get/set (EPUB 2 <code>meta name="cover"</code> and EPUB 3 <code>cover-image</code>) — new — M · med
   The most requested metadata operation after title/author is missing.</li>
-<li>[ ] <strong>FEAT-03</strong> Generic <code>&lt;meta&gt;</code> get/set (e.g. <code>calibre:series</code>, EPUB 3 <code>property</code>) — <code>src/Metadata.php</code> — M · low
+<li>[x] <strong>FEAT-03</strong> Generic <code>&lt;meta&gt;</code> get/set (e.g. <code>calibre:series</code>, EPUB 3 <code>property</code>) — <code>src/Metadata.php</code> — M · low
   Anything outside the eight Dublin Core traits is unreachable.</li>
 </ul>
 <h3 id="documentation">Documentation<a class="headerlink" href="#documentation" title="Permanent link">&para;</a></h3>

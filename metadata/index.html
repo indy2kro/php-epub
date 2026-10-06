@@ -90,6 +90,8 @@
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#identifiers">Identifiers</a>
     </li>
+    <li class="toctree-l3"><a class="reference internal" href="#other-meta-elements">Other &lt;meta&gt; Elements</a>
+    </li>
         </ul>
     </li>
     <li class="toctree-l2"><a class="reference internal" href="#usage-example">Usage Example</a>
@@ -223,6 +225,26 @@ public function setIdentifiers(array&lt;int, string&gt; $identifiers): void
 
 <p>Unambiguous references to the resource (dc:identifier), such as an ISBN or UUID.</p>
 <p>The first value passed to <code>setIdentifiers()</code> is stored in the identifier that <code>package@unique-identifier</code> points to, so the package stays valid. At least one identifier is required. An identifier whose value changes loses its type information (<code>opf:scheme</code> / <code>identifier-type</code> refinement).</p>
+<h3 id="other-meta-elements">Other <code>&lt;meta&gt;</code> Elements<a class="headerlink" href="#other-meta-elements" title="Permanent link">&para;</a></h3>
+<pre class="codehilite"><code class="language-php">public function getMeta(string $name): ?string
+public function setMeta(string $name, ?string $content): void
+public function getProperty(string $property): ?string
+public function setProperty(string $property, ?string $value): void
+public function getVersion(): string
+</code></pre>
+
+<p>Access to metadata beyond the Dublin Core fields:</p>
+<ul>
+<li><code>getMeta()</code>/<code>setMeta()</code> read and write EPUB 2 style <code>&lt;meta name="…" content="…"/&gt;</code> elements, such as <code>calibre:series</code>, <code>calibre:series_index</code> or <code>cover</code>.</li>
+<li><code>getProperty()</code>/<code>setProperty()</code> read and write EPUB 3 <code>&lt;meta property="…"&gt;value&lt;/meta&gt;</code> elements that describe the whole book, such as <code>belongs-to-collection</code> or <code>schema:accessMode</code>. Refinements of other elements (<code>refines="#id"</code>) are ignored.</li>
+<li>Passing <code>null</code> as the value removes the element. Only the first matching element is read or updated.</li>
+<li><code>getVersion()</code> returns the package version, e.g. <code>2.0</code> or <code>3.0</code>.</li>
+</ul>
+<pre class="codehilite"><code class="language-php">$metadata-&gt;setMeta('calibre:series', 'The Expanse');
+$metadata-&gt;setMeta('calibre:series_index', '1');
+$metadata-&gt;setProperty('schema:accessMode', 'textual');
+</code></pre>
+
 <h2 id="usage-example">Usage Example<a class="headerlink" href="#usage-example" title="Permanent link">&para;</a></h2>
 <pre class="codehilite"><code class="language-php">use PhpEpub\EpubFile;
 
