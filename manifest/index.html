@@ -134,7 +134,7 @@
 <p><strong><code>get(string $id): ?ManifestItem</code></strong> and <strong><code>findByPath(string $path): ?ManifestItem</code></strong>: Look up one item.</p>
 </li>
 <li>
-<p><strong><code>add(string $path, ?string $mediaType = null, ?string $id = null): ManifestItem</code></strong>: Adds a file. The media type is guessed from the extension and the id is derived from the file name when not given. Throws if the path is already listed, the id is already used anywhere in the package, or the media type or id is not valid UTF-8 XML text.</p>
+<p><strong><code>add(string $path, ?string $mediaType = null, ?string $id = null): ManifestItem</code></strong>: Adds a file. The media type is guessed from the extension (XHTML, CSS, JavaScript, NCX, SMIL, PLS, XML, JSON, text, WebVTT, the common image, font, audio and video formats; <code>application/octet-stream</code> otherwise) and the id is derived from the file name when not given. Throws if the path is already listed, the id is already used anywhere in the package, or the media type or id is not valid UTF-8 XML text.</p>
 </li>
 <li>
 <p><strong><code>remove(string $id): void</code></strong>: Removes an item and the package references to it (EPUB 2 cover meta, refinements, <code>spine@toc</code>, <code>fallback</code>/<code>media-overlay</code> of other items, <code>&lt;guide&gt;</code> references to its file). Spine entries are not touched; use <code>Spine::remove()</code> (or <code>ContentManager::deleteContent()</code>, which does both).</p>
@@ -144,6 +144,24 @@
 </li>
 <li>
 <p><strong><code>addProperty(string $id, string $property): void</code></strong> and <strong><code>removeProperty(string $id, string $property): void</code></strong>: Add or remove an EPUB 3 property token (e.g. <code>cover-image</code>, <code>nav</code>) on an item; other tokens are kept.</p>
+</li>
+<li>
+<p><strong><code>setMediaType(string $id, string $mediaType): void</code></strong>: Changes an item's media type, e.g. after its file was replaced with another format.</p>
+</li>
+<li>
+<p><strong><code>findByHref(string $href): ?ManifestItem</code></strong>: Looks up an item by an href relative to the OPF file (fragments ignored); <code>null</code> when nothing matches or the href points outside the book.</p>
+</li>
+<li>
+<p><strong><code>getGuidePath(string $type): ?string</code></strong>: The book-root path of the EPUB 2 <code>&lt;guide&gt;</code> reference of a type such as <code>cover</code> or <code>toc</code> (matched case-insensitively), or <code>null</code>.</p>
+</li>
+<li>
+<p><strong><code>setMediaType(string $id, string $mediaType): void</code></strong>: Changes an item's media type, e.g. after its file was replaced with another format.</p>
+</li>
+<li>
+<p><strong><code>findByHref(string $href): ?ManifestItem</code></strong>: Looks up an item by an href relative to the OPF file (fragments ignored); <code>null</code> when nothing matches or the href points outside the book.</p>
+</li>
+<li>
+<p><strong><code>getGuidePath(string $type): ?string</code></strong>: The book-root path of the EPUB 2 <code>&lt;guide&gt;</code> reference of a type such as <code>cover</code> or <code>toc</code> (matched case-insensitively), or <code>null</code>.</p>
 </li>
 <li>
 <p><strong><code>getOpfPath(): string</code></strong>: The OPF location relative to the book root.</p>

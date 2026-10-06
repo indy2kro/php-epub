@@ -197,11 +197,11 @@
 <pre class="codehilite"><code class="language-php">public function getCoverImage(): ?ManifestItem
 </code></pre>
 
-<p>Returns the cover: the manifest item with the EPUB 3 <code>cover-image</code> property, or else the item named by the EPUB 2 <code>&lt;meta name="cover"&gt;</code>. Returns <code>null</code> when the book has no cover. Read the bytes with <code>getContentManager()-&gt;getContent($cover-&gt;path)</code>.</p>
+<p>Returns the cover, looking in order at: the manifest item with the EPUB 3 <code>cover-image</code> property; the item named by the EPUB 2 <code>&lt;meta name="cover"&gt;</code> (by id, or by href as some books write it); the EPUB 2 <code>&lt;guide&gt;</code> cover reference, which names either the image itself or a cover page whose first image (<code>&lt;img&gt;</code> or SVG <code>&lt;image&gt;</code>) is used. Returns <code>null</code> when the book has no cover. Read the bytes with <code>getContentManager()-&gt;getContent($cover-&gt;path)</code>.</p>
 <pre class="codehilite"><code class="language-php">public function setCoverImage(string $imageData, string $mediaType, ?string $path = null): ManifestItem
 </code></pre>
 
-<p>Stores the image (by default as <code>images/cover.&lt;ext&gt;</code> next to the OPF file), adds it to the manifest and marks it as the cover: the <code>cover-image</code> property for EPUB 3 (removed from any previous cover) and <code>&lt;meta name="cover"&gt;</code> for EPUB 2 compatibility. The previous image file stays in the book. Throws if <code>$mediaType</code> is not an <code>image/…</code> type.</p>
+<p>Stores the image (by default as <code>images/cover.&lt;ext&gt;</code> next to the OPF file), adds it to the manifest and marks it as the cover: the <code>cover-image</code> property for EPUB 3 (removed from any previous cover) and <code>&lt;meta name="cover"&gt;</code> for EPUB 2 compatibility. When <code>$path</code> is already in the manifest, that item is reused and its media type updated. The previous image file stays in the book. Throws if <code>$mediaType</code> is not an <code>image/…</code> type.</p>
 <h3 id="converting">Converting<a class="headerlink" href="#converting" title="Permanent link">&para;</a></h3>
 <pre class="codehilite"><code class="language-php">public function convert(ConverterInterface $converter, string $outputPath): void
 </code></pre>

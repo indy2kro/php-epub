@@ -78,6 +78,8 @@
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#authors">Authors</a>
     </li>
+    <li class="toctree-l3"><a class="reference internal" href="#contributors">Contributors</a>
+    </li>
     <li class="toctree-l3"><a class="reference internal" href="#description">Description</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#publisher">Publisher</a>
@@ -176,16 +178,41 @@ public function isModified(): bool
 <h3 id="title">Title<a class="headerlink" href="#title" title="Permanent link">&para;</a></h3>
 <pre class="codehilite"><code class="language-php">public function getTitle(): string
 public function setTitle(string $title): void
+public function getTitles(): array
+public function setTitles(array $titles): void
 </code></pre>
 
-<p>The name given to the resource (dc:title).</p>
+<p>The name given to the resource (dc:title). A book can have several titles; in EPUB 3 a <code>title-type</code> refinement says which is the <code>main</code> title and which are subtitles, collection titles, and so on.</p>
+<ul>
+<li><code>getTitle()</code>/<code>setTitle()</code> work on the main title: the one refined as <code>main</code>, or else the first. Other titles are kept.</li>
+<li><code>getTitles()</code>/<code>setTitles()</code> read and replace all titles in document order. Existing titles are reused in order, so their <code>title-type</code> refinements stay with their position; a title whose text changes loses its <code>file-as</code> sort key.</li>
+<li>A book needs a title: <code>setTitles([])</code> and empty values throw an <code>Exception</code>.</li>
+</ul>
 <h3 id="authors">Authors<a class="headerlink" href="#authors" title="Permanent link">&para;</a></h3>
 <pre class="codehilite"><code class="language-php">public function getAuthors(): array&lt;int, string&gt;
 public function setAuthors(array&lt;int, string&gt; $authors): void
+public function getCreators(): array&lt;int, Contributor&gt;
+public function addCreator(string $name, ?string $role = 'aut', ?string $fileAs = null): void
 </code></pre>
 
-<p>The creators of the resource (dc:creator). Multiple authors are supported.</p>
-<p><code>setAuthors()</code> reuses the existing creators in order, so their roles survive (EPUB 2 <code>opf:role</code>, EPUB 3 <code>&lt;meta refines="#id" property="role"&gt;</code>). When a creator's name changes, its sort key (<code>opf:file-as</code> / <code>file-as</code> refinement) is removed because it described the old name. Creators that are no longer needed are removed together with all their refinements.</p>
+<p>The authors are the creators of the resource (dc:creator) with the role <code>aut</code> or no role at all; creators with another role, such as illustrators (<code>ill</code>), are not authors. Multiple authors are supported.</p>
+<p><code>setAuthors()</code> only replaces the authors: other creators are kept. It reuses the existing authors in order, so their roles survive (EPUB 2 <code>opf:role</code>, EPUB 3 <code>&lt;meta refines="#id" property="role"&gt;</code>). When an author's name changes, its sort key (<code>opf:file-as</code> / <code>file-as</code> refinement) is removed because it described the old name. Authors that are no longer needed are removed together with all their refinements.</p>
+<p><code>getCreators()</code> returns every creator as a <code>PhpEpub\Contributor</code> with <code>name</code>, <code>role</code> (a <a href="https://www.loc.gov/marc/relators/relaterm.html">MARC relator code</a> such as <code>aut</code>, <code>ill</code> or <code>trl</code>, or <code>null</code>) and <code>fileAs</code> (the sort key, or <code>null</code>). <code>addCreator()</code> adds one, writing the role and sort key as EPUB 3 refinements (<code>scheme="marc:relators"</code>) or as EPUB 2 <code>opf:role</code> / <code>opf:file-as</code> attributes, depending on the package version.</p>
+<h3 id="contributors">Contributors<a class="headerlink" href="#contributors" title="Permanent link">&para;</a></h3>
+<pre class="codehilite"><code class="language-php">public function getContributors(): array&lt;int, Contributor&gt;
+public function setContributors(array&lt;int, string&gt; $names): void
+public function addContributor(string $name, ?string $role = null, ?string $fileAs = null): void
+</code></pre>
+
+<p>People or organisations who contributed to the resource (dc:contributor), such as editors (<code>edt</code>) or translators (<code>trl</code>). These work like the creator methods; <code>setContributors()</code> reuses existing contributors in order, keeping their roles.</p>
+<pre class="codehilite"><code class="language-php">$metadata-&gt;addCreator('Ivan Illustrator', 'ill', 'Illustrator, Ivan');
+$metadata-&gt;addContributor('Ed Editor', 'edt');
+
+foreach ($metadata-&gt;getContributors() as $contributor) {
+    echo &quot;{$contributor-&gt;name} ({$contributor-&gt;role})\n&quot;;
+}
+</code></pre>
+
 <h3 id="description">Description<a class="headerlink" href="#description" title="Permanent link">&para;</a></h3>
 <pre class="codehilite"><code class="language-php">public function getDescription(): string
 public function setDescription(string $description): void
@@ -201,9 +228,16 @@ public function setPublisher(string $publisher): void
 <h3 id="date">Date<a class="headerlink" href="#date" title="Permanent link">&para;</a></h3>
 <pre class="codehilite"><code class="language-php">public function getDate(): string
 public function setDate(string $date): void
+public function getModifiedDate(): ?string
+public function getDateEvents(): array
 </code></pre>
 
 <p>Date of publication (dc:date). Should be in a valid date format (preferably ISO 8601).</p>
+<ul>
+<li><code>getDate()</code>/<code>setDate()</code> use the publication date: the <code>dc:date</code> with the EPUB 2 <code>opf:event="publication"</code>, or else one without an event, or else the first. Dates of other events are kept.</li>
+<li><code>getModifiedDate()</code> returns the EPUB 3 <code>dcterms:modified</code> property, or else the EPUB 2 <code>dc:date</code> with <code>opf:event="modification"</code>, or <code>null</code>. <code>save()</code> keeps the EPUB 3 value up to date.</li>
+<li><code>getDateEvents()</code> returns every <code>dc:date</code> keyed by its <code>opf:event</code> (<code>""</code> for a date without one), e.g. <code>['publication' =&gt; '1999-01-01', 'modification' =&gt; '2020-05-05']</code>.</li>
+</ul>
 <h3 id="language">Language<a class="headerlink" href="#language" title="Permanent link">&para;</a></h3>
 <pre class="codehilite"><code class="language-php">public function getLanguage(): string
 public function setLanguage(string $language): void
@@ -230,6 +264,10 @@ public function setIdentifiers(array&lt;int, string&gt; $identifiers): void
 public function setMeta(string $name, ?string $content): void
 public function getProperty(string $property): ?string
 public function setProperty(string $property, ?string $value): void
+public function getMetaValues(string $name): array
+public function setMetaValues(string $name, array $values): void
+public function getPropertyValues(string $property): array
+public function setPropertyValues(string $property, array $values): void
 public function getVersion(): string
 </code></pre>
 
@@ -237,7 +275,8 @@ public function getVersion(): string
 <ul>
 <li><code>getMeta()</code>/<code>setMeta()</code> read and write EPUB 2 style <code>&lt;meta name="…" content="…"/&gt;</code> elements, such as <code>calibre:series</code>, <code>calibre:series_index</code> or <code>cover</code>.</li>
 <li><code>getProperty()</code>/<code>setProperty()</code> read and write EPUB 3 <code>&lt;meta property="…"&gt;value&lt;/meta&gt;</code> elements that describe the whole book, such as <code>belongs-to-collection</code> or <code>schema:accessMode</code>. Refinements of other elements (<code>refines="#id"</code>) are ignored.</li>
-<li>Passing <code>null</code> as the value removes the element. Only the first matching element is read or updated.</li>
+<li>Passing <code>null</code> as the value removes the element. <code>getMeta()</code>/<code>getProperty()</code> return the first match; <code>setMeta()</code>/<code>setProperty()</code> replace every match with the single new value, so no stale duplicates are left.</li>
+<li><code>getMetaValues()</code>/<code>setMetaValues()</code> and <code>getPropertyValues()</code>/<code>setPropertyValues()</code> read and write all elements with that name or property as a list (e.g. several <code>dcterms:subject</code> properties); an empty list removes them all.</li>
 <li><code>getVersion()</code> returns the package version, e.g. <code>2.0</code> or <code>3.0</code>.</li>
 </ul>
 <pre class="codehilite"><code class="language-php">$metadata-&gt;setMeta('calibre:series', 'The Expanse');
@@ -275,7 +314,8 @@ $epubFile-&gt;save();
 <li><code>InteractsWithTitle</code> - Title handling</li>
 <li><code>InteractsWithDescription</code> - Description handling</li>
 <li><code>InteractsWithDate</code> - Date handling</li>
-<li><code>InteractsWithAuthors</code> - Author handling</li>
+<li><code>InteractsWithAuthors</code> - Author and creator handling</li>
+<li><code>InteractsWithContributors</code> - Contributor handling</li>
 <li><code>InteractsWithPublisher</code> - Publisher handling</li>
 <li><code>InteractsWithLanguage</code> - Language handling</li>
 <li><code>InteractsWithSubject</code> - Subject handling</li>

@@ -305,18 +305,18 @@ No source changes were made while compiling this list.</p>
 </ul>
 <h3 id="api-ux">API / UX<a class="headerlink" href="#api-ux" title="Permanent link">&para;</a></h3>
 <ul>
-<li>[ ] <strong>UX-01</strong> Add <code>getTitles()</code>/<code>setTitles()</code> aware of EPUB 3 <code>title-type</code> (main/subtitle) — <code>src/Traits/InteractsWithTitle.php</code> — S · low
+<li>[x] <strong>UX-01</strong> Add <code>getTitles()</code>/<code>setTitles()</code> aware of EPUB 3 <code>title-type</code> (main/subtitle) — <code>src/Traits/InteractsWithTitle.php</code> — S · low
   Deferred from the previous round; a book whose subtitle comes first returns it as the title.</li>
-<li>[ ] <strong>UX-02</strong> Expose dated events (EPUB 2 <code>opf:event</code>, EPUB 3 <code>dcterms:modified</code>) instead of only the first <code>dc:date</code> — <code>src/Traits/InteractsWithDate.php:12-22</code> — S · low
+<li>[x] <strong>UX-02</strong> Expose dated events (EPUB 2 <code>opf:event</code>, EPUB 3 <code>dcterms:modified</code>) instead of only the first <code>dc:date</code> — <code>src/Traits/InteractsWithDate.php:12-22</code> — S · low
   <code>getDate()</code> may return the modification date rather than the publication date.</li>
-<li>[ ] <strong>UX-03</strong> Add list APIs for repeated <code>&lt;meta name&gt;</code> / <code>&lt;meta property&gt;</code> entries — <code>src/Metadata.php:94-153</code> — S · low
+<li>[x] <strong>UX-03</strong> Add list APIs for repeated <code>&lt;meta name&gt;</code> / <code>&lt;meta property&gt;</code> entries — <code>src/Metadata.php:94-153</code> — S · low
   <code>setMeta()</code>/<code>setProperty()</code> only update the first match, so duplicates keep the old value alongside the new one.</li>
-<li>[ ] <strong>UX-04</strong> Extend guessed media types (aac, ogg, opus, m4v, webm, avif, json, xml, txt, vtt) and use <code>text/javascript</code> — <code>src/Manifest.php:15-36</code> — S · low
+<li>[x] <strong>UX-04</strong> Extend guessed media types (aac, ogg, opus, m4v, webm, avif, json, xml, txt, vtt) and use <code>text/javascript</code> — <code>src/Manifest.php:15-36</code> — S · low
   Common EPUB 3 media fall back to <code>application/octet-stream</code>.</li>
 </ul>
 <h3 id="features">Features<a class="headerlink" href="#features" title="Permanent link">&para;</a></h3>
 <ul>
-<li>[ ] <strong>FEAT-01</strong> Contributors and creator roles (<code>dc:contributor</code>, <code>opf:role</code> / role refinements); make <code>getAuthors()</code> honour roles — <code>src/Traits/InteractsWithAuthors.php:14-31</code> — M · med
+<li>[x] <strong>FEAT-01</strong> Contributors and creator roles (<code>dc:contributor</code>, <code>opf:role</code> / role refinements); make <code>getAuthors()</code> honour roles — <code>src/Traits/InteractsWithAuthors.php:14-31</code> — M · med
   <code>getAuthors()</code> returns illustrators and editors too, and <code>dc:contributor</code> is unreachable.</li>
 <li>[ ] <strong>FEAT-02</strong> Table-of-contents API: read and edit the EPUB 3 nav document and the EPUB 2 NCX — new, <code>src/Parser.php:134-149</code> — L · med
   Callers cannot list chapters or add a new one to the TOC after <code>addContent()</code>.</li>
