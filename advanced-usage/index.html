@@ -229,7 +229,7 @@ $calibreAdapter-&gt;convert('/path/to/input.epub', '/path/to/output.mobi');
 </tr>
 <tr>
 <td>XML entity expansion and external entities (XXE)</td>
-<td><code>&lt;!ENTITY</code> declarations are rejected and the parser never fetches network resources</td>
+<td><code>&lt;!ENTITY</code> declarations are rejected in any encoding (checked on the parsed DOCTYPE, not only the raw bytes) and the parser never fetches network resources</td>
 </tr>
 <tr>
 <td>Symlinks in the extraction directory</td>
@@ -237,7 +237,7 @@ $calibreAdapter-&gt;convert('/path/to/input.epub', '/path/to/output.mobi');
 </tr>
 <tr>
 <td>Scripts, local files and remote URLs in book HTML during PDF conversion</td>
-<td>Scripts are removed, image sources are limited to files inside the book, and Dompdf runs without remote access, PHP or JavaScript, confined to the book directory</td>
+<td>Documents are parsed as HTML; scripts, embeds and resource-loading CSS are removed, every resource attribute is limited to files inside the book, and Dompdf runs without remote access, PHP or JavaScript, confined to the book directory</td>
 </tr>
 <tr>
 <td>Shell arguments for Calibre</td>

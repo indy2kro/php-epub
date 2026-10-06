@@ -134,9 +134,10 @@
 <p>When it is created by <code>EpubFile</code> (or given a <code>Manifest</code> and <code>Spine</code>), it keeps the OPF in sync:</p>
 <ul>
 <li><code>addContent()</code> adds new files to the manifest, with a media type guessed from the extension.</li>
-<li><code>deleteContent()</code> removes the file's manifest item and its spine entry.</li>
+<li><code>deleteContent()</code> removes the file's manifest item and its spine entry, plus package references to it (EPUB 2 cover meta, refinements, <code>spine@toc</code>, <code>fallback</code>/<code>media-overlay</code> of other items, <code>&lt;guide&gt;</code> references).</li>
 </ul>
 <p>Adding a file does not put it in the reading order; call <code>Spine::add()</code> for that.</p>
+<p>The package document (OPF) itself cannot be added, updated or deleted through <code>ContentManager</code>: <code>Metadata</code>, <code>Manifest</code> and <code>Spine</code> hold it in memory and <code>EpubFile::save()</code> writes it, so a direct write would be overwritten or leave them out of date. These methods throw an <code>Exception</code> for the OPF path.</p>
 <h2 id="key-methods">Key Methods<a class="headerlink" href="#key-methods" title="Permanent link">&para;</a></h2>
 <h3 id="constructor">Constructor<a class="headerlink" href="#constructor" title="Permanent link">&para;</a></h3>
 <pre class="codehilite"><code class="language-php">public function __construct(string $contentDirectory, ?Manifest $manifest = null, ?Spine $spine = null)
@@ -160,7 +161,7 @@ $contentManager = $epubFile-&gt;getContentManager();
 <pre class="codehilite"><code class="language-php">public function addContent(string $filePath, string $content): void
 </code></pre>
 
-<p>Creates (or overwrites) a file, creating missing directories. New files are added to the manifest, except container files (<code>mimetype</code>, <code>META-INF/…</code>, the OPF itself). Throws an exception if the file cannot be written.</p>
+<p>Creates (or overwrites) a file, creating missing directories. New files are added to the manifest, except container files (<code>mimetype</code>, <code>META-INF/…</code>). Throws an exception if the file cannot be written.</p>
 <pre class="codehilite"><code class="language-php">public function updateContent(string $filePath, string $newContent): void
 </code></pre>
 

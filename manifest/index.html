@@ -134,10 +134,10 @@
 <p><strong><code>get(string $id): ?ManifestItem</code></strong> and <strong><code>findByPath(string $path): ?ManifestItem</code></strong>: Look up one item.</p>
 </li>
 <li>
-<p><strong><code>add(string $path, ?string $mediaType = null, ?string $id = null): ManifestItem</code></strong>: Adds a file. The media type is guessed from the extension and the id is derived from the file name when not given. Throws if the path is already listed or the id is taken.</p>
+<p><strong><code>add(string $path, ?string $mediaType = null, ?string $id = null): ManifestItem</code></strong>: Adds a file. The media type is guessed from the extension and the id is derived from the file name when not given. Throws if the path is already listed, the id is already used anywhere in the package, or the media type or id is not valid UTF-8 XML text.</p>
 </li>
 <li>
-<p><strong><code>remove(string $id): void</code></strong>: Removes an item. Spine entries are not touched; use <code>Spine::remove()</code> (or <code>ContentManager::deleteContent()</code>, which does both).</p>
+<p><strong><code>remove(string $id): void</code></strong>: Removes an item and the package references to it (EPUB 2 cover meta, refinements, <code>spine@toc</code>, <code>fallback</code>/<code>media-overlay</code> of other items, <code>&lt;guide&gt;</code> references to its file). Spine entries are not touched; use <code>Spine::remove()</code> (or <code>ContentManager::deleteContent()</code>, which does both).</p>
 </li>
 <li>
 <p><strong><code>pathToHref(string $path): string</code></strong> and <strong><code>hrefToPath(string $href): string</code></strong>: Convert between the two forms.</p>

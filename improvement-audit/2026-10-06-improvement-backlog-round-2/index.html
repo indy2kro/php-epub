@@ -260,9 +260,9 @@ No source changes were made while compiling this list.</p>
 <h2 id="items">Items<a class="headerlink" href="#items" title="Permanent link">&para;</a></h2>
 <h3 id="security-untrusted-input">Security (untrusted input)<a class="headerlink" href="#security-untrusted-input" title="Permanent link">&para;</a></h3>
 <ul>
-<li>[ ] <strong>SEC-01</strong> Detect entity declarations on the parsed document, not by searching raw bytes — <code>src/XmlParser.php:33-41</code> — S · med
+<li>[x] <strong>SEC-01</strong> Detect entity declarations on the parsed document, not by searching raw bytes — <code>src/XmlParser.php:33-41</code> — S · med
   <code>preg_match('/&lt;!ENTITY/')</code> runs on the file bytes, so a UTF-16 encoded container/OPF/NCX passes the guard and reaches libxml with its internal subset intact.</li>
-<li>[ ] <strong>SEC-02</strong> Confine every resource reference the PDF renderers can follow (unquoted <code>src</code>, <code>srcset</code>, SVG <code>href</code>, <code>object</code>/<code>embed</code> <code>data</code>, CSS <code>url()</code>), ideally by parsing chapters with DOM — <code>src/Converters/EpubDocumentLoader.php:89-127</code> — M · med
+<li>[x] <strong>SEC-02</strong> Confine every resource reference the PDF renderers can follow (unquoted <code>src</code>, <code>srcset</code>, SVG <code>href</code>, <code>object</code>/<code>embed</code> <code>data</code>, CSS <code>url()</code>), ideally by parsing chapters with DOM — <code>src/Converters/EpubDocumentLoader.php:89-127</code> — M · med
   The rewrite only matches quoted values, but TCPDF 7 accepts unquoted attributes (<code>tc-lib-pdf/src/HTML.php:1811</code>), so book content can pull images from TCPDF's default read allowlist (system temp dir with other books, working dir, script dir) into the PDF.</li>
 </ul>
 <h3 id="bugs">Bugs<a class="headerlink" href="#bugs" title="Permanent link">&para;</a></h3>
@@ -271,7 +271,7 @@ No source changes were made while compiling this list.</p>
   <code>getNamespaces(true)</code> has no <code>''</code> key for <code>&lt;opf:package xmlns:opf=…&gt;</code>, so <code>load()</code> throws "No OPF namespace" and the prefixed-package support in <code>Metadata</code>/<code>Spine</code> is unreachable (its test bypasses <code>Parser</code>).</li>
 <li>[ ] <strong>BUG-02</strong> Reset metadata/manifest/spine/content manager in <code>cleanup()</code> and when <code>load()</code> fails — <code>src/EpubFile.php:61-92</code> — S · med
   The getters keep returning objects bound to a deleted temp dir, so later edits and <code>save()</code> fail with confusing I/O errors.</li>
-<li>[ ] <strong>BUG-03</strong> Clear dangling references when <code>deleteContent()</code>/<code>Manifest::remove()</code> drops an item (<code>&lt;meta name="cover"&gt;</code>, <code>spine@toc</code>, <code>&lt;guide&gt;</code>) — <code>src/ContentManager.php:135-155</code>, <code>src/Manifest.php:136-142</code> — M · med
+<li>[x] <strong>BUG-03</strong> Clear dangling references when <code>deleteContent()</code>/<code>Manifest::remove()</code> drops an item (<code>&lt;meta name="cover"&gt;</code>, <code>spine@toc</code>, <code>&lt;guide&gt;</code>) — <code>src/ContentManager.php:135-155</code>, <code>src/Manifest.php:136-142</code> — M · med
   Deleting the cover image or the NCX leaves references to an id/href that no longer exists, which readers and EPUBCheck reject.</li>
 <li>[ ] <strong>BUG-04</strong> Do not let one bad manifest href make the whole manifest unreadable — <code>src/Manifest.php:74-100,225-238</code> — S · med
   <code>toItem()</code> throws for an href like <code>../x</code>, so <code>getItems()</code>, <code>findByPath()</code>, <code>getCoverImage()</code> and <code>addContent()</code> all fail instead of skipping or flagging that item.</li>
@@ -285,11 +285,11 @@ No source changes were made while compiling this list.</p>
   Many EPUB 2 books name the cover that way, and <code>getCoverImage()</code> returns null for them.</li>
 <li>[ ] <strong>BUG-09</strong> Report <code>deleteDirectory()</code> failures instead of emitting warnings from the destructor — <code>src/Util/FileSystemHelper.php:34-65</code> — S · low
   Recursive results are ignored, and a locked Windows file raises warnings from <code>__destruct</code> and leaks the temp dir silently.</li>
-<li>[ ] <strong>BUG-10</strong> Keep <code>ContentManager</code> writes to the OPF consistent with the in-memory package (refuse them, or reload) — <code>src/ContentManager.php:89-126</code>, <code>src/EpubFile.php:193-204</code> — S · low
+<li>[x] <strong>BUG-10</strong> Keep <code>ContentManager</code> writes to the OPF consistent with the in-memory package (refuse them, or reload) — <code>src/ContentManager.php:89-126</code>, <code>src/EpubFile.php:193-204</code> — S · low
   <code>updateContent()</code> on the OPF is overwritten on the next <code>save()</code> when anything else changed, and kept otherwise.</li>
-<li>[ ] <strong>BUG-11</strong> Make generated manifest ids unique across the whole OPF, not only among items — <code>src/Manifest.php:294-308</code> — S · low
+<li>[x] <strong>BUG-11</strong> Make generated manifest ids unique across the whole OPF, not only among items — <code>src/Manifest.php:294-308</code> — S · low
   A new file can get an id already used by a <code>dc:*</code> or <code>meta</code> element, producing duplicate XML ids.</li>
-<li>[ ] <strong>BUG-12</strong> Reject empty values for required fields (title, language, identifier) — <code>src/Metadata.php:188-199</code>, <code>src/Traits/InteractsWithTitle.php</code>, <code>src/Traits/InteractsWithLanguage.php</code> — S · low
+<li>[x] <strong>BUG-12</strong> Reject empty values for required fields (title, language, identifier) — <code>src/Metadata.php:188-199</code>, <code>src/Traits/InteractsWithTitle.php</code>, <code>src/Traits/InteractsWithLanguage.php</code> — S · low
   <code>setTitle('')</code> writes an empty <code>dc:title</code>, which EPUBCheck reports as an error.</li>
 </ul>
 <h3 id="converters">Converters<a class="headerlink" href="#converters" title="Permanent link">&para;</a></h3>
@@ -336,7 +336,7 @@ No source changes were made while compiling this list.</p>
 </ul>
 <h3 id="tests">Tests<a class="headerlink" href="#tests" title="Permanent link">&para;</a></h3>
 <ul>
-<li>[ ] <strong>TEST-01</strong> Run EPUBCheck in CI on books the library saved after edits (metadata, content, cover) — <code>.github/workflows/tests.yml</code>, <code>tests/EpubFileTest.php</code> — M · med
+<li>[x] <strong>TEST-01</strong> Run EPUBCheck in CI on books the library saved after edits (metadata, content, cover) — <code>.github/workflows/tests.yml</code>, <code>tests/EpubFileTest.php</code> — M · med
   Nothing checks saved books against the reference validator; BUG-03, BUG-11 and BUG-12 are exactly what it reports.</li>
 </ul>
 <h3 id="ci-and-packaging">CI and packaging<a class="headerlink" href="#ci-and-packaging" title="Permanent link">&para;</a></h3>
@@ -352,7 +352,7 @@ No source changes were made while compiling this list.</p>
 </ul>
 <h3 id="sweeps">Sweeps<a class="headerlink" href="#sweeps" title="Permanent link">&para;</a></h3>
 <ul>
-<li>[ ] <strong>SWEEP-01</strong> Validate every string written into the OPF (metadata values, <code>setMeta</code>/<code>setProperty</code>, manifest ids and media types) as UTF-8 with only XML 1.0 characters, and throw otherwise — <code>src/Metadata.php:104-153,253-263</code>, <code>src/Manifest.php:110-129</code> — S · high
+<li>[x] <strong>SWEEP-01</strong> Validate every string written into the OPF (metadata values, <code>setMeta</code>/<code>setProperty</code>, manifest ids and media types) as UTF-8 with only XML 1.0 characters, and throw otherwise — <code>src/Metadata.php:104-153,253-263</code>, <code>src/Manifest.php:110-129</code> — S · high
   Probe: a Latin-1 title is written as raw bytes into the UTF-8 OPF, which then fails to parse, so the saved book cannot be reopened; control characters are stripped by <code>setText()</code> and make <code>addChild()</code> drop the whole value.</li>
 <li>[ ] <strong>SWEEP-02</strong> Close the remaining coverage holes: <code>ZipHandler</code> (3/6 methods), <code>FileSystemHelper</code> (77.8% lines), <code>ContentManager</code> (6/8 methods), <code>TCPDFAdapter</code> (5/6), <code>EpubFile</code> (14/15) — <code>tests/</code> — M · low
   These are the error paths left after round one (failed writes, unreadable entries, cleanup failures).</li>

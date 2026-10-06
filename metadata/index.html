@@ -286,6 +286,8 @@ $epubFile-&gt;save();
 <ul>
 <li>The constructor throws <code>InvalidEpubException</code> if the package has no <code>&lt;metadata&gt;</code> element.</li>
 <li><code>setIdentifiers([])</code> throws an <code>Exception</code>, because a package needs at least one identifier.</li>
+<li><code>setTitle()</code>, <code>setLanguage()</code> and <code>setIdentifiers()</code> throw an <code>Exception</code> for an empty or whitespace-only value, because the OPF specification requires these elements to have content.</li>
+<li>Every setter (including <code>setMeta()</code> and <code>setProperty()</code>) throws an <code>Exception</code> for a value that is not valid UTF-8 or contains a character XML cannot store (control characters other than tab, newline and carriage return). Convert legacy encodings first, e.g. with <code>mb_convert_encoding($value, 'UTF-8', 'ISO-8859-1')</code>. The package is left unchanged when a value is rejected, even if it was one of several in a list.</li>
 <li><code>save()</code> throws an <code>Exception</code> if the OPF file cannot be written.</li>
 </ul>
               

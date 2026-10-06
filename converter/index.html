@@ -156,8 +156,10 @@ try {
 <p><code>DompdfAdapter</code> and <code>TCPDFAdapter</code> render every XHTML document in the <strong>spine</strong>, in reading order, each starting on a new page, and take the PDF title and author from the EPUB metadata. A directory that only contains a <code>content.xhtml</code> file (the layout older versions required) is still accepted.</p>
 <p>Book content is treated as untrusted:</p>
 <ul>
-<li><code>&lt;script&gt;</code> elements are removed.</li>
-<li>Image sources are rewritten to files inside the book; absolute paths, <code>file://</code>, remote URLs, paths escaping the book and missing files are blanked. <code>data:</code> URIs are kept.</li>
+<li>Each document is parsed with an HTML parser (not pattern-matched), so unquoted or unusually written attributes are handled too.</li>
+<li><code>&lt;script&gt;</code>, <code>&lt;link&gt;</code>, <code>&lt;base&gt;</code>, <code>&lt;meta&gt;</code>, <code>&lt;iframe&gt;</code>, <code>&lt;object&gt;</code>, <code>&lt;embed&gt;</code> and similar elements are removed, as are <code>on*</code> event attributes and <code>srcset</code>.</li>
+<li>Resource attributes (<code>src</code>, <code>xlink:href</code>, <code>poster</code>, <code>background</code>, <code>data</code>, and <code>href</code> on anything but links) are rewritten to files inside the book; absolute paths, <code>file://</code>, remote URLs, paths escaping the book and missing files are blanked. <code>data:</code> URIs are kept.</li>
+<li><code>&lt;style&gt;</code> elements and <code>style</code> attributes that could load something (<code>url()</code>, <code>@import</code>, <code>image-set()</code>, CSS escapes) are removed.</li>
 <li>Dompdf runs with remote resources, PHP and JavaScript disabled, and its file access limited (<code>chroot</code>) to the book directory.</li>
 </ul>
               
