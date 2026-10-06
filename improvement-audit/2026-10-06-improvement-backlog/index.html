@@ -261,7 +261,7 @@ at <code>af4bbcc</code> (main). No source changes were made while compiling this
   The path from the untrusted book is concatenated onto the temp dir without normalisation, so <code>../</code> segments make <code>load()</code> parse XML outside the extraction dir and <code>Metadata::save()</code> overwrite it.</li>
 <li>[x] <strong>SEC-02</strong> Reject <code>ContentManager</code> paths that resolve outside the content directory — <code>src/ContentManager.php:56-125</code> — S · med
   Callers typically pass manifest hrefs from the book, and <code>../</code> lets <code>add/update/delete/getContent</code> touch arbitrary files.</li>
-<li>[ ] <strong>SEC-03</strong> Cap total uncompressed size, entry count and compression ratio before extracting — <code>src/ZipHandler.php:21-38</code> — M · med
+<li>[x] <strong>SEC-03</strong> Cap total uncompressed size, entry count and compression ratio before extracting — <code>src/ZipHandler.php:21-38</code> — M · med
   <code>extractTo()</code> inflates every entry without limits, so a small zip bomb fills the temp disk (PHP already strips <code>../</code> from entry names).</li>
 <li>[ ] <strong>SEC-04</strong> Stop disabling TLS verification when downloading AFM fonts — <code>scripts/generate-core-fonts.php:83-86</code> — S · med
   <code>verify_peer =&gt; false</code> on a script that Composer runs on every install/update lets a network attacker substitute font data.</li>
@@ -269,11 +269,11 @@ at <code>af4bbcc</code> (main). No source changes were made while compiling this
   <code>extra_args</code> is appended raw to the shell command, so any user-influenced option becomes shell injection.</li>
 <li>[ ] <strong>SEC-06</strong> Lock down HTML renderers for untrusted book content (Dompdf <code>chroot</code> to the book dir, remote/PHP off; TCPDF image paths confined) — <code>src/Converters/DompdfAdapter.php:47-50</code>, <code>src/Converters/TCPDFAdapter.php:127-130</code> — M · med
   Book XHTML can reference local files or URLs that the renderer would read into the PDF.</li>
-<li>[ ] <strong>SEC-07</strong> Create the temp dir with mode <code>0700</code> and a <code>random_bytes</code> name — <code>src/EpubFile.php:47-50</code> — S · low
+<li>[x] <strong>SEC-07</strong> Create the temp dir with mode <code>0700</code> and a <code>random_bytes</code> name — <code>src/EpubFile.php:47-50</code> — S · low
   <code>uniqid()</code> plus the default <code>0777</code> mode leaves extracted content readable by other local users.</li>
 <li>[x] <strong>SEC-08</strong> Do not follow symlinks in <code>deleteDirectory()</code> — <code>src/Util/FileSystemHelper.php:36-55</code> — S · low
   <code>is_dir()</code> is true for a symlink to a directory, so cleanup would recurse into and delete the link target.</li>
-<li>[ ] <strong>SEC-09</strong> Parse XML with explicit <code>LIBXML_NONET</code>, reject DOCTYPEs in package files, and report libxml errors instead of <code>@</code> — <code>src/XmlParser.php:18-30</code> — S · low
+<li>[x] <strong>SEC-09</strong> Parse XML with explicit <code>LIBXML_NONET</code>, reject DOCTYPEs in package files, and report libxml errors instead of <code>@</code> — <code>src/XmlParser.php:18-30</code> — S · low
   Relies on libxml defaults for XXE safety and the <code>@</code> hides why a book failed to load.</li>
 </ul>
 <h3 id="bugs">Bugs<a class="headerlink" href="#bugs" title="Permanent link">&para;</a></h3>
@@ -322,7 +322,7 @@ at <code>af4bbcc</code> (main). No source changes were made while compiling this
   It returns absolute temp paths while every other method takes relative ones, so its output cannot be fed back in.</li>
 <li>[ ] <strong>UX-02</strong> Add list-valued <code>getSubjects()</code>/<code>setSubjects()</code> (and titles) — <code>src/Traits/InteractsWithSubject.php:13-40</code> — S · low
   Books usually have several subjects; only the first is reachable.</li>
-<li>[ ] <strong>UX-03</strong> Introduce specific exception subclasses (invalid book, ZIP, conversion) — <code>src/Exception.php</code> — M · low
+<li>[x] <strong>UX-03</strong> Introduce specific exception subclasses (invalid book, ZIP, conversion) — <code>src/Exception.php</code> — M · low
   Callers cannot tell a corrupt book from an I/O failure.</li>
 <li>[ ] <strong>UX-04</strong> Add <code>EpubFile::open()</code> and a convenience <code>convert()</code> — <code>src/EpubFile.php:21-61</code> — S · low
   Removes the "must be loaded before…" class of misuse and the manual temp-dir plumbing for conversion.</li>
