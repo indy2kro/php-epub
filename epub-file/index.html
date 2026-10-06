@@ -197,7 +197,6 @@ $epubFile-&gt;load();
 $metadata = $epubFile-&gt;getMetadata();
 echo $metadata-&gt;getTitle();
 $metadata-&gt;setTitle('New Title');
-$metadata-&gt;save();
 
 // Access the spine (reading order)
 $spine = $epubFile-&gt;getSpine();
@@ -205,7 +204,7 @@ $spine = $epubFile-&gt;getSpine();
 // Manage content files
 $content = $epubFile-&gt;getContentManager();
 
-// Save changes (overwrites original)
+// Save changes (overwrites original); pending metadata edits are written first
 $epubFile-&gt;save();
 
 // Or save to a new file

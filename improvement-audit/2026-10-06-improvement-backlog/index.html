@@ -282,19 +282,19 @@ at <code>af4bbcc</code> (main). No source changes were made while compiling this
   Probe: re-saving <code>valid.epub</code> put <code>mimetype</code> at index 15, so every saved book fails EPUBCheck and strict readers reject it.</li>
 <li>[x] <strong>BUG-02</strong> Use <code>/</code> in ZIP entry names on Windows — <code>src/ZipHandler.php:72-78</code> — S · high
   Probe on Windows produced entries like <code>EPUB\css\base.css</code>, which ZIP/OCF readers cannot resolve.</li>
-<li>[ ] <strong>BUG-03</strong> Keep the <code>dc:identifier</code> referenced by <code>package@unique-identifier</code> in <code>setIdentifiers()</code> — <code>src/Traits/InteractsWithIdentifier.php:38-54</code> — S · high
+<li>[x] <strong>BUG-03</strong> Keep the <code>dc:identifier</code> referenced by <code>package@unique-identifier</code> in <code>setIdentifiers()</code> — <code>src/Traits/InteractsWithIdentifier.php:38-54</code> — S · high
   All identifiers (and their <code>id</code>s) are deleted, leaving <code>unique-identifier</code> dangling and the OPF invalid.</li>
-<li>[ ] <strong>BUG-04</strong> Persist metadata edits from <code>EpubFile::save()</code> — <code>src/EpubFile.php:63-75</code> — S · med
+<li>[x] <strong>BUG-04</strong> Persist metadata edits from <code>EpubFile::save()</code> — <code>src/EpubFile.php:63-75</code> — S · med
   Edits are silently lost unless the caller also remembers <code>getMetadata()-&gt;save()</code>.</li>
-<li>[ ] <strong>BUG-05</strong> Preserve <code>opf:role</code>/<code>opf:file-as</code> and EPUB 3 <code>refines</code> metas when setting authors/identifiers — <code>src/Traits/InteractsWithAuthors.php:37-52</code> — M · med
+<li>[x] <strong>BUG-05</strong> Preserve <code>opf:role</code>/<code>opf:file-as</code> and EPUB 3 <code>refines</code> metas when setting authors/identifiers — <code>src/Traits/InteractsWithAuthors.php:37-52</code> — M · med
   Removing creators leaves <code>&lt;meta refines="#id"&gt;</code> pointing at nothing and drops role information.</li>
-<li>[ ] <strong>BUG-06</strong> Update EPUB 3 <code>dcterms:modified</code> when metadata is saved — <code>src/Metadata.php:41-48</code> — S · med
+<li>[x] <strong>BUG-06</strong> Update EPUB 3 <code>dcterms:modified</code> when metadata is saved — <code>src/Metadata.php:41-48</code> — S · med
   EPUB 3 requires it to reflect the last modification; it stays stale after edits.</li>
 <li>[x] <strong>BUG-07</strong> Treat an empty <code>rootfile</code> / manifest XPath result as an error — <code>src/Parser.php:69-75,100-104</code> — S · med
   <code>xpath()</code> returns <code>[]</code> not <code>false</code>, so <code>$rootfiles[0]</code> raises an undefined-key warning and a missing manifest is accepted.</li>
 <li>[x] <strong>BUG-08</strong> Handle NCX files without a default namespace — <code>src/Parser.php:124-132</code> — S · low
   <code>$namespaces['']</code> is an undefined key there, producing a warning instead of a clear error.</li>
-<li>[ ] <strong>BUG-09</strong> Support prefixed OPF packages (<code>opf:package</code>) and books without any <code>dc:</code> element — <code>src/Metadata.php:25-34</code>, <code>src/Spine.php:19-25</code>, <code>src/Traits/*.php</code> — M · med
+<li>[x] <strong>BUG-09</strong> Support prefixed OPF packages (<code>opf:package</code>) and books without any <code>dc:</code> element — <code>src/Metadata.php:25-34</code>, <code>src/Spine.php:19-25</code>, <code>src/Traits/*.php</code> — M · med
   <code>$opfXml-&gt;metadata</code> / <code>-&gt;spine</code> only work with an unprefixed default namespace, and the constructor throws when no <code>dc</code> prefix is declared.</li>
 <li>[ ] <strong>BUG-10</strong> Clean up the previous temp dir when <code>load()</code> is called twice — <code>src/EpubFile.php:45-61</code> — S · low
   Each extra <code>load()</code> leaks a full extracted copy of the book.</li>
@@ -320,8 +320,8 @@ at <code>af4bbcc</code> (main). No source changes were made while compiling this
 <ul>
 <li>[ ] <strong>UX-01</strong> Return paths relative to the book root from <code>getContentList()</code> — <code>src/ContentManager.php:30-44</code> — S · med
   It returns absolute temp paths while every other method takes relative ones, so its output cannot be fed back in.</li>
-<li>[ ] <strong>UX-02</strong> Add list-valued <code>getSubjects()</code>/<code>setSubjects()</code> (and titles) — <code>src/Traits/InteractsWithSubject.php:13-40</code> — S · low
-  Books usually have several subjects; only the first is reachable.</li>
+<li>[x] <strong>UX-02</strong> Add list-valued <code>getSubjects()</code>/<code>setSubjects()</code> (and titles) — <code>src/Traits/InteractsWithSubject.php:13-40</code> — S · low
+  Books usually have several subjects; only the first is reachable. <em>Done for subjects; multiple titles deferred.</em></li>
 <li>[x] <strong>UX-03</strong> Introduce specific exception subclasses (invalid book, ZIP, conversion) — <code>src/Exception.php</code> — M · low
   Callers cannot tell a corrupt book from an I/O failure.</li>
 <li>[ ] <strong>UX-04</strong> Add <code>EpubFile::open()</code> and a convenience <code>convert()</code> — <code>src/EpubFile.php:21-61</code> — S · low
@@ -363,7 +363,7 @@ at <code>af4bbcc</code> (main). No source changes were made while compiling this
 </ul>
 <h3 id="sweeps">Sweeps<a class="headerlink" href="#sweeps" title="Permanent link">&para;</a></h3>
 <ul>
-<li>[ ] <strong>SWEEP-01</strong> Share one scoped metadata lookup helper across the eight <code>Interacts*</code> traits (<code>/opf:package/opf:metadata/dc:*</code> instead of <code>//dc:*</code>) — <code>src/Traits/*.php</code> — M · med
+<li>[x] <strong>SWEEP-01</strong> Share one scoped metadata lookup helper across the eight <code>Interacts*</code> traits (<code>/opf:package/opf:metadata/dc:*</code> instead of <code>//dc:*</code>) — <code>src/Traits/*.php</code> — M · med
   The same xpath/empty-check block is copied eight times and matches <code>dc:</code> elements anywhere in the document.</li>
 <li>[ ] <strong>SWEEP-02</strong> Raise method coverage (52%) on error paths: <code>ZipHandler</code> (0/2), <code>Parser</code>, trait setters' "add new node" branch, <code>ContentManager</code> — <code>tests/</code> — M · med
   Most failure branches are never executed.</li>

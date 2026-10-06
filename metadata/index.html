@@ -88,7 +88,7 @@
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#subject">Subject</a>
     </li>
-    <li class="toctree-l3"><a class="reference internal" href="#identifier">Identifier</a>
+    <li class="toctree-l3"><a class="reference internal" href="#identifiers">Identifiers</a>
     </li>
         </ul>
     </li>
@@ -97,8 +97,6 @@
     <li class="toctree-l2"><a class="reference internal" href="#internal-implementation">Internal Implementation</a>
     </li>
     <li class="toctree-l2"><a class="reference internal" href="#error-handling">Error Handling</a>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#xml-namespace">XML Namespace</a>
     </li>
     </ul>
                   </li>
@@ -151,23 +149,26 @@
 <p>The <code>Metadata</code> class provides comprehensive management of Dublin Core metadata within an EPUB file. It uses a trait-based approach to organize metadata operations, with each trait handling a specific metadata field.</p>
 <h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
 <p>EPUB files use Dublin Core metadata elements (dc:) defined in the OPF (Open Packaging Format) file. The Metadata class provides get/set methods for all commonly used Dublin Core elements, along with persistence to save changes back to the OPF XML file.</p>
+<p>Only elements inside the package's <code>&lt;metadata&gt;</code> element are read or changed. Both EPUB 2 and EPUB 3 packages are supported, including packages that use a prefix for the OPF namespace (<code>&lt;opf:package&gt;</code>) or that do not declare a <code>dc</code> prefix yet.</p>
 <h2 id="key-methods">Key Methods<a class="headerlink" href="#key-methods" title="Permanent link">&para;</a></h2>
 <h3 id="constructor">Constructor<a class="headerlink" href="#constructor" title="Permanent link">&para;</a></h3>
 <pre class="codehilite"><code class="language-php">public function __construct(SimpleXMLElement $opfXml, string $opfFilePath)
 </code></pre>
 
-<p>Initializes the Metadata object. The OPF XML element is typically obtained from parsing the EPUB's OPF file. The <code>$opfFilePath</code> is needed to save changes back to disk.</p>
+<p>Initializes the Metadata object. The OPF XML element is typically obtained from parsing the EPUB's OPF file. The <code>$opfFilePath</code> is needed to save changes back to disk. Throws an <code>InvalidEpubException</code> if the package has no <code>&lt;metadata&gt;</code> element.</p>
 <h3 id="saving-changes">Saving Changes<a class="headerlink" href="#saving-changes" title="Permanent link">&para;</a></h3>
 <pre class="codehilite"><code class="language-php">public function save(): void
+public function isModified(): bool
 </code></pre>
 
-<p>Serializes the modified OPF XML back to disk. Must be called after making any metadata changes. Throws an exception if the file cannot be written.</p>
+<p><code>save()</code> serializes the OPF XML back to disk. For EPUB 3 packages, <code>dcterms:modified</code> is set to the current UTC time when metadata was changed since the last save (it is left alone when nothing changed). Throws an exception if the file cannot be written.</p>
+<p><code>isModified()</code> tells whether there are unsaved changes. <code>EpubFile::save()</code> calls <code>Metadata::save()</code> automatically when there are, so calling it yourself is optional.</p>
 <pre class="codehilite"><code class="language-php">public function getOpfFilePath(): string
 </code></pre>
 
 <p>Returns the file path of the OPF file for reference.</p>
 <h2 id="metadata-fields">Metadata Fields<a class="headerlink" href="#metadata-fields" title="Permanent link">&para;</a></h2>
-<p>The following Dublin Core elements are supported:</p>
+<p>Single-valued getters return the first matching element (or <code>''</code>); setters update it, or create it when missing. Values are escaped, so characters such as <code>&amp;</code> and <code>&lt;</code> are safe.</p>
 <h3 id="title">Title<a class="headerlink" href="#title" title="Permanent link">&para;</a></h3>
 <pre class="codehilite"><code class="language-php">public function getTitle(): string
 public function setTitle(string $title): void
@@ -180,6 +181,7 @@ public function setAuthors(array&lt;int, string&gt; $authors): void
 </code></pre>
 
 <p>The creators of the resource (dc:creator). Multiple authors are supported.</p>
+<p><code>setAuthors()</code> reuses the existing creators in order, so their roles survive (EPUB 2 <code>opf:role</code>, EPUB 3 <code>&lt;meta refines="#id" property="role"&gt;</code>). When a creator's name changes, its sort key (<code>opf:file-as</code> / <code>file-as</code> refinement) is removed because it described the old name. Creators that are no longer needed are removed together with all their refinements.</p>
 <h3 id="description">Description<a class="headerlink" href="#description" title="Permanent link">&para;</a></h3>
 <pre class="codehilite"><code class="language-php">public function getDescription(): string
 public function setDescription(string $description): void
@@ -203,19 +205,22 @@ public function setDate(string $date): void
 public function setLanguage(string $language): void
 </code></pre>
 
-<p>The language of the resource (dc:language). Use RFC 3066 language codes (e.g., "en", "fr").</p>
+<p>The language of the resource (dc:language). Use BCP 47 language codes (e.g., "en", "fr").</p>
 <h3 id="subject">Subject<a class="headerlink" href="#subject" title="Permanent link">&para;</a></h3>
 <pre class="codehilite"><code class="language-php">public function getSubject(): string
 public function setSubject(string $subject): void
+public function getSubjects(): array&lt;int, string&gt;
+public function setSubjects(array&lt;int, string&gt; $subjects): void
 </code></pre>
 
-<p>The topic of the resource (dc:subject). Can be used for keywords or topics.</p>
-<h3 id="identifier">Identifier<a class="headerlink" href="#identifier" title="Permanent link">&para;</a></h3>
-<pre class="codehilite"><code class="language-php">public function getIdentifier(): string
-public function setIdentifier(string $identifier): void
+<p>The topics of the resource (dc:subject). <code>getSubject()</code>/<code>setSubject()</code> work on the first subject; <code>getSubjects()</code>/<code>setSubjects()</code> work on all of them.</p>
+<h3 id="identifiers">Identifiers<a class="headerlink" href="#identifiers" title="Permanent link">&para;</a></h3>
+<pre class="codehilite"><code class="language-php">public function getIdentifiers(): array&lt;int, string&gt;
+public function setIdentifiers(array&lt;int, string&gt; $identifiers): void
 </code></pre>
 
-<p>An unambiguous reference to the resource (dc:identifier). Often an ISBN or UUID.</p>
+<p>Unambiguous references to the resource (dc:identifier), such as an ISBN or UUID.</p>
+<p>The first value passed to <code>setIdentifiers()</code> is stored in the identifier that <code>package@unique-identifier</code> points to, so the package stays valid. At least one identifier is required. An identifier whose value changes loses its type information (<code>opf:scheme</code> / <code>identifier-type</code> refinement).</p>
 <h2 id="usage-example">Usage Example<a class="headerlink" href="#usage-example" title="Permanent link">&para;</a></h2>
 <pre class="codehilite"><code class="language-php">use PhpEpub\EpubFile;
 
@@ -233,12 +238,10 @@ echo &quot;Language: &quot; . $metadata-&gt;getLanguage();
 $metadata-&gt;setTitle('My New Title');
 $metadata-&gt;setAuthors(['John Doe', 'Jane Smith']);
 $metadata-&gt;setPublisher('My Publishing House');
+$metadata-&gt;setSubjects(['Fiction', 'Adventure']);
 $metadata-&gt;setLanguage('en');
 
-// Save metadata changes to OPF file
-$metadata-&gt;save();
-
-// Save the complete EPUB
+// Save the complete EPUB (pending metadata changes are written first)
 $epubFile-&gt;save();
 </code></pre>
 
@@ -254,13 +257,13 @@ $epubFile-&gt;save();
 <li><code>InteractsWithSubject</code> - Subject handling</li>
 <li><code>InteractsWithIdentifier</code> - Identifier handling</li>
 </ul>
-<p>Each trait provides the get/set methods for a specific field and uses the protected <code>$opfXml</code> and <code>$dcNamespace</code> properties to interact with the OPF XML structure.</p>
+<p>Each trait is a thin layer over shared protected helpers in <code>Metadata</code> (<code>getDcValue()</code>, <code>getDcValues()</code>, <code>setDcValue()</code>, <code>setDcValues()</code>), which look up elements inside <code>&lt;metadata&gt;</code> by namespace URI rather than by prefix.</p>
 <h2 id="error-handling">Error Handling<a class="headerlink" href="#error-handling" title="Permanent link">&para;</a></h2>
-<p>The <code>save()</code> method throws an exception if:
-- The OPF file cannot be written
-- The XML cannot be serialized</p>
-<h2 id="xml-namespace">XML Namespace<a class="headerlink" href="#xml-namespace" title="Permanent link">&para;</a></h2>
-<p>The class automatically detects the Dublin Core namespace from the OPF XML on construction. This is necessary because different EPUB files may use different namespace prefixes.</p>
+<ul>
+<li>The constructor throws <code>InvalidEpubException</code> if the package has no <code>&lt;metadata&gt;</code> element.</li>
+<li><code>setIdentifiers([])</code> throws an <code>Exception</code>, because a package needs at least one identifier.</li>
+<li><code>save()</code> throws an <code>Exception</code> if the OPF file cannot be written.</li>
+</ul>
               
             </div>
           </div><footer>
