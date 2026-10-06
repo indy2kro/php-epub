@@ -8,6 +8,7 @@ use PhpEpub\Exception;
 use PhpEpub\InvalidEpubException;
 use PhpEpub\Manifest;
 use PhpEpub\Test\Support\EpubBuilder;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use SimpleXMLElement;
 
@@ -116,6 +117,31 @@ final class ManifestTest extends TestCase
 
         // "uid" belongs to the dc:identifier.
         $manifest->add('EPUB/other.xhtml', null, 'uid');
+    }
+
+    #[DataProvider('mediaTypes')]
+    public function testGuessesCommonMediaTypes(string $file, string $expected): void
+    {
+        $this->assertSame($expected, $this->manifest()->add('EPUB/' . $file)->mediaType);
+    }
+
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function mediaTypes(): iterable
+    {
+        yield 'javascript (EPUB 3.3 core type)' => ['app.js', 'text/javascript'];
+        yield 'aac' => ['track.aac', 'audio/aac'];
+        yield 'ogg' => ['track.ogg', 'audio/ogg'];
+        yield 'opus' => ['track.opus', 'audio/opus'];
+        yield 'm4v' => ['clip.m4v', 'video/mp4'];
+        yield 'webm' => ['clip.webm', 'video/webm'];
+        yield 'avif' => ['plate.avif', 'image/avif'];
+        yield 'json' => ['data.json', 'application/json'];
+        yield 'xml' => ['data.xml', 'application/xml'];
+        yield 'txt' => ['notes.txt', 'text/plain'];
+        yield 'vtt' => ['captions.vtt', 'text/vtt'];
+        yield 'pls' => ['lexicon.pls', 'application/pls+xml'];
     }
 
     public function testGeneratedIdsStartWithALetter(): void

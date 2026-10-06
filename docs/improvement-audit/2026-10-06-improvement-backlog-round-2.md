@@ -103,18 +103,18 @@ Effort: S = one file, under 30 min · M = one class plus tests · L = cross-cutt
 
 ### API / UX
 
-- [ ] **UX-01** Add `getTitles()`/`setTitles()` aware of EPUB 3 `title-type` (main/subtitle) — `src/Traits/InteractsWithTitle.php` — S · low
+- [x] **UX-01** Add `getTitles()`/`setTitles()` aware of EPUB 3 `title-type` (main/subtitle) — `src/Traits/InteractsWithTitle.php` — S · low
   Deferred from the previous round; a book whose subtitle comes first returns it as the title.
-- [ ] **UX-02** Expose dated events (EPUB 2 `opf:event`, EPUB 3 `dcterms:modified`) instead of only the first `dc:date` — `src/Traits/InteractsWithDate.php:12-22` — S · low
+- [x] **UX-02** Expose dated events (EPUB 2 `opf:event`, EPUB 3 `dcterms:modified`) instead of only the first `dc:date` — `src/Traits/InteractsWithDate.php:12-22` — S · low
   `getDate()` may return the modification date rather than the publication date.
-- [ ] **UX-03** Add list APIs for repeated `<meta name>` / `<meta property>` entries — `src/Metadata.php:94-153` — S · low
+- [x] **UX-03** Add list APIs for repeated `<meta name>` / `<meta property>` entries — `src/Metadata.php:94-153` — S · low
   `setMeta()`/`setProperty()` only update the first match, so duplicates keep the old value alongside the new one.
-- [ ] **UX-04** Extend guessed media types (aac, ogg, opus, m4v, webm, avif, json, xml, txt, vtt) and use `text/javascript` — `src/Manifest.php:15-36` — S · low
+- [x] **UX-04** Extend guessed media types (aac, ogg, opus, m4v, webm, avif, json, xml, txt, vtt) and use `text/javascript` — `src/Manifest.php:15-36` — S · low
   Common EPUB 3 media fall back to `application/octet-stream`.
 
 ### Features
 
-- [ ] **FEAT-01** Contributors and creator roles (`dc:contributor`, `opf:role` / role refinements); make `getAuthors()` honour roles — `src/Traits/InteractsWithAuthors.php:14-31` — M · med
+- [x] **FEAT-01** Contributors and creator roles (`dc:contributor`, `opf:role` / role refinements); make `getAuthors()` honour roles — `src/Traits/InteractsWithAuthors.php:14-31` — M · med
   `getAuthors()` returns illustrators and editors too, and `dc:contributor` is unreachable.
 - [ ] **FEAT-02** Table-of-contents API: read and edit the EPUB 3 nav document and the EPUB 2 NCX — new, `src/Parser.php:134-149` — L · med
   Callers cannot list chapters or add a new one to the TOC after `addContent()`.

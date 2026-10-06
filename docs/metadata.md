@@ -44,20 +44,49 @@ Single-valued getters return the first matching element (or `''`); setters updat
 ```php
 public function getTitle(): string
 public function setTitle(string $title): void
+public function getTitles(): array
+public function setTitles(array $titles): void
 ```
 
-The name given to the resource (dc:title).
+The name given to the resource (dc:title). A book can have several titles; in EPUB 3 a `title-type` refinement says which is the `main` title and which are subtitles, collection titles, and so on.
+
+- `getTitle()`/`setTitle()` work on the main title: the one refined as `main`, or else the first. Other titles are kept.
+- `getTitles()`/`setTitles()` read and replace all titles in document order. Existing titles are reused in order, so their `title-type` refinements stay with their position; a title whose text changes loses its `file-as` sort key.
+- A book needs a title: `setTitles([])` and empty values throw an `Exception`.
 
 ### Authors
 
 ```php
 public function getAuthors(): array<int, string>
 public function setAuthors(array<int, string> $authors): void
+public function getCreators(): array<int, Contributor>
+public function addCreator(string $name, ?string $role = 'aut', ?string $fileAs = null): void
 ```
 
-The creators of the resource (dc:creator). Multiple authors are supported.
+The authors are the creators of the resource (dc:creator) with the role `aut` or no role at all; creators with another role, such as illustrators (`ill`), are not authors. Multiple authors are supported.
 
-`setAuthors()` reuses the existing creators in order, so their roles survive (EPUB 2 `opf:role`, EPUB 3 `<meta refines="#id" property="role">`). When a creator's name changes, its sort key (`opf:file-as` / `file-as` refinement) is removed because it described the old name. Creators that are no longer needed are removed together with all their refinements.
+`setAuthors()` only replaces the authors: other creators are kept. It reuses the existing authors in order, so their roles survive (EPUB 2 `opf:role`, EPUB 3 `<meta refines="#id" property="role">`). When an author's name changes, its sort key (`opf:file-as` / `file-as` refinement) is removed because it described the old name. Authors that are no longer needed are removed together with all their refinements.
+
+`getCreators()` returns every creator as a `PhpEpub\Contributor` with `name`, `role` (a [MARC relator code](https://www.loc.gov/marc/relators/relaterm.html) such as `aut`, `ill` or `trl`, or `null`) and `fileAs` (the sort key, or `null`). `addCreator()` adds one, writing the role and sort key as EPUB 3 refinements (`scheme="marc:relators"`) or as EPUB 2 `opf:role` / `opf:file-as` attributes, depending on the package version.
+
+### Contributors
+
+```php
+public function getContributors(): array<int, Contributor>
+public function setContributors(array<int, string> $names): void
+public function addContributor(string $name, ?string $role = null, ?string $fileAs = null): void
+```
+
+People or organisations who contributed to the resource (dc:contributor), such as editors (`edt`) or translators (`trl`). These work like the creator methods; `setContributors()` reuses existing contributors in order, keeping their roles.
+
+```php
+$metadata->addCreator('Ivan Illustrator', 'ill', 'Illustrator, Ivan');
+$metadata->addContributor('Ed Editor', 'edt');
+
+foreach ($metadata->getContributors() as $contributor) {
+    echo "{$contributor->name} ({$contributor->role})\n";
+}
+```
 
 ### Description
 
@@ -82,9 +111,15 @@ The entity that made the resource available (dc:publisher).
 ```php
 public function getDate(): string
 public function setDate(string $date): void
+public function getModifiedDate(): ?string
+public function getDateEvents(): array
 ```
 
 Date of publication (dc:date). Should be in a valid date format (preferably ISO 8601).
+
+- `getDate()`/`setDate()` use the publication date: the `dc:date` with the EPUB 2 `opf:event="publication"`, or else one without an event, or else the first. Dates of other events are kept.
+- `getModifiedDate()` returns the EPUB 3 `dcterms:modified` property, or else the EPUB 2 `dc:date` with `opf:event="modification"`, or `null`. `save()` keeps the EPUB 3 value up to date.
+- `getDateEvents()` returns every `dc:date` keyed by its `opf:event` (`""` for a date without one), e.g. `['publication' => '1999-01-01', 'modification' => '2020-05-05']`.
 
 ### Language
 
@@ -124,6 +159,10 @@ public function getMeta(string $name): ?string
 public function setMeta(string $name, ?string $content): void
 public function getProperty(string $property): ?string
 public function setProperty(string $property, ?string $value): void
+public function getMetaValues(string $name): array
+public function setMetaValues(string $name, array $values): void
+public function getPropertyValues(string $property): array
+public function setPropertyValues(string $property, array $values): void
 public function getVersion(): string
 ```
 
@@ -131,7 +170,8 @@ Access to metadata beyond the Dublin Core fields:
 
 - `getMeta()`/`setMeta()` read and write EPUB 2 style `<meta name="…" content="…"/>` elements, such as `calibre:series`, `calibre:series_index` or `cover`.
 - `getProperty()`/`setProperty()` read and write EPUB 3 `<meta property="…">value</meta>` elements that describe the whole book, such as `belongs-to-collection` or `schema:accessMode`. Refinements of other elements (`refines="#id"`) are ignored.
-- Passing `null` as the value removes the element. Only the first matching element is read or updated.
+- Passing `null` as the value removes the element. `getMeta()`/`getProperty()` return the first match; `setMeta()`/`setProperty()` replace every match with the single new value, so no stale duplicates are left.
+- `getMetaValues()`/`setMetaValues()` and `getPropertyValues()`/`setPropertyValues()` read and write all elements with that name or property as a list (e.g. several `dcterms:subject` properties); an empty list removes them all.
 - `getVersion()` returns the package version, e.g. `2.0` or `3.0`.
 
 ```php
@@ -173,7 +213,8 @@ The Metadata class uses PHP traits to organize code:
 - `InteractsWithTitle` - Title handling
 - `InteractsWithDescription` - Description handling
 - `InteractsWithDate` - Date handling
-- `InteractsWithAuthors` - Author handling
+- `InteractsWithAuthors` - Author and creator handling
+- `InteractsWithContributors` - Contributor handling
 - `InteractsWithPublisher` - Publisher handling
 - `InteractsWithLanguage` - Language handling
 - `InteractsWithSubject` - Subject handling

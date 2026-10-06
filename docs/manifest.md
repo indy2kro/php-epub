@@ -16,13 +16,25 @@ Manifest `href`s are URLs relative to the OPF file (for example `text/chapter%20
 
 - **`get(string $id): ?ManifestItem`** and **`findByPath(string $path): ?ManifestItem`**: Look up one item.
 
-- **`add(string $path, ?string $mediaType = null, ?string $id = null): ManifestItem`**: Adds a file. The media type is guessed from the extension and the id is derived from the file name when not given. Throws if the path is already listed, the id is already used anywhere in the package, or the media type or id is not valid UTF-8 XML text.
+- **`add(string $path, ?string $mediaType = null, ?string $id = null): ManifestItem`**: Adds a file. The media type is guessed from the extension (XHTML, CSS, JavaScript, NCX, SMIL, PLS, XML, JSON, text, WebVTT, the common image, font, audio and video formats; `application/octet-stream` otherwise) and the id is derived from the file name when not given. Throws if the path is already listed, the id is already used anywhere in the package, or the media type or id is not valid UTF-8 XML text.
 
 - **`remove(string $id): void`**: Removes an item and the package references to it (EPUB 2 cover meta, refinements, `spine@toc`, `fallback`/`media-overlay` of other items, `<guide>` references to its file). Spine entries are not touched; use `Spine::remove()` (or `ContentManager::deleteContent()`, which does both).
 
 - **`pathToHref(string $path): string`** and **`hrefToPath(string $href): string`**: Convert between the two forms.
 
 - **`addProperty(string $id, string $property): void`** and **`removeProperty(string $id, string $property): void`**: Add or remove an EPUB 3 property token (e.g. `cover-image`, `nav`) on an item; other tokens are kept.
+
+- **`setMediaType(string $id, string $mediaType): void`**: Changes an item's media type, e.g. after its file was replaced with another format.
+
+- **`findByHref(string $href): ?ManifestItem`**: Looks up an item by an href relative to the OPF file (fragments ignored); `null` when nothing matches or the href points outside the book.
+
+- **`getGuidePath(string $type): ?string`**: The book-root path of the EPUB 2 `<guide>` reference of a type such as `cover` or `toc` (matched case-insensitively), or `null`.
+
+- **`setMediaType(string $id, string $mediaType): void`**: Changes an item's media type, e.g. after its file was replaced with another format.
+
+- **`findByHref(string $href): ?ManifestItem`**: Looks up an item by an href relative to the OPF file (fragments ignored); `null` when nothing matches or the href points outside the book.
+
+- **`getGuidePath(string $type): ?string`**: The book-root path of the EPUB 2 `<guide>` reference of a type such as `cover` or `toc` (matched case-insensitively), or `null`.
 
 - **`getOpfPath(): string`**: The OPF location relative to the book root.
 

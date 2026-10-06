@@ -11,6 +11,7 @@ use PhpEpub\Metadata;
 use PhpEpub\Test\Support\EpubBuilder;
 use PhpEpub\Util\FileSystemHelper;
 use PhpEpub\XmlParser;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -49,6 +50,129 @@ final class EpubFeaturesTest extends TestCase
 
         $reloaded->setMeta('calibre:series', null);
         $this->assertNull($reloaded->getMeta('calibre:series'));
+    }
+
+    public function testTitleIsTheMainTitleWhenASubtitleComesFirst(): void
+    {
+        $metadata = $this->metadata(
+            '<dc:title id="sub">The Subtitle</dc:title><meta refines="#sub" property="title-type">subtitle</meta>'
+            . '<dc:title id="main">The Main Title</dc:title><meta refines="#main" property="title-type">main</meta>',
+            withTitle: false
+        );
+
+        $this->assertSame('The Main Title', $metadata->getTitle());
+        $this->assertSame(['The Subtitle', 'The Main Title'], $metadata->getTitles());
+
+        $metadata->setTitle('Renamed');
+        $metadata->save();
+
+        $reloaded = $this->reloadMetadata();
+        $this->assertSame(['The Subtitle', 'Renamed'], $reloaded->getTitles());
+        $this->assertSame('Renamed', $reloaded->getTitle());
+    }
+
+    public function testSetTitlesReplacesAllTitlesInOrder(): void
+    {
+        $metadata = $this->metadata('', withTitle: false);
+        $this->assertSame([], $metadata->getTitles());
+
+        $metadata->setTitles(['First', 'Second']);
+        $metadata->save();
+
+        $reloaded = $this->reloadMetadata();
+        $this->assertSame(['First', 'Second'], $reloaded->getTitles());
+        $this->assertSame('First', $reloaded->getTitle());
+
+        $reloaded->setTitles(['Only']);
+        $this->assertSame(['Only'], $reloaded->getTitles());
+    }
+
+    public function testSetTitlesRequiresATitle(): void
+    {
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('cannot be empty');
+
+        $this->metadata('')->setTitles([]);
+    }
+
+    public function testDatesFollowEpub2Events(): void
+    {
+        $metadata = $this->metadata(
+            '<dc:date xmlns:opf="http://www.idpf.org/2007/opf" opf:event="modification">2020-05-05</dc:date>'
+            . '<dc:date xmlns:opf="http://www.idpf.org/2007/opf" opf:event="publication">1999-01-01</dc:date>'
+            . '<dc:date xmlns:opf="http://www.idpf.org/2007/opf" opf:event="creation">1998-02-02</dc:date>'
+        );
+
+        $this->assertSame('1999-01-01', $metadata->getDate());
+        $this->assertSame('2020-05-05', $metadata->getModifiedDate());
+        $this->assertSame(
+            ['modification' => '2020-05-05', 'publication' => '1999-01-01', 'creation' => '1998-02-02'],
+            $metadata->getDateEvents()
+        );
+
+        $metadata->setDate('2001-01-01');
+        $metadata->save();
+
+        $reloaded = $this->reloadMetadata();
+        $this->assertSame('2001-01-01', $reloaded->getDate());
+        $this->assertSame('2020-05-05', $reloaded->getDateEvents()['modification']);
+    }
+
+    public function testDatesInEpub3(): void
+    {
+        $metadata = $this->metadata('<dc:date>2010-10-10</dc:date><meta property="dcterms:modified">2026-01-02T03:04:05Z</meta>');
+
+        $this->assertSame('2010-10-10', $metadata->getDate());
+        $this->assertSame('2026-01-02T03:04:05Z', $metadata->getModifiedDate());
+        $this->assertSame(['' => '2010-10-10'], $metadata->getDateEvents());
+    }
+
+    public function testDatesWhenAbsent(): void
+    {
+        $metadata = $this->metadata('');
+
+        $this->assertSame('', $metadata->getDate());
+        $this->assertNull($metadata->getModifiedDate());
+        $this->assertSame([], $metadata->getDateEvents());
+    }
+
+    public function testRepeatedMetasAsLists(): void
+    {
+        $metadata = $this->metadata(
+            '<meta name="calibre:user_categories" content="A"/><meta name="calibre:user_categories" content="B"/>'
+            . '<meta property="dcterms:subject">x</meta><meta property="dcterms:subject">y</meta>'
+            . '<meta refines="#c1" property="dcterms:subject">refinement</meta>'
+        );
+        $this->assertSame(['A', 'B'], $metadata->getMetaValues('calibre:user_categories'));
+        $this->assertSame(['x', 'y'], $metadata->getPropertyValues('dcterms:subject'));
+        $this->assertSame([], $metadata->getMetaValues('missing'));
+
+        $metadata->setMetaValues('calibre:user_categories', ['C', 'D', 'E']);
+        $metadata->setPropertyValues('dcterms:subject', ['z']);
+        $metadata->save();
+
+        $reloaded = $this->reloadMetadata();
+        $this->assertSame(['C', 'D', 'E'], $reloaded->getMetaValues('calibre:user_categories'));
+        $this->assertSame(['z'], $reloaded->getPropertyValues('dcterms:subject'));
+
+        $reloaded->setMetaValues('calibre:user_categories', []);
+        $reloaded->setPropertyValues('dcterms:subject', []);
+        $this->assertSame([], $reloaded->getMetaValues('calibre:user_categories'));
+        $this->assertSame([], $reloaded->getPropertyValues('dcterms:subject'));
+    }
+
+    public function testSetMetaAndSetPropertyReplaceDuplicates(): void
+    {
+        $metadata = $this->metadata(
+            '<meta name="calibre:series" content="Old"/><meta name="calibre:series" content="Older"/>'
+            . '<meta property="belongs-to-collection">Old</meta><meta property="belongs-to-collection">Older</meta>'
+        );
+
+        $metadata->setMeta('calibre:series', 'New');
+        $metadata->setProperty('belongs-to-collection', 'New');
+
+        $this->assertSame(['New'], $metadata->getMetaValues('calibre:series'));
+        $this->assertSame(['New'], $metadata->getPropertyValues('belongs-to-collection'));
     }
 
     public function testEpub3PropertyRoundTripIgnoresRefinements(): void
@@ -94,6 +218,84 @@ final class EpubFeaturesTest extends TestCase
         $this->assertSame('EPUB/cover.jpg', $epubFile->getCoverImage()?->path);
     }
 
+    public function testGetCoverImageFromEpub2MetaNamingAnHref(): void
+    {
+        $epubFile = $this->open(EpubBuilder::minimal()->withFile('EPUB/package.opf', EpubBuilder::opf(
+            '<item id="img" href="images/cover.jpg" media-type="image/jpeg"/>',
+            '<meta name="cover" content="images/cover.jpg"/>'
+        )));
+
+        $this->assertSame('img', $epubFile->getCoverImage()?->id);
+    }
+
+    public function testGetCoverImageFromGuideReferenceToAnImage(): void
+    {
+        $opf = str_replace('</package>', '<guide><reference type="cover" href="images/front.png"/></guide></package>', EpubBuilder::opf(
+            '<item id="img" href="images/front.png" media-type="image/png"/>'
+        ));
+
+        $this->assertSame('img', $this->open(EpubBuilder::minimal()->withFile('EPUB/package.opf', $opf))->getCoverImage()?->id);
+    }
+
+    public function testGetCoverImageFromGuideReferenceToACoverPage(): void
+    {
+        $opf = str_replace('</package>', '<guide><reference type="cover" href="text/cover.xhtml#top"/></guide></package>', EpubBuilder::opf(
+            '<item id="page" href="text/cover.xhtml" media-type="application/xhtml+xml"/>'
+            . '<item id="img" href="images/front.jpg" media-type="image/jpeg"/>'
+        ));
+        $epubFile = $this->open(EpubBuilder::minimal()
+            ->withFile('EPUB/package.opf', $opf)
+            ->withFile('EPUB/text/cover.xhtml', EpubBuilder::xhtml('Cover', '<div><img src="../images/front.jpg" alt="Cover"/></div>')));
+
+        $this->assertSame('img', $epubFile->getCoverImage()?->id);
+    }
+
+    public function testGetCoverImageFromAnSvgCoverPageSkipsSourcesOutsideTheBook(): void
+    {
+        $opf = str_replace('</package>', '<guide><reference type="Cover" href="cover.xhtml"/></guide></package>', EpubBuilder::opf(
+            '<item id="page" href="cover.xhtml" media-type="application/xhtml+xml"/>'
+            . '<item id="img" href="images/front.jpg" media-type="image/jpeg"/>'
+        ));
+        $epubFile = $this->open(EpubBuilder::minimal()
+            ->withFile('EPUB/package.opf', $opf)
+            ->withFile('EPUB/cover.xhtml', EpubBuilder::xhtml(
+                'Cover',
+                '<img src="../../outside.jpg" alt=""/><img src="chapter.xhtml" alt=""/>'
+                . '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><image xlink:href="images/front.jpg"/></svg>'
+            )));
+
+        $this->assertSame('img', $epubFile->getCoverImage()?->id);
+    }
+
+    /**
+     * @param array<string, string> $files
+     */
+    #[DataProvider('guideCoversWithoutImage')]
+    public function testGuideCoverWithoutUsableImageGivesNoCover(string $items, string $href, array $files): void
+    {
+        $builder = EpubBuilder::minimal()->withFile(
+            'EPUB/package.opf',
+            str_replace('</package>', "<guide><reference type=\"cover\" href=\"{$href}\"/></guide></package>", EpubBuilder::opf($items))
+        );
+        foreach ($files as $path => $content) {
+            $builder->withFile($path, $content);
+        }
+
+        $this->assertNull($this->open($builder)->getCoverImage());
+    }
+
+    /**
+     * @return iterable<string, array{string, string, array<string, string>}>
+     */
+    public static function guideCoversWithoutImage(): iterable
+    {
+        yield 'not a page or image' => ['<item id="css" href="style.css" media-type="text/css"/>', 'style.css', ['EPUB/style.css' => 'p {}']];
+        yield 'page file missing' => ['<item id="page" href="cover.xhtml" media-type="application/xhtml+xml"/>', 'cover.xhtml', []];
+        yield 'page without images' => ['<item id="page" href="cover.xhtml" media-type="application/xhtml+xml"/>', 'cover.xhtml', ['EPUB/cover.xhtml' => '<html><body><p>Cover</p></body></html>']];
+        yield 'reference to an unlisted file' => ['', 'nowhere.xhtml', []];
+        yield 'reference outside the book' => ['', '../../outside.jpg', []];
+    }
+
     public function testBookWithoutCover(): void
     {
         $this->assertNull($this->open(EpubBuilder::minimal())->getCoverImage());
@@ -131,6 +333,19 @@ final class EpubFeaturesTest extends TestCase
         $this->assertSame('', $cover->properties);
         $this->assertSame($cover->id, $epubFile->getMetadata()->getMeta('cover'));
         $this->assertSame('EPUB/art/front.jpg', $epubFile->getCoverImage()?->path);
+    }
+
+    public function testSetCoverImageUpdatesTheMediaTypeOfAReusedPath(): void
+    {
+        $epubFile = $this->open(EpubBuilder::minimal()->withFile('EPUB/package.opf', EpubBuilder::opf(
+            '<item id="art" href="art/cover.img" media-type="image/jpeg"/>'
+        )));
+
+        $cover = $epubFile->setCoverImage((string) base64_decode(EpubBuilder::PNG, true), 'image/png', 'EPUB/art/cover.img');
+
+        $this->assertSame('art', $cover->id);
+        $this->assertSame('image/png', $cover->mediaType);
+        $this->assertSame('image/png', $epubFile->getManifest()->get('art')?->mediaType);
     }
 
     public function testSetCoverImageRejectsNonImages(): void
@@ -180,9 +395,14 @@ final class EpubFeaturesTest extends TestCase
         (new EpubFile($this->tmpDir . '/missing.epub'))->convert($this->createStub(ConverterInterface::class), $this->tmpDir . '/out.pdf');
     }
 
-    private function metadata(string $extra): Metadata
+    private function metadata(string $extra, bool $withTitle = true): Metadata
     {
-        file_put_contents($this->tmpDir . '/package.opf', EpubBuilder::opf(metadata: $extra));
+        $opf = EpubBuilder::opf(metadata: $extra);
+        if (! $withTitle) {
+            $opf = str_replace('<dc:title>Minimal</dc:title>', '', $opf);
+        }
+
+        file_put_contents($this->tmpDir . '/package.opf', $opf);
 
         return $this->reloadMetadata();
     }
