@@ -342,7 +342,7 @@ at <code>af4bbcc</code> (main). No source changes were made while compiling this
 <ul>
 <li>[x] <strong>DOC-01</strong> Fix the <code>Converter</code> example that wires <code>CalibreAdapter</code> with an extracted directory — <code>docs/converter.md:15-31</code> — S · med
   The documented example cannot work (see CONV-02).</li>
-<li>[ ] <strong>DOC-02</strong> Add a "Handling untrusted EPUBs" section and document the <code>save()</code> contract — <code>docs/advanced-usage.md</code>, <code>docs/epub-file.md</code> — S · low
+<li>[x] <strong>DOC-02</strong> Add a "Handling untrusted EPUBs" section and document the <code>save()</code> contract — <code>docs/advanced-usage.md</code>, <code>docs/epub-file.md</code> — S · low
   Users need to know which limits exist and that metadata must be saved before the book.</li>
 </ul>
 <h3 id="tests">Tests<a class="headerlink" href="#tests" title="Permanent link">&para;</a></h3>
@@ -358,16 +358,16 @@ at <code>af4bbcc</code> (main). No source changes were made while compiling this
 <ul>
 <li>[x] <strong>CI-01</strong> Add <code>windows-latest</code> to the test matrix — <code>.github/workflows/tests.yml:17-25</code> — S · med
   BUG-02 only shows up on Windows.</li>
-<li>[ ] <strong>CI-02</strong> Add <code>composer audit</code> and gitleaks; quote <code>$GITHUB_OUTPUT</code> (actionlint SC2086) — <code>.github/workflows/tests.yml:41</code>, <code>.github/workflows/deploy-docs.yml:30</code> — S · low
+<li>[x] <strong>CI-02</strong> Add <code>composer audit</code> and gitleaks; quote <code>$GITHUB_OUTPUT</code> (actionlint SC2086) — <code>.github/workflows/tests.yml:41</code>, <code>.github/workflows/deploy-docs.yml:30</code> — S · low
   Dependency advisories and leaked secrets are not gated.</li>
-<li>[ ] <strong>CI-03</strong> Run the same gate commands as <code>composer quality</code> (PHPStan <code>memory_limit</code>, PHPCS paths) — <code>.github/workflows/tests.yml:64-71</code> — S · low
+<li>[x] <strong>CI-03</strong> Run the same gate commands as <code>composer quality</code> (PHPStan <code>memory_limit</code>, PHPCS paths) — <code>.github/workflows/tests.yml:64-71</code> — S · low
   Local and CI gates differ.</li>
 </ul>
 <h3 id="sweeps">Sweeps<a class="headerlink" href="#sweeps" title="Permanent link">&para;</a></h3>
 <ul>
 <li>[x] <strong>SWEEP-01</strong> Share one scoped metadata lookup helper across the eight <code>Interacts*</code> traits (<code>/opf:package/opf:metadata/dc:*</code> instead of <code>//dc:*</code>) — <code>src/Traits/*.php</code> — M · med
   The same xpath/empty-check block is copied eight times and matches <code>dc:</code> elements anywhere in the document.</li>
-<li>[ ] <strong>SWEEP-02</strong> Raise method coverage (52%) on error paths: <code>ZipHandler</code> (0/2), <code>Parser</code>, trait setters' "add new node" branch, <code>ContentManager</code> — <code>tests/</code> — M · med
+<li>[x] <strong>SWEEP-02</strong> Raise method coverage (52%) on error paths: <code>ZipHandler</code> (0/2), <code>Parser</code>, trait setters' "add new node" branch, <code>ContentManager</code> — <code>tests/</code> — M · med
   Most failure branches are never executed.</li>
 </ul>
               

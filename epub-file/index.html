@@ -234,9 +234,8 @@ $epubFile = new EpubFile('/path/to/file.epub', $mockZipHandler, $mockXmlParser);
 </code></pre>
 
 <h2 id="error-handling">Error Handling<a class="headerlink" href="#error-handling" title="Permanent link">&para;</a></h2>
-<p>The class throws <code>Exception</code> in the following cases:
-- File not found or cannot be opened
-- Invalid EPUB structure
+<p>All exceptions extend <code>PhpEpub\Exception</code>. <code>load()</code> throws a <code>ZipException</code> when the archive cannot be read or exceeds the extraction limits, and an <code>InvalidEpubException</code> (or <code>XmlException</code>) when the book is invalid or references paths outside itself; see <a href="../advanced-usage/#handling-untrusted-epubs">Handling Untrusted EPUBs</a>. An <code>Exception</code> is also thrown in these cases:
+- File not found
 - Calling <code>save()</code>, <code>getMetadata()</code>, <code>getManifest()</code>, <code>getSpine()</code>, or <code>getContentManager()</code> before <code>load()</code>
 - Temporary directory creation or cleanup failures</p>
 <h2 id="file-structure">File Structure<a class="headerlink" href="#file-structure" title="Permanent link">&para;</a></h2>

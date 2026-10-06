@@ -75,6 +75,8 @@
     </li>
         </ul>
     </li>
+    <li class="toctree-l2"><a class="reference internal" href="#handling-untrusted-epubs">Handling Untrusted EPUBs</a>
+    </li>
     </ul>
                   </li>
               </ul>
@@ -145,12 +147,11 @@ $epubFilePath = '/path/to/your.epub';
 $epubFile = new EpubFile($epubFilePath);
 $epubFile-&gt;load();
 
-// Access the content manager
-$tempDir = $epubFile-&gt;getTempDir();
-$contentManager = new ContentManager($tempDir);
+// Access the content manager (it keeps the manifest and spine in sync)
+$contentManager = $epubFile-&gt;getContentManager();
 
-// Retrieve and modify content
-$contentFile = 'chapter1.xhtml';
+// Retrieve and modify content; paths are relative to the book root
+$contentFile = 'EPUB/text/chapter1.xhtml';
 $content = $contentManager-&gt;getContent($contentFile);
 $modifiedContent = str_replace('Old Text', 'New Text', $content);
 
@@ -159,6 +160,12 @@ $contentManager-&gt;updateContent($contentFile, $modifiedContent);
 </code></pre>
 
 <h3 id="saving-changes">Saving Changes<a class="headerlink" href="#saving-changes" title="Permanent link">&para;</a></h3>
+<p><code>EpubFile::save()</code> writes everything that changed since <code>load()</code>:</p>
+<ol>
+<li>Pending metadata, manifest and spine changes are written to the OPF file (for EPUB 3, <code>dcterms:modified</code> is refreshed). Calling <code>Metadata::save()</code> yourself first is optional.</li>
+<li>The extracted directory is packaged as an OCF-valid archive: <code>mimetype</code> first and uncompressed, <code>/</code> separators on every OS.</li>
+</ol>
+<p>Changes are only in the temporary directory until <code>save()</code> is called; <code>load()</code> again or <code>cleanup()</code> discards them.</p>
 <h4 id="save-to-the-same-file">Save to the Same File<a class="headerlink" href="#save-to-the-same-file" title="Permanent link">&para;</a></h4>
 <p>To save changes to the same EPUB file:</p>
 <pre class="codehilite"><code class="language-php">$epubFile-&gt;save();
@@ -201,6 +208,72 @@ $options = [
 $calibreAdapter = new CalibreAdapter($options);
 $calibreAdapter-&gt;convert('/path/to/input.epub', '/path/to/output.mobi');
 </code></pre>
+
+<h2 id="handling-untrusted-epubs">Handling Untrusted EPUBs<a class="headerlink" href="#handling-untrusted-epubs" title="Permanent link">&para;</a></h2>
+<p>An EPUB is a ZIP of XML and HTML, so a book uploaded by a user can be hostile. php-epub treats every book as untrusted input:</p>
+<table>
+<thead>
+<tr>
+<th>Risk</th>
+<th>What php-epub does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Entry names or OPF/manifest hrefs with <code>../</code> or absolute paths (path traversal)</td>
+<td>Rejected by <code>PathResolver</code>; nothing is read or written outside the extraction directory</td>
+</tr>
+<tr>
+<td>Zip bombs</td>
+<td><code>ZipHandler</code> limits entry count, total extracted size and per-entry compression ratio, measured on the bytes actually written</td>
+</tr>
+<tr>
+<td>XML entity expansion and external entities (XXE)</td>
+<td><code>&lt;!ENTITY</code> declarations are rejected and the parser never fetches network resources</td>
+</tr>
+<tr>
+<td>Symlinks in the extraction directory</td>
+<td>Cleanup deletes the link itself, never its target</td>
+</tr>
+<tr>
+<td>Scripts, local files and remote URLs in book HTML during PDF conversion</td>
+<td>Scripts are removed, image sources are limited to files inside the book, and Dompdf runs without remote access, PHP or JavaScript, confined to the book directory</td>
+</tr>
+<tr>
+<td>Shell arguments for Calibre</td>
+<td>Every argument is escaped (pass <code>extra_args</code> as a list)</td>
+</tr>
+</tbody>
+</table>
+<p>The extraction directory is created with an unpredictable name and owner-only permissions, and is removed by <code>EpubFile::cleanup()</code> or when the object is destroyed.</p>
+<p>Tighten the limits for user uploads by passing your own <code>ZipHandler</code>:</p>
+<pre class="codehilite"><code class="language-php">use PhpEpub\EpubFile;
+use PhpEpub\InvalidEpubException;
+use PhpEpub\ZipException;
+use PhpEpub\ZipHandler;
+
+$zipHandler = new ZipHandler(
+    maxEntries: 2_000,
+    maxUncompressedBytes: 200 * 1024 * 1024,
+    maxCompressionRatio: 50,
+);
+
+try {
+    $epubFile = new EpubFile($uploadedPath, $zipHandler);
+    $epubFile-&gt;load();
+} catch (ZipException $e) {
+    // Not a readable archive, or it exceeds the limits.
+} catch (InvalidEpubException $e) {
+    // Readable archive, but not a valid (or a hostile) EPUB.
+}
+</code></pre>
+
+<p>All exceptions extend <code>PhpEpub\Exception</code>:</p>
+<ul>
+<li><code>InvalidEpubException</code>: invalid structure or a path outside the book; <code>XmlException</code> (a subclass) for unparseable or unsafe XML.</li>
+<li><code>ZipException</code>: the archive cannot be read, extracted or written, or exceeds a limit.</li>
+<li><code>ConversionException</code>: a converter could not read the book or write its output.</li>
+</ul>
               
             </div>
           </div><footer>
