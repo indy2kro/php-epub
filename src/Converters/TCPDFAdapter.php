@@ -47,9 +47,8 @@ class TCPDFAdapter implements ConverterInterface
      */
     public function convert(string $epubDirectory, string $outputPath): void
     {
-        if (!defined('K_PATH_FONTS')) {
-            define('K_PATH_FONTS', dirname(__DIR__, 2) . '/vendor/tecnickcom/tc-lib-pdf-font/target/fonts/');
-        }
+        // TCPDF resolves K_PATH_FONTS itself (through Composer), whether php-epub is the root
+        // project or a dependency; defining it here would point at the wrong vendor directory.
 
         // Initialize TCPDF
         $pdf = new TCPDF();

@@ -3,6 +3,8 @@
 The `TCPDFAdapter` class in the PHP EPUB Processor library is responsible for converting EPUB content into PDF format using the TCPDF library.
 It provides a flexible interface to customize the PDF output through various styling options.
 
+Requires `tecnickcom/tcpdf` and its core fonts; see [Installation](../installation.md#tcpdf-core-fonts).
+
 ## Key Methods
 
 - **`__construct(array $styles = [])`**: Initializes the `TCPDFAdapter` with optional styling parameters, such as font, font size, margins, and whether to include headers and footers. These parameters can be customized to alter the appearance of the generated PDF.
