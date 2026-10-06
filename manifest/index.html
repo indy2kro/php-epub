@@ -3,18 +3,18 @@
 <head>
     <meta charset="utf-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="author" content="indy2kro" /><link rel="canonical" href="https://indy2kro.github.io/php-epub/xml-parser/" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="author" content="indy2kro" /><link rel="canonical" href="https://indy2kro.github.io/php-epub/manifest/" />
       <link rel="shortcut icon" href="../img/favicon.ico" />
-    <title>XmlParser - PHP EPUB</title>
+    <title>Manifest - PHP EPUB</title>
     <link rel="stylesheet" href="../css/theme.css" />
     <link rel="stylesheet" href="../css/theme_extra.css" />
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
     
       <script>
         // Current page data
-        var mkdocs_page_name = "XmlParser";
-        var mkdocs_page_input_path = "xml-parser.md";
-        var mkdocs_page_url = "/php-epub/xml-parser/";
+        var mkdocs_page_name = "Manifest";
+        var mkdocs_page_input_path = "manifest.md";
+        var mkdocs_page_url = "/php-epub/manifest/";
       </script>
     
     <!--[if lt IE 9]>
@@ -62,19 +62,21 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../metadata/">Metadata</a>
                   </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../manifest/">Manifest</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../spine/">Spine</a>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../parser/">Parser</a>
-                  </li>
-                  <li class="toctree-l1 current"><a class="reference internal current" href="#">XmlParser</a>
+                  <li class="toctree-l1 current"><a class="reference internal current" href="#">Manifest</a>
     <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#paths-and-hrefs">Paths and hrefs</a>
+    </li>
     <li class="toctree-l2"><a class="reference internal" href="#key-methods">Key Methods</a>
     </li>
     <li class="toctree-l2"><a class="reference internal" href="#usage-example">Usage Example</a>
     </li>
     </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../spine/">Spine</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../parser/">Parser</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../xml-parser/">XmlParser</a>
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../zip-handler/">ZipHandler</a>
                   </li>
@@ -106,7 +108,7 @@
   <ul class="wy-breadcrumbs">
     <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
           <li class="breadcrumb-item">Classes</li>
-      <li class="breadcrumb-item active">XmlParser</li>
+      <li class="breadcrumb-item active">Manifest</li>
     <li class="wy-breadcrumbs-aside">
     </li>
   </ul>
@@ -115,44 +117,57 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
             <div class="section" itemprop="articleBody">
               
-                <h1 id="xmlparser">XmlParser<a class="headerlink" href="#xmlparser" title="Permanent link">&para;</a></h1>
-<p>The <code>XmlParser</code> class in the PHP EPUB Processor library is responsible for handling XML file operations.
-It provides methods to load and save XML files, ensuring that the XML data is correctly parsed and stored.</p>
+                <h1 id="manifest">Manifest<a class="headerlink" href="#manifest" title="Permanent link">&para;</a></h1>
+<p>The <code>Manifest</code> class reads and edits the <code>&lt;manifest&gt;</code> section of the OPF file: the list of every resource in the book (documents, styles, images, fonts, navigation).</p>
+<p><code>EpubFile::load()</code> creates it; get it with <code>EpubFile::getManifest()</code>. <code>ContentManager</code> uses it to keep the manifest in sync when files are added or deleted.</p>
+<h2 id="paths-and-hrefs">Paths and hrefs<a class="headerlink" href="#paths-and-hrefs" title="Permanent link">&para;</a></h2>
+<p>Manifest <code>href</code>s are URLs relative to the OPF file (for example <code>text/chapter%201.xhtml</code> next to <code>EPUB/package.opf</code>). The <code>Manifest</code> translates them to <strong>paths relative to the book root</strong> (<code>EPUB/text/chapter 1.xhtml</code>), which is what <code>ContentManager</code> expects. Hrefs that would escape the book are rejected; remote resources (EPUB 3 allows e.g. streamed audio) get an empty path.</p>
 <h2 id="key-methods">Key Methods<a class="headerlink" href="#key-methods" title="Permanent link">&para;</a></h2>
 <ul>
 <li>
-<p><strong><code>parse(string $filePath): SimpleXMLElement</code></strong>: Loads an XML file from the specified path and returns it as a <code>SimpleXMLElement</code>. Documents with entity declarations (<code>&lt;!ENTITY</code>) are rejected and the parser never fetches external resources, so DOCTYPE references in EPUB 2 NCX files are left alone. Throws an <code>XmlException</code> (a subclass of <code>InvalidEpubException</code>) if the file cannot be found or loaded; the message includes the first libxml error and its line.</p>
+<p><strong><code>__construct(SimpleXMLElement $opfXml, string $opfPath)</code></strong>: <code>$opfPath</code> is the OPF location relative to the book root, as returned by <code>Parser::parse()</code>. Throws <code>InvalidEpubException</code> if the package has no manifest.</p>
 </li>
 <li>
-<p><strong><code>save(SimpleXMLElement $xml, string $filePath): void</code></strong>: Saves a <code>SimpleXMLElement</code> to the specified file path. Throws an exception if the file cannot be saved.</p>
+<p><strong><code>getItems(): array</code></strong>: All items as <code>ManifestItem</code> objects with <code>id</code>, <code>href</code>, <code>path</code>, <code>mediaType</code> and <code>properties</code>.</p>
+</li>
+<li>
+<p><strong><code>get(string $id): ?ManifestItem</code></strong> and <strong><code>findByPath(string $path): ?ManifestItem</code></strong>: Look up one item.</p>
+</li>
+<li>
+<p><strong><code>add(string $path, ?string $mediaType = null, ?string $id = null): ManifestItem</code></strong>: Adds a file. The media type is guessed from the extension and the id is derived from the file name when not given. Throws if the path is already listed or the id is taken.</p>
+</li>
+<li>
+<p><strong><code>remove(string $id): void</code></strong>: Removes an item. Spine entries are not touched; use <code>Spine::remove()</code> (or <code>ContentManager::deleteContent()</code>, which does both).</p>
+</li>
+<li>
+<p><strong><code>pathToHref(string $path): string</code></strong> and <strong><code>hrefToPath(string $href): string</code></strong>: Convert between the two forms.</p>
+</li>
+<li>
+<p><strong><code>getOpfPath(): string</code></strong>: The OPF location relative to the book root.</p>
 </li>
 </ul>
 <h2 id="usage-example">Usage Example<a class="headerlink" href="#usage-example" title="Permanent link">&para;</a></h2>
-<pre class="codehilite"><code class="language-php">use PhpEpub\XmlParser;
+<pre class="codehilite"><code class="language-php">use PhpEpub\EpubFile;
 
-$xmlParser = new XmlParser();
+$epubFile = new EpubFile('/path/to/your.epub');
+$epubFile-&gt;load();
 
-try {
-    // Load an XML file
-    $xml = $xmlParser-&gt;parse('/path/to/file.xml');
-    echo &quot;XML loaded successfully.&quot;;
+$manifest = $epubFile-&gt;getManifest();
 
-    // Modify the XML as needed
-    $xml-&gt;addChild('newElement', 'value');
-
-    // Save the modified XML back to a file
-    $xmlParser-&gt;save($xml, '/path/to/modified_file.xml');
-    echo &quot;XML saved successfully.&quot;;
-} catch (Exception $e) {
-    echo &quot;Error handling XML: &quot; . $e-&gt;getMessage();
+foreach ($manifest-&gt;getItems() as $item) {
+    echo &quot;{$item-&gt;id}: {$item-&gt;path} ({$item-&gt;mediaType})\n&quot;;
 }
+
+// Register a font that was copied into the book by other means
+$manifest-&gt;add('EPUB/fonts/Literata.woff2');
+$epubFile-&gt;save();
 </code></pre>
               
             </div>
           </div><footer>
     <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
-        <a href="../parser/" class="btn btn-neutral float-left" title="Parser"><span class="icon icon-circle-arrow-left"></span> Previous</a>
-        <a href="../zip-handler/" class="btn btn-neutral float-right" title="ZipHandler">Next <span class="icon icon-circle-arrow-right"></span></a>
+        <a href="../metadata/" class="btn btn-neutral float-left" title="Metadata"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../spine/" class="btn btn-neutral float-right" title="Spine">Next <span class="icon icon-circle-arrow-right"></span></a>
     </div>
 
   <hr/>
@@ -175,10 +190,10 @@ try {
   <span class="rst-current-version" data-toggle="rst-current-version">
     
     
-      <span><a href="../parser/" style="color: #fcfcfc">&laquo; Previous</a></span>
+      <span><a href="../metadata/" style="color: #fcfcfc">&laquo; Previous</a></span>
     
     
-      <span><a href="../zip-handler/" style="color: #fcfcfc">Next &raquo;</a></span>
+      <span><a href="../spine/" style="color: #fcfcfc">Next &raquo;</a></span>
     
   </span>
 </div>

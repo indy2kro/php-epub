@@ -86,6 +86,8 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../metadata/">Metadata</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../manifest/">Manifest</a>
+                  </li>
                   <li class="toctree-l1"><a class="reference internal" href="../spine/">Spine</a>
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../parser/">Parser</a>
@@ -158,13 +160,14 @@
 <p>Loads the EPUB file:
 - Extracts ZIP contents to a temporary directory
 - Parses <code>container.xml</code> to locate the OPF file
-- Parses the OPF file to extract metadata and spine
+- Parses the OPF file to extract metadata, manifest and spine
 - Initializes the ContentManager for file operations</p>
+<p>Calling <code>load()</code> again discards the previous extraction (and any unsaved changes) and starts from the file on disk.</p>
 <p>Throws an exception if the file cannot be opened or the EPUB structure is invalid.</p>
 <pre class="codehilite"><code class="language-php">public function save(?string $filePath = null): void
 </code></pre>
 
-<p>Saves the modified EPUB back to disk. If <code>$filePath</code> is null, overwrites the original file. Throws an exception if called before <code>load()</code>.</p>
+<p>Saves the modified EPUB back to disk. If <code>$filePath</code> is null, overwrites the original file. Pending metadata, manifest and spine changes are written to the OPF first. Throws an exception if called before <code>load()</code>.</p>
 <h3 id="accessing-components">Accessing Components<a class="headerlink" href="#accessing-components" title="Permanent link">&para;</a></h3>
 <pre class="codehilite"><code class="language-php">public function getMetadata(): Metadata
 </code></pre>
@@ -174,6 +177,10 @@
 </code></pre>
 
 <p>Returns the Spine object representing the reading order of content. Throws an exception if called before <code>load()</code>.</p>
+<pre class="codehilite"><code class="language-php">public function getManifest(): Manifest
+</code></pre>
+
+<p>Returns the Manifest object listing every resource in the book. Throws an exception if called before <code>load()</code>.</p>
 <pre class="codehilite"><code class="language-php">public function getContentManager(): ContentManager
 </code></pre>
 
@@ -230,7 +237,7 @@ $epubFile = new EpubFile('/path/to/file.epub', $mockZipHandler, $mockXmlParser);
 <p>The class throws <code>Exception</code> in the following cases:
 - File not found or cannot be opened
 - Invalid EPUB structure
-- Calling <code>load()</code>, <code>save()</code>, <code>getMetadata()</code>, <code>getSpine()</code>, or <code>getContentManager()</code> before <code>load()</code>
+- Calling <code>save()</code>, <code>getMetadata()</code>, <code>getManifest()</code>, <code>getSpine()</code>, or <code>getContentManager()</code> before <code>load()</code>
 - Temporary directory creation or cleanup failures</p>
 <h2 id="file-structure">File Structure<a class="headerlink" href="#file-structure" title="Permanent link">&para;</a></h2>
 <p>When loaded, the EPUB is extracted to a temporary directory with the following structure:</p>

@@ -62,6 +62,8 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../../metadata/">Metadata</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../manifest/">Manifest</a>
+                  </li>
                   <li class="toctree-l1"><a class="reference internal" href="../../spine/">Spine</a>
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../../parser/">Parser</a>
@@ -296,9 +298,9 @@ at <code>af4bbcc</code> (main). No source changes were made while compiling this
   <code>$namespaces['']</code> is an undefined key there, producing a warning instead of a clear error.</li>
 <li>[x] <strong>BUG-09</strong> Support prefixed OPF packages (<code>opf:package</code>) and books without any <code>dc:</code> element — <code>src/Metadata.php:25-34</code>, <code>src/Spine.php:19-25</code>, <code>src/Traits/*.php</code> — M · med
   <code>$opfXml-&gt;metadata</code> / <code>-&gt;spine</code> only work with an unprefixed default namespace, and the constructor throws when no <code>dc</code> prefix is declared.</li>
-<li>[ ] <strong>BUG-10</strong> Clean up the previous temp dir when <code>load()</code> is called twice — <code>src/EpubFile.php:45-61</code> — S · low
+<li>[x] <strong>BUG-10</strong> Clean up the previous temp dir when <code>load()</code> is called twice — <code>src/EpubFile.php:45-61</code> — S · low
   Each extra <code>load()</code> leaks a full extracted copy of the book.</li>
-<li>[ ] <strong>BUG-11</strong> Keep manifest and spine in sync on <code>addContent</code>/<code>deleteContent</code> (and create parent dirs) — <code>src/ContentManager.php:56-104</code> — M · med
+<li>[x] <strong>BUG-11</strong> Keep manifest and spine in sync on <code>addContent</code>/<code>deleteContent</code> (and create parent dirs) — <code>src/ContentManager.php:56-104</code> — M · med
   Added files are invisible to readers and deleted files leave dangling manifest/spine entries.</li>
 </ul>
 <h3 id="converters">Converters<a class="headerlink" href="#converters" title="Permanent link">&para;</a></h3>
@@ -318,8 +320,8 @@ at <code>af4bbcc</code> (main). No source changes were made while compiling this
 </ul>
 <h3 id="api-ux">API / UX<a class="headerlink" href="#api-ux" title="Permanent link">&para;</a></h3>
 <ul>
-<li>[ ] <strong>UX-01</strong> Return paths relative to the book root from <code>getContentList()</code> — <code>src/ContentManager.php:30-44</code> — S · med
-  It returns absolute temp paths while every other method takes relative ones, so its output cannot be fed back in.</li>
+<li>[x] <strong>UX-01</strong> Return paths relative to the book root from <code>getContentList()</code> — <code>src/ContentManager.php:30-44</code> — S · med
+  It returns absolute temp paths while every other method takes relative ones, so its output cannot be fed back in. <em>Done as a new <code>getContentPaths()</code>; <code>getContentList()</code> is deprecated, not changed, to stay 1.x compatible.</em></li>
 <li>[x] <strong>UX-02</strong> Add list-valued <code>getSubjects()</code>/<code>setSubjects()</code> (and titles) — <code>src/Traits/InteractsWithSubject.php:13-40</code> — S · low
   Books usually have several subjects; only the first is reachable. <em>Done for subjects; multiple titles deferred.</em></li>
 <li>[x] <strong>UX-03</strong> Introduce specific exception subclasses (invalid book, ZIP, conversion) — <code>src/Exception.php</code> — M · low
@@ -329,7 +331,7 @@ at <code>af4bbcc</code> (main). No source changes were made while compiling this
 </ul>
 <h3 id="features">Features<a class="headerlink" href="#features" title="Permanent link">&para;</a></h3>
 <ul>
-<li>[ ] <strong>FEAT-01</strong> Richer spine: <code>linear</code> flag, idref→href resolution, add/remove/reorder — <code>src/Spine.php</code> — M · med
+<li>[x] <strong>FEAT-01</strong> Richer spine: <code>linear</code> flag, idref→href resolution, add/remove/reorder — <code>src/Spine.php</code> — M · med
   The spine is a read-only list of idrefs that callers must resolve by hand.</li>
 <li>[ ] <strong>FEAT-02</strong> Cover image get/set (EPUB 2 <code>meta name="cover"</code> and EPUB 3 <code>cover-image</code>) — new — M · med
   The most requested metadata operation after title/author is missing.</li>

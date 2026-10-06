@@ -72,8 +72,6 @@
     </li>
     <li class="toctree-l2"><a class="reference internal" href="#usage-example">Usage Example</a>
     </li>
-    <li class="toctree-l2"><a class="reference internal" href="#important-notes">Important Notes</a>
-    </li>
     <li class="toctree-l2"><a class="reference internal" href="#error-handling">Error Handling</a>
     </li>
     <li class="toctree-l2"><a class="reference internal" href="#integration-with-epubfile">Integration with EpubFile</a>
@@ -81,6 +79,8 @@
     </ul>
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../metadata/">Metadata</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../manifest/">Manifest</a>
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../spine/">Spine</a>
                   </li>
@@ -130,27 +130,37 @@
                 <h1 id="contentmanager">ContentManager<a class="headerlink" href="#contentmanager" title="Permanent link">&para;</a></h1>
 <p>The <code>ContentManager</code> class provides file-level operations for content within an EPUB. It works with the extracted EPUB directory structure, allowing you to add, update, delete, and retrieve content files.</p>
 <h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
-<p>ContentManager operates on the extracted EPUB directory (accessible via <code>EpubFile::getTempDir()</code>). It does not modify the OPF manifest - you must manually update the manifest if you add or remove content files that should be part of the EPUB spine.</p>
+<p>ContentManager operates on the extracted EPUB directory (accessible via <code>EpubFile::getTempDir()</code>). All paths are <strong>relative to the book root</strong> and use <code>/</code>, for example <code>EPUB/text/chapter1.xhtml</code>. Paths that are absolute or escape the book with <code>..</code> are rejected.</p>
+<p>When it is created by <code>EpubFile</code> (or given a <code>Manifest</code> and <code>Spine</code>), it keeps the OPF in sync:</p>
+<ul>
+<li><code>addContent()</code> adds new files to the manifest, with a media type guessed from the extension.</li>
+<li><code>deleteContent()</code> removes the file's manifest item and its spine entry.</li>
+</ul>
+<p>Adding a file does not put it in the reading order; call <code>Spine::add()</code> for that.</p>
 <h2 id="key-methods">Key Methods<a class="headerlink" href="#key-methods" title="Permanent link">&para;</a></h2>
 <h3 id="constructor">Constructor<a class="headerlink" href="#constructor" title="Permanent link">&para;</a></h3>
-<pre class="codehilite"><code class="language-php">public function __construct(string $contentDirectory)
+<pre class="codehilite"><code class="language-php">public function __construct(string $contentDirectory, ?Manifest $manifest = null, ?Spine $spine = null)
 </code></pre>
 
-<p>Initializes the ContentManager with the path to the EPUB's content directory. Throws an exception if the directory does not exist.</p>
+<p>Initializes the ContentManager with the path to the extracted EPUB. Throws an exception if the directory does not exist. Without a manifest, only files are touched.</p>
 <p>Typically, you'll get this from EpubFile:</p>
 <pre class="codehilite"><code class="language-php">$epubFile-&gt;load();
 $contentManager = $epubFile-&gt;getContentManager();
 </code></pre>
 
 <h3 id="file-operations">File Operations<a class="headerlink" href="#file-operations" title="Permanent link">&para;</a></h3>
+<pre class="codehilite"><code class="language-php">public function getContentPaths(): array
+</code></pre>
+
+<p>Returns every file in the book as a sorted list of paths relative to the book root. These paths can be passed straight back to the other methods.</p>
 <pre class="codehilite"><code class="language-php">public function getContentList(): array
 </code></pre>
 
-<p>Returns an array of all file paths in the content directory (non-recursive).</p>
+<p><strong>Deprecated</strong>: returns absolute paths inside the temporary directory. Use <code>getContentPaths()</code>.</p>
 <pre class="codehilite"><code class="language-php">public function addContent(string $filePath, string $content): void
 </code></pre>
 
-<p>Creates a new file with the given content. The path is relative to the content directory. Throws an exception if the file cannot be created or already exists.</p>
+<p>Creates (or overwrites) a file, creating missing directories. New files are added to the manifest, except container files (<code>mimetype</code>, <code>META-INF/…</code>, the OPF itself). Throws an exception if the file cannot be written.</p>
 <pre class="codehilite"><code class="language-php">public function updateContent(string $filePath, string $newContent): void
 </code></pre>
 
@@ -158,7 +168,7 @@ $contentManager = $epubFile-&gt;getContentManager();
 <pre class="codehilite"><code class="language-php">public function deleteContent(string $filePath): void
 </code></pre>
 
-<p>Deletes a file from the EPUB. Throws an exception if the file doesn't exist or cannot be deleted.</p>
+<p>Deletes a file, its manifest item and its spine entry. Throws an exception if the file doesn't exist or cannot be deleted.</p>
 <pre class="codehilite"><code class="language-php">public function getContent(string $filePath): string
 </code></pre>
 
@@ -169,79 +179,44 @@ $contentManager = $epubFile-&gt;getContentManager();
 $epubFile = new EpubFile('/path/to/book.epub');
 $epubFile-&gt;load();
 
-// Get the content manager
 $content = $epubFile-&gt;getContentManager();
 
 // List existing files
-$files = $content-&gt;getContentList();
-print_r($files);
+print_r($content-&gt;getContentPaths());
 
 // Read a file
-$chapter1 = $content-&gt;getContent('chapter1.xhtml');
-echo $chapter1;
+$chapter1 = $content-&gt;getContent('EPUB/text/chapter1.xhtml');
 
-// Add a new chapter
+// Add a new chapter and put it at the end of the reading order
 $newChapter = &lt;&lt;&lt;HTML
 &lt;!DOCTYPE html&gt;
 &lt;html xmlns=&quot;http://www.w3.org/1999/xhtml&quot;&gt;
-&lt;head&gt;
-    &lt;title&gt;New Chapter&lt;/title&gt;
-&lt;/head&gt;
-&lt;body&gt;
-    &lt;h1&gt;New Chapter&lt;/h1&gt;
-    &lt;p&gt;This is a new chapter.&lt;/p&gt;
-&lt;/body&gt;
+&lt;head&gt;&lt;title&gt;New Chapter&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;&lt;h1&gt;New Chapter&lt;/h1&gt;&lt;p&gt;This is a new chapter.&lt;/p&gt;&lt;/body&gt;
 &lt;/html&gt;
 HTML;
-$content-&gt;addContent('chapter3.xhtml', $newChapter);
+$content-&gt;addContent('EPUB/text/chapter3.xhtml', $newChapter);
+$item = $epubFile-&gt;getManifest()-&gt;findByPath('EPUB/text/chapter3.xhtml');
+$epubFile-&gt;getSpine()-&gt;add($item-&gt;id);
 
 // Update existing content
-$content-&gt;updateContent('chapter1.xhtml', str_replace('Old', 'New', $chapter1));
+$content-&gt;updateContent('EPUB/text/chapter1.xhtml', str_replace('Old', 'New', $chapter1));
 
-// Delete content
-// $content-&gt;deleteContent('unwanted.xhtml');
+// Delete content (also removes it from the manifest and spine)
+// $content-&gt;deleteContent('EPUB/text/unwanted.xhtml');
 
-// Save the EPUB
+// Save the EPUB; the OPF changes are written automatically
 $epubFile-&gt;save();
 </code></pre>
 
-<h2 id="important-notes">Important Notes<a class="headerlink" href="#important-notes" title="Permanent link">&para;</a></h2>
-<ol>
-<li>
-<p><strong>Manifest Not Updated</strong>: ContentManager only handles the actual files. If you add new content files, you need to manually update the OPF manifest to include them.</p>
-</li>
-<li>
-<p><strong>Path Handling</strong>: Paths are relative to the content directory. Use forward slashes (/) even on Windows.</p>
-</li>
-<li>
-<p><strong>Content Types</strong>: ContentManager works with any file type, but for valid EPUB content, use XHTML files (<code>.xhtml</code>, <code>.html</code>), CSS (<code>.css</code>), images, or fonts.</p>
-</li>
-<li>
-<p><strong>Directory Structure</strong>: The content directory typically contains:
-   <code>EPUB/
-   ├── chapter1.xhtml
-   ├── chapter2.xhtml
-   ├── style.css
-   └── images/
-       ├── cover.jpg
-       └── diagram.png</code></p>
-</li>
-</ol>
 <h2 id="error-handling">Error Handling<a class="headerlink" href="#error-handling" title="Permanent link">&para;</a></h2>
 <p>Throws <code>Exception</code> in the following cases:
 - Directory doesn't exist (constructor)
+- A path is absolute or escapes the book (<code>InvalidEpubException</code>)
 - File operations fail (permissions, disk space)
 - Attempting to update/delete non-existent files</p>
 <h2 id="integration-with-epubfile">Integration with EpubFile<a class="headerlink" href="#integration-with-epubfile" title="Permanent link">&para;</a></h2>
-<p>ContentManager is automatically created when you call <code>load()</code>:</p>
-<pre class="codehilite"><code class="language-php">$epubFile = new EpubFile('book.epub');
-$epubFile-&gt;load(); // This creates the ContentManager internally
-
-// Now you can access it
-$content = $epubFile-&gt;getContentManager();
-</code></pre>
-
-<p>The ContentManager shares the same lifetime as the temporary directory - it's cleaned up when <code>EpubFile::cleanup()</code> or <code>__destruct()</code> is called.</p>
+<p>ContentManager is created when you call <code>load()</code>, together with the <code>Manifest</code> and <code>Spine</code> it keeps in sync. It shares the lifetime of the temporary directory, which is cleaned up by <code>EpubFile::cleanup()</code>, by <code>__destruct()</code>, or when <code>load()</code> is called again.</p>
               
             </div>
           </div><footer>

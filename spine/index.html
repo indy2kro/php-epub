@@ -62,6 +62,8 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../metadata/">Metadata</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../manifest/">Manifest</a>
+                  </li>
                   <li class="toctree-l1 current"><a class="reference internal current" href="#">Spine</a>
     <ul class="current">
     <li class="toctree-l2"><a class="reference internal" href="#key-methods">Key Methods</a>
@@ -114,37 +116,54 @@
             <div class="section" itemprop="articleBody">
               
                 <h1 id="spine">Spine<a class="headerlink" href="#spine" title="Permanent link">&para;</a></h1>
-<p>The <code>Spine</code> class in the PHP EPUB Processor library is responsible for managing the reading order of the content within an EPUB file.
-It parses the spine section of the OPF file to determine the sequence in which the content should be presented to the reader.</p>
+<p>The <code>Spine</code> class manages the reading order of the content within an EPUB file: the <code>&lt;spine&gt;</code> section of the OPF file.</p>
 <h2 id="key-methods">Key Methods<a class="headerlink" href="#key-methods" title="Permanent link">&para;</a></h2>
 <ul>
 <li>
-<p><strong><code>__construct(SimpleXMLElement $opfXml)</code></strong>: Initializes the <code>Spine</code> object with the OPF XML data. It parses the spine section to extract the reading order of the content items.</p>
+<p><strong><code>__construct(SimpleXMLElement $opfXml, ?Manifest $manifest = null)</code></strong>: Parses the spine. The manifest is optional; it is needed to resolve items in <code>getItems()</code> and to validate <code>add()</code>.</p>
 </li>
 <li>
-<p><strong><code>get(): array</code></strong>: Returns an array of item IDs that represent the reading order of the EPUB content. Each ID corresponds to a content item defined in the manifest section of the OPF file.</p>
+<p><strong><code>get(): array</code></strong>: Returns the manifest item ids (idrefs) in reading order.</p>
+</li>
+<li>
+<p><strong><code>getItems(): array</code></strong>: Returns <code>SpineItem</code> objects in reading order. Each has <code>idref</code>, <code>linear</code> (<code>false</code> for auxiliary content marked <code>linear="no"</code>, such as notes) and <code>item</code>, the referenced <code>ManifestItem</code> (with its <code>path</code> relative to the book root), or <code>null</code> without a manifest.</p>
+</li>
+<li>
+<p><strong><code>contains(string $idref): bool</code></strong>: Whether an item is in the reading order.</p>
+</li>
+<li>
+<p><strong><code>add(string $idref, ?int $position = null, bool $linear = true): void</code></strong>: Adds a manifest item to the reading order, at a zero-based position or at the end. Throws if the item is not in the manifest or is already in the spine.</p>
+</li>
+<li>
+<p><strong><code>remove(string $idref): void</code></strong>: Removes an item from the reading order (the manifest is not touched). Throws if it is not in the spine.</p>
+</li>
+<li>
+<p><strong><code>move(string $idref, int $position): void</code></strong>: Moves an item to a new zero-based position.</p>
 </li>
 </ul>
+<p>Changes are made to the OPF in memory; <code>EpubFile::save()</code> writes them (and refreshes the EPUB 3 modified date). Other <code>&lt;itemref&gt;</code> attributes, such as <code>id</code> and <code>properties</code>, are kept.</p>
 <h2 id="usage-example">Usage Example<a class="headerlink" href="#usage-example" title="Permanent link">&para;</a></h2>
 <pre class="codehilite"><code class="language-php">use PhpEpub\EpubFile;
 
-$epubFilePath = '/path/to/your.epub';
-
-$epubFile = new EpubFile($epubFilePath);
+$epubFile = new EpubFile('/path/to/your.epub');
 $epubFile-&gt;load();
 
 $spine = $epubFile-&gt;getSpine();
-$readingOrder = $spine-&gt;get();
 
-foreach ($readingOrder as $itemId) {
-    echo &quot;Content item ID in reading order: $itemId\n&quot;;
+foreach ($spine-&gt;getItems() as $spineItem) {
+    $type = $spineItem-&gt;linear ? 'main' : 'auxiliary';
+    echo &quot;{$spineItem-&gt;idref} ({$type}): {$spineItem-&gt;item?-&gt;path}\n&quot;;
 }
+
+// Show the notes right after the first chapter, then save.
+$spine-&gt;move('notes', 1);
+$epubFile-&gt;save();
 </code></pre>
               
             </div>
           </div><footer>
     <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
-        <a href="../metadata/" class="btn btn-neutral float-left" title="Metadata"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../manifest/" class="btn btn-neutral float-left" title="Manifest"><span class="icon icon-circle-arrow-left"></span> Previous</a>
         <a href="../parser/" class="btn btn-neutral float-right" title="Parser">Next <span class="icon icon-circle-arrow-right"></span></a>
     </div>
 
@@ -168,7 +187,7 @@ foreach ($readingOrder as $itemId) {
   <span class="rst-current-version" data-toggle="rst-current-version">
     
     
-      <span><a href="../metadata/" style="color: #fcfcfc">&laquo; Previous</a></span>
+      <span><a href="../manifest/" style="color: #fcfcfc">&laquo; Previous</a></span>
     
     
       <span><a href="../parser/" style="color: #fcfcfc">Next &raquo;</a></span>
