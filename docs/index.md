@@ -15,7 +15,7 @@ A PHP library for processing EPUB files, including parsing, metadata manipulatio
 Before you begin, ensure you have the following installed on your system:
 
 - **PHP**: Version 8.3 or higher.
-- **PHP Extensions**: `ext-xml`, `ext-zip`.
+- **PHP Extensions**: `ext-dom`, `ext-xml`, `ext-zip`.
 - **Composer**: For managing PHP dependencies.
 - **Calibre**: If you plan to use the CalibreAdapter for conversions.
 - **Dompdf**: If you plan to use the DompdfAdapter for PDF conversions.

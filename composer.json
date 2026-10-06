@@ -10,6 +10,7 @@
     "license" : "GPL-2.0-or-later",
     "require": {
         "php": ">=8.3",
+        "ext-dom": "*",
         "ext-xml": "*",
         "ext-zip": "*"
     },
@@ -25,7 +26,6 @@
     },
     "require-dev": {
         "ext-curl": "*",
-        "ext-dom": "*",
         "ext-mbstring": "*",
         "ext-gd": "*",
         "ext-json": "*",
