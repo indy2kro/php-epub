@@ -390,6 +390,18 @@ final class EpubFileTest extends TestCase
         ];
     }
 
+    public function testLoadCreatesPrivateUnpredictableTempDirectory(): void
+    {
+        $epubFile = new EpubFile(__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'valid.epub');
+        $epubFile->load();
+        $tempDir = (string) $epubFile->getTempDir();
+
+        $this->assertMatchesRegularExpression('/^epub_[0-9a-f]{32}$/', basename($tempDir));
+        if (DIRECTORY_SEPARATOR === '/') {
+            $this->assertSame(0700, fileperms($tempDir) & 0777);
+        }
+    }
+
     public function testSaveWithoutLoadThrowsException(): void
     {
         $this->expectException(Exception::class);

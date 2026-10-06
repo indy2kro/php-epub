@@ -43,13 +43,13 @@ class Parser
         $mimetypePath = $directory . DIRECTORY_SEPARATOR . 'mimetype';
 
         if (! file_exists($mimetypePath)) {
-            throw new Exception('Missing mimetype file: ' . $mimetypePath);
+            throw new InvalidEpubException('Missing mimetype file: ' . $mimetypePath);
         }
 
         $mimetype = file_get_contents($mimetypePath);
 
         if ($mimetype === false || trim($mimetype) !== 'application/epub+zip') {
-            throw new Exception('Invalid mimetype content: ' . $mimetypePath);
+            throw new InvalidEpubException('Invalid mimetype content: ' . $mimetypePath);
         }
     }
 
@@ -65,7 +65,7 @@ class Parser
         $containerNamespace = $namespaces[''] ?? null;
 
         if ($containerNamespace === null) {
-            throw new Exception('No container namespace found in container.xml');
+            throw new InvalidEpubException('No container namespace found in container.xml');
         }
 
         $xml->registerXPathNamespace('ns', $containerNamespace);
@@ -73,7 +73,7 @@ class Parser
         $rootfiles = $xml->xpath('//ns:rootfile');
 
         if ($rootfiles === false || $rootfiles === null || $rootfiles === []) {
-            throw new Exception('No rootfile found in container.xml');
+            throw new InvalidEpubException('No rootfile found in container.xml');
         }
 
         $rootfile = $rootfiles[0]; // Get the first rootfile node
@@ -81,7 +81,7 @@ class Parser
         $opfPath = (string) $rootfile['full-path'];
 
         if ($opfPath === '') {
-            throw new Exception('Missing full-path attribute in rootfile element');
+            throw new InvalidEpubException('Missing full-path attribute in rootfile element');
         }
 
         return $opfPath;
@@ -99,7 +99,7 @@ class Parser
         $opfNamespace = $namespaces[''] ?? null;
 
         if ($opfNamespace === null) {
-            throw new Exception('No OPF namespace found in OPF file');
+            throw new InvalidEpubException('No OPF namespace found in OPF file');
         }
 
         $xml->registerXPathNamespace('opf', $opfNamespace);
@@ -107,7 +107,7 @@ class Parser
         $manifest = $xml->xpath('/opf:package/opf:manifest');
 
         if ($manifest === false || $manifest === null || $manifest === []) {
-            throw new Exception('Missing manifest in OPF file');
+            throw new InvalidEpubException('Missing manifest in OPF file');
         }
 
         $items = $xml->xpath('/opf:package/opf:manifest/opf:item') ?: [];
@@ -138,13 +138,13 @@ class Parser
         $namespaces = $xml->getNamespaces(true);
 
         if (! isset($namespaces[''])) {
-            throw new Exception('No NCX namespace found in NCX file');
+            throw new InvalidEpubException('No NCX namespace found in NCX file');
         }
 
         $navMap = $xml->children($namespaces[''])->navMap;
 
         if (! $navMap) {
-            throw new Exception('Missing navMap in NCX file');
+            throw new InvalidEpubException('Missing navMap in NCX file');
         }
     }
 }

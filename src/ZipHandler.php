@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PhpEpub;
 
+use PhpEpub\Util\PathResolver;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 use ZipArchive;
@@ -11,30 +12,150 @@ use ZipArchive;
 class ZipHandler
 {
     /**
+     * Entries larger than this are checked against the compression ratio limit.
+     */
+    private const int RATIO_CHECK_THRESHOLD = 1024 * 1024;
+
+    private const int CHUNK_SIZE = 65536;
+
+    /**
+     * @param int $maxEntries Maximum number of entries an archive may contain.
+     * @param int $maxUncompressedBytes Maximum total size of the extracted contents.
+     * @param int $maxCompressionRatio Maximum uncompressed/compressed ratio for a single large entry.
+     */
+    public function __construct(
+        private readonly int $maxEntries = 10_000,
+        private readonly int $maxUncompressedBytes = 1024 * 1024 * 1024,
+        private readonly int $maxCompressionRatio = 100,
+        private readonly PathResolver $paths = new PathResolver()
+    ) {
+    }
+
+    /**
      * Extracts a ZIP file to a specified directory.
+     *
+     * The archive is treated as untrusted: entry names must stay inside the
+     * destination, and the entry count, total size and compression ratio are
+     * limited while the data is written (declared sizes are not trusted).
      *
      * @param string $zipFilePath The path to the ZIP file.
      * @param string $destination The directory where the contents should be extracted.
      *
-     * @throws Exception If the extraction fails.
+     * @throws ZipException If the extraction fails or a limit is exceeded.
      */
     public function extract(string $zipFilePath, string $destination): void
     {
         if (! file_exists($zipFilePath)) {
-            throw new Exception("ZIP file does not exist: {$zipFilePath}");
+            throw new ZipException("ZIP file does not exist: {$zipFilePath}");
         }
 
         $zip = new ZipArchive();
         if ($zip->open($zipFilePath) !== true) {
-            throw new Exception("Failed to open ZIP file: {$zipFilePath}");
+            throw new ZipException("Failed to open ZIP file: {$zipFilePath}");
         }
 
-        if (! $zip->extractTo($destination)) {
+        try {
+            if ($zip->numFiles > $this->maxEntries) {
+                throw new ZipException(
+                    "ZIP file has too many entries ({$zip->numFiles} > {$this->maxEntries}): {$zipFilePath}"
+                );
+            }
+
+            $extractedBytes = 0;
+            for ($index = 0; $index < $zip->numFiles; $index++) {
+                $stat = $zip->statIndex($index);
+                if ($stat === false) {
+                    throw new ZipException("Failed to read entry {$index} of ZIP file: {$zipFilePath}");
+                }
+
+                $extractedBytes += $this->extractEntry($zip, $index, $stat['name'], $stat['comp_size'], $destination, $extractedBytes);
+            }
+        } finally {
             $zip->close();
-            throw new Exception("Failed to extract ZIP file to: {$destination}");
+        }
+    }
+
+    /**
+     * Extracts one entry and returns the number of bytes written.
+     *
+     * @throws ZipException
+     */
+    private function extractEntry(
+        ZipArchive $zip,
+        int $index,
+        string $name,
+        int $compressedSize,
+        string $destination,
+        int $extractedBytes
+    ): int {
+        try {
+            $target = $this->paths->resolve($destination, $name);
+        } catch (InvalidEpubException $exception) {
+            throw new ZipException("ZIP entry resolves outside the EPUB: {$name}", 0, $exception);
         }
 
-        $zip->close();
+        if (str_ends_with($name, '/') || str_ends_with($name, '\\')) {
+            $this->ensureDirectory($target);
+
+            return 0;
+        }
+
+        $this->ensureDirectory(dirname($target));
+
+        $input = $zip->getStreamIndex($index);
+        if ($input === false) {
+            throw new ZipException("Failed to read ZIP entry: {$name}");
+        }
+
+        $output = fopen($target, 'wb');
+        if ($output === false) {
+            fclose($input);
+            throw new ZipException("Failed to create file for ZIP entry: {$name}");
+        }
+
+        $written = 0;
+
+        try {
+            while (! feof($input)) {
+                $chunk = fread($input, self::CHUNK_SIZE);
+                if ($chunk === false) {
+                    throw new ZipException("Failed to read ZIP entry: {$name}");
+                }
+
+                $written += strlen($chunk);
+
+                if ($extractedBytes + $written > $this->maxUncompressedBytes) {
+                    throw new ZipException(
+                        "ZIP file exceeds the maximum uncompressed size of {$this->maxUncompressedBytes} bytes"
+                    );
+                }
+
+                if ($written > self::RATIO_CHECK_THRESHOLD && $written > max(1, $compressedSize) * $this->maxCompressionRatio) {
+                    throw new ZipException(
+                        "ZIP entry exceeds the maximum compression ratio of {$this->maxCompressionRatio}: {$name}"
+                    );
+                }
+
+                if (fwrite($output, $chunk) === false) {
+                    throw new ZipException("Failed to write ZIP entry: {$name}");
+                }
+            }
+        } finally {
+            fclose($input);
+            fclose($output);
+        }
+
+        return $written;
+    }
+
+    /**
+     * @throws ZipException
+     */
+    private function ensureDirectory(string $directory): void
+    {
+        if (! is_dir($directory) && ! mkdir($directory, 0777, true) && ! is_dir($directory)) {
+            throw new ZipException("Failed to create directory: {$directory}");
+        }
     }
 
     /**
@@ -43,18 +164,18 @@ class ZipHandler
      * @param string $source The directory to compress.
      * @param string $zipFilePath The path where the ZIP file should be created.
      *
-     * @throws Exception If the compression fails.
+     * @throws ZipException If the compression fails.
      */
     public function compress(string $source, string $zipFilePath): void
     {
         $zip = new ZipArchive();
         if ($zip->open($zipFilePath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
-            throw new Exception("Failed to create ZIP file: {$zipFilePath}");
+            throw new ZipException("Failed to create ZIP file: {$zipFilePath}");
         }
 
         $realSource = realpath($source);
         if ($realSource === false) {
-            throw new Exception("Invalid source directory: {$source}");
+            throw new ZipException("Invalid source directory: {$source}");
         }
 
         // OCF: "mimetype" must be the first entry and must be stored uncompressed.
@@ -91,7 +212,7 @@ class ZipHandler
         }
 
         if (! $zip->close()) {
-            throw new Exception("Failed to finalize ZIP file: {$zipFilePath}");
+            throw new ZipException("Failed to finalize ZIP file: {$zipFilePath}");
         }
     }
 }

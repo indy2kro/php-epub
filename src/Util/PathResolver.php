@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace PhpEpub\Util;
 
-use PhpEpub\Exception;
+use PhpEpub\InvalidEpubException;
 
 /**
  * Resolves paths taken from an EPUB (or from callers) against the book root,
@@ -15,7 +15,7 @@ class PathResolver
     /**
      * Normalizes a path relative to the book root, using "/" as separator.
      *
-     * @throws Exception If the path is absolute or escapes the book root.
+     * @throws InvalidEpubException If the path is absolute or escapes the book root.
      */
     public function normalize(string $path): string
     {
@@ -27,7 +27,7 @@ class PathResolver
             || preg_match('/^[A-Za-z]:/', $path) === 1
             || str_contains($path, '://')
         ) {
-            throw new Exception("Path resolves outside the EPUB: {$path}");
+            throw new InvalidEpubException("Path resolves outside the EPUB: {$path}");
         }
 
         $segments = [];
@@ -38,7 +38,7 @@ class PathResolver
 
             if ($segment === '..') {
                 if ($segments === []) {
-                    throw new Exception("Path resolves outside the EPUB: {$path}");
+                    throw new InvalidEpubException("Path resolves outside the EPUB: {$path}");
                 }
                 array_pop($segments);
                 continue;
@@ -48,7 +48,7 @@ class PathResolver
         }
 
         if ($segments === []) {
-            throw new Exception("Path resolves outside the EPUB: {$path}");
+            throw new InvalidEpubException("Path resolves outside the EPUB: {$path}");
         }
 
         return implode('/', $segments);
@@ -57,7 +57,7 @@ class PathResolver
     /**
      * Joins a book-relative path onto the directory holding the extracted book.
      *
-     * @throws Exception If the path is absolute or escapes the book root.
+     * @throws InvalidEpubException If the path is absolute or escapes the book root.
      */
     public function resolve(string $rootDirectory, string $path): string
     {

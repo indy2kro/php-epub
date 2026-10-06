@@ -5,10 +5,21 @@ declare(strict_types=1);
 namespace PhpEpub\Test;
 
 use PhpEpub\Exception;
+use PhpEpub\InvalidEpubException;
+use PhpEpub\XmlException;
+use PhpEpub\ZipException;
 use PHPUnit\Framework\TestCase;
 
 final class ExceptionTest extends TestCase
 {
+    public function testSpecificExceptionsExtendTheBaseException(): void
+    {
+        $this->assertInstanceOf(Exception::class, new InvalidEpubException());
+        $this->assertInstanceOf(Exception::class, new XmlException());
+        $this->assertInstanceOf(InvalidEpubException::class, new XmlException());
+        $this->assertInstanceOf(Exception::class, new ZipException());
+    }
+
     public function testExceptionMessage(): void
     {
         $message = 'This is a test exception message.';

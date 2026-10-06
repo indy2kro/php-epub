@@ -44,8 +44,9 @@ class EpubFile
 
     public function load(): void
     {
-        $this->tempDir = sys_get_temp_dir() . DIRECTORY_SEPARATOR . uniqid('epub_', true);
-        if (! mkdir($this->tempDir) && ! is_dir($this->tempDir)) {
+        // Unpredictable name and owner-only permissions: the extracted book may be private.
+        $this->tempDir = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'epub_' . bin2hex(random_bytes(16));
+        if (! mkdir($this->tempDir, 0700)) {
             throw new Exception("Failed to create temporary directory: {$this->tempDir}");
         }
 
