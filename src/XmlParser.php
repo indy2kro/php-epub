@@ -24,7 +24,8 @@ class XmlParser
             throw new XmlException("XML file not found: {$filePath}");
         }
 
-        $content = @file_get_contents($filePath);
+        // is_file(): on Linux, reading a directory yields "" instead of false.
+        $content = is_file($filePath) ? @file_get_contents($filePath) : false;
         if ($content === false) {
             throw new XmlException("Failed to read XML file: {$filePath}");
         }
