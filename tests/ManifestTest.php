@@ -91,6 +91,20 @@ final class ManifestTest extends TestCase
         $this->assertTrue($manifest->isModified());
     }
 
+    public function testIdsAreUniqueAcrossThePackageNotJustTheManifest(): void
+    {
+        $opf = EpubBuilder::opf(metadata: '<dc:creator id="cover-jpg">Ann</dc:creator>');
+        $manifest = new Manifest(new SimpleXMLElement($opf), 'EPUB/package.opf');
+
+        $this->assertSame('cover-jpg-2', $manifest->add('EPUB/cover.jpg')->id);
+
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('already in use');
+
+        // "uid" belongs to the dc:identifier.
+        $manifest->add('EPUB/other.xhtml', null, 'uid');
+    }
+
     public function testGeneratedIdsStartWithALetter(): void
     {
         $this->assertSame('item-01-xhtml', $this->manifest()->add('EPUB/01.xhtml')->id);

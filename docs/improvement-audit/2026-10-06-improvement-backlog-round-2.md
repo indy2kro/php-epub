@@ -85,7 +85,7 @@ Effort: S = one file, under 30 min · M = one class plus tests · L = cross-cutt
   Recursive results are ignored, and a locked Windows file raises warnings from `__destruct` and leaks the temp dir silently.
 - [ ] **BUG-10** Keep `ContentManager` writes to the OPF consistent with the in-memory package (refuse them, or reload) — `src/ContentManager.php:89-126`, `src/EpubFile.php:193-204` — S · low
   `updateContent()` on the OPF is overwritten on the next `save()` when anything else changed, and kept otherwise.
-- [ ] **BUG-11** Make generated manifest ids unique across the whole OPF, not only among items — `src/Manifest.php:294-308` — S · low
+- [x] **BUG-11** Make generated manifest ids unique across the whole OPF, not only among items — `src/Manifest.php:294-308` — S · low
   A new file can get an id already used by a `dc:*` or `meta` element, producing duplicate XML ids.
 - [x] **BUG-12** Reject empty values for required fields (title, language, identifier) — `src/Metadata.php:188-199`, `src/Traits/InteractsWithTitle.php`, `src/Traits/InteractsWithLanguage.php` — S · low
   `setTitle('')` writes an empty `dc:title`, which EPUBCheck reports as an error.

@@ -117,7 +117,7 @@ class Manifest
             throw new Exception("File is already in the manifest: {$path}");
         }
 
-        if ($id !== null && $this->findNode($id) instanceof SimpleXMLElement) {
+        if ($id !== null && $this->idInUse($id)) {
             throw new Exception("Manifest id is already in use: {$id}");
         }
 
@@ -304,11 +304,25 @@ class Manifest
         }
 
         $id = $base;
-        for ($suffix = 2; $this->findNode($id) instanceof SimpleXMLElement; $suffix++) {
+        for ($suffix = 2; $this->idInUse($id); $suffix++) {
             $id = "{$base}-{$suffix}";
         }
 
         return $id;
+    }
+
+    /**
+     * XML ids must be unique in the whole package document, not only among manifest items.
+     */
+    private function idInUse(string $id): bool
+    {
+        foreach ($this->opfXml->xpath('//@id') ?: [] as $attribute) {
+            if ((string) $attribute === $id) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function guessMediaType(string $path): string
