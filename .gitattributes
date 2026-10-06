@@ -1,3 +1,9 @@
+# Keep LF everywhere so PHPCS passes on Windows checkouts too.
+* text=auto eol=lf
+*.epub binary
+*.zip binary
+*.jpg binary
+
 .github/                export-ignore
 tests/                  export-ignore
 site/                   export-ignore
