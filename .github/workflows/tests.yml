@@ -14,34 +14,51 @@ permissions:
 jobs:
   php-version:
 
-    runs-on: ubuntu-latest
+    name: PHP ${{ matrix.php-version }} on ${{ matrix.os }}
+
+    runs-on: ${{ matrix.os }}
+
+    defaults:
+      run:
+        shell: bash
 
     strategy:
       fail-fast: false
       matrix:
+        # Path separators, symlinks, temp dirs and file locking differ per OS.
+        os:
+          - ubuntu-latest
+          - windows-latest
+          - macos-latest
         php-version:
           - "8.3"
           - "8.4"
           - "8.5"
 
+    env:
+      # Style and static analysis do not depend on the OS, so run them once per PHP version.
+      STATIC_CHECKS: ${{ matrix.os == 'ubuntu-latest' }}
+
     steps:
 
         - name: Checkout
-          uses: actions/checkout@v7
+          uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+          with:
+            persist-credentials: false
 
         - name: Install PHP
-          uses: shivammathur/setup-php@v2
+          uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
           with:
             php-version: "${{ matrix.php-version }}"
             extensions: xml, zip, curl, dom, mbstring, gd, json
-            coverage: "pcov"
+            coverage: ${{ matrix.os == 'ubuntu-latest' && 'pcov' || 'none' }}
 
         - name: Get Composer Cache Directory 2
           id: composer-cache
           run: |
-            echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+            echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
 
-        - uses: actions/cache@v6
+        - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
           id: actions-cache
           with:
             path: ${{ steps.composer-cache.outputs.dir }}
@@ -50,7 +67,7 @@ jobs:
               ${{ runner.os }}-composer-${{ matrix.php-version }}-
 
         - name: Cache PHP dependencies
-          uses: actions/cache@v6
+          uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
           id: vendor-cache
           with:
             path: |
@@ -68,25 +85,34 @@ jobs:
           run: composer update --no-progress
 
         - name: Code style test
+          if: ${{ env.STATIC_CHECKS == 'true' }}
           run: vendor/bin/phpcs
 
         - name: PHPStan code analysis
+          if: ${{ env.STATIC_CHECKS == 'true' }}
           run: php vendor/bin/phpstan analyze
 
         - name: Execute Rector
+          if: ${{ env.STATIC_CHECKS == 'true' }}
           run: vendor/bin/rector --dry-run
 
         - name: Run tests
+          if: ${{ matrix.os == 'ubuntu-latest' }}
           run: vendor/bin/phpunit --coverage-clover=coverage.xml --log-junit=junit.xml
 
+        - name: Run tests
+          if: ${{ matrix.os != 'ubuntu-latest' }}
+          run: vendor/bin/phpunit
+
         - name: Upload test results to Codecov
-          if: ${{ !cancelled() }}
-          uses: codecov/test-results-action@v1
+          if: ${{ !cancelled() && matrix.os == 'ubuntu-latest' }}
+          uses: codecov/test-results-action@0fa95f0e1eeaafde2c782583b36b28ad0d8c77d3 # v1.2.1
           with:
             token: ${{ secrets.CODECOV_TOKEN }}
 
         - name: Send code coverage report to Codecov.io
-          uses: codecov/codecov-action@v7
+          if: ${{ matrix.os == 'ubuntu-latest' }}
+          uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
           with:
             token: ${{ secrets.CODECOV_TOKEN }}
             files: coverage.xml

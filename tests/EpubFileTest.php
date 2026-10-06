@@ -12,6 +12,7 @@ use PhpEpub\Spine;
 use PhpEpub\Util\FileSystemHelper;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use ZipArchive;
 
 final class EpubFileTest extends TestCase
 {
@@ -138,6 +139,32 @@ final class EpubFileTest extends TestCase
         if ($shouldLoad) {
             $this->assertFileExists($this->outputEpubPath);
         }
+    }
+
+    public function testSavedEpubIsOcfValidAndReloads(): void
+    {
+        $epubFile = new EpubFile(__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'valid.epub');
+        $epubFile->load();
+        $title = $epubFile->getMetadata()->getTitle();
+        $epubFile->save($this->outputEpubPath);
+
+        $zip = new ZipArchive();
+        $this->assertTrue($zip->open($this->outputEpubPath));
+        $first = $zip->statIndex(0);
+        $names = [];
+        for ($i = 0; $i < $zip->numFiles; $i++) {
+            $names[] = (string) $zip->getNameIndex($i);
+        }
+        $zip->close();
+
+        $this->assertIsArray($first);
+        $this->assertSame('mimetype', $first['name']);
+        $this->assertSame(ZipArchive::CM_STORE, $first['comp_method']);
+        $this->assertSame([], array_filter($names, static fn (string $name): bool => str_contains($name, '\\')));
+
+        $reloaded = new EpubFile($this->outputEpubPath);
+        $reloaded->load();
+        $this->assertSame($title, $reloaded->getMetadata()->getTitle());
     }
 
     public static function epubFileProvider(): Iterator

@@ -57,6 +57,13 @@ class ZipHandler
             throw new Exception("Invalid source directory: {$source}");
         }
 
+        // OCF: "mimetype" must be the first entry and must be stored uncompressed.
+        $mimetypePath = $realSource . DIRECTORY_SEPARATOR . 'mimetype';
+        if (is_file($mimetypePath)) {
+            $zip->addFile($mimetypePath, 'mimetype');
+            $zip->setCompressionName('mimetype', ZipArchive::CM_STORE);
+        }
+
         $files = new RecursiveIteratorIterator(
             new RecursiveDirectoryIterator($realSource, RecursiveDirectoryIterator::SKIP_DOTS),
             RecursiveIteratorIterator::SELF_FIRST
@@ -69,7 +76,12 @@ class ZipHandler
                 continue;
             }
 
-            $relativePath = substr($filePath, strlen($realSource) + 1);
+            // ZIP entry names always use "/", regardless of the host OS.
+            $relativePath = str_replace(DIRECTORY_SEPARATOR, '/', substr($filePath, strlen($realSource) + 1));
+
+            if ($relativePath === 'mimetype') {
+                continue;
+            }
 
             if ($file->isDir()) {
                 $zip->addEmptyDir($relativePath);

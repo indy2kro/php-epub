@@ -8,6 +8,7 @@ use PhpEpub\Exception;
 use PhpEpub\Util\FileSystemHelper;
 use PhpEpub\ZipHandler;
 use PHPUnit\Framework\TestCase;
+use ZipArchive;
 
 final class ZipHandlerTest extends TestCase
 {
@@ -91,6 +92,45 @@ final class ZipHandlerTest extends TestCase
         $this->assertFileExists($this->outputZipPath);
     }
 
+    public function testCompressWritesMimetypeFirstAndUncompressed(): void
+    {
+        $this->createEpubTree();
+
+        $zipHandler = new ZipHandler();
+        $zipHandler->compress($this->compressDir, $this->outputZipPath);
+
+        $zip = new ZipArchive();
+        $this->assertTrue($zip->open($this->outputZipPath));
+        $stat = $zip->statIndex(0);
+        $zip->close();
+
+        $this->assertIsArray($stat);
+        $this->assertSame('mimetype', $stat['name']);
+        $this->assertSame(ZipArchive::CM_STORE, $stat['comp_method']);
+    }
+
+    public function testCompressUsesForwardSlashesInEntryNames(): void
+    {
+        $this->createEpubTree();
+
+        $zipHandler = new ZipHandler();
+        $zipHandler->compress($this->compressDir, $this->outputZipPath);
+
+        $zip = new ZipArchive();
+        $this->assertTrue($zip->open($this->outputZipPath));
+        $names = [];
+        for ($i = 0; $i < $zip->numFiles; $i++) {
+            $names[] = (string) $zip->getNameIndex($i);
+        }
+        $zip->close();
+
+        $this->assertContains('META-INF/container.xml', $names);
+        $this->assertContains('EPUB/text/chapter.xhtml', $names);
+        foreach ($names as $name) {
+            $this->assertStringNotContainsString('\\', $name);
+        }
+    }
+
     public function testCompressNonExistentDirectoryThrowsException(): void
     {
         $this->expectException(Exception::class);
@@ -110,5 +150,20 @@ final class ZipHandlerTest extends TestCase
 
         $zipHandler = new ZipHandler();
         @$zipHandler->compress($this->compressDir, __DIR__ . DIRECTORY_SEPARATOR . 'nonexistent' . DIRECTORY_SEPARATOR . 'output.zip');
+    }
+
+    /**
+     * Creates a minimal EPUB layout whose other entries sort before "mimetype".
+     */
+    private function createEpubTree(): void
+    {
+        $metaInf = $this->compressDir . DIRECTORY_SEPARATOR . 'META-INF';
+        $text = $this->compressDir . DIRECTORY_SEPARATOR . 'EPUB' . DIRECTORY_SEPARATOR . 'text';
+        mkdir($metaInf, 0777, true);
+        mkdir($text, 0777, true);
+
+        file_put_contents($metaInf . DIRECTORY_SEPARATOR . 'container.xml', '<container/>');
+        file_put_contents($text . DIRECTORY_SEPARATOR . 'chapter.xhtml', str_repeat('<p>text</p>', 100));
+        file_put_contents($this->compressDir . DIRECTORY_SEPARATOR . 'mimetype', 'application/epub+zip');
     }
 }

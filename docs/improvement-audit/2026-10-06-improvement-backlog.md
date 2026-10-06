@@ -78,9 +78,9 @@ Effort: S = one file, under 30 min · M = one class plus tests · L = cross-cutt
 
 ### Bugs
 
-- [ ] **BUG-01** Write `mimetype` as the first, stored ZIP entry on save — `src/ZipHandler.php:49-85` — S · high
+- [x] **BUG-01** Write `mimetype` as the first, stored ZIP entry on save — `src/ZipHandler.php:49-85` — S · high
   Probe: re-saving `valid.epub` put `mimetype` at index 15, so every saved book fails EPUBCheck and strict readers reject it.
-- [ ] **BUG-02** Use `/` in ZIP entry names on Windows — `src/ZipHandler.php:72-78` — S · high
+- [x] **BUG-02** Use `/` in ZIP entry names on Windows — `src/ZipHandler.php:72-78` — S · high
   Probe on Windows produced entries like `EPUB\css\base.css`, which ZIP/OCF readers cannot resolve.
 - [ ] **BUG-03** Keep the `dc:identifier` referenced by `package@unique-identifier` in `setIdentifiers()` — `src/Traits/InteractsWithIdentifier.php:38-54` — S · high
   All identifiers (and their `id`s) are deleted, leaving `unique-identifier` dangling and the OPF invalid.
@@ -154,7 +154,7 @@ Effort: S = one file, under 30 min · M = one class plus tests · L = cross-cutt
 
 ### CI
 
-- [ ] **CI-01** Add `windows-latest` to the test matrix — `.github/workflows/tests.yml:17-25` — S · med
+- [x] **CI-01** Add `windows-latest` to the test matrix — `.github/workflows/tests.yml:17-25` — S · med
   BUG-02 only shows up on Windows.
 - [ ] **CI-02** Add `composer audit` and gitleaks; quote `$GITHUB_OUTPUT` (actionlint SC2086) — `.github/workflows/tests.yml:41`, `.github/workflows/deploy-docs.yml:30` — S · low
   Dependency advisories and leaked secrets are not gated.
