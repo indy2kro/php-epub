@@ -102,6 +102,17 @@ final class TCPDFAdapterTest extends TestCase
         $this->assertEqualsWithDelta(20.0, $margins['left'], 0.001);
     }
 
+    public function testPaperSizeAndOrientationLikeDompdf(): void
+    {
+        $default = $this->exposedAdapter()->createPdfFor($this->epubDirectory);
+        $this->assertEqualsWithDelta(210.0, $default->getPageWidth(), 0.1);
+        $this->assertEqualsWithDelta(297.0, $default->getPageHeight(), 0.1);
+
+        $letter = $this->exposedAdapter(['paper_size' => 'letter', 'orientation' => 'landscape'])->createPdfFor($this->epubDirectory);
+        $this->assertEqualsWithDelta(279.4, $letter->getPageWidth(), 0.1);
+        $this->assertEqualsWithDelta(215.9, $letter->getPageHeight(), 0.1);
+    }
+
     public function testConvertReportsUnwritableOutput(): void
     {
         $this->expectException(ConversionException::class);

@@ -96,6 +96,19 @@ final class DompdfAdapterTest extends TestCase
         $this->assertSame([realpath($this->epubDirectory)], $options->getChroot());
     }
 
+    public function testMarginsLikeTcpdf(): void
+    {
+        $html = (new DompdfAdapter(['margin_top' => 10, 'margin_right' => 11, 'margin_bottom' => 12, 'margin_left' => 13]))
+            ->buildHtml($this->epubDirectory);
+
+        $this->assertStringContainsString('@page { margin: 10mm 11mm 12mm 13mm; }', $html);
+    }
+
+    public function testDompdfKeepsItsOwnMarginsWhenNoneAreGiven(): void
+    {
+        $this->assertStringNotContainsString('@page', (new DompdfAdapter())->buildHtml($this->epubDirectory));
+    }
+
     public function testConvertReportsUnwritableOutput(): void
     {
         $this->expectException(ConversionException::class);

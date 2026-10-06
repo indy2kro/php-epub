@@ -18,6 +18,8 @@ class TCPDFAdapter implements ConverterInterface
         'margin_bottom' => 25,
         'header' => true,
         'footer' => true,
+        'paper_size' => 'A4',
+        'orientation' => 'portrait',
     ];
 
     /**
@@ -29,8 +31,9 @@ class TCPDFAdapter implements ConverterInterface
      * TCPDFAdapter constructor.
      *
      * @param array<string, mixed> $styles Optional styling parameters: font, font_size, margin_left,
-     *                                     margin_top, margin_right, margin_bottom (int), header, footer (bool).
-     *                                     Values of the wrong type fall back to the defaults.
+     *                                     margin_top, margin_right, margin_bottom (int, mm), header, footer (bool),
+     *                                     paper_size (e.g. "A4", "letter") and orientation ("portrait" or
+     *                                     "landscape"), as in DompdfAdapter. Values of the wrong type fall back to the defaults.
      */
     public function __construct(array $styles = [], private readonly EpubDocumentLoader $loader = new EpubDocumentLoader())
     {
@@ -66,7 +69,8 @@ class TCPDFAdapter implements ConverterInterface
     {
         $author = implode(', ', $document->authors);
 
-        $pdf = new TCPDF();
+        $orientation = strtolower($this->stringStyle('orientation')) === 'landscape' ? 'L' : 'P';
+        $pdf = new TCPDF($orientation, 'mm', strtoupper($this->stringStyle('paper_size')));
         $pdf->SetCreator(PDF_CREATOR);
         $pdf->SetTitle($document->title);
         $pdf->SetAuthor($author);
