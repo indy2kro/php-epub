@@ -4,16 +4,22 @@ declare(strict_types=1);
 
 namespace PhpEpub;
 
+use PhpEpub\Util\PathResolver;
+
 class Parser
 {
-    public function __construct(private readonly XmlParser $xmlParser = new XmlParser())
-    {
+    public function __construct(
+        private readonly XmlParser $xmlParser = new XmlParser(),
+        private readonly PathResolver $paths = new PathResolver()
+    ) {
     }
 
     /**
      * Parse the EPUB file structure.
      *
      * @param string $directory The directory containing the extracted EPUB contents.
+     *
+     * @return string The OPF path relative to $directory, normalized with "/" separators.
      */
     public function parse(string $directory): string
     {
@@ -22,9 +28,9 @@ class Parser
 
         $containerPath = $directory . DIRECTORY_SEPARATOR . 'META-INF' . DIRECTORY_SEPARATOR . 'container.xml';
 
-        $opfPath = $this->extractOpfPath($containerPath);
+        $opfPath = $this->paths->normalize($this->extractOpfPath($containerPath));
 
-        $this->validateOpf($directory . DIRECTORY_SEPARATOR . $opfPath);
+        $this->validateOpf($directory, $opfPath);
 
         return $opfPath;
     }
@@ -66,7 +72,7 @@ class Parser
 
         $rootfiles = $xml->xpath('//ns:rootfile');
 
-        if ($rootfiles === false || $rootfiles === null) {
+        if ($rootfiles === false || $rootfiles === null || $rootfiles === []) {
             throw new Exception('No rootfile found in container.xml');
         }
 
@@ -84,9 +90,9 @@ class Parser
     /**
      * Validates the OPF file and checks for the presence of the NCX file.
      */
-    private function validateOpf(string $opfPath): void
+    private function validateOpf(string $directory, string $opfPath): void
     {
-        $xml = $this->xmlParser->parse($opfPath);
+        $xml = $this->xmlParser->parse($this->paths->resolve($directory, $opfPath));
 
         $namespaces = $xml->getNamespaces(true);
 
@@ -98,11 +104,13 @@ class Parser
 
         $xml->registerXPathNamespace('opf', $opfNamespace);
 
-        $items = $xml->xpath('//opf:manifest/opf:item');
+        $manifest = $xml->xpath('/opf:package/opf:manifest');
 
-        if ($items === false || $items === null) {
+        if ($manifest === false || $manifest === null || $manifest === []) {
             throw new Exception('Missing manifest in OPF file');
         }
+
+        $items = $xml->xpath('/opf:package/opf:manifest/opf:item') ?: [];
 
         $ncxItem = null;
         foreach ($items as $item) {
@@ -113,8 +121,10 @@ class Parser
         }
 
         if ($ncxItem !== null) {
-            $ncxPath = dirname($opfPath) . DIRECTORY_SEPARATOR . $ncxItem;
-            $this->validateNcx($ncxPath);
+            // Manifest hrefs are URLs relative to the OPF file.
+            $opfDirectory = dirname($opfPath);
+            $ncxPath = ($opfDirectory === '.' ? '' : $opfDirectory . '/') . rawurldecode($ncxItem);
+            $this->validateNcx($this->paths->resolve($directory, $ncxPath));
         }
     }
 
@@ -126,6 +136,10 @@ class Parser
         $xml = $this->xmlParser->parse($ncxPath);
 
         $namespaces = $xml->getNamespaces(true);
+
+        if (! isset($namespaces[''])) {
+            throw new Exception('No NCX namespace found in NCX file');
+        }
 
         $navMap = $xml->children($namespaces[''])->navMap;
 

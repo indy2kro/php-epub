@@ -18,6 +18,11 @@
             "PhpEpub\\": "src/"
         }
     },
+    "autoload-dev": {
+        "psr-4": {
+            "PhpEpub\\Test\\": "tests/"
+        }
+    },
     "require-dev": {
         "ext-curl": "*",
         "ext-dom": "*",

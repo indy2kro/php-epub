@@ -48,6 +48,16 @@ class FileSystemHelper
                 continue;
             }
             $filePath = $dir . DIRECTORY_SEPARATOR . $file;
+
+            // Remove links themselves; never recurse into their targets.
+            if (is_link($filePath)) {
+                // On Windows a directory symlink is removed with rmdir().
+                if (! @unlink($filePath)) {
+                    rmdir($filePath);
+                }
+                continue;
+            }
+
             is_dir($filePath) ? $this->deleteDirectory($filePath) : unlink($filePath);
         }
 

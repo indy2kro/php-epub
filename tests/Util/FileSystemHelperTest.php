@@ -52,4 +52,27 @@ final class FileSystemHelperTest extends TestCase
         $this->assertSame(filesize($validFile), $this->helper->fileSize($validFile));
         $this->assertFalse(@$this->helper->fileSize($invalidFile));
     }
+
+    public function testDeleteDirectoryDoesNotFollowSymlinks(): void
+    {
+        $base = $this->fixturesDir . DIRECTORY_SEPARATOR . 'tmp' . DIRECTORY_SEPARATOR . 'symlink_test';
+        $book = $base . DIRECTORY_SEPARATOR . 'book';
+        $outside = $base . DIRECTORY_SEPARATOR . 'outside';
+        mkdir($book, 0777, true);
+        mkdir($outside, 0777, true);
+        file_put_contents($outside . DIRECTORY_SEPARATOR . 'keep.txt', 'keep');
+
+        try {
+            if (! @symlink($outside, $book . DIRECTORY_SEPARATOR . 'link')) {
+                $this->markTestSkipped('Creating symlinks is not permitted on this system.');
+            }
+
+            $this->assertTrue($this->helper->deleteDirectory($book));
+
+            $this->assertDirectoryDoesNotExist($book);
+            $this->assertFileExists($outside . DIRECTORY_SEPARATOR . 'keep.txt');
+        } finally {
+            $this->helper->deleteDirectory($base);
+        }
+    }
 }

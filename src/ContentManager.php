@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PhpEpub;
 
+use PhpEpub\Util\PathResolver;
+
 class ContentManager
 {
     private readonly string $contentDirectory;
@@ -13,8 +15,10 @@ class ContentManager
      *
      * @param string $contentDirectory The directory containing the EPUB content.
      */
-    public function __construct(string $contentDirectory)
-    {
+    public function __construct(
+        string $contentDirectory,
+        private readonly PathResolver $paths = new PathResolver()
+    ) {
         if (! is_dir($contentDirectory)) {
             throw new Exception("Content directory does not exist: {$contentDirectory}");
         }
@@ -54,7 +58,7 @@ class ContentManager
      */
     public function addContent(string $filePath, string $content): void
     {
-        $fullPath = $this->contentDirectory . DIRECTORY_SEPARATOR . $filePath;
+        $fullPath = $this->paths->resolve($this->contentDirectory, $filePath);
         if (file_put_contents($fullPath, $content) === false) {
             throw new Exception("Failed to add content to: {$fullPath}");
         }
@@ -70,7 +74,7 @@ class ContentManager
      */
     public function updateContent(string $filePath, string $newContent): void
     {
-        $fullPath = $this->contentDirectory . DIRECTORY_SEPARATOR . $filePath;
+        $fullPath = $this->paths->resolve($this->contentDirectory, $filePath);
         if (! file_exists($fullPath)) {
             throw new Exception("Content file does not exist: {$fullPath}");
         }
@@ -89,7 +93,7 @@ class ContentManager
      */
     public function deleteContent(string $filePath): void
     {
-        $fullPath = $this->contentDirectory . DIRECTORY_SEPARATOR . $filePath;
+        $fullPath = $this->paths->resolve($this->contentDirectory, $filePath);
         if (! file_exists($fullPath)) {
             throw new Exception("Content file does not exist: {$fullPath}");
         }
@@ -110,7 +114,7 @@ class ContentManager
      */
     public function getContent(string $filePath): string
     {
-        $fullPath = $this->contentDirectory . DIRECTORY_SEPARATOR . $filePath;
+        $fullPath = $this->paths->resolve($this->contentDirectory, $filePath);
         if (! file_exists($fullPath)) {
             throw new Exception("Content file does not exist: {$fullPath}");
         }

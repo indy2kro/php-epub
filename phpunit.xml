@@ -12,18 +12,15 @@
     failOnSkipped="false"
     failOnWarning="true"
     cacheDirectory=".phpunit.cache"
-    xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/8.3/phpunit.xsd">
+    xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd">
     <source>
         <include>
             <directory>./src/</directory>
         </include>
-        <exclude>
-            <directory>./src/Cli/</directory>
-        </exclude>
     </source>
     <testsuites>
-        <testsuite name="PhpIso Testing Suite">
-            <directory suffix=".php">./tests/</directory>
+        <testsuite name="PhpEpub Testing Suite">
+            <directory suffix="Test.php">./tests/</directory>
         </testsuite>
     </testsuites>
 </phpunit>
