@@ -6,6 +6,8 @@ The `Metadata` class provides comprehensive management of Dublin Core metadata w
 
 EPUB files use Dublin Core metadata elements (dc:) defined in the OPF (Open Packaging Format) file. The Metadata class provides get/set methods for all commonly used Dublin Core elements, along with persistence to save changes back to the OPF XML file.
 
+Only elements inside the package's `<metadata>` element are read or changed. Both EPUB 2 and EPUB 3 packages are supported, including packages that use a prefix for the OPF namespace (`<opf:package>`) or that do not declare a `dc` prefix yet.
+
 ## Key Methods
 
 ### Constructor
@@ -14,15 +16,18 @@ EPUB files use Dublin Core metadata elements (dc:) defined in the OPF (Open Pack
 public function __construct(SimpleXMLElement $opfXml, string $opfFilePath)
 ```
 
-Initializes the Metadata object. The OPF XML element is typically obtained from parsing the EPUB's OPF file. The `$opfFilePath` is needed to save changes back to disk.
+Initializes the Metadata object. The OPF XML element is typically obtained from parsing the EPUB's OPF file. The `$opfFilePath` is needed to save changes back to disk. Throws an `InvalidEpubException` if the package has no `<metadata>` element.
 
 ### Saving Changes
 
 ```php
 public function save(): void
+public function isModified(): bool
 ```
 
-Serializes the modified OPF XML back to disk. Must be called after making any metadata changes. Throws an exception if the file cannot be written.
+`save()` serializes the OPF XML back to disk. For EPUB 3 packages, `dcterms:modified` is set to the current UTC time when metadata was changed since the last save (it is left alone when nothing changed). Throws an exception if the file cannot be written.
+
+`isModified()` tells whether there are unsaved changes. `EpubFile::save()` calls `Metadata::save()` automatically when there are, so calling it yourself is optional.
 
 ```php
 public function getOpfFilePath(): string
@@ -32,7 +37,7 @@ Returns the file path of the OPF file for reference.
 
 ## Metadata Fields
 
-The following Dublin Core elements are supported:
+Single-valued getters return the first matching element (or `''`); setters update it, or create it when missing. Values are escaped, so characters such as `&` and `<` are safe.
 
 ### Title
 
@@ -51,6 +56,8 @@ public function setAuthors(array<int, string> $authors): void
 ```
 
 The creators of the resource (dc:creator). Multiple authors are supported.
+
+`setAuthors()` reuses the existing creators in order, so their roles survive (EPUB 2 `opf:role`, EPUB 3 `<meta refines="#id" property="role">`). When a creator's name changes, its sort key (`opf:file-as` / `file-as` refinement) is removed because it described the old name. Creators that are no longer needed are removed together with all their refinements.
 
 ### Description
 
@@ -86,25 +93,29 @@ public function getLanguage(): string
 public function setLanguage(string $language): void
 ```
 
-The language of the resource (dc:language). Use RFC 3066 language codes (e.g., "en", "fr").
+The language of the resource (dc:language). Use BCP 47 language codes (e.g., "en", "fr").
 
 ### Subject
 
 ```php
 public function getSubject(): string
 public function setSubject(string $subject): void
+public function getSubjects(): array<int, string>
+public function setSubjects(array<int, string> $subjects): void
 ```
 
-The topic of the resource (dc:subject). Can be used for keywords or topics.
+The topics of the resource (dc:subject). `getSubject()`/`setSubject()` work on the first subject; `getSubjects()`/`setSubjects()` work on all of them.
 
-### Identifier
+### Identifiers
 
 ```php
-public function getIdentifier(): string
-public function setIdentifier(string $identifier): void
+public function getIdentifiers(): array<int, string>
+public function setIdentifiers(array<int, string> $identifiers): void
 ```
 
-An unambiguous reference to the resource (dc:identifier). Often an ISBN or UUID.
+Unambiguous references to the resource (dc:identifier), such as an ISBN or UUID.
+
+The first value passed to `setIdentifiers()` is stored in the identifier that `package@unique-identifier` points to, so the package stays valid. At least one identifier is required. An identifier whose value changes loses its type information (`opf:scheme` / `identifier-type` refinement).
 
 ## Usage Example
 
@@ -125,12 +136,10 @@ echo "Language: " . $metadata->getLanguage();
 $metadata->setTitle('My New Title');
 $metadata->setAuthors(['John Doe', 'Jane Smith']);
 $metadata->setPublisher('My Publishing House');
+$metadata->setSubjects(['Fiction', 'Adventure']);
 $metadata->setLanguage('en');
 
-// Save metadata changes to OPF file
-$metadata->save();
-
-// Save the complete EPUB
+// Save the complete EPUB (pending metadata changes are written first)
 $epubFile->save();
 ```
 
@@ -147,14 +156,10 @@ The Metadata class uses PHP traits to organize code:
 - `InteractsWithSubject` - Subject handling
 - `InteractsWithIdentifier` - Identifier handling
 
-Each trait provides the get/set methods for a specific field and uses the protected `$opfXml` and `$dcNamespace` properties to interact with the OPF XML structure.
+Each trait is a thin layer over shared protected helpers in `Metadata` (`getDcValue()`, `getDcValues()`, `setDcValue()`, `setDcValues()`), which look up elements inside `<metadata>` by namespace URI rather than by prefix.
 
 ## Error Handling
 
-The `save()` method throws an exception if:
-- The OPF file cannot be written
-- The XML cannot be serialized
-
-## XML Namespace
-
-The class automatically detects the Dublin Core namespace from the OPF XML on construction. This is necessary because different EPUB files may use different namespace prefixes.
+- The constructor throws `InvalidEpubException` if the package has no `<metadata>` element.
+- `setIdentifiers([])` throws an `Exception`, because a package needs at least one identifier.
+- `save()` throws an `Exception` if the OPF file cannot be written.

@@ -4,40 +4,21 @@ declare(strict_types=1);
 
 namespace PhpEpub\Traits;
 
-use SimpleXMLElement;
-
 trait InteractsWithDescription
 {
     /**
-     * Gets the description of the EPUB.
+     * Gets the description of the EPUB (the first dc:description).
      */
     public function getDescription(): string
     {
-        $this->opfXml->registerXPathNamespace('dc', $this->dcNamespace);
-
-        $descriptionNode = $this->opfXml->xpath('//dc:description');
-
-        if ($descriptionNode === false || $descriptionNode === null || $descriptionNode === []) {
-            return '';
-        }
-
-        return (string) $descriptionNode[0];
+        return $this->getDcValue('description');
     }
 
     /**
-     * Sets the description of the EPUB.
+     * Sets the description of the EPUB, creating dc:description when missing.
      */
     public function setDescription(string $description): void
     {
-        $this->opfXml->registerXPathNamespace('dc', $this->dcNamespace);
-
-        $descriptionNode = $this->opfXml->xpath('//dc:description');
-
-        if ($descriptionNode !== false && $descriptionNode !== null && $descriptionNode !== [] && isset($descriptionNode[0])) {
-            // @phpstan-ignore-next-line
-            $descriptionNode[0][0] = $description;
-        } else {
-            $this->opfXml->metadata->addChild('description', $description, $this->dcNamespace);
-        }
+        $this->setDcValue('description', $description);
     }
 }

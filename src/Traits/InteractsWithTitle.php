@@ -4,40 +4,21 @@ declare(strict_types=1);
 
 namespace PhpEpub\Traits;
 
-use SimpleXMLElement;
-
 trait InteractsWithTitle
 {
     /**
-     * Gets the title of the EPUB.
+     * Gets the title of the EPUB (the first dc:title).
      */
     public function getTitle(): string
     {
-        $this->opfXml->registerXPathNamespace('dc', $this->dcNamespace);
-
-        $titleNode = $this->opfXml->xpath('//dc:title');
-
-        if ($titleNode === false || $titleNode === null || $titleNode === []) {
-            return '';
-        }
-
-        return (string) $titleNode[0];
+        return $this->getDcValue('title');
     }
 
     /**
-     * Sets the title of the EPUB.
+     * Sets the title of the EPUB, creating dc:title when missing.
      */
     public function setTitle(string $title): void
     {
-        $this->opfXml->registerXPathNamespace('dc', $this->dcNamespace);
-
-        $titleNode = $this->opfXml->xpath('//dc:title');
-
-        if ($titleNode !== false && $titleNode !== null && $titleNode !== [] && isset($titleNode[0])) {
-            // @phpstan-ignore-next-line
-            $titleNode[0][0] = $title;
-        } else {
-            $this->opfXml->metadata->addChild('title', $title, $this->dcNamespace);
-        }
+        $this->setDcValue('title', $title);
     }
 }

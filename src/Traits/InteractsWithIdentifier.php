@@ -4,52 +4,48 @@ declare(strict_types=1);
 
 namespace PhpEpub\Traits;
 
+use PhpEpub\Exception;
 use SimpleXMLElement;
 
 trait InteractsWithIdentifier
 {
     /**
-     * Gets the authors of the EPUB.
+     * Gets the identifiers (dc:identifier) of the EPUB, in document order.
      *
      * @return array<int, string>
      */
     public function getIdentifiers(): array
     {
-        $this->opfXml->registerXPathNamespace('dc', $this->dcNamespace);
-
-        $identifierNodes = $this->opfXml->xpath('//dc:identifier');
-
-        $identifiers = [];
-
-        if ($identifierNodes === false || $identifierNodes === null || $identifierNodes === []) {
-            return $identifiers;
-        }
-
-        foreach ($identifierNodes as $identifierNode) {
-            $identifiers[] = (string) $identifierNode;
-        }
-        return $identifiers;
+        return $this->getDcValues('identifier');
     }
 
     /**
-     * Sets the identifiers of the EPUB.
+     * Sets the identifiers (dc:identifier) of the EPUB.
+     *
+     * The first value is stored in the identifier referenced by
+     * package@unique-identifier, so the package stays valid. An identifier whose
+     * value changes loses its type information (opf:scheme / identifier-type
+     * refinement); removed identifiers lose all refinements.
      *
      * @param array<int, string> $identifiers
+     *
+     * @throws Exception If no identifier is given.
      */
     public function setIdentifiers(array $identifiers): void
     {
-        $this->opfXml->registerXPathNamespace('dc', $this->dcNamespace);
-
-        $identifierNodes = $this->opfXml->xpath('//dc:identifier');
-
-        if ($identifierNodes !== false && $identifierNodes !== null && $identifierNodes !== []) {
-            foreach ($identifierNodes as $key => $identifierNode) {
-                unset($identifierNodes[$key][0]);
-            }
+        if ($identifiers === []) {
+            throw new Exception('At least one identifier is required');
         }
 
-        foreach ($identifiers as $identifier) {
-            $this->opfXml->metadata->addChild('identifier', $identifier, $this->dcNamespace);
+        $elements = $this->dcElements('identifier');
+        $unique = $this->uniqueIdentifierElement();
+
+        if ($unique instanceof SimpleXMLElement) {
+            $uniqueId = (string) $unique['id'];
+            $others = array_filter($elements, static fn (SimpleXMLElement $element): bool => (string) $element['id'] !== $uniqueId);
+            $elements = [$unique, ...array_values($others)];
         }
+
+        $this->setDcValues('identifier', array_values($identifiers), $elements, ['scheme', 'identifier-type']);
     }
 }

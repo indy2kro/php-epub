@@ -4,40 +4,21 @@ declare(strict_types=1);
 
 namespace PhpEpub\Traits;
 
-use SimpleXMLElement;
-
 trait InteractsWithPublisher
 {
     /**
-     * Gets the publisher of the EPUB.
+     * Gets the publisher of the EPUB (the first dc:publisher).
      */
     public function getPublisher(): string
     {
-        $this->opfXml->registerXPathNamespace('dc', $this->dcNamespace);
-
-        $publisherNode = $this->opfXml->xpath('//dc:publisher');
-
-        if ($publisherNode === false || $publisherNode === null || $publisherNode === []) {
-            return '';
-        }
-
-        return (string) $publisherNode[0];
+        return $this->getDcValue('publisher');
     }
 
     /**
-     * Sets the publisher of the EPUB.
+     * Sets the publisher of the EPUB, creating dc:publisher when missing.
      */
     public function setPublisher(string $publisher): void
     {
-        $this->opfXml->registerXPathNamespace('dc', $this->dcNamespace);
-
-        $publisherNode = $this->opfXml->xpath('//dc:publisher');
-
-        if ($publisherNode !== false && $publisherNode !== null && $publisherNode !== [] && isset($publisherNode[0])) {
-            // @phpstan-ignore-next-line
-            $publisherNode[0][0] = $publisher;
-        } else {
-            $this->opfXml->metadata->addChild('publisher', $publisher, $this->dcNamespace);
-        }
+        $this->setDcValue('publisher', $publisher);
     }
 }

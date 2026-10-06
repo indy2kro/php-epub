@@ -18,9 +18,12 @@ class Spine
      */
     public function __construct(private readonly SimpleXMLElement $opfXml)
     {
-        foreach ($this->opfXml->spine->itemref as $item) {
-            $attr = $item->attributes();
-            $this->spine[] = (string) $attr->idref;
+        // Namespace-aware, so prefixed packages (<opf:package>) work as well.
+        $this->opfXml->registerXPathNamespace('opf', Metadata::OPF_NAMESPACE);
+        $itemrefs = $this->opfXml->xpath('/opf:package/opf:spine/opf:itemref') ?: [];
+
+        foreach ($itemrefs as $item) {
+            $this->spine[] = (string) $item['idref'];
         }
     }
 

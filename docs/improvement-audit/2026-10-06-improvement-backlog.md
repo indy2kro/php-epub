@@ -82,19 +82,19 @@ Effort: S = one file, under 30 min · M = one class plus tests · L = cross-cutt
   Probe: re-saving `valid.epub` put `mimetype` at index 15, so every saved book fails EPUBCheck and strict readers reject it.
 - [x] **BUG-02** Use `/` in ZIP entry names on Windows — `src/ZipHandler.php:72-78` — S · high
   Probe on Windows produced entries like `EPUB\css\base.css`, which ZIP/OCF readers cannot resolve.
-- [ ] **BUG-03** Keep the `dc:identifier` referenced by `package@unique-identifier` in `setIdentifiers()` — `src/Traits/InteractsWithIdentifier.php:38-54` — S · high
+- [x] **BUG-03** Keep the `dc:identifier` referenced by `package@unique-identifier` in `setIdentifiers()` — `src/Traits/InteractsWithIdentifier.php:38-54` — S · high
   All identifiers (and their `id`s) are deleted, leaving `unique-identifier` dangling and the OPF invalid.
-- [ ] **BUG-04** Persist metadata edits from `EpubFile::save()` — `src/EpubFile.php:63-75` — S · med
+- [x] **BUG-04** Persist metadata edits from `EpubFile::save()` — `src/EpubFile.php:63-75` — S · med
   Edits are silently lost unless the caller also remembers `getMetadata()->save()`.
-- [ ] **BUG-05** Preserve `opf:role`/`opf:file-as` and EPUB 3 `refines` metas when setting authors/identifiers — `src/Traits/InteractsWithAuthors.php:37-52` — M · med
+- [x] **BUG-05** Preserve `opf:role`/`opf:file-as` and EPUB 3 `refines` metas when setting authors/identifiers — `src/Traits/InteractsWithAuthors.php:37-52` — M · med
   Removing creators leaves `<meta refines="#id">` pointing at nothing and drops role information.
-- [ ] **BUG-06** Update EPUB 3 `dcterms:modified` when metadata is saved — `src/Metadata.php:41-48` — S · med
+- [x] **BUG-06** Update EPUB 3 `dcterms:modified` when metadata is saved — `src/Metadata.php:41-48` — S · med
   EPUB 3 requires it to reflect the last modification; it stays stale after edits.
 - [x] **BUG-07** Treat an empty `rootfile` / manifest XPath result as an error — `src/Parser.php:69-75,100-104` — S · med
   `xpath()` returns `[]` not `false`, so `$rootfiles[0]` raises an undefined-key warning and a missing manifest is accepted.
 - [x] **BUG-08** Handle NCX files without a default namespace — `src/Parser.php:124-132` — S · low
   `$namespaces['']` is an undefined key there, producing a warning instead of a clear error.
-- [ ] **BUG-09** Support prefixed OPF packages (`opf:package`) and books without any `dc:` element — `src/Metadata.php:25-34`, `src/Spine.php:19-25`, `src/Traits/*.php` — M · med
+- [x] **BUG-09** Support prefixed OPF packages (`opf:package`) and books without any `dc:` element — `src/Metadata.php:25-34`, `src/Spine.php:19-25`, `src/Traits/*.php` — M · med
   `$opfXml->metadata` / `->spine` only work with an unprefixed default namespace, and the constructor throws when no `dc` prefix is declared.
 - [ ] **BUG-10** Clean up the previous temp dir when `load()` is called twice — `src/EpubFile.php:45-61` — S · low
   Each extra `load()` leaks a full extracted copy of the book.
@@ -120,8 +120,8 @@ Effort: S = one file, under 30 min · M = one class plus tests · L = cross-cutt
 
 - [ ] **UX-01** Return paths relative to the book root from `getContentList()` — `src/ContentManager.php:30-44` — S · med
   It returns absolute temp paths while every other method takes relative ones, so its output cannot be fed back in.
-- [ ] **UX-02** Add list-valued `getSubjects()`/`setSubjects()` (and titles) — `src/Traits/InteractsWithSubject.php:13-40` — S · low
-  Books usually have several subjects; only the first is reachable.
+- [x] **UX-02** Add list-valued `getSubjects()`/`setSubjects()` (and titles) — `src/Traits/InteractsWithSubject.php:13-40` — S · low
+  Books usually have several subjects; only the first is reachable. *Done for subjects; multiple titles deferred.*
 - [x] **UX-03** Introduce specific exception subclasses (invalid book, ZIP, conversion) — `src/Exception.php` — M · low
   Callers cannot tell a corrupt book from an I/O failure.
 - [ ] **UX-04** Add `EpubFile::open()` and a convenience `convert()` — `src/EpubFile.php:21-61` — S · low
@@ -163,7 +163,7 @@ Effort: S = one file, under 30 min · M = one class plus tests · L = cross-cutt
 
 ### Sweeps
 
-- [ ] **SWEEP-01** Share one scoped metadata lookup helper across the eight `Interacts*` traits (`/opf:package/opf:metadata/dc:*` instead of `//dc:*`) — `src/Traits/*.php` — M · med
+- [x] **SWEEP-01** Share one scoped metadata lookup helper across the eight `Interacts*` traits (`/opf:package/opf:metadata/dc:*` instead of `//dc:*`) — `src/Traits/*.php` — M · med
   The same xpath/empty-check block is copied eight times and matches `dc:` elements anywhere in the document.
 - [ ] **SWEEP-02** Raise method coverage (52%) on error paths: `ZipHandler` (0/2), `Parser`, trait setters' "add new node" branch, `ContentManager` — `tests/` — M · med
   Most failure branches are never executed.
