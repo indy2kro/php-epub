@@ -446,6 +446,23 @@ final class EpubFileTest extends TestCase
         $epubFile->{$accessor}();
     }
 
+    public function testCloningIsRefusedAndLeavesTheOriginalUsable(): void
+    {
+        $epubFile = EpubFile::open(__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'valid.epub');
+
+        try {
+            $copy = clone $epubFile;
+            // A clone would share the extraction: its destructor would delete the original's files.
+            unset($copy);
+            $this->fail('Expected cloning to be refused.');
+        } catch (Exception $exception) {
+            $this->assertStringContainsString('cannot be cloned', $exception->getMessage());
+        }
+
+        $this->assertDirectoryExists((string) $epubFile->getTempDir());
+        $this->assertNotSame('', $epubFile->getMetadata()->getTitle());
+    }
+
     public static function accessorProvider(): Iterator
     {
         yield ['getMetadata', 'EPUB file must be loaded before accessing metadata.'];

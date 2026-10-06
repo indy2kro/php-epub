@@ -60,6 +60,20 @@ class EpubFile
     }
 
     /**
+     * A clone would share the extracted book, and the first destructor would delete it
+     * under the other instance. Open the file again (or save() a copy and open that) instead.
+     *
+     * @throws Exception Always.
+     */
+    public function __clone()
+    {
+        // The clone has no extraction of its own; keep its destructor away from the original's files.
+        $this->tempDir = null;
+
+        throw new Exception('EpubFile cannot be cloned; open the file again instead.');
+    }
+
+    /**
      * Deletes the extracted book. The EpubFile is then unloaded: call load() before using it again.
      */
     public function cleanup(): void

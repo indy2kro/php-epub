@@ -75,7 +75,7 @@ Effort: S = one file, under 30 min · M = one class plus tests · L = cross-cutt
   `toItem()` throws for an href like `../x`, so `getItems()`, `findByPath()`, `getCoverImage()` and `addContent()` all fail instead of skipping or flagging that item.
 - [x] **BUG-05** Pick the rootfile with media type `application/oebps-package+xml` instead of the first one — `src/Parser.php:73-81` — S · low
   Multi-rendition containers may list another rootfile first.
-- [ ] **BUG-06** Make cloned `EpubFile` instances safe (copy the extraction, or forbid `__clone`) — `src/EpubFile.php:56-68` — S · low
+- [x] **BUG-06** Make cloned `EpubFile` instances safe (copy the extraction, or forbid `__clone`) — `src/EpubFile.php:56-68` — S · low
   A clone shares the temp dir, so the first destructor deletes the book under the other instance.
 - [ ] **BUG-07** Update the manifest media type when `setCoverImage()` reuses an existing path — `src/EpubFile.php:172` — S · low
   Replacing `images/cover.jpg` with PNG bytes keeps `media-type="image/jpeg"`.

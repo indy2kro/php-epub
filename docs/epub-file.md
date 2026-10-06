@@ -109,6 +109,8 @@ public function cleanup(): void
 
 Manually cleans up the temporary directory. Called automatically by `__destruct()`, but can be called explicitly to release resources earlier. Afterwards the book is unloaded: `getMetadata()`, `getSpine()`, `getManifest()` and `getContentManager()` throw until `load()` is called again. A `load()` that fails also cleans up, so it never leaves a half-loaded book or its extracted files behind.
 
+An `EpubFile` cannot be cloned (`clone` throws an `Exception`), because the copy would share, and later delete, the extracted book. Open the file again, or `save()` a copy and open that.
+
 ```php
 public function getTempDir(): ?string
 ```
