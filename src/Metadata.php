@@ -312,6 +312,20 @@ class Metadata
     }
 
     /**
+     * The value of the EPUB 3 refinement (<meta refines="#id" property="…">) of an element, if any.
+     */
+    protected function refinementValue(SimpleXMLElement $element, string $property): ?string
+    {
+        foreach ($this->refinements($element) as $refinement) {
+            if ((string) $refinement['property'] === $property) {
+                return trim((string) $refinement);
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * @param list<string> $values
      *
      * @throws Exception If a value is not valid XML text, or empty for an element every package needs.
@@ -321,6 +335,10 @@ class Metadata
         XmlText::assertValid(...$values);
 
         if (in_array($name, self::REQUIRED_ELEMENTS, true)) {
+            if ($values === []) {
+                throw new Exception("dc:{$name} cannot be empty: every EPUB package needs one");
+            }
+
             foreach ($values as $value) {
                 if (trim($value) === '') {
                     throw new Exception("dc:{$name} cannot be empty: every EPUB package needs one");

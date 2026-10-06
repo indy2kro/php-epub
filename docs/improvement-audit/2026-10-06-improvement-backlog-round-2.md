@@ -103,7 +103,7 @@ Effort: S = one file, under 30 min · M = one class plus tests · L = cross-cutt
 
 ### API / UX
 
-- [ ] **UX-01** Add `getTitles()`/`setTitles()` aware of EPUB 3 `title-type` (main/subtitle) — `src/Traits/InteractsWithTitle.php` — S · low
+- [x] **UX-01** Add `getTitles()`/`setTitles()` aware of EPUB 3 `title-type` (main/subtitle) — `src/Traits/InteractsWithTitle.php` — S · low
   Deferred from the previous round; a book whose subtitle comes first returns it as the title.
 - [ ] **UX-02** Expose dated events (EPUB 2 `opf:event`, EPUB 3 `dcterms:modified`) instead of only the first `dc:date` — `src/Traits/InteractsWithDate.php:12-22` — S · low
   `getDate()` may return the modification date rather than the publication date.

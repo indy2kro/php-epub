@@ -52,6 +52,49 @@ final class EpubFeaturesTest extends TestCase
         $this->assertNull($reloaded->getMeta('calibre:series'));
     }
 
+    public function testTitleIsTheMainTitleWhenASubtitleComesFirst(): void
+    {
+        $metadata = $this->metadata(
+            '<dc:title id="sub">The Subtitle</dc:title><meta refines="#sub" property="title-type">subtitle</meta>'
+            . '<dc:title id="main">The Main Title</dc:title><meta refines="#main" property="title-type">main</meta>',
+            withTitle: false
+        );
+
+        $this->assertSame('The Main Title', $metadata->getTitle());
+        $this->assertSame(['The Subtitle', 'The Main Title'], $metadata->getTitles());
+
+        $metadata->setTitle('Renamed');
+        $metadata->save();
+
+        $reloaded = $this->reloadMetadata();
+        $this->assertSame(['The Subtitle', 'Renamed'], $reloaded->getTitles());
+        $this->assertSame('Renamed', $reloaded->getTitle());
+    }
+
+    public function testSetTitlesReplacesAllTitlesInOrder(): void
+    {
+        $metadata = $this->metadata('', withTitle: false);
+        $this->assertSame([], $metadata->getTitles());
+
+        $metadata->setTitles(['First', 'Second']);
+        $metadata->save();
+
+        $reloaded = $this->reloadMetadata();
+        $this->assertSame(['First', 'Second'], $reloaded->getTitles());
+        $this->assertSame('First', $reloaded->getTitle());
+
+        $reloaded->setTitles(['Only']);
+        $this->assertSame(['Only'], $reloaded->getTitles());
+    }
+
+    public function testSetTitlesRequiresATitle(): void
+    {
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('cannot be empty');
+
+        $this->metadata('')->setTitles([]);
+    }
+
     public function testRepeatedMetasAsLists(): void
     {
         $metadata = $this->metadata(
@@ -311,9 +354,14 @@ final class EpubFeaturesTest extends TestCase
         (new EpubFile($this->tmpDir . '/missing.epub'))->convert($this->createStub(ConverterInterface::class), $this->tmpDir . '/out.pdf');
     }
 
-    private function metadata(string $extra): Metadata
+    private function metadata(string $extra, bool $withTitle = true): Metadata
     {
-        file_put_contents($this->tmpDir . '/package.opf', EpubBuilder::opf(metadata: $extra));
+        $opf = EpubBuilder::opf(metadata: $extra);
+        if (! $withTitle) {
+            $opf = str_replace('<dc:title>Minimal</dc:title>', '', $opf);
+        }
+
+        file_put_contents($this->tmpDir . '/package.opf', $opf);
 
         return $this->reloadMetadata();
     }

@@ -44,9 +44,15 @@ Single-valued getters return the first matching element (or `''`); setters updat
 ```php
 public function getTitle(): string
 public function setTitle(string $title): void
+public function getTitles(): array
+public function setTitles(array $titles): void
 ```
 
-The name given to the resource (dc:title).
+The name given to the resource (dc:title). A book can have several titles; in EPUB 3 a `title-type` refinement says which is the `main` title and which are subtitles, collection titles, and so on.
+
+- `getTitle()`/`setTitle()` work on the main title: the one refined as `main`, or else the first. Other titles are kept.
+- `getTitles()`/`setTitles()` read and replace all titles in document order. Existing titles are reused in order, so their `title-type` refinements stay with their position; a title whose text changes loses its `file-as` sort key.
+- A book needs a title: `setTitles([])` and empty values throw an `Exception`.
 
 ### Authors
 
