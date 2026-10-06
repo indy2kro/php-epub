@@ -15,12 +15,15 @@ final readonly class EpubDocument
      * @param list<string> $chapters The <body> HTML of each spine document, in reading order.
      * @param list<string> $styles The book's CSS (linked stylesheets and <style> blocks, each once), with
      *                             resources confined to the book.
+     * @param list<string> $chapterTitles A title per chapter (its first h1-h3 heading, else its <title>; "" when
+     *                                    it has neither), in the same order as $chapters.
      */
     public function __construct(
         public string $title,
         public array $authors,
         public array $chapters,
-        public array $styles = []
+        public array $styles = [],
+        public array $chapterTitles = []
     ) {
     }
 

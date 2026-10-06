@@ -70,9 +70,9 @@ final readonly class EpubDocumentLoader
         // Legacy layout: a single content.xhtml without an OPF package.
         if (is_file($root . DIRECTORY_SEPARATOR . 'content.xhtml')) {
             $styles = [];
-            $chapter = $this->prepareChapter($root, 'content.xhtml', $styles);
+            $chapter = $this->prepareChapter($root, 'content.xhtml', $styles, $chapterTitle);
 
-            return new EpubDocument('', [], [$chapter], array_values($styles));
+            return new EpubDocument('', [], [$chapter], array_values($styles), [$chapterTitle]);
         }
 
         throw new ConversionException("No EPUB package found in: {$epubDirectory}");
@@ -88,15 +88,17 @@ final readonly class EpubDocumentLoader
         $spine = new Spine($opfXml, new Manifest($opfXml, $opfPath));
 
         $chapters = [];
+        $chapterTitles = [];
         $styles = [];
         foreach ($spine->getItems() as $spineItem) {
             $item = $spineItem->item;
             if ($item instanceof ManifestItem && $item->path !== '' && in_array($item->mediaType, self::XHTML_MEDIA_TYPES, true)) {
-                $chapters[] = $this->prepareChapter($root, $item->path, $styles);
+                $chapters[] = $this->prepareChapter($root, $item->path, $styles, $chapterTitle);
+                $chapterTitles[] = $chapterTitle;
             }
         }
 
-        return new EpubDocument($metadata->getTitle(), array_values($metadata->getAuthors()), $chapters, array_values($styles));
+        return new EpubDocument($metadata->getTitle(), array_values($metadata->getAuthors()), $chapters, array_values($styles), $chapterTitles);
     }
 
     /**
@@ -107,9 +109,14 @@ final readonly class EpubDocumentLoader
      * expressions, so unquoted or unusually spelled attributes cannot slip through.
      *
      * @param array<string, string> $styles Sanitised CSS keyed by its source, so shared stylesheets appear once.
+     * @param string|null $title Set to the chapter title (see EpubDocument::$chapterTitles).
+     *
+     * @param-out string $title
      */
-    private function prepareChapter(string $root, string $path, array &$styles): string
+    private function prepareChapter(string $root, string $path, array &$styles, ?string &$title = null): string
     {
+        $title = '';
+
         $file = $this->paths->resolve($root, $path);
         $content = is_file($file) ? @file_get_contents($file) : false;
         if ($content === false) {
@@ -129,6 +136,7 @@ final readonly class EpubDocumentLoader
 
         $directory = dirname($path) === '.' ? '' : dirname($path) . '/';
         $this->collectStyles($document, $root, $directory, $styles);
+        $title = $this->chapterTitle($document);
 
         $body = $document->getElementsByTagName('body')->item(0);
         if (! $body instanceof DOMElement) {
@@ -175,6 +183,32 @@ final readonly class EpubDocumentLoader
                 $element->setAttribute($attribute->nodeName, $this->resolveSource($root, $directory, $attribute->value));
             }
         }
+    }
+
+    /**
+     * The first h1-h3 heading of the body, else the <title>, with whitespace collapsed; "" when there is neither.
+     * Headings come first because many books repeat the book title in every <title>.
+     */
+    private function chapterTitle(DOMDocument $document): string
+    {
+        $body = $document->getElementsByTagName('body')->item(0);
+        if ($body instanceof DOMElement) {
+            foreach ($body->getElementsByTagName('*') as $element) {
+                if (in_array(strtolower($element->localName ?? ''), ['h1', 'h2', 'h3'], true)) {
+                    $heading = $this->collapseWhitespace($element->textContent);
+                    if ($heading !== '') {
+                        return $heading;
+                    }
+                }
+            }
+        }
+
+        return $this->collapseWhitespace((string) $document->getElementsByTagName('title')->item(0)?->textContent);
+    }
+
+    private function collapseWhitespace(string $text): string
+    {
+        return trim((string) preg_replace('/\s+/u', ' ', $text));
     }
 
     /**

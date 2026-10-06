@@ -102,6 +102,35 @@ final class TCPDFAdapterTest extends TestCase
         $this->assertEqualsWithDelta(20.0, $margins['left'], 0.001);
     }
 
+    public function testEveryChapterGetsABookmark(): void
+    {
+        $directory = EpubBuilder::minimal()
+            ->withFile('EPUB/package.opf', str_replace(
+                '<itemref idref="chapter"/>',
+                '<itemref idref="chapter"/><itemref idref="titled"/><itemref idref="bare"/>',
+                EpubBuilder::opf(
+                    '<item id="titled" href="titled.xhtml" media-type="application/xhtml+xml"/>'
+                    . '<item id="bare" href="bare.xhtml" media-type="application/xhtml+xml"/>'
+                )
+            ))
+            ->withFile('EPUB/chapter.xhtml', '<html><head><title>Book</title></head><body><h2>  The   First  Chapter </h2><h1>Later</h1></body></html>')
+            ->withFile('EPUB/titled.xhtml', '<html><head><title>Second Title</title></head><body><p>No heading</p></body></html>')
+            ->withFile('EPUB/bare.xhtml', '<html><body><p>Nothing</p></body></html>')
+            ->writeTo($this->epubDirectory . '-toc');
+        $adapter = $this->exposedAdapter();
+
+        try {
+            $adapter->createPdfFor($this->epubDirectory . '-toc');
+            $this->assertSame([['The First Chapter', 0], ['Second Title', 0], ['Chapter 3', 0]], $adapter->bookmarks);
+
+            $withoutBookmarks = $this->exposedAdapter(['bookmarks' => false]);
+            $withoutBookmarks->createPdfFor($this->epubDirectory . '-toc');
+            $this->assertSame([], $withoutBookmarks->bookmarks);
+        } finally {
+            $this->fileSystemHelper->deleteDirectory($this->epubDirectory . '-toc');
+        }
+    }
+
     public function testEveryChapterCarriesTheBookCss(): void
     {
         $directory = EpubBuilder::minimal()

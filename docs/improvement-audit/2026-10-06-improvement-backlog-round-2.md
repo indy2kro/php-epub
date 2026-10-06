@@ -124,7 +124,7 @@ Effort: S = one file, under 30 min · M = one class plus tests · L = cross-cutt
   The library can only edit existing books, and the test suite already holds most of the code.
 - [ ] **FEAT-05** Deterministic archives on save (sorted entries, fixed timestamps) — `src/ZipHandler.php:199-223` — S · low
   The same book saved twice differs byte for byte.
-- [ ] **FEAT-06** PDF bookmarks/outline from the spine or TOC — `src/Converters/TCPDFAdapter.php:92-95`, `src/Converters/DompdfAdapter.php:97-107` — M · low
+- [x] **FEAT-06** PDF bookmarks/outline from the spine or TOC — `src/Converters/TCPDFAdapter.php:92-95`, `src/Converters/DompdfAdapter.php:97-107` — M · low
   Generated PDFs have no navigation.
 
 ### Documentation

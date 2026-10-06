@@ -7,7 +7,7 @@ Requires `tecnickcom/tcpdf` and its core fonts; see [Installation](../installati
 
 ## Key Methods
 
-- **`__construct(array $styles = [])`**: Optional styling parameters: `font` (default `helvetica`), `font_size` (default `12`), `margin_left`/`margin_top`/`margin_right`/`margin_bottom` in mm (defaults `15`/`27`/`15`/`25`), `header`/`footer` booleans (default `true`; the header shows the book title and authors), and `paper_size` (e.g. `A4`, `letter`; default `A4`) and `orientation` (`portrait` or `landscape`; default `portrait`), as in `DompdfAdapter`. Values of the wrong type fall back to the defaults.
+- **`__construct(array $styles = [])`**: Optional styling parameters: `font` (default `helvetica`), `font_size` (default `12`), `margin_left`/`margin_top`/`margin_right`/`margin_bottom` in mm (defaults `15`/`27`/`15`/`25`), `header`/`footer` booleans (default `true`; the header shows the book title and authors), and `paper_size` (e.g. `A4`, `letter`; default `A4`) and `orientation` (`portrait` or `landscape`; default `portrait`), as in `DompdfAdapter`, and `bookmarks` (default `true`): a PDF outline entry per chapter, titled with the chapter's first `h1`–`h3` heading, else its `<title>`, else "Chapter N". Values of the wrong type fall back to the defaults.
 
 - **`convert(string $epubDirectory, string $outputPath): void`**: Renders every spine document in reading order, each on a new page, sets the PDF title and author from the EPUB metadata, and writes the PDF. Image sources are limited to files inside the book; see [Converter](../converter.md#how-the-pdf-adapters-read-a-book). Throws a `ConversionException` if the book cannot be read or the PDF cannot be written.
 
