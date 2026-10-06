@@ -148,6 +148,63 @@ final class ContentManagerTest extends TestCase
         $this->assertFileExists($this->outsidePath);
     }
 
+    public function testGetContentOfADirectoryThrowsOnEveryOs(): void
+    {
+        mkdir($this->contentDir . DIRECTORY_SEPARATOR . 'folder');
+        $contentManager = new ContentManager($this->contentDir);
+
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('Content file does not exist:');
+
+        $contentManager->getContent('folder');
+    }
+
+    public function testUpdateContentOfADirectoryThrows(): void
+    {
+        mkdir($this->contentDir . DIRECTORY_SEPARATOR . 'folder');
+        $contentManager = new ContentManager($this->contentDir);
+
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('Content file does not exist:');
+
+        $contentManager->updateContent('folder', 'text');
+    }
+
+    public function testDeleteContentOfADirectoryThrowsAndKeepsIt(): void
+    {
+        mkdir($this->contentDir . DIRECTORY_SEPARATOR . 'folder');
+        $contentManager = new ContentManager($this->contentDir);
+
+        try {
+            $contentManager->deleteContent('folder');
+            $this->fail('Expected an exception for a directory path.');
+        } catch (Exception $exception) {
+            $this->assertStringContainsString('Content file does not exist:', $exception->getMessage());
+        }
+
+        $this->assertDirectoryExists($this->contentDir . DIRECTORY_SEPARATOR . 'folder');
+    }
+
+    public function testUpdateReadOnlyContentThrows(): void
+    {
+        file_put_contents($this->sampleFilePath, 'locked');
+        chmod($this->sampleFilePath, 0444);
+        $contentManager = new ContentManager($this->contentDir);
+
+        try {
+            if (is_writable($this->sampleFilePath)) {
+                $this->markTestSkipped('Read-only files are writable here (e.g. running as root).');
+            }
+
+            $this->expectException(Exception::class);
+            $this->expectExceptionMessage('Failed to update content in:');
+
+            $contentManager->updateContent('sample.txt', 'changed');
+        } finally {
+            chmod($this->sampleFilePath, 0644);
+        }
+    }
+
     public function testAddContentToNonExistentDirectoryThrowsException(): void
     {
         $this->expectException(Exception::class);

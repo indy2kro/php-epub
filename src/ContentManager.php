@@ -115,11 +115,12 @@ class ContentManager
     public function updateContent(string $filePath, string $newContent): void
     {
         $fullPath = $this->paths->resolve($this->contentDirectory, $filePath);
-        if (! file_exists($fullPath)) {
+        // is_file(): a directory is not content (and reading one behaves differently per OS).
+        if (! is_file($fullPath)) {
             throw new Exception("Content file does not exist: {$fullPath}");
         }
 
-        if (file_put_contents($fullPath, $newContent) === false) {
+        if (@file_put_contents($fullPath, $newContent) === false) {
             throw new Exception("Failed to update content in: {$fullPath}");
         }
     }
@@ -134,11 +135,12 @@ class ContentManager
     public function deleteContent(string $filePath): void
     {
         $fullPath = $this->paths->resolve($this->contentDirectory, $filePath);
-        if (! file_exists($fullPath)) {
+        // is_file(): a directory is not content (and reading one behaves differently per OS).
+        if (! is_file($fullPath)) {
             throw new Exception("Content file does not exist: {$fullPath}");
         }
 
-        if (! unlink($fullPath)) {
+        if (! @unlink($fullPath)) {
             throw new Exception("Failed to delete content from: {$fullPath}");
         }
 
@@ -164,11 +166,12 @@ class ContentManager
     public function getContent(string $filePath): string
     {
         $fullPath = $this->paths->resolve($this->contentDirectory, $filePath);
-        if (! file_exists($fullPath)) {
+        // is_file(): a directory is not content (and reading one behaves differently per OS).
+        if (! is_file($fullPath)) {
             throw new Exception("Content file does not exist: {$fullPath}");
         }
 
-        $content = file_get_contents($fullPath);
+        $content = @file_get_contents($fullPath);
         if ($content === false) {
             throw new Exception("Failed to read content from: {$fullPath}");
         }

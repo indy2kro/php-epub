@@ -140,7 +140,7 @@ Effort: S = one file, under 30 min · M = one class plus tests · L = cross-cutt
 
 - [ ] **DOC-01** Fix the `Converter` example that wires `CalibreAdapter` with an extracted directory — `docs/converter.md:15-31` — S · med
   The documented example cannot work (see CONV-02).
-- [ ] **DOC-02** Add a "Handling untrusted EPUBs" section and document the `save()` contract — `docs/advanced-usage.md`, `docs/epub-file.md` — S · low
+- [x] **DOC-02** Add a "Handling untrusted EPUBs" section and document the `save()` contract — `docs/advanced-usage.md`, `docs/epub-file.md` — S · low
   Users need to know which limits exist and that metadata must be saved before the book.
 
 ### Tests
@@ -156,14 +156,14 @@ Effort: S = one file, under 30 min · M = one class plus tests · L = cross-cutt
 
 - [x] **CI-01** Add `windows-latest` to the test matrix — `.github/workflows/tests.yml:17-25` — S · med
   BUG-02 only shows up on Windows.
-- [ ] **CI-02** Add `composer audit` and gitleaks; quote `$GITHUB_OUTPUT` (actionlint SC2086) — `.github/workflows/tests.yml:41`, `.github/workflows/deploy-docs.yml:30` — S · low
+- [x] **CI-02** Add `composer audit` and gitleaks; quote `$GITHUB_OUTPUT` (actionlint SC2086) — `.github/workflows/tests.yml:41`, `.github/workflows/deploy-docs.yml:30` — S · low
   Dependency advisories and leaked secrets are not gated.
-- [ ] **CI-03** Run the same gate commands as `composer quality` (PHPStan `memory_limit`, PHPCS paths) — `.github/workflows/tests.yml:64-71` — S · low
+- [x] **CI-03** Run the same gate commands as `composer quality` (PHPStan `memory_limit`, PHPCS paths) — `.github/workflows/tests.yml:64-71` — S · low
   Local and CI gates differ.
 
 ### Sweeps
 
 - [x] **SWEEP-01** Share one scoped metadata lookup helper across the eight `Interacts*` traits (`/opf:package/opf:metadata/dc:*` instead of `//dc:*`) — `src/Traits/*.php` — M · med
   The same xpath/empty-check block is copied eight times and matches `dc:` elements anywhere in the document.
-- [ ] **SWEEP-02** Raise method coverage (52%) on error paths: `ZipHandler` (0/2), `Parser`, trait setters' "add new node" branch, `ContentManager` — `tests/` — M · med
+- [x] **SWEEP-02** Raise method coverage (52%) on error paths: `ZipHandler` (0/2), `Parser`, trait setters' "add new node" branch, `ContentManager` — `tests/` — M · med
   Most failure branches are never executed.
