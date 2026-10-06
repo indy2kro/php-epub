@@ -57,6 +57,45 @@ final class CalibreAdapterTest extends TestCase
         $adapter->convert($this->fakeInputFile, $this->fakeOutputFile);
     }
 
+    public function testWithoutACalibrePathEbookConvertIsFoundOnThePath(): void
+    {
+        $this->helperMock->method('findExecutable')->with('ebook-convert')->willReturn('/found/on/path/ebook-convert');
+        $this->helperMock->method('fileExists')->willReturn(true);
+        $this->helperMock->method('fileSize')->willReturn(100);
+        $this->helperMock->expects($this->once())->method('runProcess')
+            ->with($this->callback(static fn (array $command): bool => $command[0] === '/found/on/path/ebook-convert'))
+            ->willReturn(['exitCode' => 0, 'output' => '']);
+
+        (new CalibreAdapter([], $this->helperMock))->convert($this->fakeInputFile, $this->fakeOutputFile);
+    }
+
+    public function testWithoutACalibrePathTheUsualInstallLocationsAreTried(): void
+    {
+        $macOs = '/Applications/calibre.app/Contents/MacOS/ebook-convert';
+        $this->helperMock->method('findExecutable')->willReturn(null);
+        $this->helperMock->method('fileExists')->willReturnCallback(
+            fn (string $path): bool => in_array($path, [$macOs, $this->fakeInputFile, $this->fakeOutputFile], true)
+        );
+        $this->helperMock->method('fileSize')->willReturn(100);
+        $this->helperMock->expects($this->once())->method('runProcess')
+            ->with($this->callback(static fn (array $command): bool => $command[0] === $macOs))
+            ->willReturn(['exitCode' => 0, 'output' => '']);
+
+        (new CalibreAdapter([], $this->helperMock))->convert($this->fakeInputFile, $this->fakeOutputFile);
+    }
+
+    public function testWithoutACalibrePathAMissingCalibreIsReported(): void
+    {
+        $this->helperMock->method('findExecutable')->willReturn(null);
+        $this->helperMock->method('fileExists')->willReturn(false);
+        $this->helperMock->expects($this->never())->method('runProcess');
+
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('ebook-convert was not found on the PATH or in the usual install locations');
+
+        (new CalibreAdapter([], $this->helperMock))->convert($this->fakeInputFile, $this->fakeOutputFile);
+    }
+
     public function testConvertFailsWhenInputFileNotFound(): void
     {
         $this->helperMock->expects($this->exactly(2))->method('fileExists')->willReturnMap([

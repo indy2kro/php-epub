@@ -5,7 +5,7 @@ The `CalibreAdapter` class converts EPUB files to other formats (MOBI, AZW3, PDF
 ## Key Methods
 
 - **`__construct(array $options = [], FileSystemHelper $helper = new FileSystemHelper(), ZipHandler $zipHandler = new ZipHandler())`**: Options:
-    - `calibre_path`: path to `ebook-convert` (default `/usr/bin/ebook-convert`).
+    - `calibre_path`: path to `ebook-convert`. When it is not given, `ebook-convert` is looked up on the `PATH`, then in the usual install locations (`/usr/bin`, `/usr/local/bin`, `/opt/calibre`, `/Applications/calibre.app/Contents/MacOS`, `C:\Program Files\Calibre2`, `C:\Program Files (x86)\Calibre2`); `convert()` throws if it is not found.
     - `extra_args`: a **list** of extra `ebook-convert` arguments, each passed to Calibre exactly as given. Passing a single string is deprecated (it triggers an `E_USER_DEPRECATED` notice): it is split into arguments at spaces, with `"double"` or `'single'` quotes grouping words, and nothing else is interpreted.
     - `timeout`: seconds before a conversion is stopped (default `600`); `null` waits indefinitely. Throws an `Exception` at construction for zero or a negative value.
 

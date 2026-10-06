@@ -11,15 +11,28 @@ use PhpEpub\ZipHandler;
 class CalibreAdapter implements ConverterInterface
 {
     /**
-     * @var array{calibre_path: string, extra_args: string|list<string>, timeout: int|null}
+     * Where the Calibre installers put ebook-convert, tried when it is not on the PATH.
+     */
+    private const array INSTALL_LOCATIONS = [
+        '/usr/bin/ebook-convert',
+        '/usr/local/bin/ebook-convert',
+        '/opt/calibre/ebook-convert',
+        '/Applications/calibre.app/Contents/MacOS/ebook-convert',
+        'C:\\Program Files\\Calibre2\\ebook-convert.exe',
+        'C:\\Program Files (x86)\\Calibre2\\ebook-convert.exe',
+    ];
+
+    /**
+     * @var array{calibre_path: string|null, extra_args: string|list<string>, timeout: int|null}
      */
     private array $options;
 
     /**
      * CalibreAdapter constructor.
      *
-     * @param array{calibre_path?: string, extra_args?: string|list<string>, timeout?: int|null} $options
-     *        calibre_path: path to ebook-convert.
+     * @param array{calibre_path?: string|null, extra_args?: string|list<string>, timeout?: int|null} $options
+     *        calibre_path: path to ebook-convert; by default it is looked up on the PATH, then in
+     *        the usual Linux, macOS and Windows install locations.
      *        extra_args: extra ebook-convert arguments as a list, each passed to Calibre as it is.
      *        Passing a single string is deprecated: it is split into arguments at spaces (quotes group words).
      *        timeout: seconds before a conversion is stopped (default 600); null waits indefinitely.
@@ -32,7 +45,7 @@ class CalibreAdapter implements ConverterInterface
         private readonly ZipHandler $zipHandler = new ZipHandler()
     ) {
         $defaultOptions = [
-            'calibre_path' => '/usr/bin/ebook-convert',
+            'calibre_path' => null,
             'extra_args' => [],
             'timeout' => 600,
         ];
@@ -55,11 +68,7 @@ class CalibreAdapter implements ConverterInterface
      */
     public function convert(string $inputFile, string $outputPath): void
     {
-        $calibrePath = $this->options['calibre_path'];
-
-        if (! $this->helper->fileExists($calibrePath)) {
-            throw new Exception('Calibre tool not found at path: ' . $calibrePath);
-        }
+        $calibrePath = $this->calibrePath();
 
         if (is_dir($inputFile)) {
             $temporaryEpub = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'calibre_' . bin2hex(random_bytes(8)) . '.epub';
@@ -100,6 +109,38 @@ class CalibreAdapter implements ConverterInterface
         if (! $this->helper->fileExists($outputPath) || $this->helper->fileSize($outputPath) === 0) {
             throw new Exception('Calibre conversion failed');
         }
+    }
+
+    /**
+     * The configured ebook-convert, or else the one on the PATH or in a usual install location.
+     *
+     * @throws Exception If it cannot be found.
+     */
+    private function calibrePath(): string
+    {
+        $configured = $this->options['calibre_path'];
+        if ($configured !== null) {
+            if (! $this->helper->fileExists($configured)) {
+                throw new Exception('Calibre tool not found at path: ' . $configured);
+            }
+
+            return $configured;
+        }
+
+        $found = $this->helper->findExecutable('ebook-convert');
+        if ($found !== null) {
+            return $found;
+        }
+
+        foreach (self::INSTALL_LOCATIONS as $location) {
+            if ($this->helper->fileExists($location)) {
+                return $location;
+            }
+        }
+
+        throw new Exception(
+            "Calibre's ebook-convert was not found on the PATH or in the usual install locations; set the calibre_path option."
+        );
     }
 
     /**
