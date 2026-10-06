@@ -267,23 +267,23 @@ No source changes were made while compiling this list.</p>
 </ul>
 <h3 id="bugs">Bugs<a class="headerlink" href="#bugs" title="Permanent link">&para;</a></h3>
 <ul>
-<li>[ ] <strong>BUG-01</strong> Accept prefixed OPF packages and containers in <code>Parser</code> (look up the OPF/OCF namespace URIs instead of the default-namespace key) — <code>src/Parser.php:63-71,97-105</code> — S · med
+<li>[x] <strong>BUG-01</strong> Accept prefixed OPF packages and containers in <code>Parser</code> (look up the OPF/OCF namespace URIs instead of the default-namespace key) — <code>src/Parser.php:63-71,97-105</code> — S · med
   <code>getNamespaces(true)</code> has no <code>''</code> key for <code>&lt;opf:package xmlns:opf=…&gt;</code>, so <code>load()</code> throws "No OPF namespace" and the prefixed-package support in <code>Metadata</code>/<code>Spine</code> is unreachable (its test bypasses <code>Parser</code>).</li>
-<li>[ ] <strong>BUG-02</strong> Reset metadata/manifest/spine/content manager in <code>cleanup()</code> and when <code>load()</code> fails — <code>src/EpubFile.php:61-92</code> — S · med
+<li>[x] <strong>BUG-02</strong> Reset metadata/manifest/spine/content manager in <code>cleanup()</code> and when <code>load()</code> fails — <code>src/EpubFile.php:61-92</code> — S · med
   The getters keep returning objects bound to a deleted temp dir, so later edits and <code>save()</code> fail with confusing I/O errors.</li>
 <li>[x] <strong>BUG-03</strong> Clear dangling references when <code>deleteContent()</code>/<code>Manifest::remove()</code> drops an item (<code>&lt;meta name="cover"&gt;</code>, <code>spine@toc</code>, <code>&lt;guide&gt;</code>) — <code>src/ContentManager.php:135-155</code>, <code>src/Manifest.php:136-142</code> — M · med
   Deleting the cover image or the NCX leaves references to an id/href that no longer exists, which readers and EPUBCheck reject.</li>
-<li>[ ] <strong>BUG-04</strong> Do not let one bad manifest href make the whole manifest unreadable — <code>src/Manifest.php:74-100,225-238</code> — S · med
+<li>[x] <strong>BUG-04</strong> Do not let one bad manifest href make the whole manifest unreadable — <code>src/Manifest.php:74-100,225-238</code> — S · med
   <code>toItem()</code> throws for an href like <code>../x</code>, so <code>getItems()</code>, <code>findByPath()</code>, <code>getCoverImage()</code> and <code>addContent()</code> all fail instead of skipping or flagging that item.</li>
-<li>[ ] <strong>BUG-05</strong> Pick the rootfile with media type <code>application/oebps-package+xml</code> instead of the first one — <code>src/Parser.php:73-81</code> — S · low
+<li>[x] <strong>BUG-05</strong> Pick the rootfile with media type <code>application/oebps-package+xml</code> instead of the first one — <code>src/Parser.php:73-81</code> — S · low
   Multi-rendition containers may list another rootfile first.</li>
-<li>[ ] <strong>BUG-06</strong> Make cloned <code>EpubFile</code> instances safe (copy the extraction, or forbid <code>__clone</code>) — <code>src/EpubFile.php:56-68</code> — S · low
+<li>[x] <strong>BUG-06</strong> Make cloned <code>EpubFile</code> instances safe (copy the extraction, or forbid <code>__clone</code>) — <code>src/EpubFile.php:56-68</code> — S · low
   A clone shares the temp dir, so the first destructor deletes the book under the other instance.</li>
 <li>[ ] <strong>BUG-07</strong> Update the manifest media type when <code>setCoverImage()</code> reuses an existing path — <code>src/EpubFile.php:172</code> — S · low
   Replacing <code>images/cover.jpg</code> with PNG bytes keeps <code>media-type="image/jpeg"</code>.</li>
 <li>[ ] <strong>BUG-08</strong> Fall back to <code>&lt;guide&gt;&lt;reference type="cover"&gt;</code> and href-valued <code>&lt;meta name="cover"&gt;</code> in <code>getCoverImage()</code> — <code>src/EpubFile.php:129-142</code> — S · low
   Many EPUB 2 books name the cover that way, and <code>getCoverImage()</code> returns null for them.</li>
-<li>[ ] <strong>BUG-09</strong> Report <code>deleteDirectory()</code> failures instead of emitting warnings from the destructor — <code>src/Util/FileSystemHelper.php:34-65</code> — S · low
+<li>[x] <strong>BUG-09</strong> Report <code>deleteDirectory()</code> failures instead of emitting warnings from the destructor — <code>src/Util/FileSystemHelper.php:34-65</code> — S · low
   Recursive results are ignored, and a locked Windows file raises warnings from <code>__destruct</code> and leaks the temp dir silently.</li>
 <li>[x] <strong>BUG-10</strong> Keep <code>ContentManager</code> writes to the OPF consistent with the in-memory package (refuse them, or reload) — <code>src/ContentManager.php:89-126</code>, <code>src/EpubFile.php:193-204</code> — S · low
   <code>updateContent()</code> on the OPF is overwritten on the next <code>save()</code> when anything else changed, and kept otherwise.</li>

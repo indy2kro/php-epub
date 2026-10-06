@@ -128,7 +128,7 @@
 <p><strong><code>__construct(SimpleXMLElement $opfXml, string $opfPath)</code></strong>: <code>$opfPath</code> is the OPF location relative to the book root, as returned by <code>Parser::parse()</code>. Throws <code>InvalidEpubException</code> if the package has no manifest.</p>
 </li>
 <li>
-<p><strong><code>getItems(): array</code></strong>: All items as <code>ManifestItem</code> objects with <code>id</code>, <code>href</code>, <code>path</code>, <code>mediaType</code> and <code>properties</code>.</p>
+<p><strong><code>getItems(): array</code></strong>: All items as <code>ManifestItem</code> objects with <code>id</code>, <code>href</code>, <code>path</code>, <code>mediaType</code> and <code>properties</code>. <code>path</code> is empty for remote resources and for hrefs that point outside the book; such items are listed but have no file.</p>
 </li>
 <li>
 <p><strong><code>get(string $id): ?ManifestItem</code></strong> and <strong><code>findByPath(string $path): ?ManifestItem</code></strong>: Look up one item.</p>

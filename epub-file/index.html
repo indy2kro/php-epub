@@ -211,7 +211,8 @@
 <pre class="codehilite"><code class="language-php">public function cleanup(): void
 </code></pre>
 
-<p>Manually cleans up the temporary directory. Called automatically by <code>__destruct()</code>, but can be called explicitly to release resources earlier.</p>
+<p>Manually cleans up the temporary directory. Called automatically by <code>__destruct()</code>, but can be called explicitly to release resources earlier. Throws an <code>Exception</code> when the extracted files cannot all be deleted (e.g. a file still open on Windows); the path is kept so <code>cleanup()</code> can be retried, and the destructor ignores such failures. Afterwards the book is unloaded: <code>getMetadata()</code>, <code>getSpine()</code>, <code>getManifest()</code> and <code>getContentManager()</code> throw until <code>load()</code> is called again. A <code>load()</code> that fails also cleans up, so it never leaves a half-loaded book or its extracted files behind.</p>
+<p>An <code>EpubFile</code> cannot be cloned (<code>clone</code> throws an <code>Exception</code>), because the copy would share, and later delete, the extracted book. Open the file again, or <code>save()</code> a copy and open that.</p>
 <pre class="codehilite"><code class="language-php">public function getTempDir(): ?string
 </code></pre>
 
