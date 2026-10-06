@@ -71,7 +71,7 @@ Effort: S = one file, under 30 min · M = one class plus tests · L = cross-cutt
   The getters keep returning objects bound to a deleted temp dir, so later edits and `save()` fail with confusing I/O errors.
 - [x] **BUG-03** Clear dangling references when `deleteContent()`/`Manifest::remove()` drops an item (`<meta name="cover">`, `spine@toc`, `<guide>`) — `src/ContentManager.php:135-155`, `src/Manifest.php:136-142` — M · med
   Deleting the cover image or the NCX leaves references to an id/href that no longer exists, which readers and EPUBCheck reject.
-- [ ] **BUG-04** Do not let one bad manifest href make the whole manifest unreadable — `src/Manifest.php:74-100,225-238` — S · med
+- [x] **BUG-04** Do not let one bad manifest href make the whole manifest unreadable — `src/Manifest.php:74-100,225-238` — S · med
   `toItem()` throws for an href like `../x`, so `getItems()`, `findByPath()`, `getCoverImage()` and `addContent()` all fail instead of skipping or flagging that item.
 - [x] **BUG-05** Pick the rootfile with media type `application/oebps-package+xml` instead of the first one — `src/Parser.php:73-81` — S · low
   Multi-rendition containers may list another rootfile first.
