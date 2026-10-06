@@ -114,7 +114,7 @@ Effort: S = one file, under 30 min · M = one class plus tests · L = cross-cutt
 
 ### Features
 
-- [ ] **FEAT-01** Contributors and creator roles (`dc:contributor`, `opf:role` / role refinements); make `getAuthors()` honour roles — `src/Traits/InteractsWithAuthors.php:14-31` — M · med
+- [x] **FEAT-01** Contributors and creator roles (`dc:contributor`, `opf:role` / role refinements); make `getAuthors()` honour roles — `src/Traits/InteractsWithAuthors.php:14-31` — M · med
   `getAuthors()` returns illustrators and editors too, and `dc:contributor` is unreachable.
 - [ ] **FEAT-02** Table-of-contents API: read and edit the EPUB 3 nav document and the EPUB 2 NCX — new, `src/Parser.php:134-149` — L · med
   Callers cannot list chapters or add a new one to the TOC after `addContent()`.

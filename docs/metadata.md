@@ -59,11 +59,34 @@ The name given to the resource (dc:title). A book can have several titles; in EP
 ```php
 public function getAuthors(): array<int, string>
 public function setAuthors(array<int, string> $authors): void
+public function getCreators(): array<int, Contributor>
+public function addCreator(string $name, ?string $role = 'aut', ?string $fileAs = null): void
 ```
 
-The creators of the resource (dc:creator). Multiple authors are supported.
+The authors are the creators of the resource (dc:creator) with the role `aut` or no role at all; creators with another role, such as illustrators (`ill`), are not authors. Multiple authors are supported.
 
-`setAuthors()` reuses the existing creators in order, so their roles survive (EPUB 2 `opf:role`, EPUB 3 `<meta refines="#id" property="role">`). When a creator's name changes, its sort key (`opf:file-as` / `file-as` refinement) is removed because it described the old name. Creators that are no longer needed are removed together with all their refinements.
+`setAuthors()` only replaces the authors: other creators are kept. It reuses the existing authors in order, so their roles survive (EPUB 2 `opf:role`, EPUB 3 `<meta refines="#id" property="role">`). When an author's name changes, its sort key (`opf:file-as` / `file-as` refinement) is removed because it described the old name. Authors that are no longer needed are removed together with all their refinements.
+
+`getCreators()` returns every creator as a `PhpEpub\Contributor` with `name`, `role` (a [MARC relator code](https://www.loc.gov/marc/relators/relaterm.html) such as `aut`, `ill` or `trl`, or `null`) and `fileAs` (the sort key, or `null`). `addCreator()` adds one, writing the role and sort key as EPUB 3 refinements (`scheme="marc:relators"`) or as EPUB 2 `opf:role` / `opf:file-as` attributes, depending on the package version.
+
+### Contributors
+
+```php
+public function getContributors(): array<int, Contributor>
+public function setContributors(array<int, string> $names): void
+public function addContributor(string $name, ?string $role = null, ?string $fileAs = null): void
+```
+
+People or organisations who contributed to the resource (dc:contributor), such as editors (`edt`) or translators (`trl`). These work like the creator methods; `setContributors()` reuses existing contributors in order, keeping their roles.
+
+```php
+$metadata->addCreator('Ivan Illustrator', 'ill', 'Illustrator, Ivan');
+$metadata->addContributor('Ed Editor', 'edt');
+
+foreach ($metadata->getContributors() as $contributor) {
+    echo "{$contributor->name} ({$contributor->role})\n";
+}
+```
 
 ### Description
 
@@ -190,7 +213,8 @@ The Metadata class uses PHP traits to organize code:
 - `InteractsWithTitle` - Title handling
 - `InteractsWithDescription` - Description handling
 - `InteractsWithDate` - Date handling
-- `InteractsWithAuthors` - Author handling
+- `InteractsWithAuthors` - Author and creator handling
+- `InteractsWithContributors` - Contributor handling
 - `InteractsWithPublisher` - Publisher handling
 - `InteractsWithLanguage` - Language handling
 - `InteractsWithSubject` - Subject handling
