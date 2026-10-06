@@ -185,4 +185,5 @@ Each trait is a thin layer over shared protected helpers in `Metadata` (`getDcVa
 
 - The constructor throws `InvalidEpubException` if the package has no `<metadata>` element.
 - `setIdentifiers([])` throws an `Exception`, because a package needs at least one identifier.
+- Every setter (including `setMeta()` and `setProperty()`) throws an `Exception` for a value that is not valid UTF-8 or contains a character XML cannot store (control characters other than tab, newline and carriage return). Convert legacy encodings first, e.g. with `mb_convert_encoding($value, 'UTF-8', 'ISO-8859-1')`. The package is left unchanged when a value is rejected, even if it was one of several in a list.
 - `save()` throws an `Exception` if the OPF file cannot be written.

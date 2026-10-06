@@ -16,7 +16,7 @@ Manifest `href`s are URLs relative to the OPF file (for example `text/chapter%20
 
 - **`get(string $id): ?ManifestItem`** and **`findByPath(string $path): ?ManifestItem`**: Look up one item.
 
-- **`add(string $path, ?string $mediaType = null, ?string $id = null): ManifestItem`**: Adds a file. The media type is guessed from the extension and the id is derived from the file name when not given. Throws if the path is already listed or the id is taken.
+- **`add(string $path, ?string $mediaType = null, ?string $id = null): ManifestItem`**: Adds a file. The media type is guessed from the extension and the id is derived from the file name when not given. Throws if the path is already listed, the id is taken, or the media type or id is not valid UTF-8 XML text.
 
 - **`remove(string $id): void`**: Removes an item. Spine entries are not touched; use `Spine::remove()` (or `ContentManager::deleteContent()`, which does both).
 

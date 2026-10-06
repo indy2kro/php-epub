@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PhpEpub;
 
 use PhpEpub\Util\PathResolver;
+use PhpEpub\Util\XmlText;
 use SimpleXMLElement;
 
 /**
@@ -110,6 +111,7 @@ class Manifest
     public function add(string $path, ?string $mediaType = null, ?string $id = null): ManifestItem
     {
         $path = $this->paths->normalize($path);
+        XmlText::assertValid($mediaType ?? '', $id ?? '');
 
         if ($this->findByPath($path) instanceof ManifestItem) {
             throw new Exception("File is already in the manifest: {$path}");
@@ -148,6 +150,8 @@ class Manifest
      */
     public function addProperty(string $id, string $property): void
     {
+        XmlText::assertValid($property);
+
         $node = $this->requireNode($id);
         $tokens = $this->propertyTokens($node);
         if (! in_array($property, $tokens, true)) {

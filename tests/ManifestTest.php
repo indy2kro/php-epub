@@ -121,6 +121,28 @@ final class ManifestTest extends TestCase
         $manifest->add('EPUB/other.xhtml', null, 'chapter');
     }
 
+    public function testValuesThatAreNotValidXmlTextAreRejected(): void
+    {
+        $manifest = $this->manifest();
+        $attempts = [
+            'media type' => static fn () => $manifest->add('EPUB/a.xhtml', "application/xhtml+xml\x01"),
+            'id' => static fn () => $manifest->add('EPUB/b.xhtml', null, "caf\xE9"),
+            'property' => static fn () => $manifest->addProperty('chapter', "nav\x0B"),
+        ];
+
+        foreach ($attempts as $label => $attempt) {
+            try {
+                $attempt();
+                $this->fail("Expected an exception for an invalid {$label}.");
+            } catch (Exception $exception) {
+                $this->assertStringContainsString('not valid XML text', $exception->getMessage(), $label);
+            }
+        }
+
+        $this->assertCount(1, $manifest->getItems());
+        $this->assertFalse($manifest->isModified());
+    }
+
     public function testRemove(): void
     {
         $manifest = $this->manifest();

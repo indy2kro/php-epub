@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PhpEpub;
 
+use PhpEpub\Util\XmlText;
 use SimpleXMLElement;
 
 class Metadata
@@ -103,6 +104,8 @@ class Metadata
      */
     public function setMeta(string $name, ?string $content): void
     {
+        XmlText::assertValid($name, $content ?? '');
+
         $metas = $this->namedMetas($name);
 
         if ($content === null) {
@@ -136,6 +139,8 @@ class Metadata
      */
     public function setProperty(string $property, ?string $value): void
     {
+        XmlText::assertValid($property, $value ?? '');
+
         $metas = $this->propertyMetas($property);
 
         if ($value === null) {
@@ -187,6 +192,8 @@ class Metadata
      */
     protected function setDcValue(string $name, string $value): void
     {
+        XmlText::assertValid($value);
+
         $elements = $this->dcElements($name);
 
         if ($elements === []) {
@@ -213,6 +220,9 @@ class Metadata
      */
     protected function setDcValues(string $name, array $values, ?array $elements = null, array $staleOnChange = []): void
     {
+        // Check every value first, so one bad value leaves the package untouched.
+        XmlText::assertValid(...$values);
+
         $elements ??= $this->dcElements($name);
 
         foreach ($values as $index => $value) {
