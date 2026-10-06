@@ -205,6 +205,28 @@ final class ManifestTest extends TestCase
         $this->assertStringContainsString('<itemref idref="cover-page"/>', $saved);
     }
 
+    public function testRemoveCopesWithHrefsOutsideTheBook(): void
+    {
+        $opf = '<package xmlns="http://www.idpf.org/2007/opf" version="2.0"><metadata/><manifest>'
+            . '<item id="escape" href="../../outside.xhtml" media-type="application/xhtml+xml"/>'
+            . '<item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml"/>'
+            . '</manifest><spine/>'
+            . '<guide><reference type="text" href="../../elsewhere.xhtml"/><reference type="toc" href="chapter.xhtml"/></guide>'
+            . '</package>';
+        $xml = new SimpleXMLElement($opf);
+        $manifest = new Manifest($xml, 'EPUB/package.opf');
+
+        // An item with no file in the book has no guide references to clear.
+        $manifest->remove('escape');
+        $this->assertSame(2, substr_count((string) $xml->asXML(), '<reference'));
+
+        // A guide reference pointing outside the book never matches a removed item.
+        $manifest->remove('chapter');
+        $saved = (string) $xml->asXML();
+        $this->assertStringContainsString('elsewhere.xhtml', $saved);
+        $this->assertStringNotContainsString('type="toc"', $saved);
+    }
+
     public function testRemove(): void
     {
         $manifest = $this->manifest();

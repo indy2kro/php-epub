@@ -122,6 +122,15 @@ final class EpubDocumentLoaderTest extends TestCase
         $this->assertStringContainsString('src="' . htmlspecialchars($imagePath) . '"', $html);
     }
 
+    public function testEmptyChapterBecomesAnEmptyString(): void
+    {
+        $directory = EpubBuilder::minimal()
+            ->withFile('EPUB/chapter.xhtml', '')
+            ->writeTo($this->tmpDir . '/book');
+
+        $this->assertSame([''], (new EpubDocumentLoader())->load($directory)->chapters);
+    }
+
     public function testScriptsAreRemoved(): void
     {
         $directory = EpubBuilder::minimal()
