@@ -413,6 +413,39 @@ final class EpubFileTest extends TestCase
         $epubFile->{$accessor}();
     }
 
+    #[DataProvider('accessorProvider')]
+    public function testAccessorsAfterCleanupThrow(string $accessor, string $message): void
+    {
+        $epubFile = EpubFile::open(__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'valid.epub');
+        $epubFile->cleanup();
+
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage($message);
+
+        $epubFile->{$accessor}();
+    }
+
+    #[DataProvider('accessorProvider')]
+    public function testAccessorsAfterAFailedReloadThrow(string $accessor, string $message): void
+    {
+        copy(__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'valid.epub', $this->tempEpubFilePath);
+        $epubFile = EpubFile::open($this->tempEpubFilePath);
+        copy(__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'invalid.epub', $this->tempEpubFilePath);
+
+        try {
+            $epubFile->load();
+            $this->fail('Expected loading an invalid book to fail.');
+        } catch (Exception) {
+            // The failed load must not leave an extraction behind or keep the old book's objects.
+            $this->assertNull($epubFile->getTempDir());
+        }
+
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage($message);
+
+        $epubFile->{$accessor}();
+    }
+
     public static function accessorProvider(): Iterator
     {
         yield ['getMetadata', 'EPUB file must be loaded before accessing metadata.'];

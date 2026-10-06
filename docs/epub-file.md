@@ -107,7 +107,7 @@ Writes pending changes to the extracted book and converts it with the given adap
 public function cleanup(): void
 ```
 
-Manually cleans up the temporary directory. Called automatically by `__destruct()`, but can be called explicitly to release resources earlier.
+Manually cleans up the temporary directory. Called automatically by `__destruct()`, but can be called explicitly to release resources earlier. Afterwards the book is unloaded: `getMetadata()`, `getSpine()`, `getManifest()` and `getContentManager()` throw until `load()` is called again. A `load()` that fails also cleans up, so it never leaves a half-loaded book or its extracted files behind.
 
 ```php
 public function getTempDir(): ?string

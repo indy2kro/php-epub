@@ -7,6 +7,7 @@ namespace PhpEpub;
 use PhpEpub\Converters\ConverterInterface;
 use PhpEpub\Util\FileSystemHelper;
 use SimpleXMLElement;
+use Throwable;
 
 class EpubFile
 {
@@ -58,13 +59,23 @@ class EpubFile
         $this->cleanup();
     }
 
+    /**
+     * Deletes the extracted book. The EpubFile is then unloaded: call load() before using it again.
+     */
     public function cleanup(): void
     {
         if ($this->tempDir !== null && is_dir($this->tempDir)) {
             $helper = new FileSystemHelper();
             $helper->deleteDirectory($this->tempDir);
-            $this->tempDir = null;
         }
+
+        // These objects point into the deleted directory; drop them so the accessors fail clearly.
+        $this->tempDir = null;
+        $this->opfXml = null;
+        $this->metadata = null;
+        $this->manifest = null;
+        $this->spine = null;
+        $this->contentManager = null;
     }
 
     public function load(): void
@@ -78,17 +89,24 @@ class EpubFile
             throw new Exception("Failed to create temporary directory: {$this->tempDir}");
         }
 
-        $this->zipHandler->extract($this->filePath, $this->tempDir);
+        try {
+            $this->zipHandler->extract($this->filePath, $this->tempDir);
 
-        $opfFilePath = $this->parser->parse($this->tempDir);
-        $opfFileFullPath = $this->tempDir . DIRECTORY_SEPARATOR . $opfFilePath;
+            $opfFilePath = $this->parser->parse($this->tempDir);
+            $opfFileFullPath = $this->tempDir . DIRECTORY_SEPARATOR . $opfFilePath;
 
-        $this->opfXml = $this->xmlParser->parse($opfFileFullPath);
+            $this->opfXml = $this->xmlParser->parse($opfFileFullPath);
 
-        $this->metadata = new Metadata($this->opfXml, $opfFileFullPath);
-        $this->manifest = new Manifest($this->opfXml, $opfFilePath);
-        $this->spine = new Spine($this->opfXml, $this->manifest);
-        $this->contentManager = new ContentManager($this->tempDir, $this->manifest, $this->spine);
+            $this->metadata = new Metadata($this->opfXml, $opfFileFullPath);
+            $this->manifest = new Manifest($this->opfXml, $opfFilePath);
+            $this->spine = new Spine($this->opfXml, $this->manifest);
+            $this->contentManager = new ContentManager($this->tempDir, $this->manifest, $this->spine);
+        } catch (Throwable $throwable) {
+            // Do not leave a half-loaded book (or its extracted files) behind.
+            $this->cleanup();
+
+            throw $throwable;
+        }
     }
 
     public function save(?string $filePath = null): void

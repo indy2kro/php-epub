@@ -67,7 +67,7 @@ Effort: S = one file, under 30 min · M = one class plus tests · L = cross-cutt
 
 - [x] **BUG-01** Accept prefixed OPF packages and containers in `Parser` (look up the OPF/OCF namespace URIs instead of the default-namespace key) — `src/Parser.php:63-71,97-105` — S · med
   `getNamespaces(true)` has no `''` key for `<opf:package xmlns:opf=…>`, so `load()` throws "No OPF namespace" and the prefixed-package support in `Metadata`/`Spine` is unreachable (its test bypasses `Parser`).
-- [ ] **BUG-02** Reset metadata/manifest/spine/content manager in `cleanup()` and when `load()` fails — `src/EpubFile.php:61-92` — S · med
+- [x] **BUG-02** Reset metadata/manifest/spine/content manager in `cleanup()` and when `load()` fails — `src/EpubFile.php:61-92` — S · med
   The getters keep returning objects bound to a deleted temp dir, so later edits and `save()` fail with confusing I/O errors.
 - [x] **BUG-03** Clear dangling references when `deleteContent()`/`Manifest::remove()` drops an item (`<meta name="cover">`, `spine@toc`, `<guide>`) — `src/ContentManager.php:135-155`, `src/Manifest.php:136-142` — M · med
   Deleting the cover image or the NCX leaves references to an id/href that no longer exists, which readers and EPUBCheck reject.
