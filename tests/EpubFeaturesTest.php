@@ -52,6 +52,45 @@ final class EpubFeaturesTest extends TestCase
         $this->assertNull($reloaded->getMeta('calibre:series'));
     }
 
+    public function testRepeatedMetasAsLists(): void
+    {
+        $metadata = $this->metadata(
+            '<meta name="calibre:user_categories" content="A"/><meta name="calibre:user_categories" content="B"/>'
+            . '<meta property="dcterms:subject">x</meta><meta property="dcterms:subject">y</meta>'
+            . '<meta refines="#c1" property="dcterms:subject">refinement</meta>'
+        );
+        $this->assertSame(['A', 'B'], $metadata->getMetaValues('calibre:user_categories'));
+        $this->assertSame(['x', 'y'], $metadata->getPropertyValues('dcterms:subject'));
+        $this->assertSame([], $metadata->getMetaValues('missing'));
+
+        $metadata->setMetaValues('calibre:user_categories', ['C', 'D', 'E']);
+        $metadata->setPropertyValues('dcterms:subject', ['z']);
+        $metadata->save();
+
+        $reloaded = $this->reloadMetadata();
+        $this->assertSame(['C', 'D', 'E'], $reloaded->getMetaValues('calibre:user_categories'));
+        $this->assertSame(['z'], $reloaded->getPropertyValues('dcterms:subject'));
+
+        $reloaded->setMetaValues('calibre:user_categories', []);
+        $reloaded->setPropertyValues('dcterms:subject', []);
+        $this->assertSame([], $reloaded->getMetaValues('calibre:user_categories'));
+        $this->assertSame([], $reloaded->getPropertyValues('dcterms:subject'));
+    }
+
+    public function testSetMetaAndSetPropertyReplaceDuplicates(): void
+    {
+        $metadata = $this->metadata(
+            '<meta name="calibre:series" content="Old"/><meta name="calibre:series" content="Older"/>'
+            . '<meta property="belongs-to-collection">Old</meta><meta property="belongs-to-collection">Older</meta>'
+        );
+
+        $metadata->setMeta('calibre:series', 'New');
+        $metadata->setProperty('belongs-to-collection', 'New');
+
+        $this->assertSame(['New'], $metadata->getMetaValues('calibre:series'));
+        $this->assertSame(['New'], $metadata->getPropertyValues('belongs-to-collection'));
+    }
+
     public function testEpub3PropertyRoundTripIgnoresRefinements(): void
     {
         $metadata = $this->metadata(

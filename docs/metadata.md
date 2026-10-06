@@ -124,6 +124,10 @@ public function getMeta(string $name): ?string
 public function setMeta(string $name, ?string $content): void
 public function getProperty(string $property): ?string
 public function setProperty(string $property, ?string $value): void
+public function getMetaValues(string $name): array
+public function setMetaValues(string $name, array $values): void
+public function getPropertyValues(string $property): array
+public function setPropertyValues(string $property, array $values): void
 public function getVersion(): string
 ```
 
@@ -131,7 +135,8 @@ Access to metadata beyond the Dublin Core fields:
 
 - `getMeta()`/`setMeta()` read and write EPUB 2 style `<meta name="…" content="…"/>` elements, such as `calibre:series`, `calibre:series_index` or `cover`.
 - `getProperty()`/`setProperty()` read and write EPUB 3 `<meta property="…">value</meta>` elements that describe the whole book, such as `belongs-to-collection` or `schema:accessMode`. Refinements of other elements (`refines="#id"`) are ignored.
-- Passing `null` as the value removes the element. Only the first matching element is read or updated.
+- Passing `null` as the value removes the element. `getMeta()`/`getProperty()` return the first match; `setMeta()`/`setProperty()` replace every match with the single new value, so no stale duplicates are left.
+- `getMetaValues()`/`setMetaValues()` and `getPropertyValues()`/`setPropertyValues()` read and write all elements with that name or property as a list (e.g. several `dcterms:subject` properties); an empty list removes them all.
 - `getVersion()` returns the package version, e.g. `2.0` or `3.0`.
 
 ```php

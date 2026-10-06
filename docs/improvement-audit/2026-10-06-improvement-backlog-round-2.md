@@ -107,7 +107,7 @@ Effort: S = one file, under 30 min · M = one class plus tests · L = cross-cutt
   Deferred from the previous round; a book whose subtitle comes first returns it as the title.
 - [ ] **UX-02** Expose dated events (EPUB 2 `opf:event`, EPUB 3 `dcterms:modified`) instead of only the first `dc:date` — `src/Traits/InteractsWithDate.php:12-22` — S · low
   `getDate()` may return the modification date rather than the publication date.
-- [ ] **UX-03** Add list APIs for repeated `<meta name>` / `<meta property>` entries — `src/Metadata.php:94-153` — S · low
+- [x] **UX-03** Add list APIs for repeated `<meta name>` / `<meta property>` entries — `src/Metadata.php:94-153` — S · low
   `setMeta()`/`setProperty()` only update the first match, so duplicates keep the old value alongside the new one.
 - [x] **UX-04** Extend guessed media types (aac, ogg, opus, m4v, webm, avif, json, xml, txt, vtt) and use `text/javascript` — `src/Manifest.php:15-36` — S · low
   Common EPUB 3 media fall back to `application/octet-stream`.

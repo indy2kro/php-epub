@@ -106,23 +106,45 @@ class Metadata
 
     /**
      * Sets an EPUB 2 style <meta name="…" content="…"/> value; null removes it.
+     * Duplicates with the same name are replaced by this single value.
      */
     public function setMeta(string $name, ?string $content): void
     {
-        XmlText::assertValid($name, $content ?? '');
+        $this->setMetaValues($name, $content === null ? [] : [$content]);
+    }
 
+    /**
+     * Gets every <meta name="…" content="…"/> value with this name, in document order.
+     *
+     * @return list<string>
+     */
+    public function getMetaValues(string $name): array
+    {
+        return array_map(static fn (SimpleXMLElement $meta): string => (string) $meta['content'], $this->namedMetas($name));
+    }
+
+    /**
+     * Replaces every <meta name="…"> with this name by one element per value; [] removes them all.
+     *
+     * @param list<string> $values
+     */
+    public function setMetaValues(string $name, array $values): void
+    {
+        XmlText::assertValid($name, ...$values);
         $metas = $this->namedMetas($name);
 
-        if ($content === null) {
-            foreach ($metas as $meta) {
-                unset($meta[0]);
+        foreach ($values as $index => $value) {
+            if (isset($metas[$index])) {
+                $metas[$index]['content'] = $value;
+            } else {
+                $meta = $this->metadataNode->addChild('meta', null, self::OPF_NAMESPACE);
+                $meta->addAttribute('name', $name);
+                $meta->addAttribute('content', $value);
             }
-        } elseif ($metas === []) {
-            $meta = $this->metadataNode->addChild('meta', null, self::OPF_NAMESPACE);
-            $meta->addAttribute('name', $name);
-            $meta->addAttribute('content', $content);
-        } else {
-            $metas[0]['content'] = $content;
+        }
+
+        foreach (array_slice($metas, count($values)) as $meta) {
+            unset($meta[0]);
         }
 
         $this->modified = true;
@@ -141,22 +163,46 @@ class Metadata
 
     /**
      * Sets an EPUB 3 <meta property="…">value</meta> for the whole book; null removes it.
+     * Duplicates with the same property are replaced by this single value.
      */
     public function setProperty(string $property, ?string $value): void
     {
-        XmlText::assertValid($property, $value ?? '');
+        $this->setPropertyValues($property, $value === null ? [] : [$value]);
+    }
 
+    /**
+     * Gets every book-level <meta property="…"> value with this property, in document order
+     * (refinements of other elements are ignored).
+     *
+     * @return list<string>
+     */
+    public function getPropertyValues(string $property): array
+    {
+        return array_map(static fn (SimpleXMLElement $meta): string => (string) $meta, $this->propertyMetas($property));
+    }
+
+    /**
+     * Replaces every book-level <meta property="…"> with this property by one element per
+     * value; [] removes them all. Refinements of other elements are not touched.
+     *
+     * @param list<string> $values
+     */
+    public function setPropertyValues(string $property, array $values): void
+    {
+        XmlText::assertValid($property, ...$values);
         $metas = $this->propertyMetas($property);
 
-        if ($value === null) {
-            foreach ($metas as $meta) {
-                unset($meta[0]);
+        foreach ($values as $index => $value) {
+            if (isset($metas[$index])) {
+                $this->setText($metas[$index], $value);
+            } else {
+                $meta = $this->metadataNode->addChild('meta', htmlspecialchars($value, ENT_XML1), self::OPF_NAMESPACE);
+                $meta->addAttribute('property', $property);
             }
-        } elseif ($metas === []) {
-            $meta = $this->metadataNode->addChild('meta', htmlspecialchars($value, ENT_XML1), self::OPF_NAMESPACE);
-            $meta->addAttribute('property', $property);
-        } else {
-            $this->setText($metas[0], $value);
+        }
+
+        foreach (array_slice($metas, count($values)) as $meta) {
+            unset($meta[0]);
         }
 
         $this->modified = true;
