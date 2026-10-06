@@ -88,9 +88,15 @@ The entity that made the resource available (dc:publisher).
 ```php
 public function getDate(): string
 public function setDate(string $date): void
+public function getModifiedDate(): ?string
+public function getDateEvents(): array
 ```
 
 Date of publication (dc:date). Should be in a valid date format (preferably ISO 8601).
+
+- `getDate()`/`setDate()` use the publication date: the `dc:date` with the EPUB 2 `opf:event="publication"`, or else one without an event, or else the first. Dates of other events are kept.
+- `getModifiedDate()` returns the EPUB 3 `dcterms:modified` property, or else the EPUB 2 `dc:date` with `opf:event="modification"`, or `null`. `save()` keeps the EPUB 3 value up to date.
+- `getDateEvents()` returns every `dc:date` keyed by its `opf:event` (`""` for a date without one), e.g. `['publication' => '1999-01-01', 'modification' => '2020-05-05']`.
 
 ### Language
 

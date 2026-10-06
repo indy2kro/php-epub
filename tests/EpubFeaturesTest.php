@@ -95,6 +95,47 @@ final class EpubFeaturesTest extends TestCase
         $this->metadata('')->setTitles([]);
     }
 
+    public function testDatesFollowEpub2Events(): void
+    {
+        $metadata = $this->metadata(
+            '<dc:date xmlns:opf="http://www.idpf.org/2007/opf" opf:event="modification">2020-05-05</dc:date>'
+            . '<dc:date xmlns:opf="http://www.idpf.org/2007/opf" opf:event="publication">1999-01-01</dc:date>'
+            . '<dc:date xmlns:opf="http://www.idpf.org/2007/opf" opf:event="creation">1998-02-02</dc:date>'
+        );
+
+        $this->assertSame('1999-01-01', $metadata->getDate());
+        $this->assertSame('2020-05-05', $metadata->getModifiedDate());
+        $this->assertSame(
+            ['modification' => '2020-05-05', 'publication' => '1999-01-01', 'creation' => '1998-02-02'],
+            $metadata->getDateEvents()
+        );
+
+        $metadata->setDate('2001-01-01');
+        $metadata->save();
+
+        $reloaded = $this->reloadMetadata();
+        $this->assertSame('2001-01-01', $reloaded->getDate());
+        $this->assertSame('2020-05-05', $reloaded->getDateEvents()['modification']);
+    }
+
+    public function testDatesInEpub3(): void
+    {
+        $metadata = $this->metadata('<dc:date>2010-10-10</dc:date><meta property="dcterms:modified">2026-01-02T03:04:05Z</meta>');
+
+        $this->assertSame('2010-10-10', $metadata->getDate());
+        $this->assertSame('2026-01-02T03:04:05Z', $metadata->getModifiedDate());
+        $this->assertSame(['' => '2010-10-10'], $metadata->getDateEvents());
+    }
+
+    public function testDatesWhenAbsent(): void
+    {
+        $metadata = $this->metadata('');
+
+        $this->assertSame('', $metadata->getDate());
+        $this->assertNull($metadata->getModifiedDate());
+        $this->assertSame([], $metadata->getDateEvents());
+    }
+
     public function testRepeatedMetasAsLists(): void
     {
         $metadata = $this->metadata(

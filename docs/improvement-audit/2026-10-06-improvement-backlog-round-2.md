@@ -105,7 +105,7 @@ Effort: S = one file, under 30 min · M = one class plus tests · L = cross-cutt
 
 - [x] **UX-01** Add `getTitles()`/`setTitles()` aware of EPUB 3 `title-type` (main/subtitle) — `src/Traits/InteractsWithTitle.php` — S · low
   Deferred from the previous round; a book whose subtitle comes first returns it as the title.
-- [ ] **UX-02** Expose dated events (EPUB 2 `opf:event`, EPUB 3 `dcterms:modified`) instead of only the first `dc:date` — `src/Traits/InteractsWithDate.php:12-22` — S · low
+- [x] **UX-02** Expose dated events (EPUB 2 `opf:event`, EPUB 3 `dcterms:modified`) instead of only the first `dc:date` — `src/Traits/InteractsWithDate.php:12-22` — S · low
   `getDate()` may return the modification date rather than the publication date.
 - [x] **UX-03** Add list APIs for repeated `<meta name>` / `<meta property>` entries — `src/Metadata.php:94-153` — S · low
   `setMeta()`/`setProperty()` only update the first match, so duplicates keep the old value alongside the new one.
