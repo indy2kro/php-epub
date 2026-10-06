@@ -108,7 +108,7 @@ An EPUB is a ZIP of XML and HTML, so a book uploaded by a user can be hostile. p
 | XML entity expansion and external entities (XXE) | `<!ENTITY` declarations are rejected in any encoding (checked on the parsed DOCTYPE, not only the raw bytes) and the parser never fetches network resources |
 | Symlinks in the extraction directory | Cleanup deletes the link itself, never its target |
 | Scripts, local files and remote URLs in book HTML during PDF conversion | Documents are parsed as HTML; scripts, embeds and resource-loading CSS are removed, every resource attribute is limited to files inside the book, and Dompdf runs without remote access, PHP or JavaScript, confined to the book directory |
-| Shell arguments for Calibre | Every argument is escaped (pass `extra_args` as a list) |
+| Shell arguments for Calibre, and conversions that hang | Calibre is started without a shell, so no argument is interpreted, and a conversion is stopped after `timeout` seconds (600 by default) |
 
 The extraction directory is created with an unpredictable name and owner-only permissions, and is removed by `EpubFile::cleanup()` or when the object is destroyed.
 

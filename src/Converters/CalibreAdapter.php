@@ -11,17 +11,20 @@ use PhpEpub\ZipHandler;
 class CalibreAdapter implements ConverterInterface
 {
     /**
-     * @var array{calibre_path: string, extra_args: string|list<string>}
+     * @var array{calibre_path: string, extra_args: string|list<string>, timeout: int|null}
      */
     private array $options;
 
     /**
      * CalibreAdapter constructor.
      *
-     * @param array{calibre_path?: string, extra_args?: string|list<string>} $options
+     * @param array{calibre_path?: string, extra_args?: string|list<string>, timeout?: int|null} $options
      *        calibre_path: path to ebook-convert.
-     *        extra_args: extra ebook-convert arguments as a list (each one is shell-escaped).
-     *        Passing a single string is deprecated: it is inserted into the command unescaped.
+     *        extra_args: extra ebook-convert arguments as a list, each passed to Calibre as it is.
+     *        Passing a single string is deprecated: it is split into arguments at spaces (quotes group words).
+     *        timeout: seconds before a conversion is stopped (default 600); null waits indefinitely.
+     *
+     * @throws Exception If the timeout is not a positive number of seconds or null.
      */
     public function __construct(
         array $options = [],
@@ -31,9 +34,14 @@ class CalibreAdapter implements ConverterInterface
         $defaultOptions = [
             'calibre_path' => '/usr/bin/ebook-convert',
             'extra_args' => [],
+            'timeout' => 600,
         ];
 
         $this->options = array_merge($defaultOptions, $options);
+
+        if ($this->options['timeout'] !== null && $this->options['timeout'] < 1) {
+            throw new Exception('CalibreAdapter timeout must be a positive number of seconds or null');
+        }
     }
 
     /**
@@ -78,19 +86,15 @@ class CalibreAdapter implements ConverterInterface
      */
     private function run(string $calibrePath, string $inputFile, string $outputPath): void
     {
-        // Every part is escaped; stderr is captured so failures carry Calibre's message.
-        $command = escapeshellarg($calibrePath)
-            . ' ' . escapeshellarg($inputFile)
-            . ' ' . escapeshellarg($outputPath)
-            . $this->extraArguments()
-            . ' 2>&1';
+        // No shell is involved: every argument reaches Calibre as it is. Output includes stderr,
+        // so failures carry Calibre's message, and a conversion that hangs is stopped.
+        $result = $this->helper->runProcess(
+            [$calibrePath, $inputFile, $outputPath, ...$this->extraArguments()],
+            $this->options['timeout']
+        );
 
-        $output = [];
-        $returnVar = 0;
-        $this->helper->exec($command, $output, $returnVar);
-
-        if ($returnVar !== 0) {
-            throw new Exception('Calibre conversion failed: ' . implode("\n", $output));
+        if ($result['exitCode'] !== 0) {
+            throw new Exception('Calibre conversion failed: ' . trim($result['output']));
         }
 
         if (! $this->helper->fileExists($outputPath) || $this->helper->fileSize($outputPath) === 0) {
@@ -98,23 +102,29 @@ class CalibreAdapter implements ConverterInterface
         }
     }
 
-    private function extraArguments(): string
+    /**
+     * @return list<string>
+     */
+    private function extraArguments(): array
     {
         $extraArgs = $this->options['extra_args'];
 
-        if (is_string($extraArgs)) {
-            if ($extraArgs === '') {
-                return '';
-            }
-
-            trigger_error(
-                'Passing CalibreAdapter extra_args as a string is deprecated; pass a list of arguments, which are escaped individually.',
-                E_USER_DEPRECATED
-            );
-
-            return ' ' . $extraArgs;
+        if (! is_string($extraArgs)) {
+            return $extraArgs;
         }
 
-        return implode('', array_map(static fn (string $argument): string => ' ' . escapeshellarg($argument), $extraArgs));
+        if ($extraArgs === '') {
+            return [];
+        }
+
+        trigger_error(
+            'Passing CalibreAdapter extra_args as a string is deprecated; pass a list of arguments.',
+            E_USER_DEPRECATED
+        );
+
+        // Split at spaces; "double" or 'single' quotes group words. Nothing else is interpreted.
+        preg_match_all('/"([^"]*)"|\'([^\']*)\'|(\S+)/', $extraArgs, $matches, PREG_SET_ORDER | PREG_UNMATCHED_AS_NULL);
+
+        return array_map(static fn (array $match): string => $match[1] ?? $match[2] ?? $match[3] ?? '', $matches);
     }
 }

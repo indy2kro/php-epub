@@ -92,7 +92,7 @@ Effort: S = one file, under 30 min · M = one class plus tests · L = cross-cutt
 
 ### Converters
 
-- [ ] **CONV-01** Run `ebook-convert` with a timeout (`proc_open`) and kill it on expiry — `src/Converters/CalibreAdapter.php:79-99`, `src/Util/FileSystemHelper.php:21-24` — S · med
+- [x] **CONV-01** Run `ebook-convert` with a timeout (`proc_open`) and kill it on expiry — `src/Converters/CalibreAdapter.php:79-99`, `src/Util/FileSystemHelper.php:21-24` — S · med
   `exec()` waits forever, so a hostile or simply huge book hangs the worker.
 - [ ] **CONV-02** Carry the book's own CSS into the HTML renderers (sanitised, `url()` confined) — `src/Converters/EpubDocumentLoader.php:81-100`, `src/Converters/DompdfAdapter.php:97-107` — M · med
   Only `<body>` is kept, so stylesheets are dropped and every PDF loses the book's layout. Do after SEC-02.
