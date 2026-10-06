@@ -265,7 +265,7 @@ at <code>af4bbcc</code> (main). No source changes were made while compiling this
   Callers typically pass manifest hrefs from the book, and <code>../</code> lets <code>add/update/delete/getContent</code> touch arbitrary files.</li>
 <li>[x] <strong>SEC-03</strong> Cap total uncompressed size, entry count and compression ratio before extracting — <code>src/ZipHandler.php:21-38</code> — M · med
   <code>extractTo()</code> inflates every entry without limits, so a small zip bomb fills the temp disk (PHP already strips <code>../</code> from entry names).</li>
-<li>[ ] <strong>SEC-04</strong> Stop disabling TLS verification when downloading AFM fonts — <code>scripts/generate-core-fonts.php:83-86</code> — S · med
+<li>[x] <strong>SEC-04</strong> Stop disabling TLS verification when downloading AFM fonts — <code>scripts/generate-core-fonts.php:83-86</code> — S · med
   <code>verify_peer =&gt; false</code> on a script that Composer runs on every install/update lets a network attacker substitute font data.</li>
 <li>[ ] <strong>SEC-05</strong> Accept Calibre <code>extra_args</code> as a list and escape each argument — <code>src/Converters/CalibreAdapter.php:44-50</code> — S · med
   <code>extra_args</code> is appended raw to the shell command, so any user-influenced option becomes shell injection.</li>
@@ -309,7 +309,7 @@ at <code>af4bbcc</code> (main). No source changes were made while compiling this
   Real books have no root <code>content.xhtml</code>, so both PDF adapters fail on every real EPUB.</li>
 <li>[ ] <strong>CONV-02</strong> Make <code>Converter</code> work with <code>CalibreAdapter</code> (it needs the <code>.epub</code>, <code>Converter</code> passes the extracted dir) — <code>src/Converter.php:37-44</code>, <code>src/Converters/CalibreAdapter.php:31</code> — S · med
   The interface says "directory", Calibre expects a file, so <code>Converter</code> + Calibre (the docs example) cannot work.</li>
-<li>[ ] <strong>CONV-03</strong> Resolve TCPDF fonts when php-epub is installed as a dependency — <code>src/Converters/TCPDFAdapter.php:48-50</code>, <code>composer.json</code> scripts — M · med
+<li>[x] <strong>CONV-03</strong> Resolve TCPDF fonts when php-epub is installed as a dependency — <code>src/Converters/TCPDFAdapter.php:48-50</code>, <code>composer.json</code> scripts — M · med
   <code>K_PATH_FONTS</code> points at php-epub's own <code>vendor/</code>, and <code>post-install-cmd</code> only runs for the root package.</li>
 <li>[ ] <strong>CONV-04</strong> Fill TCPDF document info from EPUB metadata instead of <code>'Author Name'</code> — <code>src/Converters/TCPDFAdapter.php:55-60</code> — S · low
   Every PDF claims the same placeholder author and title.</li>

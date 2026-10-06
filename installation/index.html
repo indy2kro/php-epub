@@ -46,6 +46,12 @@
               <ul class="current">
                 <li class="toctree-l1 current"><a class="reference internal current" href="#">Installation</a>
     <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#optional-pdf-conversion">Optional: PDF conversion</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#tcpdf-core-fonts">TCPDF core fonts</a>
+    </li>
+        </ul>
+    </li>
     </ul>
                 </li>
               </ul>
@@ -113,6 +119,25 @@
                 <h1 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">&para;</a></h1>
 <p>Use Composer to install the PHP EPUB Processor library by running the following command:</p>
 <pre class="codehilite"><code>composer require indy2kro/php-epub
+</code></pre>
+
+<h2 id="optional-pdf-conversion">Optional: PDF conversion<a class="headerlink" href="#optional-pdf-conversion" title="Permanent link">&para;</a></h2>
+<p>PDF conversion uses one of two optional libraries:</p>
+<pre class="codehilite"><code>composer require dompdf/dompdf
+composer require tecnickcom/tcpdf
+</code></pre>
+
+<h3 id="tcpdf-core-fonts">TCPDF core fonts<a class="headerlink" href="#tcpdf-core-fonts" title="Permanent link">&para;</a></h3>
+<p>TCPDF 7 needs the 14 standard PDF core fonts (Helvetica, Times, Courier, …) as JSON definitions, which Composer packages do not ship. Generate them once after installing TCPDF (and again after updating <code>tecnickcom/tc-lib-pdf-font</code>):</p>
+<pre class="codehilite"><code>php vendor/indy2kro/php-epub/scripts/generate-core-fonts.php
+</code></pre>
+
+<p>The script downloads the Adobe Core14 AFM files over HTTPS (certificates verified), checks each file against a pinned SHA-256 hash, and writes the definitions into <code>vendor/tecnickcom/tc-lib-pdf-font/target/fonts/</code>, where TCPDF finds them automatically. It exits without doing anything when TCPDF is not installed.</p>
+<p>You can make this automatic in your own <code>composer.json</code>:</p>
+<pre class="codehilite"><code class="language-json">&quot;scripts&quot;: {
+    &quot;post-install-cmd&quot;: [&quot;@php vendor/indy2kro/php-epub/scripts/generate-core-fonts.php&quot;],
+    &quot;post-update-cmd&quot;: [&quot;@php vendor/indy2kro/php-epub/scripts/generate-core-fonts.php&quot;]
+}
 </code></pre>
               
             </div>
