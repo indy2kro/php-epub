@@ -146,6 +146,15 @@ final class TCPDFAdapterTest extends TestCase
         $this->assertSame(['<style>p { color: #336699; }</style><p>Text</p>'], $chapters);
     }
 
+    public function testHeaderAndFooterCanBeSwitchedOff(): void
+    {
+        $withThem = $this->exposedAdapter()->createPdfFor($this->epubDirectory);
+        $withoutThem = $this->exposedAdapter(['header' => false, 'footer' => false])->createPdfFor($this->epubDirectory);
+
+        // Without a header and footer, the same content needs fewer bytes of page drawing.
+        $this->assertLessThan(strlen($withThem->Output('', 'S')), strlen($withoutThem->Output('', 'S')));
+    }
+
     public function testPaperSizeAndOrientationLikeDompdf(): void
     {
         $default = $this->exposedAdapter()->createPdfFor($this->epubDirectory);

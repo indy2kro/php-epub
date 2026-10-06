@@ -50,16 +50,14 @@ class FileSystemHelper
         // Output goes to a file, not a pipe: pipes cannot be polled on Windows.
         $outputFile = (string) tempnam(sys_get_temp_dir(), 'epub_proc_');
         $output = $outputFile === '' ? false : @fopen($outputFile, 'w');
-        if ($output === false) {
-            throw new Exception('Failed to create a temporary file for the program output' . $this->lastError());
-        }
 
         try {
             // stdout and stderr share one handle (and so one file offset), like 2>&1.
-            $descriptors = [0 => ['file', $this->nullDevice(), 'r'], 1 => $output, 2 => $output];
-            $process = @proc_open($command, $descriptors, $pipes);
-            if ($process === false) {
-                throw new Exception("Failed to start: {$program}" . $this->lastError());
+            $process = $output === false
+                ? false
+                : @proc_open($command, [0 => ['file', $this->nullDevice(), 'r'], 1 => $output, 2 => $output], $pipes);
+            if ($output === false || $process === false) {
+                throw new Exception("Failed to start {$program}: " . (error_get_last()['message'] ?? 'unknown error'));
             }
 
             $exitCode = $this->waitFor($process, $timeout, $program);
@@ -71,7 +69,9 @@ class FileSystemHelper
             if (is_resource($output)) {
                 fclose($output);
             }
-            @unlink($outputFile);
+            if ($outputFile !== '') {
+                @unlink($outputFile);
+            }
         }
     }
 
@@ -138,16 +138,6 @@ class FileSystemHelper
     private function nullDevice(): string
     {
         return DIRECTORY_SEPARATOR === '\\' ? 'NUL' : '/dev/null';
-    }
-
-    /**
-     * Formats the last suppressed PHP error, e.g. " (No such file or directory)".
-     */
-    private function lastError(): string
-    {
-        $error = error_get_last();
-
-        return $error === null ? '' : " ({$error['message']})";
     }
 
     public function fileSize(string $path): int|false
