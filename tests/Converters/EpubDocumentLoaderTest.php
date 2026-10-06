@@ -79,6 +79,49 @@ final class EpubDocumentLoaderTest extends TestCase
         $this->assertStringNotContainsString('missing.png', $html);
     }
 
+    public function testEveryResourceReferenceIsConfinedToTheBook(): void
+    {
+        // A real file next to the book: renderers could read it if any reference slipped through.
+        file_put_contents($this->tmpDir . '/secret.png', 'png');
+        $outside = str_replace('\\', '/', (string) realpath($this->tmpDir . '/secret.png'));
+
+        $body = "<img src={$outside} /><img src=images/ok.png /><img src='{$outside}'/>"
+            . "<img srcset=\"{$outside} 2x\"/><svg><image href=\"{$outside}\"/></svg>"
+            . "<object data=\"{$outside}\"></object><embed src=\"{$outside}\"/><video poster=\"{$outside}\"></video>"
+            . "<p style=\"background: url({$outside})\">Styled</p><style>p { background: url({$outside}); }</style>"
+            . "<link rel=\"stylesheet\" href=\"{$outside}\"/><a href=\"chapter.xhtml#top\">Link</a>";
+        $directory = EpubBuilder::minimal()
+            ->withFile('EPUB/chapter.xhtml', "<html><body>{$body}</body></html>")
+            ->withFile('EPUB/images/ok.png', 'png')
+            ->writeTo($this->tmpDir . '/book');
+
+        $html = (new EpubDocumentLoader())->load($directory)->chapters[0];
+
+        $this->assertStringNotContainsString('secret.png', $html);
+        $okPath = str_replace('\\', '/', (string) realpath($directory . '/EPUB/images/ok.png'));
+        $this->assertStringContainsString($okPath, $html);
+        $this->assertStringContainsString('Styled', $html);
+        $this->assertStringContainsString('href="chapter.xhtml#top"', $html);
+    }
+
+    public function testTextAndPathsSurviveParsing(): void
+    {
+        $directory = EpubBuilder::minimal()
+            ->withFile(
+                'EPUB/chapter.xhtml',
+                '<?xml version="1.0" encoding="utf-8"?><html xmlns="http://www.w3.org/1999/xhtml"><body>'
+                . '<p>Café — naïve &amp; ñ&nbsp;end</p><img src="images/a%26b.png"/></body></html>'
+            )
+            ->withFile('EPUB/images/a&b.png', 'png')
+            ->writeTo($this->tmpDir . '/book');
+
+        $html = (new EpubDocumentLoader())->load($directory)->chapters[0];
+
+        $this->assertStringContainsString('Café — naïve &amp; ñ', $html);
+        $imagePath = str_replace('\\', '/', (string) realpath($directory . '/EPUB/images/a&b.png'));
+        $this->assertStringContainsString('src="' . htmlspecialchars($imagePath) . '"', $html);
+    }
+
     public function testScriptsAreRemoved(): void
     {
         $directory = EpubBuilder::minimal()

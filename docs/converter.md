@@ -41,6 +41,8 @@ try {
 
 Book content is treated as untrusted:
 
-- `<script>` elements are removed.
-- Image sources are rewritten to files inside the book; absolute paths, `file://`, remote URLs, paths escaping the book and missing files are blanked. `data:` URIs are kept.
+- Each document is parsed with an HTML parser (not pattern-matched), so unquoted or unusually written attributes are handled too.
+- `<script>`, `<link>`, `<base>`, `<meta>`, `<iframe>`, `<object>`, `<embed>` and similar elements are removed, as are `on*` event attributes and `srcset`.
+- Resource attributes (`src`, `xlink:href`, `poster`, `background`, `data`, and `href` on anything but links) are rewritten to files inside the book; absolute paths, `file://`, remote URLs, paths escaping the book and missing files are blanked. `data:` URIs are kept.
+- `<style>` elements and `style` attributes that could load something (`url()`, `@import`, `image-set()`, CSS escapes) are removed.
 - Dompdf runs with remote resources, PHP and JavaScript disabled, and its file access limited (`chroot`) to the book directory.

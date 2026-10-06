@@ -58,9 +58,9 @@ Effort: S = one file, under 30 min · M = one class plus tests · L = cross-cutt
 
 ### Security (untrusted input)
 
-- [ ] **SEC-01** Detect entity declarations on the parsed document, not by searching raw bytes — `src/XmlParser.php:33-41` — S · med
+- [x] **SEC-01** Detect entity declarations on the parsed document, not by searching raw bytes — `src/XmlParser.php:33-41` — S · med
   `preg_match('/<!ENTITY/')` runs on the file bytes, so a UTF-16 encoded container/OPF/NCX passes the guard and reaches libxml with its internal subset intact.
-- [ ] **SEC-02** Confine every resource reference the PDF renderers can follow (unquoted `src`, `srcset`, SVG `href`, `object`/`embed` `data`, CSS `url()`), ideally by parsing chapters with DOM — `src/Converters/EpubDocumentLoader.php:89-127` — M · med
+- [x] **SEC-02** Confine every resource reference the PDF renderers can follow (unquoted `src`, `srcset`, SVG `href`, `object`/`embed` `data`, CSS `url()`), ideally by parsing chapters with DOM — `src/Converters/EpubDocumentLoader.php:89-127` — M · med
   The rewrite only matches quoted values, but TCPDF 7 accepts unquoted attributes (`tc-lib-pdf/src/HTML.php:1811`), so book content can pull images from TCPDF's default read allowlist (system temp dir with other books, working dir, script dir) into the PDF.
 
 ### Bugs
