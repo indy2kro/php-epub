@@ -22,6 +22,11 @@ class Metadata
 
     public const string DC_NAMESPACE = 'http://purl.org/dc/elements/1.1/';
 
+    /**
+     * Dublin Core elements the OPF specification requires with a non-empty value.
+     */
+    private const array REQUIRED_ELEMENTS = ['title', 'language', 'identifier'];
+
     private readonly SimpleXMLElement $metadataNode;
 
     private bool $modified = false;
@@ -192,7 +197,7 @@ class Metadata
      */
     protected function setDcValue(string $name, string $value): void
     {
-        XmlText::assertValid($value);
+        $this->assertDcValues($name, [$value]);
 
         $elements = $this->dcElements($name);
 
@@ -221,7 +226,7 @@ class Metadata
     protected function setDcValues(string $name, array $values, ?array $elements = null, array $staleOnChange = []): void
     {
         // Check every value first, so one bad value leaves the package untouched.
-        XmlText::assertValid(...$values);
+        $this->assertDcValues($name, $values);
 
         $elements ??= $this->dcElements($name);
 
@@ -258,6 +263,24 @@ class Metadata
         }
 
         return null;
+    }
+
+    /**
+     * @param list<string> $values
+     *
+     * @throws Exception If a value is not valid XML text, or empty for an element every package needs.
+     */
+    private function assertDcValues(string $name, array $values): void
+    {
+        XmlText::assertValid(...$values);
+
+        if (in_array($name, self::REQUIRED_ELEMENTS, true)) {
+            foreach ($values as $value) {
+                if (trim($value) === '') {
+                    throw new Exception("dc:{$name} cannot be empty: every EPUB package needs one");
+                }
+            }
+        }
     }
 
     private function addDcElement(string $name, string $value): void

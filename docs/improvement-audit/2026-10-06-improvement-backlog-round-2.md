@@ -87,7 +87,7 @@ Effort: S = one file, under 30 min · M = one class plus tests · L = cross-cutt
   `updateContent()` on the OPF is overwritten on the next `save()` when anything else changed, and kept otherwise.
 - [ ] **BUG-11** Make generated manifest ids unique across the whole OPF, not only among items — `src/Manifest.php:294-308` — S · low
   A new file can get an id already used by a `dc:*` or `meta` element, producing duplicate XML ids.
-- [ ] **BUG-12** Reject empty values for required fields (title, language, identifier) — `src/Metadata.php:188-199`, `src/Traits/InteractsWithTitle.php`, `src/Traits/InteractsWithLanguage.php` — S · low
+- [x] **BUG-12** Reject empty values for required fields (title, language, identifier) — `src/Metadata.php:188-199`, `src/Traits/InteractsWithTitle.php`, `src/Traits/InteractsWithLanguage.php` — S · low
   `setTitle('')` writes an empty `dc:title`, which EPUBCheck reports as an error.
 
 ### Converters

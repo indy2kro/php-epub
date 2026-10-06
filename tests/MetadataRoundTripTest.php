@@ -276,6 +276,31 @@ XML;
         yield 'property name' => [static fn (Metadata $metadata) => $metadata->setProperty($latin1, 'Value')];
     }
 
+    /**
+     * @param \Closure(Metadata): void $edit
+     */
+    #[DataProvider('emptyRequiredValueEdits')]
+    public function testRequiredFieldsCannotBeEmptied(\Closure $edit): void
+    {
+        $metadata = $this->load(EpubBuilder::opf());
+
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('cannot be empty');
+
+        $edit($metadata);
+    }
+
+    /**
+     * @return iterable<string, array{\Closure(Metadata): void}>
+     */
+    public static function emptyRequiredValueEdits(): iterable
+    {
+        yield 'title' => [static fn (Metadata $metadata) => $metadata->setTitle('')];
+        yield 'title whitespace' => [static fn (Metadata $metadata) => $metadata->setTitle("  \n")];
+        yield 'language' => [static fn (Metadata $metadata) => $metadata->setLanguage('')];
+        yield 'identifier' => [static fn (Metadata $metadata) => $metadata->setIdentifiers(['urn:uuid:ok', ' '])];
+    }
+
     public function testUnicodeAndWhitespaceValuesRoundTrip(): void
     {
         $metadata = $this->load(EpubBuilder::opf());
