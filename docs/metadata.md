@@ -117,6 +117,29 @@ Unambiguous references to the resource (dc:identifier), such as an ISBN or UUID.
 
 The first value passed to `setIdentifiers()` is stored in the identifier that `package@unique-identifier` points to, so the package stays valid. At least one identifier is required. An identifier whose value changes loses its type information (`opf:scheme` / `identifier-type` refinement).
 
+### Other `<meta>` Elements
+
+```php
+public function getMeta(string $name): ?string
+public function setMeta(string $name, ?string $content): void
+public function getProperty(string $property): ?string
+public function setProperty(string $property, ?string $value): void
+public function getVersion(): string
+```
+
+Access to metadata beyond the Dublin Core fields:
+
+- `getMeta()`/`setMeta()` read and write EPUB 2 style `<meta name="…" content="…"/>` elements, such as `calibre:series`, `calibre:series_index` or `cover`.
+- `getProperty()`/`setProperty()` read and write EPUB 3 `<meta property="…">value</meta>` elements that describe the whole book, such as `belongs-to-collection` or `schema:accessMode`. Refinements of other elements (`refines="#id"`) are ignored.
+- Passing `null` as the value removes the element. Only the first matching element is read or updated.
+- `getVersion()` returns the package version, e.g. `2.0` or `3.0`.
+
+```php
+$metadata->setMeta('calibre:series', 'The Expanse');
+$metadata->setMeta('calibre:series_index', '1');
+$metadata->setProperty('schema:accessMode', 'textual');
+```
+
 ## Usage Example
 
 ```php

@@ -23,7 +23,13 @@ public function __construct(
 )
 ```
 
-Initializes the EpubFile with the path to an EPUB file. The optional `$zipHandler` and `$xmlParser` parameters allow dependency injection for testing.
+Initializes the EpubFile with the path to an EPUB file. The optional `$zipHandler` and `$xmlParser` parameters allow dependency injection, e.g. a `ZipHandler` with tighter extraction limits.
+
+```php
+public static function open(string $filePath, ?ZipHandler $zipHandler = null, ?XmlParser $xmlParser = null): EpubFile
+```
+
+Shortcut for `new EpubFile(...)` followed by `load()`.
 
 ### Loading and Saving
 
@@ -72,6 +78,28 @@ public function getContentManager(): ContentManager
 ```
 
 Returns the ContentManager for adding/updating/deleting content files. Throws an exception if called before `load()`.
+
+### Cover Image
+
+```php
+public function getCoverImage(): ?ManifestItem
+```
+
+Returns the cover: the manifest item with the EPUB 3 `cover-image` property, or else the item named by the EPUB 2 `<meta name="cover">`. Returns `null` when the book has no cover. Read the bytes with `getContentManager()->getContent($cover->path)`.
+
+```php
+public function setCoverImage(string $imageData, string $mediaType, ?string $path = null): ManifestItem
+```
+
+Stores the image (by default as `images/cover.<ext>` next to the OPF file), adds it to the manifest and marks it as the cover: the `cover-image` property for EPUB 3 (removed from any previous cover) and `<meta name="cover">` for EPUB 2 compatibility. The previous image file stays in the book. Throws if `$mediaType` is not an `image/…` type.
+
+### Converting
+
+```php
+public function convert(ConverterInterface $converter, string $outputPath): void
+```
+
+Writes pending changes to the extracted book and converts it with the given adapter (`DompdfAdapter`, `TCPDFAdapter`, `CalibreAdapter`, …), so unsaved edits are included. Throws if called before `load()`.
 
 ### Cleanup
 

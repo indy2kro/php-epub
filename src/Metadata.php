@@ -80,6 +80,78 @@ class Metadata
         $this->modified = true;
     }
 
+    /**
+     * The package version, e.g. "2.0" or "3.0".
+     */
+    public function getVersion(): string
+    {
+        return (string) $this->opfXml['version'];
+    }
+
+    /**
+     * Gets an EPUB 2 style <meta name="…" content="…"/> value (e.g. "calibre:series", "cover").
+     */
+    public function getMeta(string $name): ?string
+    {
+        $meta = $this->namedMetas($name)[0] ?? null;
+
+        return $meta instanceof SimpleXMLElement ? (string) $meta['content'] : null;
+    }
+
+    /**
+     * Sets an EPUB 2 style <meta name="…" content="…"/> value; null removes it.
+     */
+    public function setMeta(string $name, ?string $content): void
+    {
+        $metas = $this->namedMetas($name);
+
+        if ($content === null) {
+            foreach ($metas as $meta) {
+                unset($meta[0]);
+            }
+        } elseif ($metas === []) {
+            $meta = $this->metadataNode->addChild('meta', null, self::OPF_NAMESPACE);
+            $meta->addAttribute('name', $name);
+            $meta->addAttribute('content', $content);
+        } else {
+            $metas[0]['content'] = $content;
+        }
+
+        $this->modified = true;
+    }
+
+    /**
+     * Gets an EPUB 3 <meta property="…">value</meta> that applies to the whole book
+     * (refinements of other elements are ignored).
+     */
+    public function getProperty(string $property): ?string
+    {
+        $meta = $this->propertyMetas($property)[0] ?? null;
+
+        return $meta instanceof SimpleXMLElement ? (string) $meta : null;
+    }
+
+    /**
+     * Sets an EPUB 3 <meta property="…">value</meta> for the whole book; null removes it.
+     */
+    public function setProperty(string $property, ?string $value): void
+    {
+        $metas = $this->propertyMetas($property);
+
+        if ($value === null) {
+            foreach ($metas as $meta) {
+                unset($meta[0]);
+            }
+        } elseif ($metas === []) {
+            $meta = $this->metadataNode->addChild('meta', htmlspecialchars($value, ENT_XML1), self::OPF_NAMESPACE);
+            $meta->addAttribute('property', $property);
+        } else {
+            $this->setText($metas[0], $value);
+        }
+
+        $this->modified = true;
+    }
+
     public function getOpfFilePath(): string
     {
         return $this->opfFilePath;
@@ -236,9 +308,31 @@ class Metadata
         ));
     }
 
+    /**
+     * @return list<SimpleXMLElement>
+     */
+    private function namedMetas(string $name): array
+    {
+        return array_values(array_filter(
+            $this->query($this->metadataNode, './/opf:meta'),
+            static fn (SimpleXMLElement $meta): bool => (string) $meta['name'] === $name
+        ));
+    }
+
+    /**
+     * @return list<SimpleXMLElement>
+     */
+    private function propertyMetas(string $property): array
+    {
+        return array_values(array_filter(
+            $this->query($this->metadataNode, './/opf:meta'),
+            static fn (SimpleXMLElement $meta): bool => (string) $meta['property'] === $property && (string) $meta['refines'] === ''
+        ));
+    }
+
     private function isEpub3(): bool
     {
-        return str_starts_with((string) $this->opfXml['version'], '3');
+        return str_starts_with($this->getVersion(), '3');
     }
 
     private function updateModifiedDate(): void

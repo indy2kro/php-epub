@@ -4,11 +4,22 @@ declare(strict_types=1);
 
 namespace PhpEpub;
 
+use PhpEpub\Converters\ConverterInterface;
 use PhpEpub\Util\FileSystemHelper;
 use SimpleXMLElement;
 
 class EpubFile
 {
+    private const string COVER_PROPERTY = 'cover-image';
+
+    private const array IMAGE_EXTENSIONS = [
+        'image/jpeg' => 'jpg',
+        'image/png' => 'png',
+        'image/gif' => 'gif',
+        'image/svg+xml' => 'svg',
+        'image/webp' => 'webp',
+    ];
+
     private ?string $tempDir = null;
     private readonly ZipHandler $zipHandler;
     private readonly XmlParser $xmlParser;
@@ -27,6 +38,19 @@ class EpubFile
         $this->zipHandler = $zipHandler ?? new ZipHandler();
         $this->xmlParser = $xmlParser ?? new XmlParser();
         $this->parser = new Parser($this->xmlParser);
+    }
+
+    /**
+     * Creates an EpubFile and loads it.
+     *
+     * @throws Exception If the file cannot be extracted or is not a valid EPUB.
+     */
+    public static function open(string $filePath, ?ZipHandler $zipHandler = null, ?XmlParser $xmlParser = null): self
+    {
+        $epubFile = new self($filePath, $zipHandler, $xmlParser);
+        $epubFile->load();
+
+        return $epubFile;
     }
 
     public function __destruct()
@@ -69,7 +93,8 @@ class EpubFile
 
     public function save(?string $filePath = null): void
     {
-        if ($this->tempDir === null) {
+        $tempDir = $this->tempDir;
+        if ($tempDir === null) {
             throw new Exception('EPUB file must be loaded before saving.');
         }
 
@@ -77,7 +102,96 @@ class EpubFile
             $filePath = $this->filePath;
         }
 
-        // Persist package edits (metadata, manifest, spine) the caller has not saved yet.
+        $this->writePackage();
+        $this->zipHandler->compress($tempDir, $filePath);
+    }
+
+    /**
+     * Converts the book with the given adapter, including changes that have not been saved yet.
+     *
+     * @throws Exception If the book is not loaded or the conversion fails.
+     */
+    public function convert(ConverterInterface $converter, string $outputPath): void
+    {
+        $tempDir = $this->tempDir;
+        if ($tempDir === null) {
+            throw new Exception('EPUB file must be loaded before converting.');
+        }
+
+        $this->writePackage();
+        $converter->convert($tempDir, $outputPath);
+    }
+
+    /**
+     * Returns the cover image: the manifest item with the EPUB 3 "cover-image"
+     * property, or else the item named by the EPUB 2 <meta name="cover">.
+     */
+    public function getCoverImage(): ?ManifestItem
+    {
+        $manifest = $this->getManifest();
+
+        foreach ($manifest->getItems() as $item) {
+            if (in_array(self::COVER_PROPERTY, explode(' ', $item->properties), true)) {
+                return $item;
+            }
+        }
+
+        $coverId = $this->getMetadata()->getMeta('cover');
+
+        return $coverId === null ? null : $manifest->get($coverId);
+    }
+
+    /**
+     * Stores an image and marks it as the cover (EPUB 3 "cover-image" property and
+     * EPUB 2 <meta name="cover">). The previous cover image file is kept in the book.
+     *
+     * @param string $imageData The image bytes.
+     * @param string $mediaType The image media type, e.g. "image/jpeg".
+     * @param string|null $path Path relative to the book root; defaults to "images/cover.<ext>" next to the OPF.
+     *
+     * @throws Exception If the media type is not an image or the file cannot be written.
+     */
+    public function setCoverImage(string $imageData, string $mediaType, ?string $path = null): ManifestItem
+    {
+        if (! str_starts_with($mediaType, 'image/')) {
+            throw new Exception("Cover must be an image, got: {$mediaType}");
+        }
+
+        $manifest = $this->getManifest();
+        $metadata = $this->getMetadata();
+
+        if ($path === null) {
+            $opfDirectory = dirname($manifest->getOpfPath());
+            $path = ($opfDirectory === '.' ? '' : $opfDirectory . '/') . 'images/cover.' . (self::IMAGE_EXTENSIONS[$mediaType] ?? 'img');
+        }
+
+        foreach ($manifest->getItems() as $item) {
+            $manifest->removeProperty($item->id, self::COVER_PROPERTY);
+        }
+
+        $cover = $manifest->findByPath($path) ?? $manifest->add($path, $mediaType);
+        $this->getContentManager()->addContent($path, $imageData);
+
+        if (str_starts_with($metadata->getVersion(), '3')) {
+            $manifest->addProperty($cover->id, self::COVER_PROPERTY);
+        }
+
+        // EPUB 2 readers (and many EPUB 3 ones) look for this meta.
+        $metadata->setMeta('cover', $cover->id);
+
+        return $manifest->get($cover->id) ?? $cover;
+    }
+
+    public function getTempDir(): ?string
+    {
+        return $this->tempDir;
+    }
+
+    /**
+     * Writes pending package edits (metadata, manifest, spine) to the OPF file.
+     */
+    private function writePackage(): void
+    {
         if ($this->manifest?->isModified() === true || $this->spine?->isModified() === true) {
             $this->metadata?->markModified();
         }
@@ -87,13 +201,6 @@ class EpubFile
             $this->manifest?->markSaved();
             $this->spine?->markSaved();
         }
-
-        $this->zipHandler->compress($this->tempDir, $filePath);
-    }
-
-    public function getTempDir(): ?string
-    {
-        return $this->tempDir;
     }
 
     public function getMetadata(): Metadata
