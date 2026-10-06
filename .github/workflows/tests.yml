@@ -84,13 +84,18 @@ jobs:
         - name: Update Dependencies with latest stable
           run: composer update --no-progress
 
+        - name: Audit dependencies
+          if: ${{ env.STATIC_CHECKS == 'true' }}
+          run: composer audit
+
+        # Same commands as "composer quality", so local and CI results match.
         - name: Code style test
           if: ${{ env.STATIC_CHECKS == 'true' }}
-          run: vendor/bin/phpcs
+          run: vendor/bin/phpcs src/ tests/ docs/
 
         - name: PHPStan code analysis
           if: ${{ env.STATIC_CHECKS == 'true' }}
-          run: php vendor/bin/phpstan analyze
+          run: php -d memory_limit=512M vendor/bin/phpstan analyse --no-progress
 
         - name: Execute Rector
           if: ${{ env.STATIC_CHECKS == 'true' }}

@@ -402,6 +402,25 @@ final class EpubFileTest extends TestCase
         }
     }
 
+    #[DataProvider('accessorProvider')]
+    public function testAccessorsBeforeLoadThrow(string $accessor, string $message): void
+    {
+        $epubFile = new EpubFile(__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'valid.epub');
+
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage($message);
+
+        $epubFile->{$accessor}();
+    }
+
+    public static function accessorProvider(): Iterator
+    {
+        yield ['getMetadata', 'EPUB file must be loaded before accessing metadata.'];
+        yield ['getSpine', 'EPUB file must be loaded before accessing spine.'];
+        yield ['getManifest', 'EPUB file must be loaded before accessing manifest.'];
+        yield ['getContentManager', 'EPUB file must be loaded before accessing content manager.'];
+    }
+
     public function testSaveWithoutLoadThrowsException(): void
     {
         $this->expectException(Exception::class);

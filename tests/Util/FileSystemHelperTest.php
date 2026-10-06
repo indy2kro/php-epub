@@ -53,6 +53,11 @@ final class FileSystemHelperTest extends TestCase
         $this->assertFalse(@$this->helper->fileSize($invalidFile));
     }
 
+    public function testDeleteDirectoryOfAMissingPathSucceeds(): void
+    {
+        $this->assertTrue($this->helper->deleteDirectory($this->fixturesDir . DIRECTORY_SEPARATOR . 'does-not-exist'));
+    }
+
     public function testDeleteDirectoryDoesNotFollowSymlinks(): void
     {
         $base = $this->fixturesDir . DIRECTORY_SEPARATOR . 'tmp' . DIRECTORY_SEPARATOR . 'symlink_test';

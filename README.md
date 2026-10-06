@@ -63,8 +63,8 @@ $epubFile->load();
 $metadata = $epubFile->getMetadata();
 $title = $metadata->getTitle();
 $metadata->setTitle('New Title');
-$metadata->save();
 
+// Writes pending metadata changes, then packages the book
 $epubFile->save();
 ```
 
