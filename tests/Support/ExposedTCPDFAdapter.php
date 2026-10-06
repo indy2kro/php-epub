@@ -17,4 +17,14 @@ final class ExposedTCPDFAdapter extends TCPDFAdapter
     {
         return $this->createPdf((new EpubDocumentLoader())->load($epubDirectory));
     }
+
+    /**
+     * @return list<string>
+     */
+    public function chapterHtmlFor(string $epubDirectory): array
+    {
+        $document = (new EpubDocumentLoader())->load($epubDirectory);
+
+        return array_map(fn (string $chapter): string => $this->chapterHtml($document, $chapter), $document->chapters);
+    }
 }

@@ -95,7 +95,7 @@ class TCPDFAdapter implements ConverterInterface
 
         foreach ($document->chapters as $chapter) {
             $pdf->AddPage();
-            $pdf->writeHTML($chapter, true, false, true, false, '');
+            $pdf->writeHTML($this->chapterHtml($document, $chapter), true, false, true, false, '');
         }
 
         if ($document->chapters === []) {
@@ -103,6 +103,15 @@ class TCPDFAdapter implements ConverterInterface
         }
 
         return $pdf;
+    }
+
+    /**
+     * A chapter as passed to writeHTML(): TCPDF takes CSS from <style> elements in that HTML,
+     * so the book's styles are prepended to every chapter.
+     */
+    protected function chapterHtml(EpubDocument $document, string $chapter): string
+    {
+        return ($document->styles === [] ? '' : '<style>' . EpubDocument::styleSheet($document->styles) . '</style>') . $chapter;
     }
 
     private function stringStyle(string $name): string

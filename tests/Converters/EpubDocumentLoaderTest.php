@@ -122,6 +122,66 @@ final class EpubDocumentLoaderTest extends TestCase
         $this->assertStringContainsString('src="' . htmlspecialchars($imagePath) . '"', $html);
     }
 
+    public function testBookStylesheetsAreCollectedWithUrlsConfinedToTheBook(): void
+    {
+        file_put_contents($this->tmpDir . '/secret.png', 'png');
+        file_put_contents($this->tmpDir . '/secret.css', '.secret { color: red; }');
+        $css = 'p { color: red; } .ok { background: url("../images/ok.png"); } .bad { background: url(/etc/passwd); }'
+            . ' @import url(other.css); .esc { background: u\72l(../images/ok.png); } q::before { content: "\201C"; }'
+            . ' .set { background-image: image-set("../images/ok.png" 1x); } .out { background: url(../../../secret.png); }';
+        $head = '<link rel="stylesheet" type="text/css" href="css/style.css"/>'
+            . '<link rel="alternate stylesheet" href="css/alt.css"/><link rel="stylesheet" href="../../secret.css"/>'
+            . '<link rel="stylesheet" href="css/missing.css"/><style>h1 { color: blue; }</style>';
+        $directory = EpubBuilder::minimal()
+            ->withFile('EPUB/chapter.xhtml', "<html><head>{$head}</head><body><p>Text</p></body></html>")
+            ->withFile('EPUB/css/style.css', $css)
+            ->withFile('EPUB/css/alt.css', '.alt { color: green; }')
+            ->withFile('EPUB/images/ok.png', 'png')
+            ->writeTo($this->tmpDir . '/book');
+
+        $styles = implode("\n", (new EpubDocumentLoader())->load($directory)->styles);
+
+        $okPath = str_replace('\\', '/', (string) realpath($directory . '/EPUB/images/ok.png'));
+        $this->assertStringContainsString('p { color: red; }', $styles);
+        $this->assertStringContainsString('h1 { color: blue; }', $styles);
+        $this->assertSame(2, substr_count($styles, $okPath));
+        $this->assertStringContainsString("content: \"\u{201C}\"", $styles);
+        $this->assertStringNotContainsString('passwd', $styles);
+        $this->assertStringNotContainsString('secret', $styles);
+        $this->assertStringNotContainsString('@import', $styles);
+        $this->assertStringNotContainsString('image-set', $styles);
+        $this->assertStringNotContainsString('.alt', $styles);
+    }
+
+    public function testAStylesheetSharedByChaptersIsIncludedOnce(): void
+    {
+        $link = '<link rel="stylesheet" href="style.css"/>';
+        $directory = self::twoChapterBook()
+            ->withFile('EPUB/chapter.xhtml', "<html><head>{$link}</head><body><p>One</p></body></html>")
+            ->withFile('EPUB/text/two.xhtml', '<html><head><link rel="stylesheet" href="../style.css"/></head><body><p>Two</p></body></html>')
+            ->withFile('EPUB/style.css', 'p { margin: 0; }')
+            ->writeTo($this->tmpDir . '/book');
+
+        $this->assertSame(['p { margin: 0; }'], (new EpubDocumentLoader())->load($directory)->styles);
+    }
+
+    public function testInlineStylesAreKeptWithConfinedUrls(): void
+    {
+        file_put_contents($this->tmpDir . '/secret.png', 'png');
+        $directory = EpubBuilder::minimal()
+            ->withFile('EPUB/chapter.xhtml', '<html><body><p style="color: red; background: url(images/ok.png)">A</p>'
+                . '<p style="background: url(../../secret.png)">B</p></body></html>')
+            ->withFile('EPUB/images/ok.png', 'png')
+            ->writeTo($this->tmpDir . '/book');
+
+        $html = (new EpubDocumentLoader())->load($directory)->chapters[0];
+
+        $okPath = str_replace('\\', '/', (string) realpath($directory . '/EPUB/images/ok.png'));
+        $this->assertStringContainsString('color: red', $html);
+        $this->assertStringContainsString($okPath, $html);
+        $this->assertStringNotContainsString('secret', $html);
+    }
+
     public function testEmptyChapterBecomesAnEmptyString(): void
     {
         $directory = EpubBuilder::minimal()

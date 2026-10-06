@@ -102,6 +102,21 @@ final class TCPDFAdapterTest extends TestCase
         $this->assertEqualsWithDelta(20.0, $margins['left'], 0.001);
     }
 
+    public function testEveryChapterCarriesTheBookCss(): void
+    {
+        $directory = EpubBuilder::minimal()
+            ->withFile('EPUB/chapter.xhtml', '<html><head><style>p { color: #336699; }</style></head><body><p>Text</p></body></html>')
+            ->writeTo($this->epubDirectory . '-css');
+
+        try {
+            $chapters = $this->exposedAdapter()->chapterHtmlFor($this->epubDirectory . '-css');
+        } finally {
+            $this->fileSystemHelper->deleteDirectory($this->epubDirectory . '-css');
+        }
+
+        $this->assertSame(['<style>p { color: #336699; }</style><p>Text</p>'], $chapters);
+    }
+
     public function testPaperSizeAndOrientationLikeDompdf(): void
     {
         $default = $this->exposedAdapter()->createPdfFor($this->epubDirectory);

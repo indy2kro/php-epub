@@ -103,7 +103,10 @@ class DompdfAdapter implements ConverterInterface
 
         return '<!DOCTYPE html><html><head><meta charset="utf-8">'
             . '<title>' . htmlspecialchars($document->title, ENT_QUOTES | ENT_HTML5) . '</title>'
-            . '<style>' . $css . '</style></head><body>'
+            . '<style>' . $css . '</style>'
+            // The book's own CSS comes after the defaults, so the book's styling wins.
+            . ($document->styles === [] ? '' : '<style>' . EpubDocument::styleSheet($document->styles) . '</style>')
+            . '</head><body>'
             . implode('<div style="page-break-before: always"></div>', $document->chapters)
             . '</body></html>';
     }

@@ -7,6 +7,7 @@ namespace PhpEpub\Test\Converters;
 use PhpEpub\ConversionException;
 use PhpEpub\Converters\DompdfAdapter;
 use PhpEpub\Exception;
+use PhpEpub\Test\Support\EpubBuilder;
 use PhpEpub\Test\Support\ExposedDompdfAdapter;
 use PhpEpub\Util\FileSystemHelper;
 use PHPUnit\Framework\TestCase;
@@ -94,6 +95,24 @@ final class DompdfAdapterTest extends TestCase
         $this->assertFalse($options->isPhpEnabled());
         $this->assertFalse($options->isJavascriptEnabled());
         $this->assertSame([realpath($this->epubDirectory)], $options->getChroot());
+    }
+
+    public function testBookCssFollowsTheAdapterDefaults(): void
+    {
+        $directory = EpubBuilder::minimal()
+            ->withFile('EPUB/chapter.xhtml', '<html><head><link rel="stylesheet" href="book.css"/></head><body><p>Text</p></body></html>')
+            ->withFile('EPUB/book.css', 'p { text-align: justify; } q::after { content: "</style><script>x</script>"; }')
+            ->writeTo($this->epubDirectory . '-css');
+
+        try {
+            $html = (new DompdfAdapter())->buildHtml($this->epubDirectory . '-css');
+        } finally {
+            (new FileSystemHelper())->deleteDirectory($this->epubDirectory . '-css');
+        }
+
+        $this->assertMatchesRegularExpression('/font-size: 12pt;.*p \{ text-align: justify; \}/s', $html);
+        // Book CSS cannot close the <style> element.
+        $this->assertSame(2, substr_count(strtolower($html), '</style>'));
     }
 
     public function testMarginsLikeTcpdf(): void
