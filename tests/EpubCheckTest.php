@@ -77,6 +77,10 @@ final class EpubCheckTest extends TestCase
             $metadata->setIdentifiers(['urn:uuid:9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d', 'urn:isbn:9780000000002']);
             $metadata->setMeta('calibre:series', 'Series');
             $metadata->setProperty('belongs-to-collection', 'Collection');
+            $metadata->setPropertyValues('dcterms:subject', ['Subject A', 'Subject B']);
+            $metadata->setTitles(['Main Title', 'A Subtitle']);
+            $metadata->addCreator('Ivan Illustrator', 'ill', 'Illustrator, Ivan');
+            $metadata->addContributor('Ed Editor', 'edt', 'Editor, Ed');
         }];
 
         yield 'added and removed content' => [static function (EpubFile $epubFile): void {
