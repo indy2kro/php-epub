@@ -86,6 +86,15 @@ final class XmlParserTest extends TestCase
         $this->assertSame([], libxml_get_errors());
     }
 
+    public function testParseUnreadablePathThrowsException(): void
+    {
+        $this->expectException(XmlException::class);
+        $this->expectExceptionMessage('Failed to read XML file:');
+
+        // A directory exists but cannot be read as a file.
+        (new XmlParser())->parse(__DIR__ . DIRECTORY_SEPARATOR . 'fixtures');
+    }
+
     public function testParseValidXml(): void
     {
         $parser = new XmlParser();

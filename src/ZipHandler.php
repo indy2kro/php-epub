@@ -102,24 +102,25 @@ class ZipHandler
 
         $this->ensureDirectory(dirname($target));
 
-        $input = $zip->getStreamIndex($index);
+        // Hostile archives make these calls emit warnings; report them as exceptions instead.
+        $input = @$zip->getStreamIndex($index);
         if ($input === false) {
-            throw new ZipException("Failed to read ZIP entry: {$name}");
+            throw new ZipException("Failed to read ZIP entry: {$name} ({$zip->getStatusString()})");
         }
 
-        $output = fopen($target, 'wb');
+        $output = @fopen($target, 'wb');
         if ($output === false) {
             fclose($input);
-            throw new ZipException("Failed to create file for ZIP entry: {$name}");
+            throw new ZipException("Failed to create file for ZIP entry: {$name}" . $this->lastError());
         }
 
         $written = 0;
 
         try {
             while (! feof($input)) {
-                $chunk = fread($input, self::CHUNK_SIZE);
+                $chunk = @fread($input, self::CHUNK_SIZE);
                 if ($chunk === false) {
-                    throw new ZipException("Failed to read ZIP entry: {$name}");
+                    throw new ZipException("Failed to read ZIP entry: {$name}" . $this->lastError());
                 }
 
                 $written += strlen($chunk);
@@ -153,9 +154,19 @@ class ZipHandler
      */
     private function ensureDirectory(string $directory): void
     {
-        if (! is_dir($directory) && ! mkdir($directory, 0777, true) && ! is_dir($directory)) {
-            throw new ZipException("Failed to create directory: {$directory}");
+        if (! is_dir($directory) && ! @mkdir($directory, 0777, true) && ! is_dir($directory)) {
+            throw new ZipException("Failed to create directory: {$directory}" . $this->lastError());
         }
+    }
+
+    /**
+     * Formats the last suppressed PHP error, e.g. " (Zlib error: data error)".
+     */
+    private function lastError(): string
+    {
+        $error = error_get_last();
+
+        return $error === null ? '' : " ({$error['message']})";
     }
 
     /**

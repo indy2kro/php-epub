@@ -24,7 +24,7 @@ class XmlParser
             throw new XmlException("XML file not found: {$filePath}");
         }
 
-        $content = file_get_contents($filePath);
+        $content = @file_get_contents($filePath);
         if ($content === false) {
             throw new XmlException("Failed to read XML file: {$filePath}");
         }
