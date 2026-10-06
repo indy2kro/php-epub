@@ -446,15 +446,51 @@ final class EpubFileTest extends TestCase
         $epubFile->{$accessor}();
     }
 
+    public function testCleanupReportsAnExtractionItCannotDeleteAndCanRetry(): void
+    {
+        $epubFile = EpubFile::open(__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'valid.epub');
+        $tempDir = (string) $epubFile->getTempDir();
+        $metaInf = $tempDir . DIRECTORY_SEPARATOR . 'META-INF';
+
+        // Windows cannot remove a directory while a file in it is open; POSIX cannot unlink from a read-only directory.
+        $handle = fopen($metaInf . DIRECTORY_SEPARATOR . 'container.xml', 'r');
+        chmod($metaInf, 0500);
+
+        try {
+            if (DIRECTORY_SEPARATOR === '/' && is_writable($metaInf)) {
+                $this->markTestSkipped('Read-only directories are writable here (e.g. running as root).');
+            }
+
+            try {
+                $epubFile->cleanup();
+                $this->fail('Expected cleanup() to report the directory it could not delete.');
+            } catch (Exception $exception) {
+                $this->assertStringContainsString($tempDir, $exception->getMessage());
+            }
+        } finally {
+            if (is_resource($handle)) {
+                fclose($handle);
+            }
+            chmod($metaInf, 0700);
+        }
+
+        // The book is unloaded, but the leftover directory is remembered so cleanup can be retried.
+        $this->assertSame($tempDir, $epubFile->getTempDir());
+        $epubFile->cleanup();
+        $this->assertDirectoryDoesNotExist($tempDir);
+        $this->assertNull($epubFile->getTempDir());
+    }
+
     public function testCloningIsRefusedAndLeavesTheOriginalUsable(): void
     {
         $epubFile = EpubFile::open(__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'valid.epub');
 
+        // A clone would share the extraction: its destructor would delete the original's files.
+        $cloneOf = static fn (EpubFile $original): EpubFile => clone $original;
+
         try {
-            $copy = clone $epubFile;
-            // A clone would share the extraction: its destructor would delete the original's files.
-            unset($copy);
-            $this->fail('Expected cloning to be refused.');
+            $copy = $cloneOf($epubFile);
+            $this->fail('Expected cloning to be refused, got a ' . $copy::class . '.');
         } catch (Exception $exception) {
             $this->assertStringContainsString('cannot be cloned', $exception->getMessage());
         }

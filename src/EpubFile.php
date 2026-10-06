@@ -56,7 +56,8 @@ class EpubFile
 
     public function __destruct()
     {
-        $this->cleanup();
+        // A destructor must not throw; call cleanup() explicitly to see a failure.
+        $this->cleanupQuietly();
     }
 
     /**
@@ -78,24 +79,31 @@ class EpubFile
      */
     public function cleanup(): void
     {
-        if ($this->tempDir !== null && is_dir($this->tempDir)) {
-            $helper = new FileSystemHelper();
-            $helper->deleteDirectory($this->tempDir);
-        }
-
-        // These objects point into the deleted directory; drop them so the accessors fail clearly.
-        $this->tempDir = null;
+        // These objects point into the extraction; drop them so the accessors fail clearly.
         $this->opfXml = null;
         $this->metadata = null;
         $this->manifest = null;
         $this->spine = null;
         $this->contentManager = null;
+
+        $tempDir = $this->tempDir;
+        if ($tempDir === null) {
+            return;
+        }
+
+        if (! (new FileSystemHelper())->deleteDirectory($tempDir)) {
+            // Keep the path, so a later cleanup() (or the destructor) can retry.
+            throw new Exception("Failed to delete the extracted EPUB: {$tempDir}");
+        }
+
+        $this->tempDir = null;
     }
 
     public function load(): void
     {
-        // Loading again starts from the file on disk; drop the previous extraction.
-        $this->cleanup();
+        // Loading again starts from the file on disk; drop the previous extraction
+        // (if it cannot be deleted, it must not stop the new book from loading).
+        $this->cleanupQuietly();
 
         // Unpredictable name and owner-only permissions: the extracted book may be private.
         $this->tempDir = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'epub_' . bin2hex(random_bytes(16));
@@ -116,8 +124,9 @@ class EpubFile
             $this->spine = new Spine($this->opfXml, $this->manifest);
             $this->contentManager = new ContentManager($this->tempDir, $this->manifest, $this->spine);
         } catch (Throwable $throwable) {
-            // Do not leave a half-loaded book (or its extracted files) behind.
-            $this->cleanup();
+            // Do not leave a half-loaded book (or its extracted files) behind,
+            // and report why loading failed rather than a cleanup problem.
+            $this->cleanupQuietly();
 
             throw $throwable;
         }
@@ -212,6 +221,19 @@ class EpubFile
         $metadata->setMeta('cover', $cover->id);
 
         return $manifest->get($cover->id) ?? $cover;
+    }
+
+    /**
+     * cleanup() for callers that cannot report a failure; the book is unloaded either way.
+     */
+    private function cleanupQuietly(): void
+    {
+        try {
+            $this->cleanup();
+        } catch (Exception) {
+            // Nothing to report to; the directory is left in the system temp dir.
+            $this->tempDir = null;
+        }
     }
 
     public function getTempDir(): ?string

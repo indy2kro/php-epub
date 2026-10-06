@@ -30,6 +30,9 @@ class FileSystemHelper
 
     /**
      * Recursively deletes a directory and its contents.
+     *
+     * Deletes as much as it can and returns false, without emitting warnings, when
+     * anything could not be removed (e.g. a file locked on Windows, or a read-only directory).
      */
     public function deleteDirectory(string $dir): bool
     {
@@ -37,12 +40,13 @@ class FileSystemHelper
             return true;
         }
 
-        $files = scandir($dir);
+        $files = @scandir($dir);
 
         if ($files === false) {
             return false;
         }
 
+        $deleted = true;
         foreach ($files as $file) {
             if ($file === '.' || $file === '..') {
                 continue;
@@ -52,15 +56,14 @@ class FileSystemHelper
             // Remove links themselves; never recurse into their targets.
             if (is_link($filePath)) {
                 // On Windows a directory symlink is removed with rmdir().
-                if (! @unlink($filePath)) {
-                    rmdir($filePath);
-                }
+                $deleted = (@unlink($filePath) || @rmdir($filePath)) && $deleted;
                 continue;
             }
 
-            is_dir($filePath) ? $this->deleteDirectory($filePath) : unlink($filePath);
+            $deleted = (is_dir($filePath) ? $this->deleteDirectory($filePath) : @unlink($filePath)) && $deleted;
         }
 
-        return rmdir($dir);
+        // A directory that still has contents cannot be removed; do not try (and warn).
+        return $deleted && @rmdir($dir);
     }
 }
