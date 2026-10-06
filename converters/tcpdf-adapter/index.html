@@ -123,10 +123,10 @@ It provides a flexible interface to customize the PDF output through various sty
 <h2 id="key-methods">Key Methods<a class="headerlink" href="#key-methods" title="Permanent link">&para;</a></h2>
 <ul>
 <li>
-<p><strong><code>__construct(array $styles = [])</code></strong>: Initializes the <code>TCPDFAdapter</code> with optional styling parameters, such as font, font size, margins, and whether to include headers and footers. These parameters can be customized to alter the appearance of the generated PDF.</p>
+<p><strong><code>__construct(array $styles = [])</code></strong>: Optional styling parameters: <code>font</code> (default <code>helvetica</code>), <code>font_size</code> (default <code>12</code>), <code>margin_left</code>/<code>margin_top</code>/<code>margin_right</code>/<code>margin_bottom</code> in mm (defaults <code>15</code>/<code>27</code>/<code>15</code>/<code>25</code>), and <code>header</code>/<code>footer</code> booleans (default <code>true</code>; the header shows the book title and authors). Values of the wrong type fall back to the defaults.</p>
 </li>
 <li>
-<p><strong><code>convert(string $epubDirectory, string $outputPath): void</code></strong>: Converts the EPUB content to a PDF using TCPDF. It sets document information, applies styles, adds pages, writes content, and saves the PDF to the specified output path. Throws an exception if the conversion fails.</p>
+<p><strong><code>convert(string $epubDirectory, string $outputPath): void</code></strong>: Renders every spine document in reading order, each on a new page, sets the PDF title and author from the EPUB metadata, and writes the PDF. Image sources are limited to files inside the book; see <a href="../../converter/#how-the-pdf-adapters-read-a-book">Converter</a>. Throws a <code>ConversionException</code> if the book cannot be read or the PDF cannot be written.</p>
 </li>
 </ul>
 <h2 id="usage-example">Usage Example<a class="headerlink" href="#usage-example" title="Permanent link">&para;</a></h2>

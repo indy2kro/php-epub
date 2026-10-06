@@ -78,6 +78,8 @@
     </li>
     <li class="toctree-l2"><a class="reference internal" href="#usage-example">Usage Example</a>
     </li>
+    <li class="toctree-l2"><a class="reference internal" href="#how-the-pdf-adapters-read-a-book">How the PDF adapters read a book</a>
+    </li>
     </ul>
                   </li>
                   <li class="toctree-l1"><a class="reference internal" >Converters</a>
@@ -116,40 +118,48 @@
             <div class="section" itemprop="articleBody">
               
                 <h1 id="converter">Converter<a class="headerlink" href="#converter" title="Permanent link">&para;</a></h1>
-<p>The <code>Converter</code> class in the PHP EPUB Processor library is responsible for converting EPUB files into various formats.
-It utilizes different converter adapters to handle specific formats, such as PDF or MOBI, providing a flexible and extensible conversion system.</p>
+<p>The <code>Converter</code> class converts an extracted EPUB into other formats by dispatching to format-specific adapters (PDF via Dompdf or TCPDF, MOBI/AZW3/… via Calibre).</p>
 <h2 id="key-methods">Key Methods<a class="headerlink" href="#key-methods" title="Permanent link">&para;</a></h2>
 <ul>
 <li>
-<p><strong><code>__construct(string $epubDirectory, array $adapters)</code></strong>: Initializes the <code>Converter</code> with the directory containing the EPUB contents and a map of format-specific converter adapters. Throws an exception if the directory does not exist.</p>
+<p><strong><code>__construct(string $epubDirectory, array $adapters)</code></strong>: Initializes the <code>Converter</code> with the directory containing the extracted EPUB and a map of format =&gt; <code>ConverterInterface</code> adapter. Throws an exception if the directory does not exist.</p>
 </li>
 <li>
-<p><strong><code>convert(string $format, string $outputPath): void</code></strong>: Converts the EPUB to the specified format using the appropriate adapter. Throws an exception if the format is not supported or if the conversion fails.</p>
+<p><strong><code>convert(string $format, string $outputPath): void</code></strong>: Converts the EPUB with the adapter registered for <code>$format</code>. Throws an exception if the format is not supported or if the conversion fails.</p>
 </li>
 </ul>
+<p>Every adapter accepts the extracted directory. <code>CalibreAdapter</code> also accepts an <code>.epub</code> file; given a directory, it packages it into a temporary <code>.epub</code> first.</p>
 <h2 id="usage-example">Usage Example<a class="headerlink" href="#usage-example" title="Permanent link">&para;</a></h2>
-<pre class="codehilite"><code class="language-php">use PhpEpub\Converter;
+<pre class="codehilite"><code class="language-php">use PhpEpub\ConversionException;
+use PhpEpub\Converter;
 use PhpEpub\Converters\CalibreAdapter;
 use PhpEpub\Converters\DompdfAdapter;
+use PhpEpub\EpubFile;
 
-$epubDirectory = '/path/to/extracted/epub';
-$adapters = [
+$epubFile = new EpubFile('/path/to/book.epub');
+$epubFile-&gt;load();
+
+$converter = new Converter($epubFile-&gt;getTempDir(), [
     'pdf' =&gt; new DompdfAdapter(),
-    'mobi' =&gt; new CalibreAdapter(),
-];
-
-$converter = new Converter($epubDirectory, $adapters);
+    'mobi' =&gt; new CalibreAdapter(['calibre_path' =&gt; '/usr/bin/ebook-convert']),
+]);
 
 try {
     $converter-&gt;convert('pdf', '/path/to/output.pdf');
-    echo &quot;EPUB successfully converted to PDF.&quot;;
-
     $converter-&gt;convert('mobi', '/path/to/output.mobi');
-    echo &quot;EPUB successfully converted to PDF.&quot;;
-} catch (Exception $e) {
+} catch (ConversionException $e) {
     echo &quot;Conversion failed: &quot; . $e-&gt;getMessage();
 }
 </code></pre>
+
+<h2 id="how-the-pdf-adapters-read-a-book">How the PDF adapters read a book<a class="headerlink" href="#how-the-pdf-adapters-read-a-book" title="Permanent link">&para;</a></h2>
+<p><code>DompdfAdapter</code> and <code>TCPDFAdapter</code> render every XHTML document in the <strong>spine</strong>, in reading order, each starting on a new page, and take the PDF title and author from the EPUB metadata. A directory that only contains a <code>content.xhtml</code> file (the layout older versions required) is still accepted.</p>
+<p>Book content is treated as untrusted:</p>
+<ul>
+<li><code>&lt;script&gt;</code> elements are removed.</li>
+<li>Image sources are rewritten to files inside the book; absolute paths, <code>file://</code>, remote URLs, paths escaping the book and missing files are blanked. <code>data:</code> URIs are kept.</li>
+<li>Dompdf runs with remote resources, PHP and JavaScript disabled, and its file access limited (<code>chroot</code>) to the book directory.</li>
+</ul>
               
             </div>
           </div><footer>

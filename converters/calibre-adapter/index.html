@@ -117,33 +117,34 @@
             <div class="section" itemprop="articleBody">
               
                 <h1 id="calibreadapter">CalibreAdapter<a class="headerlink" href="#calibreadapter" title="Permanent link">&para;</a></h1>
-<p>The <code>CalibreAdapter</code> class in the PHP EPUB Processor library is responsible for converting EPUB files to other formats using the Calibre command-line tool.
-It provides a flexible interface to execute conversions by leveraging Calibre's powerful ebook-convert utility.</p>
+<p>The <code>CalibreAdapter</code> class converts EPUB files to other formats (MOBI, AZW3, PDF, DOCX, …) with Calibre's <code>ebook-convert</code> command-line tool.</p>
 <h2 id="key-methods">Key Methods<a class="headerlink" href="#key-methods" title="Permanent link">&para;</a></h2>
 <ul>
 <li>
-<p><strong><code>__construct(array $options = [], FileSystemHelper $helper = new FileSystemHelper())</code></strong>: Initializes the <code>CalibreAdapter</code> with optional command-line options for Calibre and a file system helper. Default options include the path to the Calibre executable and any extra arguments.</p>
+<p><strong><code>__construct(array $options = [], FileSystemHelper $helper = new FileSystemHelper(), ZipHandler $zipHandler = new ZipHandler())</code></strong>: Options:</p>
+<ul>
+<li><code>calibre_path</code>: path to <code>ebook-convert</code> (default <code>/usr/bin/ebook-convert</code>).</li>
+<li><code>extra_args</code>: a <strong>list</strong> of extra <code>ebook-convert</code> arguments. Each one is shell-escaped individually. Passing a single string is deprecated: it is inserted into the command unescaped and triggers an <code>E_USER_DEPRECATED</code> notice.</li>
+</ul>
 </li>
 <li>
-<p><strong><code>convert(string $inputFile, string $outputPath): void</code></strong>: Converts an EPUB file to another format using Calibre. It constructs and executes a command-line call to <code>ebook-convert</code>. Throws an exception if the conversion fails or if the Calibre tool or input file is not found.</p>
+<p><strong><code>convert(string $inputFile, string $outputPath): void</code></strong>: Converts an <code>.epub</code> file, or a directory with an extracted EPUB (packaged into a temporary <code>.epub</code> first, which is removed afterwards). The output extension selects the format. Every part of the command is escaped and Calibre's error output is included in the exception message. Throws an exception if Calibre or the input is missing, or if the conversion fails.</p>
 </li>
 </ul>
 <h2 id="usage-example">Usage Example<a class="headerlink" href="#usage-example" title="Permanent link">&para;</a></h2>
 <pre class="codehilite"><code class="language-php">use PhpEpub\Converters\CalibreAdapter;
-use PhpEpub\Util\FileSystemHelper;
 
-$options = [
+$calibreAdapter = new CalibreAdapter([
     'calibre_path' =&gt; '/usr/local/bin/ebook-convert',
-    'extra_args' =&gt; '--output-profile kindle',
-];
-
-$calibreAdapter = new CalibreAdapter($options, new FileSystemHelper());
+    'extra_args' =&gt; ['--output-profile', 'kindle', '--title', $userSuppliedTitle],
+]);
 
 try {
     $calibreAdapter-&gt;convert('/path/to/input.epub', '/path/to/output.mobi');
     echo &quot;EPUB successfully converted to MOBI.&quot;;
 } catch (Exception $e) {
     echo &quot;Conversion failed: &quot; . $e-&gt;getMessage();
+}
 </code></pre>
               
             </div>

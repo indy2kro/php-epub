@@ -195,7 +195,7 @@ $tcpdfAdapter-&gt;convert('/path/to/extracted/epub', '/path/to/output.pdf');
 
 $options = [
     'calibre_path' =&gt; '/usr/bin/ebook-convert',
-    'extra_args' =&gt; '--output-profile kindle',
+    'extra_args' =&gt; ['--output-profile', 'kindle'],
 ];
 
 $calibreAdapter = new CalibreAdapter($options);

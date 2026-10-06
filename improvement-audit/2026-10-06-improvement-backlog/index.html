@@ -267,9 +267,9 @@ at <code>af4bbcc</code> (main). No source changes were made while compiling this
   <code>extractTo()</code> inflates every entry without limits, so a small zip bomb fills the temp disk (PHP already strips <code>../</code> from entry names).</li>
 <li>[x] <strong>SEC-04</strong> Stop disabling TLS verification when downloading AFM fonts — <code>scripts/generate-core-fonts.php:83-86</code> — S · med
   <code>verify_peer =&gt; false</code> on a script that Composer runs on every install/update lets a network attacker substitute font data.</li>
-<li>[ ] <strong>SEC-05</strong> Accept Calibre <code>extra_args</code> as a list and escape each argument — <code>src/Converters/CalibreAdapter.php:44-50</code> — S · med
+<li>[x] <strong>SEC-05</strong> Accept Calibre <code>extra_args</code> as a list and escape each argument — <code>src/Converters/CalibreAdapter.php:44-50</code> — S · med
   <code>extra_args</code> is appended raw to the shell command, so any user-influenced option becomes shell injection.</li>
-<li>[ ] <strong>SEC-06</strong> Lock down HTML renderers for untrusted book content (Dompdf <code>chroot</code> to the book dir, remote/PHP off; TCPDF image paths confined) — <code>src/Converters/DompdfAdapter.php:47-50</code>, <code>src/Converters/TCPDFAdapter.php:127-130</code> — M · med
+<li>[x] <strong>SEC-06</strong> Lock down HTML renderers for untrusted book content (Dompdf <code>chroot</code> to the book dir, remote/PHP off; TCPDF image paths confined) — <code>src/Converters/DompdfAdapter.php:47-50</code>, <code>src/Converters/TCPDFAdapter.php:127-130</code> — M · med
   Book XHTML can reference local files or URLs that the renderer would read into the PDF.</li>
 <li>[x] <strong>SEC-07</strong> Create the temp dir with mode <code>0700</code> and a <code>random_bytes</code> name — <code>src/EpubFile.php:47-50</code> — S · low
   <code>uniqid()</code> plus the default <code>0777</code> mode leaves extracted content readable by other local users.</li>
@@ -305,17 +305,17 @@ at <code>af4bbcc</code> (main). No source changes were made while compiling this
 </ul>
 <h3 id="converters">Converters<a class="headerlink" href="#converters" title="Permanent link">&para;</a></h3>
 <ul>
-<li>[ ] <strong>CONV-01</strong> Render spine documents in order instead of a hard-coded <code>content.xhtml</code> — <code>src/Converters/DompdfAdapter.php:83-97</code>, <code>src/Converters/TCPDFAdapter.php:135-149</code> — M · high
+<li>[x] <strong>CONV-01</strong> Render spine documents in order instead of a hard-coded <code>content.xhtml</code> — <code>src/Converters/DompdfAdapter.php:83-97</code>, <code>src/Converters/TCPDFAdapter.php:135-149</code> — M · high
   Real books have no root <code>content.xhtml</code>, so both PDF adapters fail on every real EPUB.</li>
-<li>[ ] <strong>CONV-02</strong> Make <code>Converter</code> work with <code>CalibreAdapter</code> (it needs the <code>.epub</code>, <code>Converter</code> passes the extracted dir) — <code>src/Converter.php:37-44</code>, <code>src/Converters/CalibreAdapter.php:31</code> — S · med
+<li>[x] <strong>CONV-02</strong> Make <code>Converter</code> work with <code>CalibreAdapter</code> (it needs the <code>.epub</code>, <code>Converter</code> passes the extracted dir) — <code>src/Converter.php:37-44</code>, <code>src/Converters/CalibreAdapter.php:31</code> — S · med
   The interface says "directory", Calibre expects a file, so <code>Converter</code> + Calibre (the docs example) cannot work.</li>
 <li>[x] <strong>CONV-03</strong> Resolve TCPDF fonts when php-epub is installed as a dependency — <code>src/Converters/TCPDFAdapter.php:48-50</code>, <code>composer.json</code> scripts — M · med
   <code>K_PATH_FONTS</code> points at php-epub's own <code>vendor/</code>, and <code>post-install-cmd</code> only runs for the root package.</li>
-<li>[ ] <strong>CONV-04</strong> Fill TCPDF document info from EPUB metadata instead of <code>'Author Name'</code> — <code>src/Converters/TCPDFAdapter.php:55-60</code> — S · low
+<li>[x] <strong>CONV-04</strong> Fill TCPDF document info from EPUB metadata instead of <code>'Author Name'</code> — <code>src/Converters/TCPDFAdapter.php:55-60</code> — S · low
   Every PDF claims the same placeholder author and title.</li>
-<li>[ ] <strong>CONV-05</strong> Check <code>file_put_contents</code> results and capture Calibre stderr — <code>src/Converters/DompdfAdapter.php:76</code>, <code>src/Converters/TCPDFAdapter.php:131</code>, <code>src/Converters/CalibreAdapter.php:44-50</code> — S · low
+<li>[x] <strong>CONV-05</strong> Check <code>file_put_contents</code> results and capture Calibre stderr — <code>src/Converters/DompdfAdapter.php:76</code>, <code>src/Converters/TCPDFAdapter.php:131</code>, <code>src/Converters/CalibreAdapter.php:44-50</code> — S · low
   Write failures are silent and Calibre errors arrive with an empty message.</li>
-<li>[ ] <strong>CONV-06</strong> Align defaults and honour <code>font_size</code> in Dompdf — <code>src/Converters/TCPDFAdapter.php:90-115</code>, <code>src/Converters/DompdfAdapter.php:24-30</code> — S · low
+<li>[x] <strong>CONV-06</strong> Align defaults and honour <code>font_size</code> in Dompdf — <code>src/Converters/TCPDFAdapter.php:90-115</code>, <code>src/Converters/DompdfAdapter.php:24-30</code> — S · low
   Fallbacks (font size 27, bottom margin 27) contradict the declared defaults (12, 25) and Dompdf ignores <code>font_size</code>.</li>
 </ul>
 <h3 id="api-ux">API / UX<a class="headerlink" href="#api-ux" title="Permanent link">&para;</a></h3>
@@ -340,7 +340,7 @@ at <code>af4bbcc</code> (main). No source changes were made while compiling this
 </ul>
 <h3 id="documentation">Documentation<a class="headerlink" href="#documentation" title="Permanent link">&para;</a></h3>
 <ul>
-<li>[ ] <strong>DOC-01</strong> Fix the <code>Converter</code> example that wires <code>CalibreAdapter</code> with an extracted directory — <code>docs/converter.md:15-31</code> — S · med
+<li>[x] <strong>DOC-01</strong> Fix the <code>Converter</code> example that wires <code>CalibreAdapter</code> with an extracted directory — <code>docs/converter.md:15-31</code> — S · med
   The documented example cannot work (see CONV-02).</li>
 <li>[ ] <strong>DOC-02</strong> Add a "Handling untrusted EPUBs" section and document the <code>save()</code> contract — <code>docs/advanced-usage.md</code>, <code>docs/epub-file.md</code> — S · low
   Users need to know which limits exist and that metadata must be saved before the book.</li>
@@ -349,7 +349,7 @@ at <code>af4bbcc</code> (main). No source changes were made while compiling this
 <ul>
 <li>[x] <strong>TEST-01</strong> Add <code>tests/Support/EpubBuilder</code> and an OCF round-trip test (save → reopen → <code>mimetype</code> first/stored, <code>/</code> separators) — <code>tests/</code> — M · high
   Nothing asserts that saved books are structurally valid, which is how BUG-01/BUG-02 went unnoticed.</li>
-<li>[ ] <strong>TEST-02</strong> Cover <code>PhpEpub\Converter</code> (no test references it) — <code>tests/</code> — S · low
+<li>[x] <strong>TEST-02</strong> Cover <code>PhpEpub\Converter</code> (no test references it) — <code>tests/</code> — S · low
   Format dispatch and the unsupported-format error are untested.</li>
 <li>[x] <strong>TEST-03</strong> Fix <code>phpunit.xml</code>: suite named "PhpIso Testing Suite", excludes non-existent <code>src/Cli/</code>, schema 8.3 — <code>phpunit.xml:14-27</code> — S · low
   Copy-paste leftovers from php-iso.</li>

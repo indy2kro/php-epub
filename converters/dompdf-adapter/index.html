@@ -117,33 +117,35 @@
             <div class="section" itemprop="articleBody">
               
                 <h1 id="dompdfadapter">DompdfAdapter<a class="headerlink" href="#dompdfadapter" title="Permanent link">&para;</a></h1>
-<p>The <code>DompdfAdapter</code> class in the PHP EPUB Processor library is responsible for converting EPUB content into PDF format using the Dompdf library.
-It provides a flexible interface to customize the PDF output through various styling options.</p>
+<p>The <code>DompdfAdapter</code> class converts EPUB content into PDF using the Dompdf library (<code>composer require dompdf/dompdf</code>).</p>
 <h2 id="key-methods">Key Methods<a class="headerlink" href="#key-methods" title="Permanent link">&para;</a></h2>
 <ul>
 <li>
-<p><strong><code>__construct(array $styles = [])</code></strong>: Initializes the <code>DompdfAdapter</code> with optional styling parameters, such as font, font size, paper size, and orientation. These parameters can be customized to alter the appearance of the generated PDF.</p>
+<p><strong><code>__construct(array $styles = [])</code></strong>: Optional styling parameters: <code>font</code> (default <code>Arial</code>), <code>font_size</code> in points (default <code>12</code>), <code>paper_size</code> (default <code>A4</code>) and <code>orientation</code> (default <code>portrait</code>). Values of the wrong type fall back to the defaults.</p>
 </li>
 <li>
-<p><strong><code>convert(string $epubDirectory, string $outputPath): void</code></strong>: Converts the EPUB content to a PDF using Dompdf. It loads the content, sets the paper size and orientation, renders the PDF, and saves it to the specified output path. Throws an exception if the conversion fails.</p>
+<p><strong><code>convert(string $epubDirectory, string $outputPath): void</code></strong>: Renders every spine document in reading order, each on a new page, sets the PDF title and author from the EPUB metadata, and writes the PDF. Throws a <code>ConversionException</code> if the book cannot be read or the PDF cannot be written.</p>
+</li>
+<li>
+<p><strong><code>buildHtml(string $epubDirectory): string</code></strong>: Returns the HTML document that <code>convert()</code> renders, e.g. for previews or debugging.</p>
 </li>
 </ul>
+<p>Dompdf runs with remote resources, PHP and JavaScript disabled and its file access limited to the book directory; see <a href="../../converter/#how-the-pdf-adapters-read-a-book">Converter</a>.</p>
 <h2 id="usage-example">Usage Example<a class="headerlink" href="#usage-example" title="Permanent link">&para;</a></h2>
-<pre class="codehilite"><code class="language-php">use PhpEpub\Converters\DompdfAdapter;
+<pre class="codehilite"><code class="language-php">use PhpEpub\ConversionException;
+use PhpEpub\Converters\DompdfAdapter;
 
-$styles = [
+$dompdfAdapter = new DompdfAdapter([
     'font' =&gt; 'Times New Roman',
     'font_size' =&gt; 14,
     'paper_size' =&gt; 'A4',
     'orientation' =&gt; 'landscape',
-];
-
-$dompdfAdapter = new DompdfAdapter($styles);
+]);
 
 try {
     $dompdfAdapter-&gt;convert('/path/to/extracted/epub', '/path/to/output.pdf');
     echo &quot;EPUB successfully converted to PDF.&quot;;
-} catch (Exception $e) {
+} catch (ConversionException $e) {
     echo &quot;Conversion failed: &quot; . $e-&gt;getMessage();
 }
 </code></pre>
