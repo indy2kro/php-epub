@@ -34,8 +34,10 @@ public function load(): void
 Loads the EPUB file:
 - Extracts ZIP contents to a temporary directory
 - Parses `container.xml` to locate the OPF file
-- Parses the OPF file to extract metadata and spine
+- Parses the OPF file to extract metadata, manifest and spine
 - Initializes the ContentManager for file operations
+
+Calling `load()` again discards the previous extraction (and any unsaved changes) and starts from the file on disk.
 
 Throws an exception if the file cannot be opened or the EPUB structure is invalid.
 
@@ -43,7 +45,7 @@ Throws an exception if the file cannot be opened or the EPUB structure is invali
 public function save(?string $filePath = null): void
 ```
 
-Saves the modified EPUB back to disk. If `$filePath` is null, overwrites the original file. Throws an exception if called before `load()`.
+Saves the modified EPUB back to disk. If `$filePath` is null, overwrites the original file. Pending metadata, manifest and spine changes are written to the OPF first. Throws an exception if called before `load()`.
 
 ### Accessing Components
 
@@ -58,6 +60,12 @@ public function getSpine(): Spine
 ```
 
 Returns the Spine object representing the reading order of content. Throws an exception if called before `load()`.
+
+```php
+public function getManifest(): Manifest
+```
+
+Returns the Manifest object listing every resource in the book. Throws an exception if called before `load()`.
 
 ```php
 public function getContentManager(): ContentManager
@@ -128,7 +136,7 @@ $epubFile = new EpubFile('/path/to/file.epub', $mockZipHandler, $mockXmlParser);
 The class throws `Exception` in the following cases:
 - File not found or cannot be opened
 - Invalid EPUB structure
-- Calling `load()`, `save()`, `getMetadata()`, `getSpine()`, or `getContentManager()` before `load()`
+- Calling `save()`, `getMetadata()`, `getManifest()`, `getSpine()`, or `getContentManager()` before `load()`
 - Temporary directory creation or cleanup failures
 
 ## File Structure

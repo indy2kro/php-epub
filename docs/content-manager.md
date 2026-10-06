@@ -4,17 +4,24 @@ The `ContentManager` class provides file-level operations for content within an 
 
 ## Overview
 
-ContentManager operates on the extracted EPUB directory (accessible via `EpubFile::getTempDir()`). It does not modify the OPF manifest - you must manually update the manifest if you add or remove content files that should be part of the EPUB spine.
+ContentManager operates on the extracted EPUB directory (accessible via `EpubFile::getTempDir()`). All paths are **relative to the book root** and use `/`, for example `EPUB/text/chapter1.xhtml`. Paths that are absolute or escape the book with `..` are rejected.
+
+When it is created by `EpubFile` (or given a `Manifest` and `Spine`), it keeps the OPF in sync:
+
+- `addContent()` adds new files to the manifest, with a media type guessed from the extension.
+- `deleteContent()` removes the file's manifest item and its spine entry.
+
+Adding a file does not put it in the reading order; call `Spine::add()` for that.
 
 ## Key Methods
 
 ### Constructor
 
 ```php
-public function __construct(string $contentDirectory)
+public function __construct(string $contentDirectory, ?Manifest $manifest = null, ?Spine $spine = null)
 ```
 
-Initializes the ContentManager with the path to the EPUB's content directory. Throws an exception if the directory does not exist.
+Initializes the ContentManager with the path to the extracted EPUB. Throws an exception if the directory does not exist. Without a manifest, only files are touched.
 
 Typically, you'll get this from EpubFile:
 
@@ -26,16 +33,22 @@ $contentManager = $epubFile->getContentManager();
 ### File Operations
 
 ```php
+public function getContentPaths(): array
+```
+
+Returns every file in the book as a sorted list of paths relative to the book root. These paths can be passed straight back to the other methods.
+
+```php
 public function getContentList(): array
 ```
 
-Returns an array of all file paths in the content directory (non-recursive).
+**Deprecated**: returns absolute paths inside the temporary directory. Use `getContentPaths()`.
 
 ```php
 public function addContent(string $filePath, string $content): void
 ```
 
-Creates a new file with the given content. The path is relative to the content directory. Throws an exception if the file cannot be created or already exists.
+Creates (or overwrites) a file, creating missing directories. New files are added to the manifest, except container files (`mimetype`, `META-INF/…`, the OPF itself). Throws an exception if the file cannot be written.
 
 ```php
 public function updateContent(string $filePath, string $newContent): void
@@ -47,7 +60,7 @@ Updates an existing file's content. Throws an exception if the file doesn't exis
 public function deleteContent(string $filePath): void
 ```
 
-Deletes a file from the EPUB. Throws an exception if the file doesn't exist or cannot be deleted.
+Deletes a file, its manifest item and its spine entry. Throws an exception if the file doesn't exist or cannot be deleted.
 
 ```php
 public function getContent(string $filePath): string
@@ -63,78 +76,44 @@ use PhpEpub\EpubFile;
 $epubFile = new EpubFile('/path/to/book.epub');
 $epubFile->load();
 
-// Get the content manager
 $content = $epubFile->getContentManager();
 
 // List existing files
-$files = $content->getContentList();
-print_r($files);
+print_r($content->getContentPaths());
 
 // Read a file
-$chapter1 = $content->getContent('chapter1.xhtml');
-echo $chapter1;
+$chapter1 = $content->getContent('EPUB/text/chapter1.xhtml');
 
-// Add a new chapter
+// Add a new chapter and put it at the end of the reading order
 $newChapter = <<<HTML
 <!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml">
-<head>
-    <title>New Chapter</title>
-</head>
-<body>
-    <h1>New Chapter</h1>
-    <p>This is a new chapter.</p>
-</body>
+<head><title>New Chapter</title></head>
+<body><h1>New Chapter</h1><p>This is a new chapter.</p></body>
 </html>
 HTML;
-$content->addContent('chapter3.xhtml', $newChapter);
+$content->addContent('EPUB/text/chapter3.xhtml', $newChapter);
+$item = $epubFile->getManifest()->findByPath('EPUB/text/chapter3.xhtml');
+$epubFile->getSpine()->add($item->id);
 
 // Update existing content
-$content->updateContent('chapter1.xhtml', str_replace('Old', 'New', $chapter1));
+$content->updateContent('EPUB/text/chapter1.xhtml', str_replace('Old', 'New', $chapter1));
 
-// Delete content
-// $content->deleteContent('unwanted.xhtml');
+// Delete content (also removes it from the manifest and spine)
+// $content->deleteContent('EPUB/text/unwanted.xhtml');
 
-// Save the EPUB
+// Save the EPUB; the OPF changes are written automatically
 $epubFile->save();
 ```
-
-## Important Notes
-
-1. **Manifest Not Updated**: ContentManager only handles the actual files. If you add new content files, you need to manually update the OPF manifest to include them.
-
-2. **Path Handling**: Paths are relative to the content directory. Use forward slashes (/) even on Windows.
-
-3. **Content Types**: ContentManager works with any file type, but for valid EPUB content, use XHTML files (`.xhtml`, `.html`), CSS (`.css`), images, or fonts.
-
-4. **Directory Structure**: The content directory typically contains:
-   ```
-   EPUB/
-   ├── chapter1.xhtml
-   ├── chapter2.xhtml
-   ├── style.css
-   └── images/
-       ├── cover.jpg
-       └── diagram.png
-   ```
 
 ## Error Handling
 
 Throws `Exception` in the following cases:
 - Directory doesn't exist (constructor)
+- A path is absolute or escapes the book (`InvalidEpubException`)
 - File operations fail (permissions, disk space)
 - Attempting to update/delete non-existent files
 
 ## Integration with EpubFile
 
-ContentManager is automatically created when you call `load()`:
-
-```php
-$epubFile = new EpubFile('book.epub');
-$epubFile->load(); // This creates the ContentManager internally
-
-// Now you can access it
-$content = $epubFile->getContentManager();
-```
-
-The ContentManager shares the same lifetime as the temporary directory - it's cleaned up when `EpubFile::cleanup()` or `__destruct()` is called.
+ContentManager is created when you call `load()`, together with the `Manifest` and `Spine` it keeps in sync. It shares the lifetime of the temporary directory, which is cleaned up by `EpubFile::cleanup()`, by `__destruct()`, or when `load()` is called again.

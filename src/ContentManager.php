@@ -13,10 +13,15 @@ class ContentManager
     /**
      * ContentManager constructor.
      *
-     * @param string $contentDirectory The directory containing the EPUB content.
+     * Paths passed to the methods below are relative to the book root (e.g. "EPUB/text/ch1.xhtml").
+     * When a manifest (and spine) are given, adding and deleting files keeps them in sync.
+     *
+     * @param string $contentDirectory The directory containing the extracted EPUB.
      */
     public function __construct(
         string $contentDirectory,
+        private readonly ?Manifest $manifest = null,
+        private readonly ?Spine $spine = null,
         private readonly PathResolver $paths = new PathResolver()
     ) {
         if (! is_dir($contentDirectory)) {
@@ -27,7 +32,28 @@ class ContentManager
     }
 
     /**
-     * Gets a list of content files in the EPUB.
+     * Gets the files in the EPUB as paths relative to the book root, sorted, using "/".
+     *
+     * These paths can be passed straight back to getContent(), updateContent() and deleteContent().
+     *
+     * @return list<string>
+     */
+    public function getContentPaths(): array
+    {
+        $root = (string) realpath($this->contentDirectory);
+        $paths = array_map(
+            static fn (string $file): string => str_replace(DIRECTORY_SEPARATOR, '/', substr($file, strlen($root) + 1)),
+            $this->getContentList()
+        );
+        sort($paths, SORT_STRING);
+
+        return $paths;
+    }
+
+    /**
+     * Gets a list of content files in the EPUB as absolute paths inside the temp directory.
+     *
+     * @deprecated Use getContentPaths(), whose paths work with the other ContentManager methods.
      *
      * @return array<string> List of content file paths.
      */
@@ -49,9 +75,13 @@ class ContentManager
     }
 
     /**
-     * Adds a new content file to the EPUB.
+     * Adds (or overwrites) a content file, creating missing directories.
      *
-     * @param string $filePath The path where the content should be added.
+     * New files are added to the manifest (with a media type guessed from the extension),
+     * except container files (mimetype, META-INF/, the OPF itself). Use Spine::add() to
+     * also place a document in the reading order.
+     *
+     * @param string $filePath The path relative to the book root.
      * @param string $content The content to add.
      *
      * @throws Exception If the file cannot be created.
@@ -59,8 +89,18 @@ class ContentManager
     public function addContent(string $filePath, string $content): void
     {
         $fullPath = $this->paths->resolve($this->contentDirectory, $filePath);
+        $directory = dirname($fullPath);
+        if (! is_dir($directory) && ! @mkdir($directory, 0777, true) && ! is_dir($directory)) {
+            throw new Exception("Failed to create directory: {$directory}");
+        }
+
         if (file_put_contents($fullPath, $content) === false) {
             throw new Exception("Failed to add content to: {$fullPath}");
+        }
+
+        $path = $this->paths->normalize($filePath);
+        if ($this->manifest instanceof Manifest && ! $this->isContainerFile($path) && ! $this->manifest->findByPath($path) instanceof ManifestItem) {
+            $this->manifest->add($path);
         }
     }
 
@@ -85,9 +125,9 @@ class ContentManager
     }
 
     /**
-     * Deletes a content file from the EPUB.
+     * Deletes a content file from the EPUB, with its manifest item and spine entry.
      *
-     * @param string $filePath The path of the content to delete.
+     * @param string $filePath The path relative to the book root.
      *
      * @throws Exception If the file cannot be deleted.
      */
@@ -100,6 +140,15 @@ class ContentManager
 
         if (! unlink($fullPath)) {
             throw new Exception("Failed to delete content from: {$fullPath}");
+        }
+
+        $item = $this->manifest?->findByPath($filePath);
+        if ($item instanceof ManifestItem) {
+            if ($this->spine?->contains($item->id) === true) {
+                $this->spine->remove($item->id);
+            }
+
+            $this->manifest->remove($item->id);
         }
     }
 
@@ -125,5 +174,15 @@ class ContentManager
         }
 
         return $content;
+    }
+
+    /**
+     * Files that belong to the container, not to the publication, and are never listed in the manifest.
+     */
+    private function isContainerFile(string $path): bool
+    {
+        return $path === 'mimetype'
+            || str_starts_with($path, 'META-INF/')
+            || ($this->manifest instanceof Manifest && $path === $this->manifest->getOpfPath());
     }
 }

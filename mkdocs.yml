@@ -28,6 +28,7 @@ nav:
     - EpubFile: epub-file.md
     - ContentManager: content-manager.md
     - Metadata: metadata.md
+    - Manifest: manifest.md
     - Spine: spine.md
     - Parser: parser.md
     - XmlParser: xml-parser.md

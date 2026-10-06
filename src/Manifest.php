@@ -1,0 +1,264 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PhpEpub;
+
+use PhpEpub\Util\PathResolver;
+use SimpleXMLElement;
+
+/**
+ * Reads and edits the OPF manifest: the list of every resource in the book.
+ */
+class Manifest
+{
+    private const array MEDIA_TYPES = [
+        'xhtml' => 'application/xhtml+xml',
+        'html' => 'application/xhtml+xml',
+        'htm' => 'application/xhtml+xml',
+        'css' => 'text/css',
+        'js' => 'application/javascript',
+        'ncx' => 'application/x-dtbncx+xml',
+        'smil' => 'application/smil+xml',
+        'svg' => 'image/svg+xml',
+        'jpg' => 'image/jpeg',
+        'jpeg' => 'image/jpeg',
+        'png' => 'image/png',
+        'gif' => 'image/gif',
+        'webp' => 'image/webp',
+        'otf' => 'font/otf',
+        'ttf' => 'font/ttf',
+        'woff' => 'font/woff',
+        'woff2' => 'font/woff2',
+        'mp3' => 'audio/mpeg',
+        'mp4' => 'video/mp4',
+        'm4a' => 'audio/mp4',
+    ];
+
+    private readonly SimpleXMLElement $manifestNode;
+
+    /**
+     * Directory of the OPF file relative to the book root ("" at the root).
+     */
+    private readonly string $opfDirectory;
+
+    private readonly string $opfPath;
+
+    private bool $modified = false;
+
+    /**
+     * @param SimpleXMLElement $opfXml The parsed OPF package document.
+     * @param string $opfPath The OPF path relative to the book root (as returned by Parser::parse()).
+     *
+     * @throws InvalidEpubException If the package has no manifest element.
+     */
+    public function __construct(
+        private readonly SimpleXMLElement $opfXml,
+        string $opfPath,
+        private readonly PathResolver $paths = new PathResolver()
+    ) {
+        $manifestNodes = $this->query('/opf:package/opf:manifest');
+        if ($manifestNodes === []) {
+            throw new InvalidEpubException('Missing manifest in OPF file');
+        }
+
+        $this->manifestNode = $manifestNodes[0];
+        $this->opfPath = $this->paths->normalize($opfPath);
+        $directory = dirname($this->opfPath);
+        $this->opfDirectory = $directory === '.' ? '' : $directory;
+    }
+
+    /**
+     * @return list<ManifestItem>
+     */
+    public function getItems(): array
+    {
+        return array_map($this->toItem(...), $this->itemNodes());
+    }
+
+    public function get(string $id): ?ManifestItem
+    {
+        $node = $this->findNode($id);
+
+        return $node instanceof SimpleXMLElement ? $this->toItem($node) : null;
+    }
+
+    /**
+     * Finds the item for a file path relative to the book root.
+     */
+    public function findByPath(string $path): ?ManifestItem
+    {
+        $path = $this->paths->normalize($path);
+
+        foreach ($this->getItems() as $item) {
+            if ($item->path === $path) {
+                return $item;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Adds a file (path relative to the book root) to the manifest.
+     *
+     * @param string|null $mediaType Defaults to a guess from the file extension.
+     * @param string|null $id Defaults to an id derived from the file name.
+     *
+     * @throws Exception If the path is already listed or the id is taken.
+     */
+    public function add(string $path, ?string $mediaType = null, ?string $id = null): ManifestItem
+    {
+        $path = $this->paths->normalize($path);
+
+        if ($this->findByPath($path) instanceof ManifestItem) {
+            throw new Exception("File is already in the manifest: {$path}");
+        }
+
+        if ($id !== null && $this->findNode($id) instanceof SimpleXMLElement) {
+            throw new Exception("Manifest id is already in use: {$id}");
+        }
+
+        $item = $this->manifestNode->addChild('item', null, Metadata::OPF_NAMESPACE);
+        $item->addAttribute('id', $id ?? $this->uniqueId($path));
+        $item->addAttribute('href', $this->pathToHref($path));
+        $item->addAttribute('media-type', $mediaType ?? $this->guessMediaType($path));
+        $this->modified = true;
+
+        return $this->toItem($item);
+    }
+
+    /**
+     * Removes an item from the manifest. Spine references are not touched; see Spine::remove().
+     *
+     * @throws Exception If no item has this id.
+     */
+    public function remove(string $id): void
+    {
+        $node = $this->findNode($id);
+        if (! $node instanceof SimpleXMLElement) {
+            throw new Exception("No manifest item with id \"{$id}\"");
+        }
+
+        unset($node[0]);
+        $this->modified = true;
+    }
+
+    /**
+     * Converts a path relative to the book root into an href relative to the OPF file.
+     */
+    public function pathToHref(string $path): string
+    {
+        $segments = explode('/', $this->paths->normalize($path));
+        $base = $this->opfDirectory === '' ? [] : explode('/', $this->opfDirectory);
+
+        // Drop the common leading directories, then climb out of the rest of the OPF directory.
+        while ($base !== [] && count($segments) > 1 && $base[0] === $segments[0]) {
+            array_shift($base);
+            array_shift($segments);
+        }
+
+        $relative = array_merge(array_fill(0, count($base), '..'), array_map(rawurlencode(...), $segments));
+
+        return implode('/', $relative);
+    }
+
+    /**
+     * Converts an href relative to the OPF file into a path relative to the book root.
+     *
+     * @throws InvalidEpubException If the href points outside the book.
+     */
+    public function hrefToPath(string $href): string
+    {
+        $href = rawurldecode(explode('#', $href, 2)[0]);
+
+        return $this->paths->normalize(($this->opfDirectory === '' ? '' : $this->opfDirectory . '/') . $href);
+    }
+
+    /**
+     * The OPF path relative to the book root.
+     */
+    public function getOpfPath(): string
+    {
+        return $this->opfPath;
+    }
+
+    public function isModified(): bool
+    {
+        return $this->modified;
+    }
+
+    /**
+     * Marks the current state as persisted (called by EpubFile::save()).
+     */
+    public function markSaved(): void
+    {
+        $this->modified = false;
+    }
+
+    private function toItem(SimpleXMLElement $node): ManifestItem
+    {
+        $href = (string) $node['href'];
+        // EPUB 3 allows remote resources (e.g. streamed audio); they have no file in the book.
+        $isRemote = preg_match('#^[a-z][a-z0-9+.-]*:#i', $href) === 1;
+
+        return new ManifestItem(
+            (string) $node['id'],
+            $href,
+            $isRemote ? '' : $this->hrefToPath($href),
+            (string) $node['media-type'],
+            (string) $node['properties']
+        );
+    }
+
+    private function findNode(string $id): ?SimpleXMLElement
+    {
+        foreach ($this->itemNodes() as $node) {
+            if ((string) $node['id'] === $id) {
+                return $node;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return list<SimpleXMLElement>
+     */
+    private function itemNodes(): array
+    {
+        return $this->query('/opf:package/opf:manifest/opf:item');
+    }
+
+    private function uniqueId(string $path): string
+    {
+        // Ids must be XML names: letters first, then letters, digits, "-", "_" or ".".
+        $base = trim((string) preg_replace('/[^a-z0-9]+/', '-', strtolower(basename($path))), '-');
+        if ($base === '' || ! ctype_alpha($base[0])) {
+            $base = 'item-' . $base;
+        }
+
+        $id = $base;
+        for ($suffix = 2; $this->findNode($id) instanceof SimpleXMLElement; $suffix++) {
+            $id = "{$base}-{$suffix}";
+        }
+
+        return $id;
+    }
+
+    private function guessMediaType(string $path): string
+    {
+        return self::MEDIA_TYPES[strtolower(pathinfo($path, PATHINFO_EXTENSION))] ?? 'application/octet-stream';
+    }
+
+    /**
+     * @return list<SimpleXMLElement>
+     */
+    private function query(string $expression): array
+    {
+        $this->opfXml->registerXPathNamespace('opf', Metadata::OPF_NAMESPACE);
+        $result = $this->opfXml->xpath($expression);
+
+        return $result === false || $result === null ? [] : array_values($result);
+    }
+}
