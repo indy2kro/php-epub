@@ -40,12 +40,12 @@ final class MetadataTest extends TestCase
         }
     }
 
-    public function testConstructorThrowsExceptionWhenDcNamespaceMissing(): void
+    public function testConstructorThrowsExceptionWhenMetadataElementMissing(): void
     {
         $opfXml = new SimpleXMLElement('<package xmlns="http://www.idpf.org/2007/opf"></package>');
 
         $this->expectException(Exception::class);
-        $this->expectExceptionMessage('Failed to identify dc namespace');
+        $this->expectExceptionMessage('Missing metadata element in OPF file');
 
         new Metadata($opfXml, $this->tempOpfFilePath);
     }

@@ -4,40 +4,21 @@ declare(strict_types=1);
 
 namespace PhpEpub\Traits;
 
-use SimpleXMLElement;
-
 trait InteractsWithLanguage
 {
     /**
-     * Gets the language of the EPUB.
+     * Gets the language of the EPUB (the first dc:language).
      */
     public function getLanguage(): string
     {
-        $this->opfXml->registerXPathNamespace('dc', $this->dcNamespace);
-
-        $languageNode = $this->opfXml->xpath('//dc:language');
-
-        if ($languageNode === false || $languageNode === null || $languageNode === []) {
-            return '';
-        }
-
-        return (string) $languageNode[0];
+        return $this->getDcValue('language');
     }
 
     /**
-     * Sets the language of the EPUB.
+     * Sets the language of the EPUB, creating dc:language when missing.
      */
     public function setLanguage(string $language): void
     {
-        $this->opfXml->registerXPathNamespace('dc', $this->dcNamespace);
-
-        $languageNode = $this->opfXml->xpath('//dc:language');
-
-        if ($languageNode !== false && $languageNode !== null && $languageNode !== [] && isset($languageNode[0])) {
-            // @phpstan-ignore-next-line
-            $languageNode[0][0] = $language;
-        } else {
-            $this->opfXml->metadata->addChild('language', $language, $this->dcNamespace);
-        }
+        $this->setDcValue('language', $language);
     }
 }

@@ -4,65 +4,29 @@ declare(strict_types=1);
 
 namespace PhpEpub\Traits;
 
-use SimpleXMLElement;
-
 trait InteractsWithAuthors
 {
     /**
-     * Gets the authors of the EPUB.
+     * Gets the authors (dc:creator) of the EPUB, in document order.
      *
      * @return array<int, string>
      */
     public function getAuthors(): array
     {
-        $this->opfXml->registerXPathNamespace('dc', $this->dcNamespace);
-
-        $creatorNodes = $this->opfXml->xpath('//dc:creator');
-
-        if ($this->isAuthorsNodeEmpty($creatorNodes)) {
-            return [];
-        }
-
-        $authors = [];
-        foreach ($creatorNodes as $creatorNode) {
-            $authors[] = (string) $creatorNode;
-        }
-        return $authors;
+        return $this->getDcValues('creator');
     }
 
     /**
-     * Sets the authors of the EPUB.
+     * Sets the authors (dc:creator) of the EPUB.
+     *
+     * Existing creators are reused in order, so roles (EPUB 2 opf:role, EPUB 3
+     * role refinements) are kept. A creator whose name changes loses its sort key
+     * (opf:file-as / file-as refinement); removed creators lose all refinements.
      *
      * @param array<int, string> $authors
      */
     public function setAuthors(array $authors): void
     {
-        $this->opfXml->registerXPathNamespace('dc', $this->dcNamespace);
-
-        $creatorNodes = $this->opfXml->xpath('//dc:creator');
-
-        if (! $this->isAuthorsNodeEmpty($creatorNodes)) {
-            foreach ($creatorNodes as $key => $creatorNode) {
-                unset($creatorNodes[$key][0]);
-            }
-        }
-
-        foreach ($authors as $author) {
-            $this->opfXml->metadata->addChild('creator', $author, $this->dcNamespace);
-        }
-    }
-
-    /**
-     * @param array<SimpleXMLElement>|false|null $creatorNodes
-     *
-     * @phpstan-assert-if-false array<SimpleXMLElement> $creatorNodes
-     */
-    private function isAuthorsNodeEmpty(mixed $creatorNodes): bool
-    {
-        if ($creatorNodes === false || $creatorNodes === null || $creatorNodes === []) {
-            return true;
-        }
-
-        return false;
+        $this->setDcValues('creator', array_values($authors), null, ['file-as']);
     }
 }

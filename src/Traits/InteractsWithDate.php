@@ -4,40 +4,21 @@ declare(strict_types=1);
 
 namespace PhpEpub\Traits;
 
-use SimpleXMLElement;
-
 trait InteractsWithDate
 {
     /**
-     * Gets the date of the EPUB.
+     * Gets the date of the EPUB (the first dc:date).
      */
     public function getDate(): string
     {
-        $this->opfXml->registerXPathNamespace('dc', $this->dcNamespace);
-
-        $dateNode = $this->opfXml->xpath('//dc:date');
-
-        if ($dateNode === false || $dateNode === null || $dateNode === []) {
-            return '';
-        }
-
-        return (string) $dateNode[0];
+        return $this->getDcValue('date');
     }
 
     /**
-     * Sets the date of the EPUB.
+     * Sets the date of the EPUB, creating dc:date when missing.
      */
     public function setDate(string $date): void
     {
-        $this->opfXml->registerXPathNamespace('dc', $this->dcNamespace);
-
-        $dateNode = $this->opfXml->xpath('//dc:date');
-
-        if ($dateNode !== false && $dateNode !== null && $dateNode !== [] && isset($dateNode[0])) {
-            // @phpstan-ignore-next-line
-            $dateNode[0][0] = $date;
-        } else {
-            $this->opfXml->metadata->addChild('date', $date, $this->dcNamespace);
-        }
+        $this->setDcValue('date', $date);
     }
 }

@@ -72,6 +72,11 @@ class EpubFile
             $filePath = $this->filePath;
         }
 
+        // Persist metadata edits the caller has not saved yet.
+        if ($this->metadata?->isModified() === true) {
+            $this->metadata->save();
+        }
+
         $this->zipHandler->compress($this->tempDir, $filePath);
     }
 
