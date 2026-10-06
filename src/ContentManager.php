@@ -78,7 +78,7 @@ class ContentManager
      * Adds (or overwrites) a content file, creating missing directories.
      *
      * New files are added to the manifest (with a media type guessed from the extension),
-     * except container files (mimetype, META-INF/, the OPF itself). Use Spine::add() to
+     * except container files (mimetype, META-INF/). The OPF itself is refused. Use Spine::add() to
      * also place a document in the reading order.
      *
      * @param string $filePath The path relative to the book root.
@@ -88,6 +88,7 @@ class ContentManager
      */
     public function addContent(string $filePath, string $content): void
     {
+        $this->refusePackageDocument($filePath);
         $fullPath = $this->paths->resolve($this->contentDirectory, $filePath);
         $directory = dirname($fullPath);
         if (! is_dir($directory) && ! @mkdir($directory, 0777, true) && ! is_dir($directory)) {
@@ -114,6 +115,7 @@ class ContentManager
      */
     public function updateContent(string $filePath, string $newContent): void
     {
+        $this->refusePackageDocument($filePath);
         $fullPath = $this->paths->resolve($this->contentDirectory, $filePath);
         // is_file(): a directory is not content (and reading one behaves differently per OS).
         if (! is_file($fullPath)) {
@@ -134,6 +136,7 @@ class ContentManager
      */
     public function deleteContent(string $filePath): void
     {
+        $this->refusePackageDocument($filePath);
         $fullPath = $this->paths->resolve($this->contentDirectory, $filePath);
         // is_file(): a directory is not content (and reading one behaves differently per OS).
         if (! is_file($fullPath)) {
@@ -180,12 +183,25 @@ class ContentManager
     }
 
     /**
+     * The OPF is held in memory by Metadata, Manifest and Spine and written by EpubFile::save(),
+     * so a direct write would be overwritten or would leave those objects out of date.
+     *
+     * @throws Exception If the path is the package document.
+     */
+    private function refusePackageDocument(string $filePath): void
+    {
+        if ($this->manifest instanceof Manifest && $this->paths->normalize($filePath) === $this->manifest->getOpfPath()) {
+            throw new Exception(
+                "The package document cannot be changed as content: {$filePath}. Use Metadata, Manifest and Spine instead."
+            );
+        }
+    }
+
+    /**
      * Files that belong to the container, not to the publication, and are never listed in the manifest.
      */
     private function isContainerFile(string $path): bool
     {
-        return $path === 'mimetype'
-            || str_starts_with($path, 'META-INF/')
-            || ($this->manifest instanceof Manifest && $path === $this->manifest->getOpfPath());
+        return $path === 'mimetype' || str_starts_with($path, 'META-INF/');
     }
 }

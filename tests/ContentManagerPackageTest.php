@@ -61,9 +61,33 @@ final class ContentManagerPackageTest extends TestCase
         [$contentManager, $manifest] = $this->open();
 
         $contentManager->addContent('META-INF/encryption.xml', '<encryption/>');
-        $contentManager->addContent('EPUB/package.opf', (string) file_get_contents($this->tmpDir . '/book/EPUB/package.opf'));
 
         $this->assertCount(1, $manifest->getItems());
+    }
+
+    public function testThePackageDocumentCannotBeChangedAsContent(): void
+    {
+        [$contentManager] = $this->open();
+        $opfPath = $this->tmpDir . '/book/EPUB/package.opf';
+        $original = (string) file_get_contents($opfPath);
+
+        $attempts = [
+            'add' => static fn () => $contentManager->addContent('EPUB/package.opf', '<package/>'),
+            'update' => static fn () => $contentManager->updateContent('EPUB/./package.opf', '<package/>'),
+            'delete' => static fn () => $contentManager->deleteContent('EPUB/package.opf'),
+        ];
+
+        foreach ($attempts as $label => $attempt) {
+            try {
+                $attempt();
+                $this->fail("Expected {$label} of the package document to be refused.");
+            } catch (Exception $exception) {
+                $this->assertStringContainsString('package document', $exception->getMessage(), $label);
+            }
+        }
+
+        $this->assertStringEqualsFile($opfPath, $original);
+        $this->assertSame($original, $contentManager->getContent('EPUB/package.opf'));
     }
 
     public function testAddContentFailsWhenAFileBlocksTheDirectory(): void
