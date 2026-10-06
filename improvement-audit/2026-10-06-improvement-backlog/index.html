@@ -257,9 +257,9 @@ at <code>af4bbcc</code> (main). No source changes were made while compiling this
 <h2 id="items">Items<a class="headerlink" href="#items" title="Permanent link">&para;</a></h2>
 <h3 id="security-untrusted-input">Security (untrusted input)<a class="headerlink" href="#security-untrusted-input" title="Permanent link">&para;</a></h3>
 <ul>
-<li>[ ] <strong>SEC-01</strong> Confine <code>container.xml</code> <code>full-path</code> and NCX/manifest hrefs to the extraction directory — <code>src/Parser.php:24-28,75-81,113-116</code>, <code>src/EpubFile.php:55-60</code>, <code>src/Metadata.php:41-46</code> — M · high
+<li>[x] <strong>SEC-01</strong> Confine <code>container.xml</code> <code>full-path</code> and NCX/manifest hrefs to the extraction directory — <code>src/Parser.php:24-28,75-81,113-116</code>, <code>src/EpubFile.php:55-60</code>, <code>src/Metadata.php:41-46</code> — M · high
   The path from the untrusted book is concatenated onto the temp dir without normalisation, so <code>../</code> segments make <code>load()</code> parse XML outside the extraction dir and <code>Metadata::save()</code> overwrite it.</li>
-<li>[ ] <strong>SEC-02</strong> Reject <code>ContentManager</code> paths that resolve outside the content directory — <code>src/ContentManager.php:56-125</code> — S · med
+<li>[x] <strong>SEC-02</strong> Reject <code>ContentManager</code> paths that resolve outside the content directory — <code>src/ContentManager.php:56-125</code> — S · med
   Callers typically pass manifest hrefs from the book, and <code>../</code> lets <code>add/update/delete/getContent</code> touch arbitrary files.</li>
 <li>[ ] <strong>SEC-03</strong> Cap total uncompressed size, entry count and compression ratio before extracting — <code>src/ZipHandler.php:21-38</code> — M · med
   <code>extractTo()</code> inflates every entry without limits, so a small zip bomb fills the temp disk (PHP already strips <code>../</code> from entry names).</li>
@@ -271,7 +271,7 @@ at <code>af4bbcc</code> (main). No source changes were made while compiling this
   Book XHTML can reference local files or URLs that the renderer would read into the PDF.</li>
 <li>[ ] <strong>SEC-07</strong> Create the temp dir with mode <code>0700</code> and a <code>random_bytes</code> name — <code>src/EpubFile.php:47-50</code> — S · low
   <code>uniqid()</code> plus the default <code>0777</code> mode leaves extracted content readable by other local users.</li>
-<li>[ ] <strong>SEC-08</strong> Do not follow symlinks in <code>deleteDirectory()</code> — <code>src/Util/FileSystemHelper.php:36-55</code> — S · low
+<li>[x] <strong>SEC-08</strong> Do not follow symlinks in <code>deleteDirectory()</code> — <code>src/Util/FileSystemHelper.php:36-55</code> — S · low
   <code>is_dir()</code> is true for a symlink to a directory, so cleanup would recurse into and delete the link target.</li>
 <li>[ ] <strong>SEC-09</strong> Parse XML with explicit <code>LIBXML_NONET</code>, reject DOCTYPEs in package files, and report libxml errors instead of <code>@</code> — <code>src/XmlParser.php:18-30</code> — S · low
   Relies on libxml defaults for XXE safety and the <code>@</code> hides why a book failed to load.</li>
@@ -290,9 +290,9 @@ at <code>af4bbcc</code> (main). No source changes were made while compiling this
   Removing creators leaves <code>&lt;meta refines="#id"&gt;</code> pointing at nothing and drops role information.</li>
 <li>[ ] <strong>BUG-06</strong> Update EPUB 3 <code>dcterms:modified</code> when metadata is saved — <code>src/Metadata.php:41-48</code> — S · med
   EPUB 3 requires it to reflect the last modification; it stays stale after edits.</li>
-<li>[ ] <strong>BUG-07</strong> Treat an empty <code>rootfile</code> / manifest XPath result as an error — <code>src/Parser.php:69-75,100-104</code> — S · med
+<li>[x] <strong>BUG-07</strong> Treat an empty <code>rootfile</code> / manifest XPath result as an error — <code>src/Parser.php:69-75,100-104</code> — S · med
   <code>xpath()</code> returns <code>[]</code> not <code>false</code>, so <code>$rootfiles[0]</code> raises an undefined-key warning and a missing manifest is accepted.</li>
-<li>[ ] <strong>BUG-08</strong> Handle NCX files without a default namespace — <code>src/Parser.php:124-132</code> — S · low
+<li>[x] <strong>BUG-08</strong> Handle NCX files without a default namespace — <code>src/Parser.php:124-132</code> — S · low
   <code>$namespaces['']</code> is an undefined key there, producing a warning instead of a clear error.</li>
 <li>[ ] <strong>BUG-09</strong> Support prefixed OPF packages (<code>opf:package</code>) and books without any <code>dc:</code> element — <code>src/Metadata.php:25-34</code>, <code>src/Spine.php:19-25</code>, <code>src/Traits/*.php</code> — M · med
   <code>$opfXml-&gt;metadata</code> / <code>-&gt;spine</code> only work with an unprefixed default namespace, and the constructor throws when no <code>dc</code> prefix is declared.</li>
@@ -345,11 +345,11 @@ at <code>af4bbcc</code> (main). No source changes were made while compiling this
 </ul>
 <h3 id="tests">Tests<a class="headerlink" href="#tests" title="Permanent link">&para;</a></h3>
 <ul>
-<li>[ ] <strong>TEST-01</strong> Add <code>tests/Support/EpubBuilder</code> and an OCF round-trip test (save → reopen → <code>mimetype</code> first/stored, <code>/</code> separators) — <code>tests/</code> — M · high
+<li>[x] <strong>TEST-01</strong> Add <code>tests/Support/EpubBuilder</code> and an OCF round-trip test (save → reopen → <code>mimetype</code> first/stored, <code>/</code> separators) — <code>tests/</code> — M · high
   Nothing asserts that saved books are structurally valid, which is how BUG-01/BUG-02 went unnoticed.</li>
 <li>[ ] <strong>TEST-02</strong> Cover <code>PhpEpub\Converter</code> (no test references it) — <code>tests/</code> — S · low
   Format dispatch and the unsupported-format error are untested.</li>
-<li>[ ] <strong>TEST-03</strong> Fix <code>phpunit.xml</code>: suite named "PhpIso Testing Suite", excludes non-existent <code>src/Cli/</code>, schema 8.3 — <code>phpunit.xml:14-27</code> — S · low
+<li>[x] <strong>TEST-03</strong> Fix <code>phpunit.xml</code>: suite named "PhpIso Testing Suite", excludes non-existent <code>src/Cli/</code>, schema 8.3 — <code>phpunit.xml:14-27</code> — S · low
   Copy-paste leftovers from php-iso.</li>
 </ul>
 <h3 id="ci">CI<a class="headerlink" href="#ci" title="Permanent link">&para;</a></h3>
