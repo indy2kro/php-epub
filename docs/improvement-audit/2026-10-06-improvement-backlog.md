@@ -57,9 +57,9 @@ Effort: S = one file, under 30 min · M = one class plus tests · L = cross-cutt
 
 ### Security (untrusted input)
 
-- [ ] **SEC-01** Confine `container.xml` `full-path` and NCX/manifest hrefs to the extraction directory — `src/Parser.php:24-28,75-81,113-116`, `src/EpubFile.php:55-60`, `src/Metadata.php:41-46` — M · high
+- [x] **SEC-01** Confine `container.xml` `full-path` and NCX/manifest hrefs to the extraction directory — `src/Parser.php:24-28,75-81,113-116`, `src/EpubFile.php:55-60`, `src/Metadata.php:41-46` — M · high
   The path from the untrusted book is concatenated onto the temp dir without normalisation, so `../` segments make `load()` parse XML outside the extraction dir and `Metadata::save()` overwrite it.
-- [ ] **SEC-02** Reject `ContentManager` paths that resolve outside the content directory — `src/ContentManager.php:56-125` — S · med
+- [x] **SEC-02** Reject `ContentManager` paths that resolve outside the content directory — `src/ContentManager.php:56-125` — S · med
   Callers typically pass manifest hrefs from the book, and `../` lets `add/update/delete/getContent` touch arbitrary files.
 - [ ] **SEC-03** Cap total uncompressed size, entry count and compression ratio before extracting — `src/ZipHandler.php:21-38` — M · med
   `extractTo()` inflates every entry without limits, so a small zip bomb fills the temp disk (PHP already strips `../` from entry names).
@@ -71,7 +71,7 @@ Effort: S = one file, under 30 min · M = one class plus tests · L = cross-cutt
   Book XHTML can reference local files or URLs that the renderer would read into the PDF.
 - [ ] **SEC-07** Create the temp dir with mode `0700` and a `random_bytes` name — `src/EpubFile.php:47-50` — S · low
   `uniqid()` plus the default `0777` mode leaves extracted content readable by other local users.
-- [ ] **SEC-08** Do not follow symlinks in `deleteDirectory()` — `src/Util/FileSystemHelper.php:36-55` — S · low
+- [x] **SEC-08** Do not follow symlinks in `deleteDirectory()` — `src/Util/FileSystemHelper.php:36-55` — S · low
   `is_dir()` is true for a symlink to a directory, so cleanup would recurse into and delete the link target.
 - [ ] **SEC-09** Parse XML with explicit `LIBXML_NONET`, reject DOCTYPEs in package files, and report libxml errors instead of `@` — `src/XmlParser.php:18-30` — S · low
   Relies on libxml defaults for XXE safety and the `@` hides why a book failed to load.
@@ -90,9 +90,9 @@ Effort: S = one file, under 30 min · M = one class plus tests · L = cross-cutt
   Removing creators leaves `<meta refines="#id">` pointing at nothing and drops role information.
 - [ ] **BUG-06** Update EPUB 3 `dcterms:modified` when metadata is saved — `src/Metadata.php:41-48` — S · med
   EPUB 3 requires it to reflect the last modification; it stays stale after edits.
-- [ ] **BUG-07** Treat an empty `rootfile` / manifest XPath result as an error — `src/Parser.php:69-75,100-104` — S · med
+- [x] **BUG-07** Treat an empty `rootfile` / manifest XPath result as an error — `src/Parser.php:69-75,100-104` — S · med
   `xpath()` returns `[]` not `false`, so `$rootfiles[0]` raises an undefined-key warning and a missing manifest is accepted.
-- [ ] **BUG-08** Handle NCX files without a default namespace — `src/Parser.php:124-132` — S · low
+- [x] **BUG-08** Handle NCX files without a default namespace — `src/Parser.php:124-132` — S · low
   `$namespaces['']` is an undefined key there, producing a warning instead of a clear error.
 - [ ] **BUG-09** Support prefixed OPF packages (`opf:package`) and books without any `dc:` element — `src/Metadata.php:25-34`, `src/Spine.php:19-25`, `src/Traits/*.php` — M · med
   `$opfXml->metadata` / `->spine` only work with an unprefixed default namespace, and the constructor throws when no `dc` prefix is declared.
@@ -145,11 +145,11 @@ Effort: S = one file, under 30 min · M = one class plus tests · L = cross-cutt
 
 ### Tests
 
-- [ ] **TEST-01** Add `tests/Support/EpubBuilder` and an OCF round-trip test (save → reopen → `mimetype` first/stored, `/` separators) — `tests/` — M · high
+- [x] **TEST-01** Add `tests/Support/EpubBuilder` and an OCF round-trip test (save → reopen → `mimetype` first/stored, `/` separators) — `tests/` — M · high
   Nothing asserts that saved books are structurally valid, which is how BUG-01/BUG-02 went unnoticed.
 - [ ] **TEST-02** Cover `PhpEpub\Converter` (no test references it) — `tests/` — S · low
   Format dispatch and the unsupported-format error are untested.
-- [ ] **TEST-03** Fix `phpunit.xml`: suite named "PhpIso Testing Suite", excludes non-existent `src/Cli/`, schema 8.3 — `phpunit.xml:14-27` — S · low
+- [x] **TEST-03** Fix `phpunit.xml`: suite named "PhpIso Testing Suite", excludes non-existent `src/Cli/`, schema 8.3 — `phpunit.xml:14-27` — S · low
   Copy-paste leftovers from php-iso.
 
 ### CI

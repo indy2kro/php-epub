@@ -13,6 +13,7 @@ final class ContentManagerTest extends TestCase
 {
     private string $contentDir;
     private string $sampleFilePath;
+    private string $outsidePath;
     private FileSystemHelper $fileSystemHelper;
 
     protected function setUp(): void
@@ -20,6 +21,7 @@ final class ContentManagerTest extends TestCase
         $this->fileSystemHelper = new FileSystemHelper();
         $this->contentDir = __DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'tmp' . DIRECTORY_SEPARATOR . 'content';
         $this->sampleFilePath = $this->contentDir . DIRECTORY_SEPARATOR . 'sample.txt';
+        $this->outsidePath = dirname($this->contentDir) . DIRECTORY_SEPARATOR . 'outside.txt';
 
         // Ensure the content directory exists
         if (! is_dir($this->contentDir)) {
@@ -30,6 +32,10 @@ final class ContentManagerTest extends TestCase
     protected function tearDown(): void
     {
         // Clean up any files or directories created during tests
+        if (file_exists($this->outsidePath)) {
+            unlink($this->outsidePath);
+        }
+
         if (is_dir($this->contentDir)) {
             $this->fileSystemHelper->deleteDirectory($this->contentDir);
         }
@@ -87,6 +93,61 @@ final class ContentManagerTest extends TestCase
         $this->assertContains($this->contentDir . DIRECTORY_SEPARATOR . 'another.txt', $contentList);
     }
 
+    public function testGetContentRejectsPathOutsideTheBook(): void
+    {
+        file_put_contents($this->outsidePath, 'secret');
+        $contentManager = new ContentManager($this->contentDir);
+
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('outside the EPUB');
+
+        $contentManager->getContent('../outside.txt');
+    }
+
+    public function testAddContentRejectsPathOutsideTheBook(): void
+    {
+        $contentManager = new ContentManager($this->contentDir);
+
+        try {
+            $contentManager->addContent('../outside.txt', 'planted');
+            $this->fail('Expected an exception for a path outside the book.');
+        } catch (Exception $exception) {
+            $this->assertStringContainsString('outside the EPUB', $exception->getMessage());
+        }
+
+        $this->assertFileDoesNotExist($this->outsidePath);
+    }
+
+    public function testUpdateContentRejectsPathOutsideTheBook(): void
+    {
+        file_put_contents($this->outsidePath, 'original');
+        $contentManager = new ContentManager($this->contentDir);
+
+        try {
+            $contentManager->updateContent('sub/../../outside.txt', 'changed');
+            $this->fail('Expected an exception for a path outside the book.');
+        } catch (Exception $exception) {
+            $this->assertStringContainsString('outside the EPUB', $exception->getMessage());
+        }
+
+        $this->assertStringEqualsFile($this->outsidePath, 'original');
+    }
+
+    public function testDeleteContentRejectsAbsolutePath(): void
+    {
+        file_put_contents($this->outsidePath, 'keep me');
+        $contentManager = new ContentManager($this->contentDir);
+
+        try {
+            $contentManager->deleteContent($this->outsidePath);
+            $this->fail('Expected an exception for an absolute path.');
+        } catch (Exception $exception) {
+            $this->assertStringContainsString('outside the EPUB', $exception->getMessage());
+        }
+
+        $this->assertFileExists($this->outsidePath);
+    }
+
     public function testAddContentToNonExistentDirectoryThrowsException(): void
     {
         $this->expectException(Exception::class);
@@ -137,11 +198,11 @@ final class ContentManagerTest extends TestCase
         $this->expectException(Exception::class);
         $this->expectExceptionMessage('Failed to add content to:');
 
-        // Create a directory path where we expect a file
-        $invalidPath = $this->contentDir . DIRECTORY_SEPARATOR . 'test' . DIRECTORY_SEPARATOR;
+        // A directory already exists where the file should be written
+        mkdir($this->contentDir . DIRECTORY_SEPARATOR . 'test');
 
         $contentManager = new ContentManager($this->contentDir);
-        @$contentManager->addContent($invalidPath, 'Sample content');
+        @$contentManager->addContent('test', 'Sample content');
     }
 
     public function testUpdateContentFailsWithNonexistentFile(): void

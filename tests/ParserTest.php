@@ -6,6 +6,7 @@ namespace PhpEpub\Test;
 
 use PhpEpub\Exception;
 use PhpEpub\Parser;
+use PhpEpub\Test\Support\EpubBuilder;
 use PhpEpub\Util\FileSystemHelper;
 use PhpEpub\XmlParser;
 use PHPUnit\Framework\TestCase;
@@ -87,6 +88,98 @@ final class ParserTest extends TestCase
 
         $this->expectException(Exception::class);
         $this->expectExceptionMessage('Failed to load XML file:');
+
+        $this->parser->parse($directory);
+    }
+
+    public function testParseRejectsOpfPathOutsideTheBook(): void
+    {
+        // A readable OPF exists outside the book, so only path confinement can stop this.
+        file_put_contents($this->tmpDir . '/outside.opf', EpubBuilder::opf());
+        $directory = EpubBuilder::minimal()
+            ->withContainer('../outside.opf')
+            ->writeTo($this->tmpDir . '/book');
+
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('outside the EPUB');
+
+        $this->parser->parse($directory);
+    }
+
+    public function testParseRejectsAbsoluteOpfPath(): void
+    {
+        $directory = EpubBuilder::minimal()
+            ->withContainer('/etc/package.opf')
+            ->writeTo($this->tmpDir . '/book');
+
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('outside the EPUB');
+
+        $this->parser->parse($directory);
+    }
+
+    public function testParseRejectsNcxPathOutsideTheBook(): void
+    {
+        file_put_contents(
+            $this->tmpDir . '/outside.ncx',
+            '<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1"><navMap/></ncx>'
+        );
+        $directory = EpubBuilder::minimal()
+            ->withFile('EPUB/package.opf', EpubBuilder::opf(
+                '<item id="ncx" href="../../outside.ncx" media-type="application/x-dtbncx+xml"/>'
+            ))
+            ->writeTo($this->tmpDir . '/book');
+
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('outside the EPUB');
+
+        $this->parser->parse($directory);
+    }
+
+    public function testParseNormalizesOpfPath(): void
+    {
+        $directory = EpubBuilder::minimal()
+            ->withContainer('./META-INF/../EPUB/package.opf')
+            ->writeTo($this->tmpDir . '/book');
+
+        $this->assertSame('EPUB/package.opf', $this->parser->parse($directory));
+    }
+
+    public function testParseEmptyRootfilesThrowsException(): void
+    {
+        $directory = EpubBuilder::minimal()
+            ->withFile('META-INF/container.xml', '<container xmlns="urn:oasis:names:tc:opendocument:xmlns:container" version="1.0"><rootfiles/></container>')
+            ->writeTo($this->tmpDir . '/book');
+
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('No rootfile found in container.xml');
+
+        $this->parser->parse($directory);
+    }
+
+    public function testParseOpfWithoutManifestThrowsException(): void
+    {
+        $directory = EpubBuilder::minimal()
+            ->withFile('EPUB/package.opf', '<package xmlns="http://www.idpf.org/2007/opf" version="3.0"><metadata/><spine/></package>')
+            ->writeTo($this->tmpDir . '/book');
+
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('Missing manifest in OPF file');
+
+        $this->parser->parse($directory);
+    }
+
+    public function testParseNcxWithoutNamespaceThrowsException(): void
+    {
+        $directory = EpubBuilder::minimal()
+            ->withFile('EPUB/package.opf', EpubBuilder::opf(
+                '<item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>'
+            ))
+            ->withFile('EPUB/toc.ncx', '<ncx version="2005-1"><navMap/></ncx>')
+            ->writeTo($this->tmpDir . '/book');
+
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('No NCX namespace found');
 
         $this->parser->parse($directory);
     }
