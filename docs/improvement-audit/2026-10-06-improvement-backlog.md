@@ -96,9 +96,9 @@ Effort: S = one file, under 30 min · M = one class plus tests · L = cross-cutt
   `$namespaces['']` is an undefined key there, producing a warning instead of a clear error.
 - [x] **BUG-09** Support prefixed OPF packages (`opf:package`) and books without any `dc:` element — `src/Metadata.php:25-34`, `src/Spine.php:19-25`, `src/Traits/*.php` — M · med
   `$opfXml->metadata` / `->spine` only work with an unprefixed default namespace, and the constructor throws when no `dc` prefix is declared.
-- [ ] **BUG-10** Clean up the previous temp dir when `load()` is called twice — `src/EpubFile.php:45-61` — S · low
+- [x] **BUG-10** Clean up the previous temp dir when `load()` is called twice — `src/EpubFile.php:45-61` — S · low
   Each extra `load()` leaks a full extracted copy of the book.
-- [ ] **BUG-11** Keep manifest and spine in sync on `addContent`/`deleteContent` (and create parent dirs) — `src/ContentManager.php:56-104` — M · med
+- [x] **BUG-11** Keep manifest and spine in sync on `addContent`/`deleteContent` (and create parent dirs) — `src/ContentManager.php:56-104` — M · med
   Added files are invisible to readers and deleted files leave dangling manifest/spine entries.
 
 ### Converters
@@ -118,8 +118,8 @@ Effort: S = one file, under 30 min · M = one class plus tests · L = cross-cutt
 
 ### API / UX
 
-- [ ] **UX-01** Return paths relative to the book root from `getContentList()` — `src/ContentManager.php:30-44` — S · med
-  It returns absolute temp paths while every other method takes relative ones, so its output cannot be fed back in.
+- [x] **UX-01** Return paths relative to the book root from `getContentList()` — `src/ContentManager.php:30-44` — S · med
+  It returns absolute temp paths while every other method takes relative ones, so its output cannot be fed back in. *Done as a new `getContentPaths()`; `getContentList()` is deprecated, not changed, to stay 1.x compatible.*
 - [x] **UX-02** Add list-valued `getSubjects()`/`setSubjects()` (and titles) — `src/Traits/InteractsWithSubject.php:13-40` — S · low
   Books usually have several subjects; only the first is reachable. *Done for subjects; multiple titles deferred.*
 - [x] **UX-03** Introduce specific exception subclasses (invalid book, ZIP, conversion) — `src/Exception.php` — M · low
@@ -129,7 +129,7 @@ Effort: S = one file, under 30 min · M = one class plus tests · L = cross-cutt
 
 ### Features
 
-- [ ] **FEAT-01** Richer spine: `linear` flag, idref→href resolution, add/remove/reorder — `src/Spine.php` — M · med
+- [x] **FEAT-01** Richer spine: `linear` flag, idref→href resolution, add/remove/reorder — `src/Spine.php` — M · med
   The spine is a read-only list of idrefs that callers must resolve by hand.
 - [ ] **FEAT-02** Cover image get/set (EPUB 2 `meta name="cover"` and EPUB 3 `cover-image`) — new — M · med
   The most requested metadata operation after title/author is missing.

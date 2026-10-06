@@ -15,6 +15,7 @@ class EpubFile
     private readonly Parser $parser;
     private ?Metadata $metadata = null;
     private ?Spine $spine = null;
+    private ?Manifest $manifest = null;
     private ?SimpleXMLElement $opfXml = null;
     private ?ContentManager $contentManager = null;
 
@@ -44,6 +45,9 @@ class EpubFile
 
     public function load(): void
     {
+        // Loading again starts from the file on disk; drop the previous extraction.
+        $this->cleanup();
+
         // Unpredictable name and owner-only permissions: the extracted book may be private.
         $this->tempDir = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'epub_' . bin2hex(random_bytes(16));
         if (! mkdir($this->tempDir, 0700)) {
@@ -58,8 +62,9 @@ class EpubFile
         $this->opfXml = $this->xmlParser->parse($opfFileFullPath);
 
         $this->metadata = new Metadata($this->opfXml, $opfFileFullPath);
-        $this->spine = new Spine($this->opfXml);
-        $this->contentManager = new ContentManager($this->tempDir);
+        $this->manifest = new Manifest($this->opfXml, $opfFilePath);
+        $this->spine = new Spine($this->opfXml, $this->manifest);
+        $this->contentManager = new ContentManager($this->tempDir, $this->manifest, $this->spine);
     }
 
     public function save(?string $filePath = null): void
@@ -72,9 +77,15 @@ class EpubFile
             $filePath = $this->filePath;
         }
 
-        // Persist metadata edits the caller has not saved yet.
+        // Persist package edits (metadata, manifest, spine) the caller has not saved yet.
+        if ($this->manifest?->isModified() === true || $this->spine?->isModified() === true) {
+            $this->metadata?->markModified();
+        }
+
         if ($this->metadata?->isModified() === true) {
             $this->metadata->save();
+            $this->manifest?->markSaved();
+            $this->spine?->markSaved();
         }
 
         $this->zipHandler->compress($this->tempDir, $filePath);
@@ -101,6 +112,15 @@ class EpubFile
         }
 
         return $this->spine;
+    }
+
+    public function getManifest(): Manifest
+    {
+        if ($this->manifest === null) {
+            throw new Exception('EPUB file must be loaded before accessing manifest.');
+        }
+
+        return $this->manifest;
     }
 
     public function getContentManager(): ContentManager

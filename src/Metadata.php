@@ -71,6 +71,15 @@ class Metadata
         return $this->modified;
     }
 
+    /**
+     * Records that the package changed outside the Dublin Core fields (e.g. manifest or spine),
+     * so the next save() writes the OPF and refreshes the EPUB 3 modified date.
+     */
+    public function markModified(): void
+    {
+        $this->modified = true;
+    }
+
     public function getOpfFilePath(): string
     {
         return $this->opfFilePath;
