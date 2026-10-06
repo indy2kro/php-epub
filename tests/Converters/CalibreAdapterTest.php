@@ -62,11 +62,11 @@ final class CalibreAdapterTest extends TestCase
         $this->helperMock->method('findExecutable')->with('ebook-convert')->willReturn('/found/on/path/ebook-convert');
         $this->helperMock->method('fileExists')->willReturn(true);
         $this->helperMock->method('fileSize')->willReturn(100);
-        $this->helperMock->expects($this->once())->method('runProcess')
-            ->with($this->callback(static fn (array $command): bool => $command[0] === '/found/on/path/ebook-convert'))
-            ->willReturn(['exitCode' => 0, 'output' => '']);
+        $program = $this->captureProgram();
 
         (new CalibreAdapter([], $this->helperMock))->convert($this->fakeInputFile, $this->fakeOutputFile);
+
+        $this->assertSame('/found/on/path/ebook-convert', $program->value);
     }
 
     public function testWithoutACalibrePathTheUsualInstallLocationsAreTried(): void
@@ -77,11 +77,11 @@ final class CalibreAdapterTest extends TestCase
             fn (string $path): bool => in_array($path, [$macOs, $this->fakeInputFile, $this->fakeOutputFile], true)
         );
         $this->helperMock->method('fileSize')->willReturn(100);
-        $this->helperMock->expects($this->once())->method('runProcess')
-            ->with($this->callback(static fn (array $command): bool => $command[0] === $macOs))
-            ->willReturn(['exitCode' => 0, 'output' => '']);
+        $program = $this->captureProgram();
 
         (new CalibreAdapter([], $this->helperMock))->convert($this->fakeInputFile, $this->fakeOutputFile);
+
+        $this->assertSame($macOs, $program->value);
     }
 
     public function testWithoutACalibrePathAMissingCalibreIsReported(): void
@@ -223,6 +223,25 @@ final class CalibreAdapterTest extends TestCase
         $this->expectExceptionMessage('Calibre conversion failed');
 
         $adapter->convert($this->fakeInputFile, $this->fakeOutputFile);
+    }
+
+    /**
+     * Expects one successful Calibre run and records the program it was started with.
+     */
+    private function captureProgram(): \stdClass
+    {
+        $program = new \stdClass();
+        $program->value = null;
+
+        $this->helperMock->expects($this->once())->method('runProcess')->willReturnCallback(
+            static function (array $command) use ($program): array {
+                $program->value = $command[0];
+
+                return ['exitCode' => 0, 'output' => ''];
+            }
+        );
+
+        return $program;
     }
 
     /**
