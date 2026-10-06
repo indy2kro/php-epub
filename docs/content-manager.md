@@ -9,7 +9,7 @@ ContentManager operates on the extracted EPUB directory (accessible via `EpubFil
 When it is created by `EpubFile` (or given a `Manifest` and `Spine`), it keeps the OPF in sync:
 
 - `addContent()` adds new files to the manifest, with a media type guessed from the extension.
-- `deleteContent()` removes the file's manifest item and its spine entry.
+- `deleteContent()` removes the file's manifest item and its spine entry, plus package references to it (EPUB 2 cover meta, refinements, `spine@toc`, `fallback`/`media-overlay` of other items, `<guide>` references).
 
 Adding a file does not put it in the reading order; call `Spine::add()` for that.
 

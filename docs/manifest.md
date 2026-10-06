@@ -18,7 +18,7 @@ Manifest `href`s are URLs relative to the OPF file (for example `text/chapter%20
 
 - **`add(string $path, ?string $mediaType = null, ?string $id = null): ManifestItem`**: Adds a file. The media type is guessed from the extension and the id is derived from the file name when not given. Throws if the path is already listed, the id is already used anywhere in the package, or the media type or id is not valid UTF-8 XML text.
 
-- **`remove(string $id): void`**: Removes an item. Spine entries are not touched; use `Spine::remove()` (or `ContentManager::deleteContent()`, which does both).
+- **`remove(string $id): void`**: Removes an item and the package references to it (EPUB 2 cover meta, refinements, `spine@toc`, `fallback`/`media-overlay` of other items, `<guide>` references to its file). Spine entries are not touched; use `Spine::remove()` (or `ContentManager::deleteContent()`, which does both).
 
 - **`pathToHref(string $path): string`** and **`hrefToPath(string $href): string`**: Convert between the two forms.
 

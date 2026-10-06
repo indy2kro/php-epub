@@ -131,15 +131,21 @@ class Manifest
     }
 
     /**
-     * Removes an item from the manifest. Spine references are not touched; see Spine::remove().
+     * Removes an item from the manifest, together with the package references to it:
+     * the EPUB 2 cover meta, refinements, spine@toc, fallback / media-overlay
+     * attributes of other items and <guide> references to its file.
+     *
+     * Spine itemrefs are not touched; see Spine::remove().
      *
      * @throws Exception If no item has this id.
      */
     public function remove(string $id): void
     {
         $node = $this->requireNode($id);
+        $href = (string) $node['href'];
 
         unset($node[0]);
+        $this->removeReferences($id, $href);
         $this->modified = true;
     }
 
@@ -224,6 +230,60 @@ class Manifest
     public function markSaved(): void
     {
         $this->modified = false;
+    }
+
+    /**
+     * Clears every reference that would dangle once the item with this id and href is gone.
+     */
+    private function removeReferences(string $id, string $href): void
+    {
+        foreach ($this->query('/opf:package/opf:spine') as $spine) {
+            if ((string) $spine['toc'] === $id) {
+                unset($spine['toc']);
+            }
+        }
+
+        foreach ($this->itemNodes() as $item) {
+            foreach (['fallback', 'media-overlay'] as $attribute) {
+                if ((string) $item[$attribute] === $id) {
+                    unset($item[$attribute]);
+                }
+            }
+        }
+
+        foreach ($this->query('/opf:package/opf:metadata//opf:meta') as $meta) {
+            $isCover = (string) $meta['name'] === 'cover' && (string) $meta['content'] === $id;
+            if ($isCover || (string) $meta['refines'] === '#' . $id) {
+                unset($meta[0]);
+            }
+        }
+
+        $path = $this->tryHrefToPath($href);
+        if ($path === null) {
+            return;
+        }
+
+        foreach ($this->query('/opf:package/opf:guide') as $guide) {
+            foreach ($this->query('/opf:package/opf:guide/opf:reference') as $reference) {
+                if ($this->tryHrefToPath((string) $reference['href']) === $path) {
+                    unset($reference[0]);
+                }
+            }
+
+            // OPF 2 requires at least one reference in a guide.
+            if ($guide->children(Metadata::OPF_NAMESPACE)->count() === 0) {
+                unset($guide[0]);
+            }
+        }
+    }
+
+    private function tryHrefToPath(string $href): ?string
+    {
+        try {
+            return $this->hrefToPath($href);
+        } catch (InvalidEpubException) {
+            return null;
+        }
     }
 
     private function toItem(SimpleXMLElement $node): ManifestItem

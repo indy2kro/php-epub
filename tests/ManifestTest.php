@@ -157,6 +157,41 @@ final class ManifestTest extends TestCase
         $this->assertFalse($manifest->isModified());
     }
 
+    public function testRemoveClearsReferencesToTheItem(): void
+    {
+        $opf = '<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="uid">'
+            . '<metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:identifier id="uid">urn:x</dc:identifier>'
+            . '<meta name="cover" content="cover"/><meta name="calibre:series" content="Kept"/>'
+            . '<meta refines="#cover" property="alt-script">Cover</meta><meta refines="#uid" property="identifier-type">kept</meta>'
+            . '</metadata><manifest>'
+            . '<item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>'
+            . '<item id="cover" href="images/cover.jpg" media-type="image/jpeg"/>'
+            . '<item id="cover-page" href="cover.xhtml" media-type="application/xhtml+xml"/>'
+            . '<item id="alt" href="images/cover.webp" media-type="image/webp" fallback="cover"/>'
+            . '<item id="audio-page" href="a.xhtml" media-type="application/xhtml+xml" media-overlay="cover"/>'
+            . '</manifest><spine toc="ncx"><itemref idref="cover-page"/></spine>'
+            . '<guide><reference type="cover" href="images/cover.jpg"/><reference type="text" href="cover.xhtml#start"/></guide>'
+            . '</package>';
+        $xml = new SimpleXMLElement($opf);
+        $manifest = new Manifest($xml, 'EPUB/package.opf');
+
+        $manifest->remove('cover');
+        $manifest->remove('ncx');
+        $manifest->remove('cover-page');
+
+        $saved = (string) $xml->asXML();
+        $this->assertStringNotContainsString('name="cover"', $saved);
+        $this->assertStringNotContainsString('refines="#cover"', $saved);
+        $this->assertStringNotContainsString('fallback=', $saved);
+        $this->assertStringNotContainsString('media-overlay=', $saved);
+        $this->assertStringNotContainsString('toc=', $saved);
+        $this->assertStringNotContainsString('<reference', $saved);
+        // Unrelated metadata and spine entries stay; spine itemrefs are Spine's job.
+        $this->assertStringContainsString('content="Kept"', $saved);
+        $this->assertStringContainsString('refines="#uid"', $saved);
+        $this->assertStringContainsString('<itemref idref="cover-page"/>', $saved);
+    }
+
     public function testRemove(): void
     {
         $manifest = $this->manifest();

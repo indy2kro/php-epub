@@ -69,7 +69,7 @@ Effort: S = one file, under 30 min · M = one class plus tests · L = cross-cutt
   `getNamespaces(true)` has no `''` key for `<opf:package xmlns:opf=…>`, so `load()` throws "No OPF namespace" and the prefixed-package support in `Metadata`/`Spine` is unreachable (its test bypasses `Parser`).
 - [ ] **BUG-02** Reset metadata/manifest/spine/content manager in `cleanup()` and when `load()` fails — `src/EpubFile.php:61-92` — S · med
   The getters keep returning objects bound to a deleted temp dir, so later edits and `save()` fail with confusing I/O errors.
-- [ ] **BUG-03** Clear dangling references when `deleteContent()`/`Manifest::remove()` drops an item (`<meta name="cover">`, `spine@toc`, `<guide>`) — `src/ContentManager.php:135-155`, `src/Manifest.php:136-142` — M · med
+- [x] **BUG-03** Clear dangling references when `deleteContent()`/`Manifest::remove()` drops an item (`<meta name="cover">`, `spine@toc`, `<guide>`) — `src/ContentManager.php:135-155`, `src/Manifest.php:136-142` — M · med
   Deleting the cover image or the NCX leaves references to an id/href that no longer exists, which readers and EPUBCheck reject.
 - [ ] **BUG-04** Do not let one bad manifest href make the whole manifest unreadable — `src/Manifest.php:74-100,225-238` — S · med
   `toItem()` throws for an href like `../x`, so `getItems()`, `findByPath()`, `getCoverImage()` and `addContent()` all fail instead of skipping or flagging that item.
