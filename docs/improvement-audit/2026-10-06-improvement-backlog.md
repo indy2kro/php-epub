@@ -124,16 +124,16 @@ Effort: S = one file, under 30 min · M = one class plus tests · L = cross-cutt
   Books usually have several subjects; only the first is reachable. *Done for subjects; multiple titles deferred.*
 - [x] **UX-03** Introduce specific exception subclasses (invalid book, ZIP, conversion) — `src/Exception.php` — M · low
   Callers cannot tell a corrupt book from an I/O failure.
-- [ ] **UX-04** Add `EpubFile::open()` and a convenience `convert()` — `src/EpubFile.php:21-61` — S · low
+- [x] **UX-04** Add `EpubFile::open()` and a convenience `convert()` — `src/EpubFile.php:21-61` — S · low
   Removes the "must be loaded before…" class of misuse and the manual temp-dir plumbing for conversion.
 
 ### Features
 
 - [x] **FEAT-01** Richer spine: `linear` flag, idref→href resolution, add/remove/reorder — `src/Spine.php` — M · med
   The spine is a read-only list of idrefs that callers must resolve by hand.
-- [ ] **FEAT-02** Cover image get/set (EPUB 2 `meta name="cover"` and EPUB 3 `cover-image`) — new — M · med
+- [x] **FEAT-02** Cover image get/set (EPUB 2 `meta name="cover"` and EPUB 3 `cover-image`) — new — M · med
   The most requested metadata operation after title/author is missing.
-- [ ] **FEAT-03** Generic `<meta>` get/set (e.g. `calibre:series`, EPUB 3 `property`) — `src/Metadata.php` — M · low
+- [x] **FEAT-03** Generic `<meta>` get/set (e.g. `calibre:series`, EPUB 3 `property`) — `src/Metadata.php` — M · low
   Anything outside the eight Dublin Core traits is unreachable.
 
 ### Documentation

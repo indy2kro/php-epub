@@ -22,6 +22,8 @@ Manifest `href`s are URLs relative to the OPF file (for example `text/chapter%20
 
 - **`pathToHref(string $path): string`** and **`hrefToPath(string $href): string`**: Convert between the two forms.
 
+- **`addProperty(string $id, string $property): void`** and **`removeProperty(string $id, string $property): void`**: Add or remove an EPUB 3 property token (e.g. `cover-image`, `nav`) on an item; other tokens are kept.
+
 - **`getOpfPath(): string`**: The OPF location relative to the book root.
 
 ## Usage Example

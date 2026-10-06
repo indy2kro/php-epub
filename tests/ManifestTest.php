@@ -136,6 +136,26 @@ final class ManifestTest extends TestCase
         $manifest->remove('chapter');
     }
 
+    public function testAddAndRemoveProperties(): void
+    {
+        $manifest = $this->manifest('<item id="img" href="i.png" media-type="image/png" properties="svg"/>');
+
+        $manifest->addProperty('img', 'cover-image');
+        $manifest->addProperty('img', 'cover-image');
+        $this->assertSame('svg cover-image', $manifest->get('img')?->properties);
+
+        $manifest->removeProperty('img', 'svg');
+        $manifest->removeProperty('img', 'cover-image');
+        $manifest->removeProperty('img', 'not-there');
+        $this->assertSame('', $manifest->get('img')?->properties);
+        $this->assertTrue($manifest->isModified());
+
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('No manifest item with id "missing"');
+
+        $manifest->addProperty('missing', 'nav');
+    }
+
     private function manifest(string $extraItems = ''): Manifest
     {
         return new Manifest(new SimpleXMLElement(EpubBuilder::opf($extraItems)), 'EPUB/package.opf');

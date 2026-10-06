@@ -135,13 +135,39 @@ class Manifest
      */
     public function remove(string $id): void
     {
-        $node = $this->findNode($id);
-        if (! $node instanceof SimpleXMLElement) {
-            throw new Exception("No manifest item with id \"{$id}\"");
-        }
+        $node = $this->requireNode($id);
 
         unset($node[0]);
         $this->modified = true;
+    }
+
+    /**
+     * Adds an EPUB 3 property token (e.g. "cover-image", "nav") to an item.
+     *
+     * @throws Exception If no item has this id.
+     */
+    public function addProperty(string $id, string $property): void
+    {
+        $node = $this->requireNode($id);
+        $tokens = $this->propertyTokens($node);
+        if (! in_array($property, $tokens, true)) {
+            $tokens[] = $property;
+            $this->writeProperties($node, $tokens);
+        }
+    }
+
+    /**
+     * Removes an EPUB 3 property token from an item.
+     *
+     * @throws Exception If no item has this id.
+     */
+    public function removeProperty(string $id, string $property): void
+    {
+        $node = $this->requireNode($id);
+        $tokens = $this->propertyTokens($node);
+        if (in_array($property, $tokens, true)) {
+            $this->writeProperties($node, array_values(array_diff($tokens, [$property])));
+        }
     }
 
     /**
@@ -209,6 +235,41 @@ class Manifest
             (string) $node['media-type'],
             (string) $node['properties']
         );
+    }
+
+    /**
+     * @throws Exception If no item has this id.
+     */
+    private function requireNode(string $id): SimpleXMLElement
+    {
+        $node = $this->findNode($id);
+        if (! $node instanceof SimpleXMLElement) {
+            throw new Exception("No manifest item with id \"{$id}\"");
+        }
+
+        return $node;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function propertyTokens(SimpleXMLElement $node): array
+    {
+        return preg_split('/\s+/', trim((string) $node['properties']), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+    }
+
+    /**
+     * @param list<string> $tokens
+     */
+    private function writeProperties(SimpleXMLElement $node, array $tokens): void
+    {
+        if ($tokens === []) {
+            unset($node['properties']);
+        } else {
+            $node['properties'] = implode(' ', $tokens);
+        }
+
+        $this->modified = true;
     }
 
     private function findNode(string $id): ?SimpleXMLElement
