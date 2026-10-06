@@ -65,7 +65,7 @@ Effort: S = one file, under 30 min · M = one class plus tests · L = cross-cutt
 
 ### Bugs
 
-- [ ] **BUG-01** Accept prefixed OPF packages and containers in `Parser` (look up the OPF/OCF namespace URIs instead of the default-namespace key) — `src/Parser.php:63-71,97-105` — S · med
+- [x] **BUG-01** Accept prefixed OPF packages and containers in `Parser` (look up the OPF/OCF namespace URIs instead of the default-namespace key) — `src/Parser.php:63-71,97-105` — S · med
   `getNamespaces(true)` has no `''` key for `<opf:package xmlns:opf=…>`, so `load()` throws "No OPF namespace" and the prefixed-package support in `Metadata`/`Spine` is unreachable (its test bypasses `Parser`).
 - [ ] **BUG-02** Reset metadata/manifest/spine/content manager in `cleanup()` and when `load()` fails — `src/EpubFile.php:61-92` — S · med
   The getters keep returning objects bound to a deleted temp dir, so later edits and `save()` fail with confusing I/O errors.
@@ -73,7 +73,7 @@ Effort: S = one file, under 30 min · M = one class plus tests · L = cross-cutt
   Deleting the cover image or the NCX leaves references to an id/href that no longer exists, which readers and EPUBCheck reject.
 - [ ] **BUG-04** Do not let one bad manifest href make the whole manifest unreadable — `src/Manifest.php:74-100,225-238` — S · med
   `toItem()` throws for an href like `../x`, so `getItems()`, `findByPath()`, `getCoverImage()` and `addContent()` all fail instead of skipping or flagging that item.
-- [ ] **BUG-05** Pick the rootfile with media type `application/oebps-package+xml` instead of the first one — `src/Parser.php:73-81` — S · low
+- [x] **BUG-05** Pick the rootfile with media type `application/oebps-package+xml` instead of the first one — `src/Parser.php:73-81` — S · low
   Multi-rendition containers may list another rootfile first.
 - [ ] **BUG-06** Make cloned `EpubFile` instances safe (copy the extraction, or forbid `__clone`) — `src/EpubFile.php:56-68` — S · low
   A clone shares the temp dir, so the first destructor deletes the book under the other instance.

@@ -3,6 +3,7 @@
 The `Parser` class in the PHP EPUB Processor library is responsible for parsing the structure of an EPUB file.
 It validates the essential components of the EPUB, such as the mimetype, OPF, and NCX files,
 ensuring that the EPUB file is correctly structured and ready for further processing.
+Container, package and NCX documents are matched by namespace URI, so prefixed elements (e.g. `<opf:package>`) work as well.
 
 ## Key Methods
 
@@ -12,7 +13,7 @@ ensuring that the EPUB file is correctly structured and ready for further proces
 
 - **`validateMimetype(string $directory): void`**: Validates the presence and content of the mimetype file, ensuring it is correctly set to `application/epub+zip`.
 
-- **`extractOpfPath(string $containerPath): string`**: Extracts the OPF file path from the `container.xml` file, which defines the location of the OPF file within the EPUB.
+- **`extractOpfPath(string $containerPath): string`**: Extracts the OPF file path from the `container.xml` file, which defines the location of the OPF file within the EPUB. When the container lists several rootfiles (e.g. another rendition), the one with media type `application/oebps-package+xml` is used.
 
 - **`validateOpf(string $opfPath): void`**: Validates the OPF file and checks for the presence of the NCX file, ensuring the EPUB's manifest and navigation are correctly defined.
 
