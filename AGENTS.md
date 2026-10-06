@@ -86,8 +86,11 @@ Represents reading order - which content to display and in what order.
 ## Testing
 
 - PHPUnit is used for testing
-- 3 tests are skipped by default (require Calibre installation)
+- 4 tests are skipped by default (Calibre installation, symlink permission, read-only files)
 - Run tests with: `vendor/bin/phpunit`
+- `tests/EpubCheckTest.php` (group `epubcheck`) saves edited books and, when `EPUBCHECK_JAR` points at
+  `epubcheck.jar`, validates them with EPUBCheck (`EPUBCHECK_JAVA` overrides the java binary). CI runs it
+  in the `epubcheck` job: `EPUBCHECK_JAR=/path/to/epubcheck.jar vendor/bin/phpunit --group epubcheck`
 
 ## PHP Version
 

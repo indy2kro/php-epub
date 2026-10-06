@@ -134,7 +134,7 @@ Effort: S = one file, under 30 min · M = one class plus tests · L = cross-cutt
 
 ### Tests
 
-- [ ] **TEST-01** Run EPUBCheck in CI on books the library saved after edits (metadata, content, cover) — `.github/workflows/tests.yml`, `tests/EpubFileTest.php` — M · med
+- [x] **TEST-01** Run EPUBCheck in CI on books the library saved after edits (metadata, content, cover) — `.github/workflows/tests.yml`, `tests/EpubFileTest.php` — M · med
   Nothing checks saved books against the reference validator; BUG-03, BUG-11 and BUG-12 are exactly what it reports.
 
 ### CI and packaging

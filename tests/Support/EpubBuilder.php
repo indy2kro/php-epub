@@ -17,6 +17,61 @@ final class EpubBuilder
      */
     private array $files = [];
 
+    /**
+     * A 1x1 PNG, for tests that need real image bytes (validators check them).
+     */
+    public const string PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+
+    /**
+     * A small EPUB 3 book that passes EPUBCheck: navigation document, dcterms:modified
+     * and complete XHTML documents.
+     */
+    public static function epub3(): self
+    {
+        $opf = <<<XML
+<?xml version="1.0" encoding="UTF-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="uid">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:identifier id="uid">urn:uuid:3f1e2a4c-5b6d-4e7f-8a9b-0c1d2e3f4a5b</dc:identifier>
+    <dc:title>Valid Book</dc:title>
+    <dc:language>en</dc:language>
+    <meta property="dcterms:modified">2026-01-01T00:00:00Z</meta>
+  </metadata>
+  <manifest>
+    <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>
+    <item id="chapter" href="text/chapter.xhtml" media-type="application/xhtml+xml"/>
+    <item id="style" href="css/style.css" media-type="text/css"/>
+  </manifest>
+  <spine>
+    <itemref idref="chapter"/>
+  </spine>
+</package>
+XML;
+
+        return (new self())
+            ->withFile('mimetype', 'application/epub+zip')
+            ->withContainer('EPUB/package.opf')
+            ->withFile('EPUB/package.opf', $opf)
+            ->withFile('EPUB/nav.xhtml', self::xhtml(
+                'Contents',
+                '<nav epub:type="toc"><h1>Contents</h1><ol><li><a href="text/chapter.xhtml">Chapter</a></li></ol></nav>'
+            ))
+            ->withFile('EPUB/text/chapter.xhtml', self::xhtml('Chapter', '<h1>Chapter</h1><p>Text.</p>', '../css/style.css'))
+            ->withFile('EPUB/css/style.css', 'p { margin: 0; }');
+    }
+
+    /**
+     * A complete EPUB 3 XHTML content document.
+     */
+    public static function xhtml(string $title, string $body, ?string $stylesheet = null): string
+    {
+        $link = $stylesheet === null ? '' : "<link rel=\"stylesheet\" type=\"text/css\" href=\"{$stylesheet}\"/>";
+
+        return '<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html>'
+            . '<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="en" lang="en">'
+            . "<head><meta charset=\"utf-8\"/><title>{$title}</title>{$link}</head><body>{$body}</body></html>";
+    }
+
     public static function minimal(): self
     {
         return (new self())
