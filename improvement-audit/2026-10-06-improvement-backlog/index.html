@@ -278,9 +278,9 @@ at <code>af4bbcc</code> (main). No source changes were made while compiling this
 </ul>
 <h3 id="bugs">Bugs<a class="headerlink" href="#bugs" title="Permanent link">&para;</a></h3>
 <ul>
-<li>[ ] <strong>BUG-01</strong> Write <code>mimetype</code> as the first, stored ZIP entry on save — <code>src/ZipHandler.php:49-85</code> — S · high
+<li>[x] <strong>BUG-01</strong> Write <code>mimetype</code> as the first, stored ZIP entry on save — <code>src/ZipHandler.php:49-85</code> — S · high
   Probe: re-saving <code>valid.epub</code> put <code>mimetype</code> at index 15, so every saved book fails EPUBCheck and strict readers reject it.</li>
-<li>[ ] <strong>BUG-02</strong> Use <code>/</code> in ZIP entry names on Windows — <code>src/ZipHandler.php:72-78</code> — S · high
+<li>[x] <strong>BUG-02</strong> Use <code>/</code> in ZIP entry names on Windows — <code>src/ZipHandler.php:72-78</code> — S · high
   Probe on Windows produced entries like <code>EPUB\css\base.css</code>, which ZIP/OCF readers cannot resolve.</li>
 <li>[ ] <strong>BUG-03</strong> Keep the <code>dc:identifier</code> referenced by <code>package@unique-identifier</code> in <code>setIdentifiers()</code> — <code>src/Traits/InteractsWithIdentifier.php:38-54</code> — S · high
   All identifiers (and their <code>id</code>s) are deleted, leaving <code>unique-identifier</code> dangling and the OPF invalid.</li>
@@ -354,7 +354,7 @@ at <code>af4bbcc</code> (main). No source changes were made while compiling this
 </ul>
 <h3 id="ci">CI<a class="headerlink" href="#ci" title="Permanent link">&para;</a></h3>
 <ul>
-<li>[ ] <strong>CI-01</strong> Add <code>windows-latest</code> to the test matrix — <code>.github/workflows/tests.yml:17-25</code> — S · med
+<li>[x] <strong>CI-01</strong> Add <code>windows-latest</code> to the test matrix — <code>.github/workflows/tests.yml:17-25</code> — S · med
   BUG-02 only shows up on Windows.</li>
 <li>[ ] <strong>CI-02</strong> Add <code>composer audit</code> and gitleaks; quote <code>$GITHUB_OUTPUT</code> (actionlint SC2086) — <code>.github/workflows/tests.yml:41</code>, <code>.github/workflows/deploy-docs.yml:30</code> — S · low
   Dependency advisories and leaked secrets are not gated.</li>
