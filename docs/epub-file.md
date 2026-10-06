@@ -85,13 +85,13 @@ Returns the ContentManager for adding/updating/deleting content files. Throws an
 public function getCoverImage(): ?ManifestItem
 ```
 
-Returns the cover: the manifest item with the EPUB 3 `cover-image` property, or else the item named by the EPUB 2 `<meta name="cover">`. Returns `null` when the book has no cover. Read the bytes with `getContentManager()->getContent($cover->path)`.
+Returns the cover, looking in order at: the manifest item with the EPUB 3 `cover-image` property; the item named by the EPUB 2 `<meta name="cover">` (by id, or by href as some books write it); the EPUB 2 `<guide>` cover reference, which names either the image itself or a cover page whose first image (`<img>` or SVG `<image>`) is used. Returns `null` when the book has no cover. Read the bytes with `getContentManager()->getContent($cover->path)`.
 
 ```php
 public function setCoverImage(string $imageData, string $mediaType, ?string $path = null): ManifestItem
 ```
 
-Stores the image (by default as `images/cover.<ext>` next to the OPF file), adds it to the manifest and marks it as the cover: the `cover-image` property for EPUB 3 (removed from any previous cover) and `<meta name="cover">` for EPUB 2 compatibility. The previous image file stays in the book. Throws if `$mediaType` is not an `image/…` type.
+Stores the image (by default as `images/cover.<ext>` next to the OPF file), adds it to the manifest and marks it as the cover: the `cover-image` property for EPUB 3 (removed from any previous cover) and `<meta name="cover">` for EPUB 2 compatibility. When `$path` is already in the manifest, that item is reused and its media type updated. The previous image file stays in the book. Throws if `$mediaType` is not an `image/…` type.
 
 ### Converting
 

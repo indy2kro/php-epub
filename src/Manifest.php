@@ -150,6 +150,48 @@ class Manifest
     }
 
     /**
+     * Changes the media type of an item, e.g. after its file was replaced with another format.
+     *
+     * @throws Exception If no item has this id, or the media type is not valid XML text.
+     */
+    public function setMediaType(string $id, string $mediaType): void
+    {
+        XmlText::assertValid($mediaType);
+        $node = $this->requireNode($id);
+
+        if ((string) $node['media-type'] !== $mediaType) {
+            $node['media-type'] = $mediaType;
+            $this->modified = true;
+        }
+    }
+
+    /**
+     * Finds the item for an href relative to the OPF file (fragments are ignored);
+     * null when no item matches or the href points outside the book.
+     */
+    public function findByHref(string $href): ?ManifestItem
+    {
+        $path = $this->tryHrefToPath($href);
+
+        return $path === null ? null : $this->findByPath($path);
+    }
+
+    /**
+     * The file path (relative to the book root) of the EPUB 2 <guide> reference of the
+     * given type, e.g. "cover" or "toc"; null when there is none or it points outside the book.
+     */
+    public function getGuidePath(string $type): ?string
+    {
+        foreach ($this->query('/opf:package/opf:guide/opf:reference') as $reference) {
+            if (strcasecmp((string) $reference['type'], $type) === 0) {
+                return $this->tryHrefToPath((string) $reference['href']);
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Adds an EPUB 3 property token (e.g. "cover-image", "nav") to an item.
      *
      * @throws Exception If no item has this id.

@@ -24,6 +24,18 @@ Manifest `href`s are URLs relative to the OPF file (for example `text/chapter%20
 
 - **`addProperty(string $id, string $property): void`** and **`removeProperty(string $id, string $property): void`**: Add or remove an EPUB 3 property token (e.g. `cover-image`, `nav`) on an item; other tokens are kept.
 
+- **`setMediaType(string $id, string $mediaType): void`**: Changes an item's media type, e.g. after its file was replaced with another format.
+
+- **`findByHref(string $href): ?ManifestItem`**: Looks up an item by an href relative to the OPF file (fragments ignored); `null` when nothing matches or the href points outside the book.
+
+- **`getGuidePath(string $type): ?string`**: The book-root path of the EPUB 2 `<guide>` reference of a type such as `cover` or `toc` (matched case-insensitively), or `null`.
+
+- **`setMediaType(string $id, string $mediaType): void`**: Changes an item's media type, e.g. after its file was replaced with another format.
+
+- **`findByHref(string $href): ?ManifestItem`**: Looks up an item by an href relative to the OPF file (fragments ignored); `null` when nothing matches or the href points outside the book.
+
+- **`getGuidePath(string $type): ?string`**: The book-root path of the EPUB 2 `<guide>` reference of a type such as `cover` or `toc` (matched case-insensitively), or `null`.
+
 - **`getOpfPath(): string`**: The OPF location relative to the book root.
 
 ## Usage Example

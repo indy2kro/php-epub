@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PhpEpub;
 
+use DOMDocument;
 use PhpEpub\Converters\ConverterInterface;
 use PhpEpub\Util\FileSystemHelper;
 use SimpleXMLElement;
@@ -164,8 +165,10 @@ class EpubFile
     }
 
     /**
-     * Returns the cover image: the manifest item with the EPUB 3 "cover-image"
-     * property, or else the item named by the EPUB 2 <meta name="cover">.
+     * Returns the cover image, looking in order at: the manifest item with the EPUB 3
+     * "cover-image" property; the item named by the EPUB 2 <meta name="cover"> (by id, or
+     * by href as some books write it); the EPUB 2 <guide> cover reference, which names
+     * either the image or a cover page whose first image is used.
      */
     public function getCoverImage(): ?ManifestItem
     {
@@ -177,9 +180,21 @@ class EpubFile
             }
         }
 
-        $coverId = $this->getMetadata()->getMeta('cover');
+        $cover = $this->getMetadata()->getMeta('cover');
+        if ($cover !== null) {
+            $item = $manifest->get($cover) ?? $manifest->findByHref($cover);
+            if ($item instanceof ManifestItem) {
+                return $item;
+            }
+        }
 
-        return $coverId === null ? null : $manifest->get($coverId);
+        $guidePath = $manifest->getGuidePath('cover');
+        $item = $guidePath === null ? null : $manifest->findByPath($guidePath);
+        if (! $item instanceof ManifestItem) {
+            return null;
+        }
+
+        return str_starts_with($item->mediaType, 'image/') ? $item : $this->firstImageOf($item);
     }
 
     /**
@@ -212,6 +227,8 @@ class EpubFile
 
         $cover = $manifest->findByPath($path) ?? $manifest->add($path, $mediaType);
         $this->getContentManager()->addContent($path, $imageData);
+        // The path may have held another format before.
+        $manifest->setMediaType($cover->id, $mediaType);
 
         if (str_starts_with($metadata->getVersion(), '3')) {
             $manifest->addProperty($cover->id, self::COVER_PROPERTY);
@@ -221,6 +238,52 @@ class EpubFile
         $metadata->setMeta('cover', $cover->id);
 
         return $manifest->get($cover->id) ?? $cover;
+    }
+
+    /**
+     * The manifest item of the first image (<img src>, or SVG <image href>) in an XHTML page.
+     */
+    private function firstImageOf(ManifestItem $page): ?ManifestItem
+    {
+        if (! in_array($page->mediaType, ['application/xhtml+xml', 'text/html'], true)) {
+            return null;
+        }
+
+        $document = new DOMDocument();
+        $useInternalErrors = libxml_use_internal_errors(true);
+
+        try {
+            $document->loadHTML('<?xml encoding="UTF-8">' . $this->getContentManager()->getContent($page->path), LIBXML_NONET);
+        } catch (Exception) {
+            return null;
+        } finally {
+            libxml_clear_errors();
+            libxml_use_internal_errors($useInternalErrors);
+        }
+
+        $sources = [];
+        foreach ($document->getElementsByTagName('img') as $image) {
+            $sources[] = $image->getAttribute('src');
+        }
+        foreach ($document->getElementsByTagName('image') as $image) {
+            $sources[] = $image->getAttribute('xlink:href') ?: $image->getAttribute('href');
+        }
+
+        $manifest = $this->getManifest();
+        $directory = dirname($page->path) === '.' ? '' : dirname($page->path) . '/';
+        foreach ($sources as $source) {
+            try {
+                $item = $manifest->findByPath($directory . rawurldecode(explode('#', $source, 2)[0]));
+            } catch (InvalidEpubException) {
+                continue;
+            }
+
+            if ($item instanceof ManifestItem && str_starts_with($item->mediaType, 'image/')) {
+                return $item;
+            }
+        }
+
+        return null;
     }
 
     /**
