@@ -6,10 +6,17 @@ namespace PhpEpub\Converters;
 
 use Dompdf\Dompdf;
 use Dompdf\Options;
-use PhpEpub\Exception;
+use PhpEpub\ConversionException;
 
 class DompdfAdapter implements ConverterInterface
 {
+    private const array DEFAULT_STYLES = [
+        'font' => 'Arial',
+        'font_size' => 12,
+        'paper_size' => 'A4',
+        'orientation' => 'portrait',
+    ];
+
     /**
      * @var array<string, mixed>
      */
@@ -18,81 +25,98 @@ class DompdfAdapter implements ConverterInterface
     /**
      * DompdfAdapter constructor.
      *
-     * @param array<string, mixed> $styles Optional styling parameters.
+     * @param array<string, mixed> $styles Optional styling parameters: font, font_size (pt), paper_size, orientation.
      */
-    public function __construct(array $styles = [])
+    public function __construct(array $styles = [], private readonly EpubDocumentLoader $loader = new EpubDocumentLoader())
     {
-        // Default styling parameters
-        $defaultStyles = [
-            'font' => 'Arial',
-            'font_size' => 12,
-            'paper_size' => 'A4',
-            'orientation' => 'portrait',
-        ];
-
-        // Merge default styles with user-provided styles
-        $this->styles = array_merge($defaultStyles, $styles);
+        $this->styles = array_merge(self::DEFAULT_STYLES, $styles);
     }
 
     /**
      * Converts the EPUB content to a PDF using Dompdf.
      *
+     * Every spine document is rendered in reading order, each starting on a new page,
+     * and the PDF title and author are taken from the EPUB metadata.
+     *
      * @param string $epubDirectory The directory containing the extracted EPUB contents.
      * @param string $outputPath The path where the converted PDF should be saved.
      *
-     * @throws Exception If the conversion fails.
+     * @throws ConversionException If the conversion fails.
      */
     public function convert(string $epubDirectory, string $outputPath): void
     {
-        // Initialize Dompdf with options
-        $options = new Options();
-        $options->set('defaultFont', $this->styles['font']);
-        $dompdf = new Dompdf($options);
+        $document = $this->loader->load($epubDirectory);
 
-        // Load EPUB content (this is a simplified example)
-        $content = $this->loadEpubContent($epubDirectory);
+        $dompdf = $this->createDompdf($epubDirectory);
+        $dompdf->loadHtml($this->renderHtml($document));
+        $dompdf->setPaper($this->stringStyle('paper_size'), $this->stringStyle('orientation'));
 
-        // Load HTML content into Dompdf
-        $dompdf->loadHtml($content);
-
-        $paperSize = 'A4';
-        if (isset($this->styles['paper_size']) && is_string($this->styles['paper_size'])) {
-            $paperSize = $this->styles['paper_size'];
+        if ($document->title !== '') {
+            $dompdf->addInfo('Title', $document->title);
         }
 
-        $orientation = 'portrait';
-        if (isset($this->styles['orientation']) && is_string($this->styles['orientation'])) {
-            $orientation = $this->styles['orientation'];
+        if ($document->authors !== []) {
+            $dompdf->addInfo('Author', implode(', ', $document->authors));
         }
 
-        // Set paper size and orientation
-        $dompdf->setPaper($paperSize, $orientation);
-
-        // Render the PDF
         $dompdf->render();
 
-        // Output the generated PDF to a file
-        file_put_contents($outputPath, $dompdf->output());
+        if (@file_put_contents($outputPath, (string) $dompdf->output()) === false) {
+            throw new ConversionException("Failed to write PDF: {$outputPath}");
+        }
     }
 
     /**
-     * Loads the EPUB content for conversion.
+     * Returns the HTML document that convert() renders, e.g. for previews.
      *
-     * @throws Exception If the content cannot be loaded.
+     * @throws ConversionException If the book cannot be read.
      */
-    private function loadEpubContent(string $epubDirectory): string
+    public function buildHtml(string $epubDirectory): string
     {
-        // Simplified example: Load content from a specific file
-        $contentFile = $epubDirectory . '/content.xhtml'; // Adjust this path as needed
-        if (! file_exists($contentFile)) {
-            throw new Exception("Content file not found: {$contentFile}");
-        }
+        return $this->renderHtml($this->loader->load($epubDirectory));
+    }
 
-        $content = file_get_contents($contentFile);
-        if ($content === false) {
-            throw new Exception("Failed to read content from: {$contentFile}");
-        }
+    /**
+     * Creates a Dompdf instance that cannot reach outside the book: no remote
+     * resources, no embedded PHP or JavaScript, and file access limited to the book.
+     */
+    protected function createDompdf(string $epubDirectory): Dompdf
+    {
+        $root = realpath($epubDirectory);
 
-        return $content;
+        $options = new Options();
+        $options->set('defaultFont', $this->stringStyle('font'));
+        $options->setIsRemoteEnabled(false);
+        $options->setIsPhpEnabled(false);
+        $options->setIsJavascriptEnabled(false);
+        $options->setChroot([$root === false ? $epubDirectory : $root]);
+
+        return new Dompdf($options);
+    }
+
+    private function renderHtml(EpubDocument $document): string
+    {
+        $font = str_replace(['"', '<', '>', ';', '}'], '', $this->stringStyle('font'));
+        $css = sprintf('body { font-family: "%s"; font-size: %dpt; }', $font, $this->intStyle('font_size'));
+
+        return '<!DOCTYPE html><html><head><meta charset="utf-8">'
+            . '<title>' . htmlspecialchars($document->title, ENT_QUOTES | ENT_HTML5) . '</title>'
+            . '<style>' . $css . '</style></head><body>'
+            . implode('<div style="page-break-before: always"></div>', $document->chapters)
+            . '</body></html>';
+    }
+
+    private function stringStyle(string $name): string
+    {
+        $value = $this->styles[$name] ?? null;
+
+        return is_string($value) ? $value : (string) self::DEFAULT_STYLES[$name];
+    }
+
+    private function intStyle(string $name): int
+    {
+        $value = $this->styles[$name] ?? null;
+
+        return is_int($value) ? $value : (int) self::DEFAULT_STYLES[$name];
     }
 }

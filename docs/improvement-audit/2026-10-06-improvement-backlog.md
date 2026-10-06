@@ -65,9 +65,9 @@ Effort: S = one file, under 30 min · M = one class plus tests · L = cross-cutt
   `extractTo()` inflates every entry without limits, so a small zip bomb fills the temp disk (PHP already strips `../` from entry names).
 - [x] **SEC-04** Stop disabling TLS verification when downloading AFM fonts — `scripts/generate-core-fonts.php:83-86` — S · med
   `verify_peer => false` on a script that Composer runs on every install/update lets a network attacker substitute font data.
-- [ ] **SEC-05** Accept Calibre `extra_args` as a list and escape each argument — `src/Converters/CalibreAdapter.php:44-50` — S · med
+- [x] **SEC-05** Accept Calibre `extra_args` as a list and escape each argument — `src/Converters/CalibreAdapter.php:44-50` — S · med
   `extra_args` is appended raw to the shell command, so any user-influenced option becomes shell injection.
-- [ ] **SEC-06** Lock down HTML renderers for untrusted book content (Dompdf `chroot` to the book dir, remote/PHP off; TCPDF image paths confined) — `src/Converters/DompdfAdapter.php:47-50`, `src/Converters/TCPDFAdapter.php:127-130` — M · med
+- [x] **SEC-06** Lock down HTML renderers for untrusted book content (Dompdf `chroot` to the book dir, remote/PHP off; TCPDF image paths confined) — `src/Converters/DompdfAdapter.php:47-50`, `src/Converters/TCPDFAdapter.php:127-130` — M · med
   Book XHTML can reference local files or URLs that the renderer would read into the PDF.
 - [x] **SEC-07** Create the temp dir with mode `0700` and a `random_bytes` name — `src/EpubFile.php:47-50` — S · low
   `uniqid()` plus the default `0777` mode leaves extracted content readable by other local users.
@@ -103,17 +103,17 @@ Effort: S = one file, under 30 min · M = one class plus tests · L = cross-cutt
 
 ### Converters
 
-- [ ] **CONV-01** Render spine documents in order instead of a hard-coded `content.xhtml` — `src/Converters/DompdfAdapter.php:83-97`, `src/Converters/TCPDFAdapter.php:135-149` — M · high
+- [x] **CONV-01** Render spine documents in order instead of a hard-coded `content.xhtml` — `src/Converters/DompdfAdapter.php:83-97`, `src/Converters/TCPDFAdapter.php:135-149` — M · high
   Real books have no root `content.xhtml`, so both PDF adapters fail on every real EPUB.
-- [ ] **CONV-02** Make `Converter` work with `CalibreAdapter` (it needs the `.epub`, `Converter` passes the extracted dir) — `src/Converter.php:37-44`, `src/Converters/CalibreAdapter.php:31` — S · med
+- [x] **CONV-02** Make `Converter` work with `CalibreAdapter` (it needs the `.epub`, `Converter` passes the extracted dir) — `src/Converter.php:37-44`, `src/Converters/CalibreAdapter.php:31` — S · med
   The interface says "directory", Calibre expects a file, so `Converter` + Calibre (the docs example) cannot work.
 - [x] **CONV-03** Resolve TCPDF fonts when php-epub is installed as a dependency — `src/Converters/TCPDFAdapter.php:48-50`, `composer.json` scripts — M · med
   `K_PATH_FONTS` points at php-epub's own `vendor/`, and `post-install-cmd` only runs for the root package.
-- [ ] **CONV-04** Fill TCPDF document info from EPUB metadata instead of `'Author Name'` — `src/Converters/TCPDFAdapter.php:55-60` — S · low
+- [x] **CONV-04** Fill TCPDF document info from EPUB metadata instead of `'Author Name'` — `src/Converters/TCPDFAdapter.php:55-60` — S · low
   Every PDF claims the same placeholder author and title.
-- [ ] **CONV-05** Check `file_put_contents` results and capture Calibre stderr — `src/Converters/DompdfAdapter.php:76`, `src/Converters/TCPDFAdapter.php:131`, `src/Converters/CalibreAdapter.php:44-50` — S · low
+- [x] **CONV-05** Check `file_put_contents` results and capture Calibre stderr — `src/Converters/DompdfAdapter.php:76`, `src/Converters/TCPDFAdapter.php:131`, `src/Converters/CalibreAdapter.php:44-50` — S · low
   Write failures are silent and Calibre errors arrive with an empty message.
-- [ ] **CONV-06** Align defaults and honour `font_size` in Dompdf — `src/Converters/TCPDFAdapter.php:90-115`, `src/Converters/DompdfAdapter.php:24-30` — S · low
+- [x] **CONV-06** Align defaults and honour `font_size` in Dompdf — `src/Converters/TCPDFAdapter.php:90-115`, `src/Converters/DompdfAdapter.php:24-30` — S · low
   Fallbacks (font size 27, bottom margin 27) contradict the declared defaults (12, 25) and Dompdf ignores `font_size`.
 
 ### API / UX
@@ -138,7 +138,7 @@ Effort: S = one file, under 30 min · M = one class plus tests · L = cross-cutt
 
 ### Documentation
 
-- [ ] **DOC-01** Fix the `Converter` example that wires `CalibreAdapter` with an extracted directory — `docs/converter.md:15-31` — S · med
+- [x] **DOC-01** Fix the `Converter` example that wires `CalibreAdapter` with an extracted directory — `docs/converter.md:15-31` — S · med
   The documented example cannot work (see CONV-02).
 - [ ] **DOC-02** Add a "Handling untrusted EPUBs" section and document the `save()` contract — `docs/advanced-usage.md`, `docs/epub-file.md` — S · low
   Users need to know which limits exist and that metadata must be saved before the book.
@@ -147,7 +147,7 @@ Effort: S = one file, under 30 min · M = one class plus tests · L = cross-cutt
 
 - [x] **TEST-01** Add `tests/Support/EpubBuilder` and an OCF round-trip test (save → reopen → `mimetype` first/stored, `/` separators) — `tests/` — M · high
   Nothing asserts that saved books are structurally valid, which is how BUG-01/BUG-02 went unnoticed.
-- [ ] **TEST-02** Cover `PhpEpub\Converter` (no test references it) — `tests/` — S · low
+- [x] **TEST-02** Cover `PhpEpub\Converter` (no test references it) — `tests/` — S · low
   Format dispatch and the unsupported-format error are untested.
 - [x] **TEST-03** Fix `phpunit.xml`: suite named "PhpIso Testing Suite", excludes non-existent `src/Cli/`, schema 8.3 — `phpunit.xml:14-27` — S · low
   Copy-paste leftovers from php-iso.

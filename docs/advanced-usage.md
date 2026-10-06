@@ -84,7 +84,7 @@ use PhpEpub\Converters\CalibreAdapter;
 
 $options = [
     'calibre_path' => '/usr/bin/ebook-convert',
-    'extra_args' => '--output-profile kindle',
+    'extra_args' => ['--output-profile', 'kindle'],
 ];
 
 $calibreAdapter = new CalibreAdapter($options);
