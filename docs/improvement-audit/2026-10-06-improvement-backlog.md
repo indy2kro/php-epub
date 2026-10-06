@@ -63,7 +63,7 @@ Effort: S = one file, under 30 min · M = one class plus tests · L = cross-cutt
   Callers typically pass manifest hrefs from the book, and `../` lets `add/update/delete/getContent` touch arbitrary files.
 - [x] **SEC-03** Cap total uncompressed size, entry count and compression ratio before extracting — `src/ZipHandler.php:21-38` — M · med
   `extractTo()` inflates every entry without limits, so a small zip bomb fills the temp disk (PHP already strips `../` from entry names).
-- [ ] **SEC-04** Stop disabling TLS verification when downloading AFM fonts — `scripts/generate-core-fonts.php:83-86` — S · med
+- [x] **SEC-04** Stop disabling TLS verification when downloading AFM fonts — `scripts/generate-core-fonts.php:83-86` — S · med
   `verify_peer => false` on a script that Composer runs on every install/update lets a network attacker substitute font data.
 - [ ] **SEC-05** Accept Calibre `extra_args` as a list and escape each argument — `src/Converters/CalibreAdapter.php:44-50` — S · med
   `extra_args` is appended raw to the shell command, so any user-influenced option becomes shell injection.
@@ -107,7 +107,7 @@ Effort: S = one file, under 30 min · M = one class plus tests · L = cross-cutt
   Real books have no root `content.xhtml`, so both PDF adapters fail on every real EPUB.
 - [ ] **CONV-02** Make `Converter` work with `CalibreAdapter` (it needs the `.epub`, `Converter` passes the extracted dir) — `src/Converter.php:37-44`, `src/Converters/CalibreAdapter.php:31` — S · med
   The interface says "directory", Calibre expects a file, so `Converter` + Calibre (the docs example) cannot work.
-- [ ] **CONV-03** Resolve TCPDF fonts when php-epub is installed as a dependency — `src/Converters/TCPDFAdapter.php:48-50`, `composer.json` scripts — M · med
+- [x] **CONV-03** Resolve TCPDF fonts when php-epub is installed as a dependency — `src/Converters/TCPDFAdapter.php:48-50`, `composer.json` scripts — M · med
   `K_PATH_FONTS` points at php-epub's own `vendor/`, and `post-install-cmd` only runs for the root package.
 - [ ] **CONV-04** Fill TCPDF document info from EPUB metadata instead of `'Author Name'` — `src/Converters/TCPDFAdapter.php:55-60` — S · low
   Every PDF claims the same placeholder author and title.
