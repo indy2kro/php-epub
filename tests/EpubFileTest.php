@@ -481,6 +481,34 @@ final class EpubFileTest extends TestCase
         $this->assertNull($epubFile->getTempDir());
     }
 
+    public function testReloadSucceedsWhenThePreviousExtractionCannotBeDeleted(): void
+    {
+        $epubFile = EpubFile::open(__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'valid.epub');
+        $oldTempDir = (string) $epubFile->getTempDir();
+        $metaInf = $oldTempDir . DIRECTORY_SEPARATOR . 'META-INF';
+
+        $handle = fopen($metaInf . DIRECTORY_SEPARATOR . 'container.xml', 'r');
+        chmod($metaInf, 0500);
+
+        try {
+            if (DIRECTORY_SEPARATOR === '/' && is_writable($metaInf)) {
+                $this->markTestSkipped('Read-only directories are writable here (e.g. running as root).');
+            }
+
+            // The stuck old extraction must not stop the book from loading again.
+            $epubFile->load();
+
+            $this->assertNotSame($oldTempDir, $epubFile->getTempDir());
+            $this->assertNotSame('', $epubFile->getMetadata()->getTitle());
+        } finally {
+            if (is_resource($handle)) {
+                fclose($handle);
+            }
+            chmod($metaInf, 0700);
+            $this->fileSystemHelper->deleteDirectory($oldTempDir);
+        }
+    }
+
     public function testCloningIsRefusedAndLeavesTheOriginalUsable(): void
     {
         $epubFile = EpubFile::open(__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'valid.epub');
