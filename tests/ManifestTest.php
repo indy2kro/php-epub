@@ -57,6 +57,19 @@ final class ManifestTest extends TestCase
         $this->assertCount(2, $manifest->getItems());
     }
 
+    public function testItemsPointingOutsideTheBookDoNotBreakTheManifest(): void
+    {
+        $manifest = $this->manifest('<item id="escape" href="../../outside.xhtml" media-type="application/xhtml+xml"/>');
+
+        $items = $manifest->getItems();
+
+        $this->assertCount(2, $items);
+        // Like a remote resource: listed, but without a file in the book.
+        $this->assertSame('', $manifest->get('escape')?->path);
+        $this->assertSame('chapter', $manifest->findByPath('EPUB/chapter.xhtml')?->id);
+        $this->assertSame('new-xhtml', $manifest->add('EPUB/new.xhtml')->id);
+    }
+
     public function testHrefToPathRejectsHrefsOutsideTheBook(): void
     {
         $this->expectException(InvalidEpubException::class);

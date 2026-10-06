@@ -80,4 +80,32 @@ final class FileSystemHelperTest extends TestCase
             $this->helper->deleteDirectory($base);
         }
     }
+
+    public function testDeleteDirectoryReportsFailureWithoutWarnings(): void
+    {
+        $base = $this->fixturesDir . DIRECTORY_SEPARATOR . 'tmp' . DIRECTORY_SEPARATOR . 'undeletable';
+        $nested = $base . DIRECTORY_SEPARATOR . 'nested';
+        mkdir($nested, 0777, true);
+        file_put_contents($nested . DIRECTORY_SEPARATOR . 'file.txt', 'x');
+
+        // Windows cannot remove a directory while a file in it is open; POSIX cannot unlink from a read-only directory.
+        $handle = fopen($nested . DIRECTORY_SEPARATOR . 'file.txt', 'r');
+        chmod($nested, 0500);
+
+        try {
+            if (DIRECTORY_SEPARATOR === '/' && is_writable($nested)) {
+                $this->markTestSkipped('Read-only directories are writable here (e.g. running as root).');
+            }
+
+            // failOnWarning turns any warning from unlink()/rmdir() into a failure.
+            $this->assertFalse($this->helper->deleteDirectory($base));
+            $this->assertDirectoryExists($base);
+        } finally {
+            if (is_resource($handle)) {
+                fclose($handle);
+            }
+            chmod($nested, 0777);
+            $this->helper->deleteDirectory($base);
+        }
+    }
 }

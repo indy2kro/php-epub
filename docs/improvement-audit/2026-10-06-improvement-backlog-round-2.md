@@ -65,23 +65,23 @@ Effort: S = one file, under 30 min · M = one class plus tests · L = cross-cutt
 
 ### Bugs
 
-- [ ] **BUG-01** Accept prefixed OPF packages and containers in `Parser` (look up the OPF/OCF namespace URIs instead of the default-namespace key) — `src/Parser.php:63-71,97-105` — S · med
+- [x] **BUG-01** Accept prefixed OPF packages and containers in `Parser` (look up the OPF/OCF namespace URIs instead of the default-namespace key) — `src/Parser.php:63-71,97-105` — S · med
   `getNamespaces(true)` has no `''` key for `<opf:package xmlns:opf=…>`, so `load()` throws "No OPF namespace" and the prefixed-package support in `Metadata`/`Spine` is unreachable (its test bypasses `Parser`).
-- [ ] **BUG-02** Reset metadata/manifest/spine/content manager in `cleanup()` and when `load()` fails — `src/EpubFile.php:61-92` — S · med
+- [x] **BUG-02** Reset metadata/manifest/spine/content manager in `cleanup()` and when `load()` fails — `src/EpubFile.php:61-92` — S · med
   The getters keep returning objects bound to a deleted temp dir, so later edits and `save()` fail with confusing I/O errors.
 - [x] **BUG-03** Clear dangling references when `deleteContent()`/`Manifest::remove()` drops an item (`<meta name="cover">`, `spine@toc`, `<guide>`) — `src/ContentManager.php:135-155`, `src/Manifest.php:136-142` — M · med
   Deleting the cover image or the NCX leaves references to an id/href that no longer exists, which readers and EPUBCheck reject.
-- [ ] **BUG-04** Do not let one bad manifest href make the whole manifest unreadable — `src/Manifest.php:74-100,225-238` — S · med
+- [x] **BUG-04** Do not let one bad manifest href make the whole manifest unreadable — `src/Manifest.php:74-100,225-238` — S · med
   `toItem()` throws for an href like `../x`, so `getItems()`, `findByPath()`, `getCoverImage()` and `addContent()` all fail instead of skipping or flagging that item.
-- [ ] **BUG-05** Pick the rootfile with media type `application/oebps-package+xml` instead of the first one — `src/Parser.php:73-81` — S · low
+- [x] **BUG-05** Pick the rootfile with media type `application/oebps-package+xml` instead of the first one — `src/Parser.php:73-81` — S · low
   Multi-rendition containers may list another rootfile first.
-- [ ] **BUG-06** Make cloned `EpubFile` instances safe (copy the extraction, or forbid `__clone`) — `src/EpubFile.php:56-68` — S · low
+- [x] **BUG-06** Make cloned `EpubFile` instances safe (copy the extraction, or forbid `__clone`) — `src/EpubFile.php:56-68` — S · low
   A clone shares the temp dir, so the first destructor deletes the book under the other instance.
 - [ ] **BUG-07** Update the manifest media type when `setCoverImage()` reuses an existing path — `src/EpubFile.php:172` — S · low
   Replacing `images/cover.jpg` with PNG bytes keeps `media-type="image/jpeg"`.
 - [ ] **BUG-08** Fall back to `<guide><reference type="cover">` and href-valued `<meta name="cover">` in `getCoverImage()` — `src/EpubFile.php:129-142` — S · low
   Many EPUB 2 books name the cover that way, and `getCoverImage()` returns null for them.
-- [ ] **BUG-09** Report `deleteDirectory()` failures instead of emitting warnings from the destructor — `src/Util/FileSystemHelper.php:34-65` — S · low
+- [x] **BUG-09** Report `deleteDirectory()` failures instead of emitting warnings from the destructor — `src/Util/FileSystemHelper.php:34-65` — S · low
   Recursive results are ignored, and a locked Windows file raises warnings from `__destruct` and leaks the temp dir silently.
 - [x] **BUG-10** Keep `ContentManager` writes to the OPF consistent with the in-memory package (refuse them, or reload) — `src/ContentManager.php:89-126`, `src/EpubFile.php:193-204` — S · low
   `updateContent()` on the OPF is overwritten on the next `save()` when anything else changed, and kept otherwise.

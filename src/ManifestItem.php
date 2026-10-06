@@ -12,7 +12,7 @@ final readonly class ManifestItem
     /**
      * @param string $id The item id, referenced by spine itemrefs.
      * @param string $href The href as written in the OPF (relative to the OPF file, URL-encoded).
-     * @param string $path The file path relative to the book root, usable with ContentManager ("" for remote resources).
+     * @param string $path The file path relative to the book root, usable with ContentManager ("" for remote resources and hrefs that point outside the book).
      * @param string $mediaType The item's media type.
      * @param string $properties Space-separated EPUB 3 properties (e.g. "nav", "cover-image"), or "".
      */

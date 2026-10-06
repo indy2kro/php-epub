@@ -290,12 +290,13 @@ class Manifest
     {
         $href = (string) $node['href'];
         // EPUB 3 allows remote resources (e.g. streamed audio); they have no file in the book.
+        // Neither has an href that escapes the book: one hostile item must not hide the others.
         $isRemote = preg_match('#^[a-z][a-z0-9+.-]*:#i', $href) === 1;
 
         return new ManifestItem(
             (string) $node['id'],
             $href,
-            $isRemote ? '' : $this->hrefToPath($href),
+            $isRemote ? '' : ($this->tryHrefToPath($href) ?? ''),
             (string) $node['media-type'],
             (string) $node['properties']
         );

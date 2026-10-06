@@ -413,6 +413,120 @@ final class EpubFileTest extends TestCase
         $epubFile->{$accessor}();
     }
 
+    #[DataProvider('accessorProvider')]
+    public function testAccessorsAfterCleanupThrow(string $accessor, string $message): void
+    {
+        $epubFile = EpubFile::open(__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'valid.epub');
+        $epubFile->cleanup();
+
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage($message);
+
+        $epubFile->{$accessor}();
+    }
+
+    #[DataProvider('accessorProvider')]
+    public function testAccessorsAfterAFailedReloadThrow(string $accessor, string $message): void
+    {
+        copy(__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'valid.epub', $this->tempEpubFilePath);
+        $epubFile = EpubFile::open($this->tempEpubFilePath);
+        copy(__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'invalid.epub', $this->tempEpubFilePath);
+
+        try {
+            $epubFile->load();
+            $this->fail('Expected loading an invalid book to fail.');
+        } catch (Exception) {
+            // The failed load must not leave an extraction behind or keep the old book's objects.
+            $this->assertNull($epubFile->getTempDir());
+        }
+
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage($message);
+
+        $epubFile->{$accessor}();
+    }
+
+    public function testCleanupReportsAnExtractionItCannotDeleteAndCanRetry(): void
+    {
+        $epubFile = EpubFile::open(__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'valid.epub');
+        $tempDir = (string) $epubFile->getTempDir();
+        $metaInf = $tempDir . DIRECTORY_SEPARATOR . 'META-INF';
+
+        // Windows cannot remove a directory while a file in it is open; POSIX cannot unlink from a read-only directory.
+        $handle = fopen($metaInf . DIRECTORY_SEPARATOR . 'container.xml', 'r');
+        chmod($metaInf, 0500);
+
+        try {
+            if (DIRECTORY_SEPARATOR === '/' && is_writable($metaInf)) {
+                $this->markTestSkipped('Read-only directories are writable here (e.g. running as root).');
+            }
+
+            try {
+                $epubFile->cleanup();
+                $this->fail('Expected cleanup() to report the directory it could not delete.');
+            } catch (Exception $exception) {
+                $this->assertStringContainsString($tempDir, $exception->getMessage());
+            }
+        } finally {
+            if (is_resource($handle)) {
+                fclose($handle);
+            }
+            chmod($metaInf, 0700);
+        }
+
+        // The book is unloaded, but the leftover directory is remembered so cleanup can be retried.
+        $this->assertSame($tempDir, $epubFile->getTempDir());
+        $epubFile->cleanup();
+        $this->assertDirectoryDoesNotExist($tempDir);
+        $this->assertNull($epubFile->getTempDir());
+    }
+
+    public function testReloadSucceedsWhenThePreviousExtractionCannotBeDeleted(): void
+    {
+        $epubFile = EpubFile::open(__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'valid.epub');
+        $oldTempDir = (string) $epubFile->getTempDir();
+        $metaInf = $oldTempDir . DIRECTORY_SEPARATOR . 'META-INF';
+
+        $handle = fopen($metaInf . DIRECTORY_SEPARATOR . 'container.xml', 'r');
+        chmod($metaInf, 0500);
+
+        try {
+            if (DIRECTORY_SEPARATOR === '/' && is_writable($metaInf)) {
+                $this->markTestSkipped('Read-only directories are writable here (e.g. running as root).');
+            }
+
+            // The stuck old extraction must not stop the book from loading again.
+            $epubFile->load();
+
+            $this->assertNotSame($oldTempDir, $epubFile->getTempDir());
+            $this->assertNotSame('', $epubFile->getMetadata()->getTitle());
+        } finally {
+            if (is_resource($handle)) {
+                fclose($handle);
+            }
+            chmod($metaInf, 0700);
+            $this->fileSystemHelper->deleteDirectory($oldTempDir);
+        }
+    }
+
+    public function testCloningIsRefusedAndLeavesTheOriginalUsable(): void
+    {
+        $epubFile = EpubFile::open(__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'valid.epub');
+
+        // A clone would share the extraction: its destructor would delete the original's files.
+        $cloneOf = static fn (EpubFile $original): EpubFile => clone $original;
+
+        try {
+            $copy = $cloneOf($epubFile);
+            $this->fail('Expected cloning to be refused, got a ' . $copy::class . '.');
+        } catch (Exception $exception) {
+            $this->assertStringContainsString('cannot be cloned', $exception->getMessage());
+        }
+
+        $this->assertDirectoryExists((string) $epubFile->getTempDir());
+        $this->assertNotSame('', $epubFile->getMetadata()->getTitle());
+    }
+
     public static function accessorProvider(): Iterator
     {
         yield ['getMetadata', 'EPUB file must be loaded before accessing metadata.'];

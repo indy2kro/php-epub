@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PhpEpub\Test;
 
+use PhpEpub\EpubFile;
 use PhpEpub\Exception;
 use PhpEpub\InvalidEpubException;
 use PhpEpub\Parser;
@@ -234,6 +235,53 @@ final class ParserTest extends TestCase
         $this->expectExceptionMessage('No NCX namespace found');
 
         $this->parser->parse($directory);
+    }
+
+    public function testPrefixedContainerPackageAndNcxLoad(): void
+    {
+        $opf = '<?xml version="1.0" encoding="UTF-8"?>'
+            . '<opf:package xmlns:opf="http://www.idpf.org/2007/opf" xmlns:dc="http://purl.org/dc/elements/1.1/" version="2.0" unique-identifier="uid">'
+            . '<opf:metadata><dc:identifier id="uid">urn:x</dc:identifier><dc:title>Prefixed</dc:title><dc:language>en</dc:language></opf:metadata>'
+            . '<opf:manifest><opf:item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml"/>'
+            . '<opf:item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/></opf:manifest>'
+            . '<opf:spine toc="ncx"><opf:itemref idref="chapter"/></opf:spine></opf:package>';
+        $epubPath = EpubBuilder::minimal()
+            ->withFile('META-INF/container.xml', '<c:container xmlns:c="urn:oasis:names:tc:opendocument:xmlns:container" version="1.0">'
+                . '<c:rootfiles><c:rootfile full-path="EPUB/package.opf" media-type="application/oebps-package+xml"/></c:rootfiles></c:container>')
+            ->withFile('EPUB/package.opf', $opf)
+            ->withFile('EPUB/toc.ncx', '<n:ncx xmlns:n="http://www.daisy.org/z3986/2005/ncx/" version="2005-1"><n:navMap/></n:ncx>')
+            ->buildEpub($this->tmpDir . '/prefixed.epub');
+
+        $epubFile = EpubFile::open($epubPath);
+
+        $this->assertSame('Prefixed', $epubFile->getMetadata()->getTitle());
+        $this->assertSame(['chapter'], $epubFile->getSpine()->get());
+        $epubFile->cleanup();
+    }
+
+    public function testContainerAndNcxWithAnUnexpectedDefaultNamespaceStillLoad(): void
+    {
+        // Books in the wild get namespace URIs slightly wrong; these loaded before and must keep loading.
+        $directory = EpubBuilder::minimal()
+            ->withFile('META-INF/container.xml', '<container xmlns="urn:oasis:names:tc:opendocument:xmlns:container:typo" version="1.0">'
+                . '<rootfiles><rootfile full-path="EPUB/package.opf"/></rootfiles></container>')
+            ->withFile('EPUB/package.opf', EpubBuilder::opf('<item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>'))
+            ->withFile('EPUB/toc.ncx', '<ncx xmlns="http://www.daisy.org/z3986/2005/ncx" version="2005-1"><navMap/></ncx>')
+            ->writeTo($this->tmpDir . '/book');
+
+        $this->assertSame('EPUB/package.opf', $this->parser->parse($directory));
+    }
+
+    public function testParsePicksThePackageRootfileWhenItIsNotFirst(): void
+    {
+        $directory = EpubBuilder::minimal()
+            ->withFile('META-INF/container.xml', '<container xmlns="urn:oasis:names:tc:opendocument:xmlns:container" version="1.0"><rootfiles>'
+                . '<rootfile full-path="book.pdf" media-type="application/pdf"/>'
+                . '<rootfile full-path="EPUB/package.opf" media-type="application/oebps-package+xml"/>'
+                . '</rootfiles></container>')
+            ->writeTo($this->tmpDir . '/book');
+
+        $this->assertSame('EPUB/package.opf', $this->parser->parse($directory));
     }
 
     private function copyFixtureToTmp(string $fixtureName): string

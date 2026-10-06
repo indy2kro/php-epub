@@ -12,7 +12,7 @@ Manifest `href`s are URLs relative to the OPF file (for example `text/chapter%20
 
 - **`__construct(SimpleXMLElement $opfXml, string $opfPath)`**: `$opfPath` is the OPF location relative to the book root, as returned by `Parser::parse()`. Throws `InvalidEpubException` if the package has no manifest.
 
-- **`getItems(): array`**: All items as `ManifestItem` objects with `id`, `href`, `path`, `mediaType` and `properties`.
+- **`getItems(): array`**: All items as `ManifestItem` objects with `id`, `href`, `path`, `mediaType` and `properties`. `path` is empty for remote resources and for hrefs that point outside the book; such items are listed but have no file.
 
 - **`get(string $id): ?ManifestItem`** and **`findByPath(string $path): ?ManifestItem`**: Look up one item.
 
