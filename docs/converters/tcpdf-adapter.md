@@ -7,9 +7,9 @@ Requires `tecnickcom/tcpdf` and its core fonts; see [Installation](../installati
 
 ## Key Methods
 
-- **`__construct(array $styles = [])`**: Initializes the `TCPDFAdapter` with optional styling parameters, such as font, font size, margins, and whether to include headers and footers. These parameters can be customized to alter the appearance of the generated PDF.
+- **`__construct(array $styles = [])`**: Optional styling parameters: `font` (default `helvetica`), `font_size` (default `12`), `margin_left`/`margin_top`/`margin_right`/`margin_bottom` in mm (defaults `15`/`27`/`15`/`25`), and `header`/`footer` booleans (default `true`; the header shows the book title and authors). Values of the wrong type fall back to the defaults.
 
-- **`convert(string $epubDirectory, string $outputPath): void`**: Converts the EPUB content to a PDF using TCPDF. It sets document information, applies styles, adds pages, writes content, and saves the PDF to the specified output path. Throws an exception if the conversion fails.
+- **`convert(string $epubDirectory, string $outputPath): void`**: Renders every spine document in reading order, each on a new page, sets the PDF title and author from the EPUB metadata, and writes the PDF. Image sources are limited to files inside the book; see [Converter](../converter.md#how-the-pdf-adapters-read-a-book). Throws a `ConversionException` if the book cannot be read or the PDF cannot be written.
 
 ## Usage Example
 
