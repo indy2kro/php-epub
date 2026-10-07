@@ -131,12 +131,12 @@ were re-checked against the round-3 hardening.
 
 ### Tests
 
-- [ ] **TEST-01** Run the PHP examples in `README.md` and `docs/` in the test suite (lint every block, execute the self-contained ones against a fixture) — `README.md`, `docs/*.md`, `tests/` — M · low
+- [x] **TEST-01** Run the PHP examples in `README.md` and `docs/` in the test suite (lint every block, execute the self-contained ones against a fixture) — `README.md`, `docs/*.md`, `tests/` — M · low
   PHPCS on `docs/` does not look inside Markdown and no test reads `docs/`, so examples drift silently whenever the API changes. Round 3's DOC-01 and DOC-02 fixed drift of this kind.
-- [ ] **TEST-02** Fuzz the untrusted-input parsers (`ZipHandler::extract()`, `XmlParser`, `Parser`, `EpubDocumentLoader`) with mutated fixtures in a scheduled job — `tests/Support/EpubBuilder.php`, `.github/workflows/tests.yml` — M · low
+- [x] **TEST-02** Fuzz the untrusted-input parsers (`ZipHandler::extract()`, `XmlParser`, `Parser`, `EpubDocumentLoader`) with mutated fixtures in a scheduled job — `tests/Support/EpubBuilder.php`, `.github/workflows/tests.yml` — M · low
   Hostile-input tests are hand-written cases. A cheap mutation fuzzer (truncated entries, flipped bytes, random names) would find crashes and non-library exceptions that example-based tests miss.
 
 ### CI
 
-- [ ] **CI-01** Mark dev-only files `export-ignore`: `docs/`, `mkdocs.yml`, `AGENTS.md`, `phpcs.xml`, `phpstan.neon`, `phpunit.xml`, `rector.php`, `composer.lock`, `.gitignore` — `.gitattributes:10-20` — S · low
+- [x] **CI-01** Mark dev-only files `export-ignore`: `docs/`, `mkdocs.yml`, `AGENTS.md`, `phpcs.xml`, `phpstan.neon`, `phpunit.xml`, `rector.php`, `composer.lock`, `.gitignore` — `.gitattributes:10-20` — S · low
   `git archive HEAD` shows that all of them ship in the Composer dist package, which every dependent downloads.

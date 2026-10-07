@@ -39,13 +39,18 @@ final class DocumentationExamplesTest extends TestCase
         'Exception',
         'Throwable',
         'TCPDF',
-        'Dompdf\\Dompdf',
-        'Dompdf\\Options',
+        \Dompdf\Dompdf::class,
+        \Dompdf\Options::class,
     ];
 
     /**
      * Lower-case methods of other libraries that examples call, such as a PSR-7 request in the web upload example.
      */
+    /**
+     * @var array<string, true>|null
+     */
+    private static ?array $methodCache = null;
+
     private const array OTHER_METHODS = ['getbody', 'getcontents'];
 
     /**
@@ -192,9 +197,8 @@ final class DocumentationExamplesTest extends TestCase
      */
     private static function knownMethods(): array
     {
-        static $methods = null;
-        if ($methods !== null) {
-            return $methods;
+        if (self::$methodCache !== null) {
+            return self::$methodCache;
         }
 
         $methods = [];
@@ -215,6 +219,8 @@ final class DocumentationExamplesTest extends TestCase
                 $methods[strtolower($method->getName())] = true;
             }
         }
+
+        self::$methodCache = $methods;
 
         return $methods;
     }

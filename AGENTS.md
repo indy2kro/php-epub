@@ -93,6 +93,18 @@ Represents reading order - which content to display and in what order.
   errors its original lacks) (`EPUBCHECK_JAVA` overrides the java binary). CI runs it
   in the `epubcheck` job: `EPUBCHECK_JAR=/path/to/epubcheck.jar vendor/bin/phpunit --group epubcheck`
 
+- `tests/DocumentationExamplesTest.php` extracts every fenced `php` block from `README.md` and `docs/**/*.md`, checks
+  that it parses, that the `PhpEpub\...` classes it imports exist and that every method it calls is a public method
+  of a class in `src/`. Blocks that are API signatures (starting with `public`) are wrapped automatically; a block
+  that is deliberately a fragment gets `<!-- example:skip -->` on the line above its opening fence. The failure
+  names the file, the line of the block and the problem. New API docs need examples that pass this test.
+- `tests/FuzzTest.php` (group `fuzz`) mutates valid books (truncation, byte flips, odd or duplicated entry names,
+  corrupted container/OPF/NCX/nav/XHTML) and feeds them to `ZipHandler::extract()`, `EpubFile::open()` +
+  `validate()`, `XmlParser::parseString()` and `EpubDocumentLoader::load()`. Only `PhpEpub\Exception` subclasses
+  are allowed; warnings, notices and deprecations fail. `EPUB_FUZZ_SEED` (fixed by default), `EPUB_FUZZ_ITERATIONS`
+  (default 40) and `EPUB_FUZZ_FIRST` control it, and a failure prints the seed and the command to reproduce it. The
+  `fuzz` CI job runs it with 5000 iterations on the nightly schedule and on `workflow_dispatch`.
+
 ## PHP Version
 
 - Minimum: PHP 8.3
