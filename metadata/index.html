@@ -96,6 +96,10 @@
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#identifiers">Identifiers</a>
     </li>
+    <li class="toctree-l3"><a class="reference internal" href="#other-dublin-core-elements">Other Dublin Core Elements</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#series">Series</a>
+    </li>
     <li class="toctree-l3"><a class="reference internal" href="#other-meta-elements">Other &lt;meta&gt; Elements</a>
     </li>
         </ul>
@@ -247,9 +251,11 @@ public function getDateEvents(): array
 <h3 id="language">Language<a class="headerlink" href="#language" title="Permanent link">&para;</a></h3>
 <pre class="codehilite"><code class="language-php">public function getLanguage(): string
 public function setLanguage(string $language): void
+public function getLanguages(): array&lt;int, string&gt;
+public function setLanguages(array&lt;int, string&gt; $languages): void
 </code></pre>
 
-<p>The language of the resource (dc:language). Use BCP 47 language codes (e.g., "en", "fr").</p>
+<p>The language of the resource (dc:language). Use BCP 47 language codes (e.g., "en", "fr"). <code>getLanguage()</code>/<code>setLanguage()</code> work on the main (first) language; <code>getLanguages()</code>/<code>setLanguages()</code> on all of them, for multilingual books. At least one language is required.</p>
 <h3 id="subject">Subject<a class="headerlink" href="#subject" title="Permanent link">&para;</a></h3>
 <pre class="codehilite"><code class="language-php">public function getSubject(): string
 public function setSubject(string $subject): void
@@ -262,11 +268,41 @@ public function setSubjects(array&lt;int, string&gt; $subjects): void
 <pre class="codehilite"><code class="language-php">public function getIdentifiers(): array&lt;int, string&gt;
 public function getUniqueIdentifier(): ?string
 public function setIdentifiers(array&lt;int, string&gt; $identifiers): void
+public function getTypedIdentifiers(): array&lt;int, Identifier&gt;
+public function getIsbn(): ?string
 </code></pre>
 
 <p>Unambiguous references to the resource (dc:identifier), such as an ISBN or UUID.</p>
 <p>The first value passed to <code>setIdentifiers()</code> is stored in the identifier that <code>package@unique-identifier</code> points to, so the package stays valid. At least one identifier is required. An identifier whose value changes loses its type information (<code>opf:scheme</code> / <code>identifier-type</code> refinement). <code>getUniqueIdentifier()</code> returns that identifier, or <code>null</code> when <code>package@unique-identifier</code> points to none.</p>
 <p>Obfuscated fonts (listed in <code>META-INF/encryption.xml</code>) are keyed with the unique identifier, so when it changes, <code>EpubFile::save()</code> re-keys them: fonts obfuscated with the IDPF algorithm work with any identifier, while Adobe's older algorithm needs a <code>urn:uuid:</code> identifier, and saving throws an <code>Exception</code> naming the font otherwise.</p>
+<p><code>getTypedIdentifiers()</code> returns <code>PhpEpub\Identifier</code> objects (<code>value</code>, <code>scheme</code>). The scheme, in upper case, comes from the EPUB 2 <code>opf:scheme</code> attribute, else the EPUB 3 <code>identifier-type</code> refinement (ONIX codes <code>02</code> and <code>15</code> read as <code>ISBN</code>, <code>06</code> as <code>DOI</code>), else a <code>urn:&lt;scheme&gt;:</code> or <code>doi:</code> prefix, else a valid ISBN check digit; it is <code>null</code> when none of these applies. <code>getIsbn()</code> returns the first ISBN without prefix, hyphens or spaces (e.g. <code>9780306406157</code>), or <code>null</code>.</p>
+<pre class="codehilite"><code class="language-php">foreach ($metadata-&gt;getTypedIdentifiers() as $identifier) {
+    echo $identifier-&gt;scheme ?? 'unknown', ': ', $identifier-&gt;value, &quot;\n&quot;;
+}
+</code></pre>
+
+<h3 id="other-dublin-core-elements">Other Dublin Core Elements<a class="headerlink" href="#other-dublin-core-elements" title="Permanent link">&para;</a></h3>
+<pre class="codehilite"><code class="language-php">public function getDublinCoreValues(string $element): array&lt;int, string&gt;
+public function setDublinCoreValues(string $element, array&lt;int, string&gt; $values): void
+</code></pre>
+
+<p>Read and write any of the fifteen Dublin Core elements by name, including those without dedicated methods: <code>rights</code> (licence text), <code>source</code>, <code>type</code>, <code>format</code>, <code>relation</code> and <code>coverage</code>. <code>setDublinCoreValues()</code> replaces every element with that name (<code>[]</code> removes them all), reusing existing elements in order so the ids and refinements of unchanged values survive. Title and language still need at least one non-empty value, and identifiers are set with <code>setIdentifiers()</code>. Both throw an <code>Exception</code> for a name that is not a Dublin Core element.</p>
+<pre class="codehilite"><code class="language-php">$metadata-&gt;setDublinCoreValues('rights', ['CC BY 4.0']);
+print_r($metadata-&gt;getDublinCoreValues('source'));
+</code></pre>
+
+<h3 id="series">Series<a class="headerlink" href="#series" title="Permanent link">&para;</a></h3>
+<pre class="codehilite"><code class="language-php">public function getSeries(): ?string
+public function getSeriesIndex(): ?string
+public function setSeries(?string $name, int|float|string|null $index = null): void
+</code></pre>
+
+<p>Books record their series in two ways: EPUB 3 <code>&lt;meta property="belongs-to-collection"&gt;</code> refined with <code>collection-type</code> <code>series</code> (and <code>group-position</code> for the position), and Calibre's <code>calibre:series</code> and <code>calibre:series_index</code> metas, which EPUB 2 books and many reading systems use. <code>getSeries()</code> and <code>getSeriesIndex()</code> read the EPUB 3 series collection, or else the Calibre metas, and return <code>null</code> when there is none. The index is returned as written, e.g. <code>"2"</code> or <code>"2.5"</code>.</p>
+<p><code>setSeries()</code> writes the Calibre metas and, for EPUB 3 packages, a series collection that replaces the previous one; other collections are kept. <code>null</code> removes the series (and its index); a call without an index removes the old index. It throws an <code>Exception</code> for an empty name or an index that is not a number.</p>
+<pre class="codehilite"><code class="language-php">$metadata-&gt;setSeries('The Expanse', 2);
+echo $metadata-&gt;getSeries(), ' #', $metadata-&gt;getSeriesIndex(); // The Expanse #2
+</code></pre>
+
 <h3 id="other-meta-elements">Other <code>&lt;meta&gt;</code> Elements<a class="headerlink" href="#other-meta-elements" title="Permanent link">&para;</a></h3>
 <pre class="codehilite"><code class="language-php">public function getMeta(string $name): ?string
 public function setMeta(string $name, ?string $content): void
@@ -287,8 +323,7 @@ public function getVersion(): string
 <li><code>getMetaValues()</code>/<code>setMetaValues()</code> and <code>getPropertyValues()</code>/<code>setPropertyValues()</code> read and write all elements with that name or property as a list (e.g. several <code>dcterms:subject</code> properties); an empty list removes them all.</li>
 <li><code>getVersion()</code> returns the package version, e.g. <code>2.0</code> or <code>3.0</code>.</li>
 </ul>
-<pre class="codehilite"><code class="language-php">$metadata-&gt;setMeta('calibre:series', 'The Expanse');
-$metadata-&gt;setMeta('calibre:series_index', '1');
+<pre class="codehilite"><code class="language-php">$metadata-&gt;setMeta('calibre:title_sort', 'Expanse, The');
 $metadata-&gt;setProperty('schema:accessMode', 'textual');
 </code></pre>
 
@@ -328,6 +363,7 @@ $epubFile-&gt;save();
 <li><code>InteractsWithLanguage</code> - Language handling</li>
 <li><code>InteractsWithSubject</code> - Subject handling</li>
 <li><code>InteractsWithIdentifier</code> - Identifier handling</li>
+<li><code>InteractsWithSeries</code> - Series handling (EPUB 3 collections and Calibre metas)</li>
 </ul>
 <p>Each trait is a thin layer over shared protected helpers in <code>Metadata</code> (<code>getDcValue()</code>, <code>getDcValues()</code>, <code>setDcValue()</code>, <code>setDcValues()</code>), which look up elements inside <code>&lt;metadata&gt;</code> by namespace URI rather than by prefix.</p>
 <h2 id="error-handling">Error Handling<a class="headerlink" href="#error-handling" title="Permanent link">&para;</a></h2>

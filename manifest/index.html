@@ -164,13 +164,7 @@
 <p><strong><code>getGuidePath(string $type): ?string</code></strong>: The book-root path of the EPUB 2 <code>&lt;guide&gt;</code> reference of a type such as <code>cover</code> or <code>toc</code> (matched case-insensitively), or <code>null</code>.</p>
 </li>
 <li>
-<p><strong><code>setMediaType(string $id, string $mediaType): void</code></strong>: Changes an item's media type, e.g. after its file was replaced with another format.</p>
-</li>
-<li>
-<p><strong><code>findByHref(string $href): ?ManifestItem</code></strong>: Looks up an item by an href relative to the OPF file (fragments ignored); <code>null</code> when nothing matches or the href points outside the book.</p>
-</li>
-<li>
-<p><strong><code>getGuidePath(string $type): ?string</code></strong>: The book-root path of the EPUB 2 <code>&lt;guide&gt;</code> reference of a type such as <code>cover</code> or <code>toc</code> (matched case-insensitively), or <code>null</code>.</p>
+<p><strong><code>removeGuideReferences(string $type): void</code></strong>: Removes the EPUB 2 <code>&lt;guide&gt;</code> references of a type (compared case-insensitively), and the guide when none is left.</p>
 </li>
 <li>
 <p><strong><code>getOpfPath(): string</code></strong>: The OPF location relative to the book root.</p>

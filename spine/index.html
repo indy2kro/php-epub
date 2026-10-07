@@ -138,13 +138,22 @@
 <p><strong><code>contains(string $idref): bool</code></strong>: Whether an item is in the reading order.</p>
 </li>
 <li>
-<p><strong><code>add(string $idref, ?int $position = null, bool $linear = true): void</code></strong>: Adds a manifest item to the reading order, at a zero-based position or at the end. Throws if the item is not in the manifest or is already in the spine.</p>
+<p><strong><code>add(string $idref, ?int $position = null, bool $linear = true): void</code></strong>: Adds a manifest item to the reading order, at a zero-based position (0 to the spine length) or at the end. Throws if the item is not in the manifest or is already in the spine, or the position is out of range.</p>
 </li>
 <li>
 <p><strong><code>remove(string $idref): void</code></strong>: Removes an item from the reading order (the manifest is not touched). Throws if it is not in the spine.</p>
 </li>
 <li>
-<p><strong><code>move(string $idref, int $position): void</code></strong>: Moves an item to a new zero-based position.</p>
+<p><strong><code>move(string $idref, int $position): void</code></strong>: Moves an item to a new zero-based position (0 to the spine length - 1). Throws if it is not in the spine or the position is out of range.</p>
+</li>
+<li>
+<p><strong><code>setLinear(string $idref, bool $linear): void</code></strong>: Marks an entry as part of the main reading order or as auxiliary content (<code>linear="no"</code>), keeping its other attributes. Throws if it is not in the spine.</p>
+</li>
+<li>
+<p><strong><code>getPageProgressionDirection(): ?string</code></strong> and <strong><code>setPageProgressionDirection(?string $direction): void</code></strong>: The EPUB 3 <code>page-progression-direction</code> of the spine: <code>ltr</code>, <code>rtl</code> (right-to-left books such as manga) or <code>default</code>; <code>null</code> when not set, and passing <code>null</code> removes it. Setting throws for any other value and for EPUB 2 packages, which do not have the attribute.</p>
+</li>
+<li>
+<p><strong><code>isModified(): bool</code></strong>: Whether the reading order changed since loading or the last save.</p>
 </li>
 </ul>
 <p>Changes are made to the OPF in memory; <code>EpubFile::save()</code> writes them (and refreshes the EPUB 3 modified date). Other <code>&lt;itemref&gt;</code> attributes, such as <code>id</code> and <code>properties</code>, are kept.</p>

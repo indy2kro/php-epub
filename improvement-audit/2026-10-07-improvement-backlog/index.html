@@ -283,7 +283,7 @@ No source changes were made while compiling this list.</p>
   A probe confirmed that a deleted chapter's nav/NCX entry stays, which EPUBCheck reports as an error (RSC-007), while <code>validate()</code> only warns.</li>
 <li>[x] <strong>BUG-05</strong> Do not let <code>load()</code> discard a book made with <code>create()</code> that was never saved — <code>src/EpubFile.php:104-145</code> — S · low
   <code>load()</code> re-extracts <code>$filePath</code>, which does not exist yet for an unsaved new book, so it throws and cleans up the work in progress.</li>
-<li>[ ] <strong>BUG-06</strong> Check that cover bytes match the declared image media type — <code>src/EpubFile.php:302-335</code> — S · low
+<li>[x] <strong>BUG-06</strong> Check that cover bytes match the declared image media type — <code>src/EpubFile.php:302-335</code> — S · low
   <code>setCoverImage()</code> trusts the media type, so PNG bytes declared as <code>image/jpeg</code> produce a book that EPUBCheck and some readers reject. <code>getimagesizefromstring()</code> can detect the real type.</li>
 <li>[x] <strong>BUG-07</strong> Report entries that differ only by case when extracting on case-insensitive filesystems — <code>src/ZipHandler.php:46-90</code> — S · low
   On Windows and macOS <code>Text/a.xhtml</code> and <code>text/a.xhtml</code> extract to the same file, so one silently replaces the other.</li>
@@ -303,13 +303,13 @@ No source changes were made while compiling this list.</p>
 </ul>
 <h3 id="features">Features<a class="headerlink" href="#features" title="Permanent link">&para;</a></h3>
 <ul>
-<li>[ ] <strong>FEAT-01</strong> Series API that reads and writes both <code>calibre:series</code>/<code>calibre:series_index</code> and EPUB 3 <code>belongs-to-collection</code> (<code>collection-type</code> series, <code>group-position</code>) — <code>src/Metadata.php:94-200</code> — M · med
+<li>[x] <strong>FEAT-01</strong> Series API that reads and writes both <code>calibre:series</code>/<code>calibre:series_index</code> and EPUB 3 <code>belongs-to-collection</code> (<code>collection-type</code> series, <code>group-position</code>) — <code>src/Metadata.php:94-200</code> — M · med
   Series is the most common metadata after title and author, and the two conventions disagree, so callers have to know about and update both by hand.</li>
 <li>[ ] <strong>FEAT-02</strong> Check XHTML content documents in <code>validate()</code>: well-formedness and local references (<code>img</code>, <code>link</code>, <code>a</code>) that are missing or not in the manifest — <code>src/Validator.php</code> — M · med
   Broken references are EPUBCheck's most common errors and <code>addChapter()</code> inserts caller markup as is, but <code>validate()</code> never looks inside content documents.</li>
-<li>[ ] <strong>FEAT-03</strong> Access the remaining Dublin Core elements (rights, source, type, format, relation, coverage) and all languages — <code>src/Metadata.php:180-260</code>, <code>src/Traits/InteractsWithLanguage.php</code> — S · low
+<li>[x] <strong>FEAT-03</strong> Access the remaining Dublin Core elements (rights, source, type, format, relation, coverage) and all languages — <code>src/Metadata.php:180-260</code>, <code>src/Traits/InteractsWithLanguage.php</code> — S · low
   Only eight DC elements have accessors and <code>getDcValues()</code> is protected, so <code>dc:rights</code> (licence text) and multilingual books cannot be handled.</li>
-<li>[ ] <strong>FEAT-04</strong> Typed identifier lookup (<code>getIsbn()</code>, schemes from <code>opf:scheme</code>, <code>identifier-type</code> refinements and <code>urn:</code> prefixes) — <code>src/Traits/InteractsWithIdentifier.php:12-49</code> — S · low
+<li>[x] <strong>FEAT-04</strong> Typed identifier lookup (<code>getIsbn()</code>, schemes from <code>opf:scheme</code>, <code>identifier-type</code> refinements and <code>urn:</code> prefixes) — <code>src/Traits/InteractsWithIdentifier.php:12-49</code> — S · low
   <code>getIdentifiers()</code> returns bare strings, so finding the ISBN means reimplementing the EPUB 2 and EPUB 3 scheme conventions.</li>
 <li>[ ] <strong>FEAT-05</strong> Rename or move content files and update every reference (manifest href, spine, table of contents, guide) — <code>src/ContentManager.php</code> — M · low
   Reorganising a book's files today means deleting and re-adding content, which loses the manifest id, spine position and TOC entries.</li>
@@ -318,11 +318,11 @@ No source changes were made while compiling this list.</p>
 </ul>
 <h3 id="public-api">Public API<a class="headerlink" href="#public-api" title="Permanent link">&para;</a></h3>
 <ul>
-<li>[ ] <strong>UX-01</strong> Add <code>removeCoverImage()</code> and an option to delete the previous cover file — <code>src/EpubFile.php:302-335</code> — S · low
+<li>[x] <strong>UX-01</strong> Add <code>removeCoverImage()</code> and an option to delete the previous cover file — <code>src/EpubFile.php:302-335</code> — S · low
   Replacing a cover leaves the old image in the book, and a cover cannot be removed without manual manifest and meta edits.</li>
-<li>[ ] <strong>UX-02</strong> Spine: <code>setLinear()</code> for existing entries, <code>page-progression-direction</code>, and bounds checks in <code>move()</code>/<code>add()</code> — <code>src/Spine.php:73-119</code> — S · low
+<li>[x] <strong>UX-02</strong> Spine: <code>setLinear()</code> for existing entries, <code>page-progression-direction</code>, and bounds checks in <code>move()</code>/<code>add()</code> — <code>src/Spine.php:73-119</code> — S · low
   <code>linear</code> can only be set when adding, right-to-left books cannot be configured, and an out-of-range or negative position is silently clamped or counted from the end.</li>
-<li>[ ] <strong>UX-03</strong> Mark <code>Manifest</code>/<code>Spine</code> <code>markSaved()</code> and <code>Metadata</code> <code>markModified()</code> as internal, or document them — <code>src/Manifest.php</code>, <code>src/Spine.php</code>, <code>src/Metadata.php:74-81</code> — S · low
+<li>[x] <strong>UX-03</strong> Mark <code>Manifest</code>/<code>Spine</code> <code>markSaved()</code> and <code>Metadata</code> <code>markModified()</code> as internal, or document them — <code>src/Manifest.php</code>, <code>src/Spine.php</code>, <code>src/Metadata.php:74-81</code> — S · low
   They are public only so <code>EpubFile</code> can coordinate saving, and calling them out of order makes <code>save()</code> skip writing the package.</li>
 </ul>
 <h3 id="documentation">Documentation<a class="headerlink" href="#documentation" title="Permanent link">&para;</a></h3>

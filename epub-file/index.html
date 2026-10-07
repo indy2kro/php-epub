@@ -311,10 +311,15 @@ $epubFile-&gt;save();
 </code></pre>
 
 <p>Returns the cover, looking in order at: the manifest item with the EPUB 3 <code>cover-image</code> property; the item named by the EPUB 2 <code>&lt;meta name="cover"&gt;</code> (by id, or by href as some books write it); the EPUB 2 <code>&lt;guide&gt;</code> cover reference, which names either the image itself or a cover page whose first image (<code>&lt;img&gt;</code> or SVG <code>&lt;image&gt;</code>) is used. Returns <code>null</code> when the book has no cover. Read the bytes with <code>getContentManager()-&gt;getContent($cover-&gt;path)</code>.</p>
-<pre class="codehilite"><code class="language-php">public function setCoverImage(string $imageData, string $mediaType, ?string $path = null): ManifestItem
+<pre class="codehilite"><code class="language-php">public function setCoverImage(string $imageData, string $mediaType, ?string $path = null, bool $deletePrevious = false): ManifestItem
 </code></pre>
 
-<p>Stores the image (by default as <code>images/cover.&lt;ext&gt;</code> next to the OPF file), adds it to the manifest and marks it as the cover: the <code>cover-image</code> property for EPUB 3 (removed from any previous cover) and <code>&lt;meta name="cover"&gt;</code> for EPUB 2 compatibility. When <code>$path</code> is already in the manifest, that item is reused and its media type updated. The previous image file stays in the book. Throws if <code>$mediaType</code> is not an <code>image/…</code> type.</p>
+<p>Stores the image (by default as <code>images/cover.&lt;ext&gt;</code> next to the OPF file), adds it to the manifest and marks it as the cover: the <code>cover-image</code> property for EPUB 3 (removed from any previous cover) and <code>&lt;meta name="cover"&gt;</code> for EPUB 2 compatibility. When <code>$path</code> is already in the manifest, that item is reused and its media type updated. The previous image file stays in the book unless <code>$deletePrevious</code> is <code>true</code>.</p>
+<p>Throws if <code>$mediaType</code> is not an <code>image/…</code> type, or if JPEG, PNG, GIF or WebP data does not match it (for example PNG bytes declared as <code>image/jpeg</code>); other formats, such as SVG, are stored as declared. Nothing is written when it throws.</p>
+<pre class="codehilite"><code class="language-php">public function removeCoverImage(bool $deleteFile = false): void
+</code></pre>
+
+<p>Unmarks the cover: removes the <code>cover-image</code> property, <code>&lt;meta name="cover"&gt;</code> and <code>&lt;guide&gt;</code> cover references, so <code>getCoverImage()</code> returns <code>null</code> afterwards. With <code>$deleteFile</code>, the image is also deleted from the book (with its manifest item). A cover page in the reading order stays.</p>
 <h3 id="converting">Converting<a class="headerlink" href="#converting" title="Permanent link">&para;</a></h3>
 <pre class="codehilite"><code class="language-php">public function convert(ConverterInterface $converter, string $outputPath): void
 </code></pre>
