@@ -98,7 +98,7 @@ class CalibreAdapter implements ConverterInterface
         // No shell is involved: every argument reaches Calibre as it is. Output includes stderr,
         // so failures carry Calibre's message, and a conversion that hangs is stopped.
         $result = $this->helper->runProcess(
-            [$calibrePath, $inputFile, $outputPath, ...$this->extraArguments()],
+            [$calibrePath, self::pathArgument($inputFile), self::pathArgument($outputPath), ...$this->extraArguments()],
             $this->options['timeout']
         );
 
@@ -109,6 +109,15 @@ class CalibreAdapter implements ConverterInterface
         if (! $this->helper->fileExists($outputPath) || $this->helper->fileSize($outputPath) === 0) {
             throw new Exception('Calibre conversion failed');
         }
+    }
+
+    /**
+     * A path as an ebook-convert argument: a relative path starting with "-" gets "./" (".\" on
+     * Windows) in front, so Calibre never reads it as an option.
+     */
+    private static function pathArgument(string $path): string
+    {
+        return str_starts_with($path, '-') ? '.' . DIRECTORY_SEPARATOR . $path : $path;
     }
 
     /**

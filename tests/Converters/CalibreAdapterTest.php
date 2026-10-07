@@ -141,6 +141,27 @@ final class CalibreAdapterTest extends TestCase
         );
     }
 
+    public function testRelativePathsStartingWithADashAreNeverReadAsOptions(): void
+    {
+        $this->helperMock->method('fileExists')->willReturn(true);
+        $this->helperMock->method('fileSize')->willReturn(100);
+        $command = [];
+        $this->helperMock->expects($this->once())->method('runProcess')->willReturnCallback(
+            static function (array $arguments) use (&$command): array {
+                $command = $arguments;
+
+                return ['exitCode' => 0, 'output' => ''];
+            }
+        );
+
+        (new CalibreAdapter(['calibre_path' => $this->fakeCalibrePath], $this->helperMock))->convert('-input.epub', '-x.pdf');
+
+        $this->assertSame(
+            [$this->fakeCalibrePath, '.' . DIRECTORY_SEPARATOR . '-input.epub', '.' . DIRECTORY_SEPARATOR . '-x.pdf'],
+            $command
+        );
+    }
+
     public function testConversionsAreLimitedToTenMinutesByDefault(): void
     {
         [, $timeout] = $this->runWithCommandCapture([], $this->fakeInputFile);
