@@ -120,7 +120,7 @@ Effort: S = one file, under 30 min · M = one class plus tests · L = cross-cutt
   Callers cannot list chapters or add a new one to the TOC after `addContent()`.
 - [ ] **FEAT-03** Validation API that returns a list of problems (structure, manifest/spine references, required metadata) — `src/Parser.php` — L · med
   `Parser` only throws on the first fatal problem, so callers cannot check a book or their own edits before publishing.
-- [ ] **FEAT-04** Create a new EPUB from scratch (promote `tests/Support/EpubBuilder` to a public builder) — `tests/Support/EpubBuilder.php`, `src/EpubFile.php` — M · med
+- [x] **FEAT-04** Create a new EPUB from scratch (promote `tests/Support/EpubBuilder` to a public builder) — `tests/Support/EpubBuilder.php`, `src/EpubFile.php` — M · med
   The library can only edit existing books, and the test suite already holds most of the code.
 - [x] **FEAT-05** Deterministic archives on save (sorted entries, fixed timestamps) — `src/ZipHandler.php:199-223` — S · low
   The same book saved twice differs byte for byte.

@@ -79,6 +79,27 @@ public function getContentManager(): ContentManager
 
 Returns the ContentManager for adding/updating/deleting content files. Throws an exception if called before `load()`.
 
+### Creating a Book
+
+```php
+public static function create(string $filePath, string $title, string $language = 'en', ?string $identifier = null): EpubFile
+public function addChapter(string $title, string $body, ?string $path = null): ManifestItem
+```
+
+`create()` prepares a new EPUB 3 book (package document with title, language, identifier and `dcterms:modified`, plus a navigation document) and returns it opened, like `open()`. Nothing is written to `$filePath` until `save()`. Without `$identifier`, a random `urn:uuid:…` is used.
+
+`addChapter()` writes an XHTML document with the given title and body markup, adds it to the manifest and the reading order, and appends it to the table of contents when the book has one. It works on any loaded book; by default chapters are stored as `text/chapter-N.xhtml` next to the OPF. The body is inserted as it is, so it must be well-formed XHTML.
+
+A book needs at least one chapter to be valid.
+
+```php
+$epubFile = EpubFile::create('/path/to/new.epub', 'My Book', 'en');
+$epubFile->getMetadata()->setAuthors(['Jane Doe']);
+$epubFile->addChapter('Chapter One', '<h1>Chapter One</h1><p>It begins.</p>');
+$epubFile->addChapter('Chapter Two', '<h1>Chapter Two</h1><p>It goes on.</p>');
+$epubFile->save();
+```
+
 ### Table of Contents
 
 ```php

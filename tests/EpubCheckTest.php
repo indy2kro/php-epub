@@ -59,6 +59,25 @@ final class EpubCheckTest extends TestCase
         $this->assertPassesEpubCheck($saved);
     }
 
+    public function testBookCreatedFromScratchIsValid(): void
+    {
+        $path = $this->tmpDir . DIRECTORY_SEPARATOR . 'created.epub';
+
+        $epubFile = EpubFile::create($path, 'Created From Scratch', 'en');
+        $epubFile->getMetadata()->setAuthors(['Ann Author']);
+        $epubFile->addChapter('Chapter One', '<h1>Chapter One</h1><p>First.</p>');
+        $epubFile->addChapter('Chapter Two', '<h1>Chapter Two</h1><p>Second.</p>');
+        $epubFile->setCoverImage((string) base64_decode(EpubBuilder::PNG, true), 'image/png');
+        $epubFile->save();
+        $epubFile->cleanup();
+
+        $reopened = EpubFile::open($path);
+        $this->assertCount(2, $reopened->getTableOfContents()->getEntries());
+        $reopened->cleanup();
+
+        $this->assertPassesEpubCheck($path);
+    }
+
     /**
      * @return iterable<string, array{\Closure(EpubFile): void}>
      */

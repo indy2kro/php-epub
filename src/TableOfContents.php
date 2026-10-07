@@ -45,6 +45,14 @@ final readonly class TableOfContents
     }
 
     /**
+     * Whether the book has a navigation document or NCX that can hold a table of contents.
+     */
+    public function isAvailable(): bool
+    {
+        return $this->navPath() !== null || $this->ncxPath() !== null;
+    }
+
+    /**
      * The entries of the navigation document's toc, or else of the NCX; [] when the book has neither.
      *
      * @return list<TocEntry>
