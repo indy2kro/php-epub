@@ -129,7 +129,7 @@ Effort: S = one file, under 30 min · M = one class plus tests · L = cross-cutt
 
 ### Documentation
 
-- [ ] **DOC-01** Refresh the README: `EpubFile::open()`/`convert()`, cover, manifest/spine editing, exceptions, and an accurate "Validation" claim — `README.md:11-60` — S · low
+- [x] **DOC-01** Refresh the README: `EpubFile::open()`/`convert()`, cover, manifest/spine editing, exceptions, and an accurate "Validation" claim — `README.md:11-60` — S · low
   It still shows `load()` plus converting an extracted directory and advertises content validation the library does not do.
 
 ### Tests
