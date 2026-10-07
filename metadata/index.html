@@ -173,7 +173,7 @@
 public function isModified(): bool
 </code></pre>
 
-<p><code>save()</code> serializes the OPF XML back to disk. For EPUB 3 packages, <code>dcterms:modified</code> is set to the current UTC time when metadata was changed since the last save (it is left alone when nothing changed). Throws an exception if the file cannot be written.</p>
+<p><code>save()</code> serializes the OPF XML back to disk. When metadata was changed since the last save, the modification date is updated (it is left alone when nothing changed): for EPUB 3 packages <code>dcterms:modified</code> is set to the current UTC time, and for EPUB 2 packages an existing <code>dc:date</code> with <code>opf:event="modification"</code> is set to the current UTC date (none is added). Throws an exception if the file cannot be written.</p>
 <p><code>isModified()</code> tells whether there are unsaved changes. <code>EpubFile::save()</code> calls <code>Metadata::save()</code> automatically when there are, so calling it yourself is optional.</p>
 <pre class="codehilite"><code class="language-php">public function getOpfFilePath(): string
 </code></pre>
@@ -241,7 +241,7 @@ public function getDateEvents(): array
 <p>Date of publication (dc:date). Should be in a valid date format (preferably ISO 8601).</p>
 <ul>
 <li><code>getDate()</code>/<code>setDate()</code> use the publication date: the <code>dc:date</code> with the EPUB 2 <code>opf:event="publication"</code>, or else one without an event, or else the first. Dates of other events are kept.</li>
-<li><code>getModifiedDate()</code> returns the EPUB 3 <code>dcterms:modified</code> property, or else the EPUB 2 <code>dc:date</code> with <code>opf:event="modification"</code>, or <code>null</code>. <code>save()</code> keeps the EPUB 3 value up to date.</li>
+<li><code>getModifiedDate()</code> returns the EPUB 3 <code>dcterms:modified</code> property, or else the EPUB 2 <code>dc:date</code> with <code>opf:event="modification"</code>, or <code>null</code>. <code>save()</code> keeps both up to date.</li>
 <li><code>getDateEvents()</code> returns every <code>dc:date</code> keyed by its <code>opf:event</code> (<code>""</code> for a date without one), e.g. <code>['publication' =&gt; '1999-01-01', 'modification' =&gt; '2020-05-05']</code>.</li>
 </ul>
 <h3 id="language">Language<a class="headerlink" href="#language" title="Permanent link">&para;</a></h3>
@@ -260,11 +260,13 @@ public function setSubjects(array&lt;int, string&gt; $subjects): void
 <p>The topics of the resource (dc:subject). <code>getSubject()</code>/<code>setSubject()</code> work on the first subject; <code>getSubjects()</code>/<code>setSubjects()</code> work on all of them.</p>
 <h3 id="identifiers">Identifiers<a class="headerlink" href="#identifiers" title="Permanent link">&para;</a></h3>
 <pre class="codehilite"><code class="language-php">public function getIdentifiers(): array&lt;int, string&gt;
+public function getUniqueIdentifier(): ?string
 public function setIdentifiers(array&lt;int, string&gt; $identifiers): void
 </code></pre>
 
 <p>Unambiguous references to the resource (dc:identifier), such as an ISBN or UUID.</p>
-<p>The first value passed to <code>setIdentifiers()</code> is stored in the identifier that <code>package@unique-identifier</code> points to, so the package stays valid. At least one identifier is required. An identifier whose value changes loses its type information (<code>opf:scheme</code> / <code>identifier-type</code> refinement).</p>
+<p>The first value passed to <code>setIdentifiers()</code> is stored in the identifier that <code>package@unique-identifier</code> points to, so the package stays valid. At least one identifier is required. An identifier whose value changes loses its type information (<code>opf:scheme</code> / <code>identifier-type</code> refinement). <code>getUniqueIdentifier()</code> returns that identifier, or <code>null</code> when <code>package@unique-identifier</code> points to none.</p>
+<p>Obfuscated fonts (listed in <code>META-INF/encryption.xml</code>) are keyed with the unique identifier, so when it changes, <code>EpubFile::save()</code> re-keys them: fonts obfuscated with the IDPF algorithm work with any identifier, while Adobe's older algorithm needs a <code>urn:uuid:</code> identifier, and saving throws an <code>Exception</code> naming the font otherwise.</p>
 <h3 id="other-meta-elements">Other <code>&lt;meta&gt;</code> Elements<a class="headerlink" href="#other-meta-elements" title="Permanent link">&para;</a></h3>
 <pre class="codehilite"><code class="language-php">public function getMeta(string $name): ?string
 public function setMeta(string $name, ?string $content): void

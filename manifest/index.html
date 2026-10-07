@@ -152,6 +152,9 @@
 <p><strong><code>addProperty(string $id, string $property): void</code></strong> and <strong><code>removeProperty(string $id, string $property): void</code></strong>: Add or remove an EPUB 3 property token (e.g. <code>cover-image</code>, <code>nav</code>) on an item; other tokens are kept.</p>
 </li>
 <li>
+<p><strong><code>isEpub3(): bool</code></strong>: Whether the package is EPUB 3 (version 3.x), whose items carry properties.</p>
+</li>
+<li>
 <p><strong><code>setMediaType(string $id, string $mediaType): void</code></strong>: Changes an item's media type, e.g. after its file was replaced with another format.</p>
 </li>
 <li>

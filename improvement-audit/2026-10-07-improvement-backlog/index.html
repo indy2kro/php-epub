@@ -268,18 +268,18 @@ No source changes were made while compiling this list.</p>
 <h2 id="items">Items<a class="headerlink" href="#items" title="Permanent link">&para;</a></h2>
 <h3 id="security-untrusted-input">Security (untrusted input)<a class="headerlink" href="#security-untrusted-input" title="Permanent link">&para;</a></h3>
 <ul>
-<li>[ ] <strong>SEC-01</strong> Confine image references inside SVG files and <code>data:</code> SVGs before PDF rendering — <code>src/Converters/EpubDocumentLoader.php:240-300</code>, <code>vendor/tecnickcom/tc-lib-pdf/src/SVG.php:7418-7500</code> — M · med
+<li>[x] <strong>SEC-01</strong> Confine image references inside SVG files and <code>data:</code> SVGs before PDF rendering — <code>src/Converters/EpubDocumentLoader.php:240-300</code>, <code>vendor/tecnickcom/tc-lib-pdf/src/SVG.php:7418-7500</code> — M · med
   The loader confines references in chapter HTML but passes book SVG files and <code>data:image/svg+xml</code> URIs to the renderer unexamined. tc-lib-pdf follows <code>&lt;image href&gt;</code> and nested <code>.svg</code> references, so with TCPDF a book's SVG can embed images from TCPDF's default read allowlist (the system temp dir holding other books, the working dir). Dompdf is chrooted to the book and is not affected.</li>
 </ul>
 <h3 id="bugs">Bugs<a class="headerlink" href="#bugs" title="Permanent link">&para;</a></h3>
 <ul>
-<li>[ ] <strong>BUG-01</strong> Keep IDPF-obfuscated fonts readable when the unique identifier changes (re-obfuscate, or refuse the change) — <code>src/Traits/InteractsWithIdentifier.php:35-49</code>, <code>src/EpubFile.php:236-247</code> — M · high
+<li>[x] <strong>BUG-01</strong> Keep IDPF-obfuscated fonts readable when the unique identifier changes (re-obfuscate, or refuse the change) — <code>src/Traits/InteractsWithIdentifier.php:35-49</code>, <code>src/EpubFile.php:236-247</code> — M · high
   Font obfuscation XORs fonts with a key derived from the unique identifier, and nothing reads <code>META-INF/encryption.xml</code>, so <code>setIdentifiers()</code> on such a book silently turns every embedded font into garbage.</li>
 <li>[ ] <strong>BUG-02</strong> Open books with recoverable structure problems (an EPUB 3 book with a broken or navMap-less NCX, a missing or padded mimetype) and report them through <code>validate()</code> — <code>src/Parser.php:48-60,130-156</code> — M · med
   <code>Parser</code> throws on the first problem, so an EPUB 3 book whose optional legacy NCX is broken cannot be loaded or repaired with the library, although every reader opens it.</li>
-<li>[ ] <strong>BUG-03</strong> Set the EPUB 3 manifest properties (<code>svg</code>, <code>mathml</code>, <code>scripted</code>, <code>remote-resources</code>) for XHTML added or updated through <code>ContentManager</code>/<code>addChapter()</code> — <code>src/ContentManager.php:89-130</code>, <code>src/EpubFile.php:162-188</code> — M · med
+<li>[x] <strong>BUG-03</strong> Set the EPUB 3 manifest properties (<code>svg</code>, <code>mathml</code>, <code>scripted</code>, <code>remote-resources</code>) for XHTML added or updated through <code>ContentManager</code>/<code>addChapter()</code> — <code>src/ContentManager.php:89-130</code>, <code>src/EpubFile.php:162-188</code> — M · med
   EPUB 3 requires these properties on content that uses those features, so <code>addChapter()</code> with an inline <code>&lt;svg&gt;</code> or <code>&lt;math&gt;</code> body produces a book EPUBCheck rejects (OPF-014).</li>
-<li>[ ] <strong>BUG-04</strong> Remove table-of-contents entries for files that <code>deleteContent()</code>/<code>Manifest::remove()</code> drop, and report dangling TOC links as errors — <code>src/ContentManager.php:135-160</code>, <code>src/Validator.php:180-200</code> — S · med
+<li>[x] <strong>BUG-04</strong> Remove table-of-contents entries for files that <code>deleteContent()</code>/<code>Manifest::remove()</code> drop, and report dangling TOC links as errors — <code>src/ContentManager.php:135-160</code>, <code>src/Validator.php:180-200</code> — S · med
   A probe confirmed that a deleted chapter's nav/NCX entry stays, which EPUBCheck reports as an error (RSC-007), while <code>validate()</code> only warns.</li>
 <li>[ ] <strong>BUG-05</strong> Do not let <code>load()</code> discard a book made with <code>create()</code> that was never saved — <code>src/EpubFile.php:104-145</code> — S · low
   <code>load()</code> re-extracts <code>$filePath</code>, which does not exist yet for an unsaved new book, so it throws and cleans up the work in progress.</li>
@@ -287,9 +287,9 @@ No source changes were made while compiling this list.</p>
   <code>setCoverImage()</code> trusts the media type, so PNG bytes declared as <code>image/jpeg</code> produce a book that EPUBCheck and some readers reject. <code>getimagesizefromstring()</code> can detect the real type.</li>
 <li>[ ] <strong>BUG-07</strong> Report entries that differ only by case when extracting on case-insensitive filesystems — <code>src/ZipHandler.php:46-90</code> — S · low
   On Windows and macOS <code>Text/a.xhtml</code> and <code>text/a.xhtml</code> extract to the same file, so one silently replaces the other.</li>
-<li>[ ] <strong>BUG-08</strong> Update the EPUB 2 <code>opf:event="modification"</code> date on save, as <code>dcterms:modified</code> is for EPUB 3 — <code>src/Metadata.php:51-64</code> — S · low
+<li>[x] <strong>BUG-08</strong> Update the EPUB 2 <code>opf:event="modification"</code> date on save, as <code>dcterms:modified</code> is for EPUB 3 — <code>src/Metadata.php:51-64</code> — S · low
   <code>getModifiedDate()</code> reports the EPUB 2 modification event, which <code>save()</code> never touches, so the date stays at its original value after edits.</li>
-<li>[ ] <strong>BUG-09</strong> Update the NCX <code>docTitle</code> when the book title changes — <code>src/TableOfContents.php</code>, <code>src/Traits/InteractsWithTitle.php</code> — S · low
+<li>[x] <strong>BUG-09</strong> Update the NCX <code>docTitle</code> when the book title changes — <code>src/TableOfContents.php</code>, <code>src/Traits/InteractsWithTitle.php</code> — S · low
   <code>setTitle()</code> only changes the OPF, so readers that show the NCX <code>docTitle</code> keep the old name.</li>
 </ul>
 <h3 id="converters">Converters<a class="headerlink" href="#converters" title="Permanent link">&para;</a></h3>
@@ -346,7 +346,7 @@ No source changes were made while compiling this list.</p>
 </ul>
 <h3 id="sweeps">Sweeps<a class="headerlink" href="#sweeps" title="Permanent link">&para;</a></h3>
 <ul>
-<li>[ ] <strong>SWEEP-01</strong> Report write failures with an exception and no PHP warning in <code>XmlParser::save()</code>, <code>Metadata::save()</code> and <code>ContentManager::addContent()</code> — <code>src/XmlParser.php:73-85</code>, <code>src/Metadata.php:64</code>, <code>src/ContentManager.php:99</code> — S · low
+<li>[x] <strong>SWEEP-01</strong> Report write failures with an exception and no PHP warning in <code>XmlParser::save()</code>, <code>Metadata::save()</code> and <code>ContentManager::addContent()</code> — <code>src/XmlParser.php:73-85</code>, <code>src/Metadata.php:64</code>, <code>src/ContentManager.php:99</code> — S · low
   <code>asXML()</code> and <code>file_put_contents()</code> warn before the exception is thrown, which fails strict callers and test suites, while <code>updateContent()</code> and the rest of the library already report I/O failures without warnings.</li>
 </ul>
               
