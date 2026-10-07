@@ -255,6 +255,78 @@ class Manifest
     }
 
     /**
+     * The EPUB 2 <guide> references as landmarks, with the guide's own types ("cover", "text",
+     * "title-page", …; see Landmark::fromGuideType() for the EPUB 3 equivalents), in document order.
+     * References that point outside the book are left out.
+     *
+     * @return list<Landmark>
+     */
+    public function getGuideReferences(): array
+    {
+        $references = [];
+        foreach ($this->query('/opf:package/opf:guide/opf:reference') as $reference) {
+            $href = (string) $reference['href'];
+            $path = $this->tryHrefToPath($href);
+            if ($path === null) {
+                continue;
+            }
+
+            $fragment = explode('#', $href, 2)[1] ?? '';
+            $references[] = new Landmark((string) $reference['type'], (string) $reference['title'], $path, $fragment === '' ? null : rawurldecode($fragment));
+        }
+
+        return $references;
+    }
+
+    /**
+     * Replaces the EPUB 2 <guide> by these references (types are the guide's own); [] removes the guide.
+     * The guide is created after the spine when the package has none.
+     *
+     * @param list<Landmark> $references
+     *
+     * @throws Exception If a value is not valid XML text or a path leaves the book.
+     */
+    public function setGuideReferences(array $references): void
+    {
+        foreach ($references as $reference) {
+            XmlText::assertValid($reference->type, $reference->title, $reference->fragment ?? '');
+            $this->paths->normalize($reference->path);
+        }
+
+        foreach ($this->query('/opf:package/opf:guide') as $guide) {
+            unset($guide[0]);
+        }
+
+        if ($references !== []) {
+            $guide = $this->opfXml->addChild('guide', null, Metadata::OPF_NAMESPACE);
+            foreach ($references as $reference) {
+                $node = $guide->addChild('reference', null, Metadata::OPF_NAMESPACE);
+                $node->addAttribute('type', $reference->type);
+                if ($reference->title !== '') {
+                    $node->addAttribute('title', $reference->title);
+                }
+
+                $fragment = $reference->fragment === null || $reference->fragment === '' ? '' : '#' . rawurlencode($reference->fragment);
+                $node->addAttribute('href', $this->pathToHref($reference->path) . $fragment);
+            }
+
+            $this->moveAfterSpine($guide);
+        }
+
+        $this->modified = true;
+    }
+
+    /**
+     * The guide follows the spine (and precedes bindings and collections) in an EPUB 3 package.
+     */
+    private function moveAfterSpine(SimpleXMLElement $guide): void
+    {
+        $spine = $this->query('/opf:package/opf:spine')[0] ?? null;
+        $spineNode = $spine instanceof SimpleXMLElement ? dom_import_simplexml($spine) : null;
+        $spineNode?->parentNode?->insertBefore(dom_import_simplexml($guide), $spineNode->nextSibling);
+    }
+
+    /**
      * Whether the package is EPUB 3 (version 3.x), whose items carry properties.
      */
     public function isEpub3(): bool
