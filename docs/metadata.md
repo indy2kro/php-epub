@@ -230,8 +230,7 @@ $metadata->setProperty('schema:accessMode', 'textual');
 ```php
 use PhpEpub\EpubFile;
 
-$epubFile = new EpubFile('/path/to/your.epub');
-$epubFile->load();
+$epubFile = EpubFile::open('/path/to/your.epub');
 
 $metadata = $epubFile->getMetadata();
 

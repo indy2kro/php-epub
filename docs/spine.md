@@ -31,8 +31,7 @@ Changes are made to the OPF in memory; `EpubFile::save()` writes them (and refre
 ```php
 use PhpEpub\EpubFile;
 
-$epubFile = new EpubFile('/path/to/your.epub');
-$epubFile->load();
+$epubFile = EpubFile::open('/path/to/your.epub');
 
 $spine = $epubFile->getSpine();
 

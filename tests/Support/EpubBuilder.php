@@ -66,6 +66,62 @@ XML;
     }
 
     /**
+     * A small EPUB 2 book meant to pass EPUBCheck: NCX (with dtb:uid), opf:* attributes and a guide.
+     */
+    public static function epub2(): self
+    {
+        $uid = 'urn:uuid:7c1f0e2a-4b3d-4e5f-8a9b-0c1d2e3f4a5c';
+        $opf = <<<XML
+<?xml version="1.0" encoding="UTF-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="2.0" unique-identifier="uid">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:opf="http://www.idpf.org/2007/opf">
+    <dc:identifier id="uid" opf:scheme="UUID">{$uid}</dc:identifier>
+    <dc:title>Valid EPUB 2 Book</dc:title>
+    <dc:creator opf:role="aut" opf:file-as="Author, Ann">Ann Author</dc:creator>
+    <dc:language>en</dc:language>
+    <dc:date opf:event="modification">2026-01-01</dc:date>
+  </metadata>
+  <manifest>
+    <item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>
+    <item id="chapter" href="text/chapter.xhtml" media-type="application/xhtml+xml"/>
+    <item id="style" href="css/style.css" media-type="text/css"/>
+  </manifest>
+  <spine toc="ncx">
+    <itemref idref="chapter"/>
+  </spine>
+  <guide>
+    <reference type="text" title="Start" href="text/chapter.xhtml"/>
+  </guide>
+</package>
+XML;
+        $ncx = <<<XML
+<?xml version="1.0" encoding="UTF-8"?>
+<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1">
+  <head>
+    <meta name="dtb:uid" content="{$uid}"/>
+    <meta name="dtb:depth" content="1"/>
+    <meta name="dtb:totalPageCount" content="0"/>
+    <meta name="dtb:maxPageNumber" content="0"/>
+  </head>
+  <docTitle><text>Valid EPUB 2 Book</text></docTitle>
+  <navMap>
+    <navPoint id="nav-chapter" playOrder="1"><navLabel><text>Chapter</text></navLabel><content src="text/chapter.xhtml"/></navPoint>
+  </navMap>
+</ncx>
+XML;
+
+        return (new self())
+            ->withFile('mimetype', 'application/epub+zip')
+            ->withContainer('OEBPS/content.opf')
+            ->withFile('OEBPS/content.opf', $opf)
+            ->withFile('OEBPS/toc.ncx', $ncx)
+            ->withFile('OEBPS/text/chapter.xhtml', '<?xml version="1.0" encoding="UTF-8"?><html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">'
+                . '<head><title>Chapter</title><link rel="stylesheet" type="text/css" href="../css/style.css"/></head>'
+                . '<body><h1>Chapter</h1><p>Text.</p></body></html>')
+            ->withFile('OEBPS/css/style.css', 'p { margin: 0; }');
+    }
+
+    /**
      * A complete EPUB 3 XHTML content document.
      */
     public static function xhtml(string $title, string $body, ?string $stylesheet = null): string

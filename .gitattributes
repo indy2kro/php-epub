@@ -7,3 +7,4 @@
 .github/                export-ignore
 tests/                  export-ignore
 site/                   export-ignore
+codecov.yml             export-ignore

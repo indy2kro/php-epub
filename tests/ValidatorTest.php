@@ -83,6 +83,21 @@ final class ValidatorTest extends TestCase
         yield 'NCX without navMap' => [(clone $withNcx)->withFile('EPUB/toc.ncx', '<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1"/>'), ['NCX_INVALID']];
         yield 'NCX without namespace' => [(clone $withNcx)->withFile('EPUB/toc.ncx', '<ncx version="2005-1"><navMap/></ncx>'), ['NCX_INVALID']];
         yield 'navigation document not well-formed' => [EpubBuilder::epub3()->withFile('EPUB/nav.xhtml', '<html><body><nav'), ['NAV_INVALID']];
+        $chapter = static fn (string $body): EpubBuilder => EpubBuilder::epub3()
+            ->withFile('EPUB/text/chapter.xhtml', EpubBuilder::xhtml('Chapter', $body, '../css/style.css'));
+        yield 'content not well-formed' => [EpubBuilder::epub3()->withFile('EPUB/text/chapter.xhtml', '<html><body><p>Open'), ['CONTENT_NOT_WELL_FORMED']];
+        yield 'image missing' => [$chapter('<img src="../images/gone.png" alt=""/>'), ['CONTENT_REFERENCE_MISSING']];
+        yield 'link to a missing chapter' => [$chapter('<a href="missing.xhtml#part">Next</a>'), ['CONTENT_REFERENCE_MISSING']];
+        yield 'reference outside the book' => [$chapter('<img src="../../../../outside.png" alt=""/>'), ['CONTENT_REFERENCE_MISSING']];
+        yield 'image not in the manifest' => [
+            $chapter('<img src="../images/extra.png" alt=""/>')->withFile('EPUB/images/extra.png', (string) base64_decode(EpubBuilder::PNG, true)),
+            ['FILE_NOT_IN_MANIFEST', 'CONTENT_REFERENCE_NOT_IN_MANIFEST'],
+        ];
+        yield 'remote, data, fragment and in-book references are fine' => [
+            $chapter('<p id="top"><a href="https://example.com/">Web</a><a href="#top">Top</a><a href="chapter.xhtml#top">Self</a>'
+                . '<img src="data:image/png;base64,' . EpubBuilder::PNG . '" alt=""/><a href="mailto:a@example.com">Mail</a></p>'),
+            [],
+        ];
         yield 'file not in the manifest' => [EpubBuilder::epub3()->withFile('EPUB/extra.css', 'p {}'), ['FILE_NOT_IN_MANIFEST']];
         yield 'toc link to an unlisted file' => [
             EpubBuilder::epub3()->withFile('EPUB/nav.xhtml', EpubBuilder::xhtml(

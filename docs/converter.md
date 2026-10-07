@@ -19,8 +19,7 @@ use PhpEpub\Converters\CalibreAdapter;
 use PhpEpub\Converters\DompdfAdapter;
 use PhpEpub\EpubFile;
 
-$epubFile = new EpubFile('/path/to/book.epub');
-$epubFile->load();
+$epubFile = EpubFile::open('/path/to/book.epub');
 
 $converter = new Converter($epubFile->getTempDir(), [
     'pdf' => new DompdfAdapter(),

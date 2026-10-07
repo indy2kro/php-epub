@@ -49,7 +49,8 @@ final readonly class Validator
     }
 
     /**
-     * @return list<ValidationIssue> Errors and warnings, grouped by area (container, metadata, ids, manifest, spine, navigation).
+     * @return list<ValidationIssue> Errors and warnings, grouped by area (container, metadata, ids, manifest, spine,
+     *                               content documents, navigation).
      */
     public function validate(): array
     {
@@ -59,6 +60,7 @@ final readonly class Validator
             ...$this->checkIds(),
             ...$this->checkManifest(),
             ...$this->checkSpine(),
+            ...$this->checkContent(),
             ...$this->checkNavigation(),
         ];
     }
@@ -178,6 +180,83 @@ final readonly class Validator
         }
 
         return $issues;
+    }
+
+    /**
+     * XHTML content documents must be well-formed, and the local files they reference (images,
+     * stylesheets, media, links to other documents) must exist and be in the manifest. Remote URLs,
+     * data: URIs and links within the same document are not checked.
+     *
+     * @return list<ValidationIssue>
+     */
+    private function checkContent(): array
+    {
+        $issues = [];
+        foreach ($this->manifest->getItems() as $item) {
+            // The navigation document is checked by checkNavigation().
+            $isNav = in_array('nav', explode(' ', $item->properties), true);
+            if ($isNav || $item->mediaType !== 'application/xhtml+xml' || $item->path === '' || ! is_file($this->paths->resolve($this->rootDirectory, $item->path))) {
+                continue;
+            }
+
+            try {
+                $root = dom_import_simplexml($this->xmlParser->parse($this->paths->resolve($this->rootDirectory, $item->path)));
+            } catch (XmlException $exception) {
+                $issues[] = $this->error('CONTENT_NOT_WELL_FORMED', 'The content document is not well-formed XML: ' . $exception->getMessage(), $item->path);
+                continue;
+            }
+
+            $directory = dirname($item->path) === '.' ? '' : dirname($item->path) . '/';
+            $checked = [];
+            foreach ($root instanceof \DOMElement ? $root->getElementsByTagName('*') : [] as $element) {
+                foreach ($element->attributes ?? [] as $attribute) {
+                    $target = $this->localReference($element->localName ?? '', $attribute->localName ?? '', $attribute->value, $directory);
+                    if ($target !== null && ! isset($checked[$target])) {
+                        $checked[$target] = true;
+                        array_push($issues, ...$this->checkReference($item->path, $target));
+                    }
+                }
+            }
+        }
+
+        return $issues;
+    }
+
+    /**
+     * The book-relative path a resource attribute refers to ("" when it leaves the book), or null
+     * when the attribute is not a reference to a local file.
+     */
+    private function localReference(string $element, string $attribute, string $value, string $directory): ?string
+    {
+        $isReference = in_array($attribute, ['src', 'poster', 'data'], true)
+            || ($attribute === 'href' && in_array($element, ['a', 'area', 'link', 'image', 'use'], true));
+        $value = trim($value);
+        if (! $isReference || $value === '' || str_starts_with($value, '#') || preg_match('#^[a-z][a-z0-9+.-]*:#i', $value) === 1) {
+            return null;
+        }
+
+        $file = rawurldecode(explode('?', explode('#', $value, 2)[0], 2)[0]);
+        try {
+            return $file === '' ? null : $this->paths->normalize($directory . $file);
+        } catch (InvalidEpubException) {
+            return '';
+        }
+    }
+
+    /**
+     * @return list<ValidationIssue>
+     */
+    private function checkReference(string $document, string $target): array
+    {
+        if ($target === '' || ! is_file($this->paths->resolve($this->rootDirectory, $target))) {
+            $where = $target === '' ? 'a file outside the book' : "{$target}, which does not exist";
+
+            return [$this->error('CONTENT_REFERENCE_MISSING', "The content document refers to {$where}.", $document)];
+        }
+
+        return $this->manifest->findByPath($target) instanceof ManifestItem
+            ? []
+            : [$this->error('CONTENT_REFERENCE_NOT_IN_MANIFEST', "The content document refers to {$target}, which is not in the manifest.", $document)];
     }
 
     /**

@@ -43,7 +43,26 @@ final class EpubCheckTest extends TestCase
     #[DataProvider('edits')]
     public function testSavedBookIsValid(\Closure $edit): void
     {
-        $source = EpubBuilder::epub3()->buildEpub($this->tmpDir . DIRECTORY_SEPARATOR . 'source.epub');
+        $this->assertSavedBookIsValid(EpubBuilder::epub3(), $edit);
+    }
+
+    /**
+     * EPUB 2 books exercise the NCX, opf:* attributes and the guide, which EPUB 3 books do not.
+     *
+     * @param \Closure(EpubFile): void $edit
+     */
+    #[DataProvider('epub2Edits')]
+    public function testSavedEpub2BookIsValid(\Closure $edit): void
+    {
+        $this->assertSavedBookIsValid(EpubBuilder::epub2(), $edit);
+    }
+
+    /**
+     * @param \Closure(EpubFile): void $edit
+     */
+    private function assertSavedBookIsValid(EpubBuilder $book, \Closure $edit): void
+    {
+        $source = $book->buildEpub($this->tmpDir . DIRECTORY_SEPARATOR . 'source.epub');
         $saved = $this->tmpDir . DIRECTORY_SEPARATOR . 'saved.epub';
 
         $epubFile = EpubFile::open($source);
@@ -51,12 +70,56 @@ final class EpubCheckTest extends TestCase
         $epubFile->save($saved);
         $epubFile->cleanup();
 
-        // The library reads its own output back.
+        // The library reads its own output back, and finds nothing wrong with it.
         $reopened = EpubFile::open($saved);
         $this->assertNotSame('', $reopened->getMetadata()->getTitle());
+        $this->assertSame([], array_map(strval(...), $reopened->validate()));
         $reopened->cleanup();
 
         $this->assertPassesEpubCheck($saved);
+    }
+
+    /**
+     * Real-world books need not be valid, but saving them must not add problems: the codes that
+     * validate() and EPUBCheck report for the saved book are a subset of those for the original.
+     */
+    #[DataProvider('fixtureBooks')]
+    public function testSavingAFixtureBookAddsNoProblems(string $fixture): void
+    {
+        $saved = $this->tmpDir . DIRECTORY_SEPARATOR . 'saved.epub';
+
+        $original = EpubFile::open($fixture);
+        $before = self::codes($original->validate());
+        $original->getMetadata()->setTitle($original->getMetadata()->getTitle() . ' (saved)');
+        $original->save($saved);
+        $original->cleanup();
+
+        $reopened = EpubFile::open($saved);
+        $after = self::codes($reopened->validate());
+        $reopened->cleanup();
+
+        $this->assertSame([], array_values(array_diff($after, $before)), 'validate() reports new problems after saving.');
+        $this->assertSame([], array_values(array_diff($this->epubCheckCodes($saved), $this->epubCheckCodes($fixture))), 'EPUBCheck reports new problems after saving.');
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function fixtureBooks(): iterable
+    {
+        foreach (glob(__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'valid*.epub') ?: [] as $fixture) {
+            yield basename($fixture) => [$fixture];
+        }
+    }
+
+    /**
+     * @param list<\PhpEpub\ValidationIssue> $issues
+     *
+     * @return list<string>
+     */
+    private static function codes(array $issues): array
+    {
+        return array_values(array_unique(array_map(static fn (\PhpEpub\ValidationIssue $issue): string => $issue->code, $issues)));
     }
 
     public function testBookCreatedFromScratchIsValid(): void
@@ -135,11 +198,78 @@ final class EpubCheckTest extends TestCase
         }];
     }
 
+    /**
+     * @return iterable<string, array{\Closure(EpubFile): void}>
+     */
+    public static function epub2Edits(): iterable
+    {
+        yield 'unchanged' => [static function (EpubFile $epubFile): void {
+        }];
+
+        yield 'metadata' => [static function (EpubFile $epubFile): void {
+            $metadata = $epubFile->getMetadata();
+            $metadata->setTitle('Edited EPUB 2 & <Title>');
+            $metadata->setAuthors(['Ann Author']);
+            $metadata->addCreator('Ivan Illustrator', 'ill', 'Illustrator, Ivan');
+            $metadata->addContributor('Ed Editor', 'edt', 'Editor, Ed');
+            $metadata->setIdentifiers(['urn:uuid:9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d', 'urn:isbn:9780000000002']);
+            $metadata->setDate('2026-10-07');
+            $metadata->setSeries('A Series', 2);
+            $metadata->setDublinCoreValues('rights', ['CC BY 4.0']);
+        }];
+
+        yield 'chapters and table of contents' => [static function (EpubFile $epubFile): void {
+            $added = $epubFile->addChapter('Added', '<h1>Added</h1><h2 id="section">Section</h2><p>New.</p>');
+            $epubFile->getTableOfContents()->addEntry(new TocEntry('Added section', $added->path, 'section'));
+        }];
+
+        yield 'chapter in the guide deleted' => [static function (EpubFile $epubFile): void {
+            $epubFile->addChapter('Second', '<p>Second chapter.</p>');
+            $epubFile->getContentManager()->deleteContent('OEBPS/text/chapter.xhtml');
+        }];
+
+        yield 'cover image' => [static function (EpubFile $epubFile): void {
+            $epubFile->setCoverImage((string) base64_decode(EpubBuilder::PNG, true), 'image/png');
+        }];
+    }
+
     private function assertPassesEpubCheck(string $epubPath): void
+    {
+        $result = $this->runEpubCheck($epubPath);
+        if ($result === null) {
+            return;
+        }
+
+        $this->assertSame(0, $result['exitCode'], "EPUBCheck reported errors:\n" . implode("\n", $result['output']));
+    }
+
+    /**
+     * The codes of the errors EPUBCheck reports (e.g. "RSC-005"); [] when EPUBCheck is not set up.
+     *
+     * @return list<string>
+     */
+    private function epubCheckCodes(string $epubPath): array
+    {
+        $result = $this->runEpubCheck($epubPath);
+        if ($result === null) {
+            return [];
+        }
+
+        preg_match_all('/^(?:ERROR|FATAL)\(([A-Z]+-\d+)\)/m', implode("\n", $result['output']), $matches);
+
+        return array_values(array_unique($matches[1]));
+    }
+
+    /**
+     * Runs EPUBCheck when EPUBCHECK_JAR is set; null otherwise.
+     *
+     * @return array{exitCode: int, output: list<string>}|null
+     */
+    private function runEpubCheck(string $epubPath): ?array
     {
         $jar = getenv('EPUBCHECK_JAR');
         if ($jar === false || $jar === '') {
-            return;
+            return null;
         }
 
         $java = getenv('EPUBCHECK_JAVA');
@@ -150,6 +280,6 @@ final class EpubCheckTest extends TestCase
         $exitCode = 0;
         exec($command, $output, $exitCode);
 
-        $this->assertSame(0, $exitCode, "EPUBCheck reported errors:\n" . implode("\n", $output));
+        return ['exitCode' => $exitCode, 'output' => $output];
     }
 }

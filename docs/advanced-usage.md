@@ -6,15 +6,11 @@ To modify the content within an EPUB file, you can use the ContentManager class 
 
 ```php
 use PhpEpub\EpubFile;
-use PhpEpub\ContentManager;
-
-$epubFilePath = '/path/to/your.epub';
 
 // Load the EPUB file
-$epubFile = new EpubFile($epubFilePath);
-$epubFile->load();
+$epubFile = EpubFile::open('/path/to/your.epub');
 
-// Access the content manager (it keeps the manifest and spine in sync)
+// Access the content manager (it keeps the manifest, spine and table of contents in sync)
 $contentManager = $epubFile->getContentManager();
 
 // Retrieve and modify content; paths are relative to the book root
@@ -58,44 +54,25 @@ This will create a new EPUB file with the changes, leaving the original file unc
 
 ## Converting EPUB
 
-You can convert an EPUB to PDF using one of the available adapters.
-
-
-### Convert to PDF Using DompdfAdapter
-
-```php
-use PhpEpub\Converters\DompdfAdapter;
-
-$dompdfAdapter = new DompdfAdapter();
-$dompdfAdapter->convert('/path/to/extracted/epub', '/path/to/output.pdf');
-```
-
-### Convert to PDF Using TCPDFAdapter
-
-To convert using TCPDF:
-
-```php
-use PhpEpub\Converters\TCPDFAdapter;
-
-$tcpdfAdapter = new TCPDFAdapter();
-$tcpdfAdapter->convert('/path/to/extracted/epub', '/path/to/output.pdf');
-```
-
-### Convert to MOBI Using CalibreAdapter
-
-To convert using Calibre:
+Pass an adapter to `EpubFile::convert()`; the book's unsaved changes are included:
 
 ```php
 use PhpEpub\Converters\CalibreAdapter;
+use PhpEpub\Converters\DompdfAdapter;
+use PhpEpub\Converters\TCPDFAdapter;
+use PhpEpub\EpubFile;
 
-$options = [
-    'calibre_path' => '/usr/bin/ebook-convert',
-    'extra_args' => ['--output-profile', 'kindle'],
-];
+$epubFile = EpubFile::open('/path/to/your.epub');
 
-$calibreAdapter = new CalibreAdapter($options);
-$calibreAdapter->convert('/path/to/input.epub', '/path/to/output.mobi');
+// PDF with Dompdf or TCPDF (both pure PHP)
+$epubFile->convert(new DompdfAdapter(['paper_size' => 'A5']), '/path/to/output.pdf');
+$epubFile->convert(new TCPDFAdapter(['font_size' => 11]), '/path/to/output.pdf');
+
+// MOBI, AZW3 and other formats with Calibre's ebook-convert (found on the PATH by default)
+$epubFile->convert(new CalibreAdapter(['extra_args' => ['--output-profile', 'kindle']]), '/path/to/output.mobi');
 ```
+
+The adapters also convert an extracted book directory directly (`$adapter->convert('/path/to/extracted/epub', $output)`), and `CalibreAdapter` takes an `.epub` file as well. See [Converter](converter.md) for every option and for how the PDF adapters read a book.
 
 ## Handling Untrusted EPUBs
 
@@ -127,8 +104,7 @@ $zipHandler = new ZipHandler(
 );
 
 try {
-    $epubFile = new EpubFile($uploadedPath, $zipHandler);
-    $epubFile->load();
+    $epubFile = EpubFile::open($uploadedPath, $zipHandler);
 } catch (ZipException $e) {
     // Not a readable archive, or it exceeds the limits.
 } catch (InvalidEpubException $e) {

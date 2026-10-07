@@ -335,12 +335,41 @@ final class TableOfContentsTest extends TestCase
         $epubFile->save();
 
         $ncx = $epubFile->getContentManager()->getContent('OEBPS/toc.ncx');
-        $this->assertStringContainsString('<head/><docTitle><text>Renamed</text></docTitle><navMap>', $ncx);
+        $this->assertStringContainsString('<meta name="dtb:uid" content="urn:x"/></head><docTitle><text>Renamed</text></docTitle><navMap>', $ncx);
+    }
+
+    public function testSavingANewUniqueIdentifierUpdatesTheNcxUid(): void
+    {
+        $builder = $this->epub2Book();
+        $builder->withFile('OEBPS/toc.ncx', str_replace('<head/>', '<head><meta name="dtb:uid" content="urn:x"/><meta name="dtb:depth" content="2"/></head>', (string) $builder->getFile('OEBPS/toc.ncx')));
+        $epubFile = $this->open($builder);
+
+        $epubFile->getMetadata()->setIdentifiers(['urn:uuid:11111111-2222-3333-4444-555555555555']);
+        $epubFile->save();
+
+        $ncx = $epubFile->getContentManager()->getContent('OEBPS/toc.ncx');
+        $this->assertStringContainsString('<meta name="dtb:uid" content="urn:uuid:11111111-2222-3333-4444-555555555555"/>', $ncx);
+        $this->assertStringContainsString('<meta name="dtb:depth" content="2"/>', $ncx);
+    }
+
+    public function testSavingAddsAMissingNcxUid(): void
+    {
+        $epubFile = $this->open($this->epub2Book());
+
+        $epubFile->getMetadata()->setTitle('Renamed');
+        $epubFile->save();
+
+        $this->assertStringContainsString(
+            '<head><meta name="dtb:uid" content="urn:x"/></head>',
+            $epubFile->getContentManager()->getContent('OEBPS/toc.ncx')
+        );
     }
 
     public function testSavingOtherMetadataLeavesTheNcxUntouched(): void
     {
-        $epubFile = $this->open($this->epub2Book());
+        $builder = $this->epub2Book();
+        $builder->withFile('OEBPS/toc.ncx', str_replace('<head/>', '<head><meta name="dtb:uid" content="urn:x"/></head>', (string) $builder->getFile('OEBPS/toc.ncx')));
+        $epubFile = $this->open($builder);
         $ncx = $epubFile->getContentManager()->getContent('OEBPS/toc.ncx');
 
         $epubFile->getMetadata()->setDescription('About');
