@@ -92,6 +92,8 @@
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#language">Language</a>
     </li>
+    <li class="toctree-l3"><a class="reference internal" href="#accessibility">Accessibility</a>
+    </li>
     <li class="toctree-l3"><a class="reference internal" href="#subject">Subject</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#identifiers">Identifiers</a>
@@ -202,19 +204,27 @@ public function setTitles(array $titles): void
 <pre class="codehilite"><code class="language-php">public function getAuthors(): array&lt;int, string&gt;
 public function setAuthors(array&lt;int, string&gt; $authors): void
 public function getCreators(): array&lt;int, Contributor&gt;
+public function setCreators(array&lt;int, Contributor&gt; $creators): void
 public function addCreator(string $name, ?string $role = 'aut', ?string $fileAs = null): void
 </code></pre>
 
 <p>The authors are the creators of the resource (dc:creator) with the role <code>aut</code> or no role at all; creators with another role, such as illustrators (<code>ill</code>), are not authors. Multiple authors are supported.</p>
 <p><code>setAuthors()</code> only replaces the authors: other creators are kept. It reuses the existing authors in order, so their roles survive (EPUB 2 <code>opf:role</code>, EPUB 3 <code>&lt;meta refines="#id" property="role"&gt;</code>). When an author's name changes, its sort key (<code>opf:file-as</code> / <code>file-as</code> refinement) is removed because it described the old name. Authors that are no longer needed are removed together with all their refinements.</p>
 <p><code>getCreators()</code> returns every creator as a <code>PhpEpub\Contributor</code> with <code>name</code>, <code>role</code> (a <a href="https://www.loc.gov/marc/relators/relaterm.html">MARC relator code</a> such as <code>aut</code>, <code>ill</code> or <code>trl</code>, or <code>null</code>) and <code>fileAs</code> (the sort key, or <code>null</code>). <code>addCreator()</code> adds one, writing the role and sort key as EPUB 3 refinements (<code>scheme="marc:relators"</code>) or as EPUB 2 <code>opf:role</code> / <code>opf:file-as</code> attributes, depending on the package version.</p>
+<p><code>setCreators()</code> is the inverse of <code>getCreators()</code>: it replaces every creator by the given <code>Contributor</code> objects. Existing creators are reused in order, so their ids and other refinements survive; the role and sort key of each are set exactly as given (<code>null</code> removes them), in the form the package version expects. Creators beyond the list are removed with their refinements. It throws an <code>Exception</code> for an empty name or an invalid value, and then changes nothing.</p>
+<pre class="codehilite"><code class="language-php">$metadata-&gt;setCreators([
+    new Contributor('Jane Doe', 'aut', 'Doe, Jane'),
+    new Contributor('Ivan Illustrator', 'ill', null),
+]);
+</code></pre>
+
 <h3 id="contributors">Contributors<a class="headerlink" href="#contributors" title="Permanent link">&para;</a></h3>
 <pre class="codehilite"><code class="language-php">public function getContributors(): array&lt;int, Contributor&gt;
-public function setContributors(array&lt;int, string&gt; $names): void
+public function setContributors(array&lt;int, string|Contributor&gt; $contributors): void
 public function addContributor(string $name, ?string $role = null, ?string $fileAs = null): void
 </code></pre>
 
-<p>People or organisations who contributed to the resource (dc:contributor), such as editors (<code>edt</code>) or translators (<code>trl</code>). These work like the creator methods; <code>setContributors()</code> reuses existing contributors in order, keeping their roles.</p>
+<p>People or organisations who contributed to the resource (dc:contributor), such as editors (<code>edt</code>) or translators (<code>trl</code>). These work like the creator methods. <code>setContributors()</code> reuses existing contributors in order. A plain name keeps the role of the contributor it reuses (its sort key is dropped when the name changes), while a <code>Contributor</code> object sets the role and sort key exactly (<code>null</code> removes them), so names and objects can be mixed. Empty names throw an <code>Exception</code>.</p>
 <pre class="codehilite"><code class="language-php">$metadata-&gt;addCreator('Ivan Illustrator', 'ill', 'Illustrator, Ivan');
 $metadata-&gt;addContributor('Ed Editor', 'edt');
 
@@ -237,15 +247,15 @@ public function setPublisher(string $publisher): void
 <p>The entity that made the resource available (dc:publisher).</p>
 <h3 id="date">Date<a class="headerlink" href="#date" title="Permanent link">&para;</a></h3>
 <pre class="codehilite"><code class="language-php">public function getDate(): string
-public function setDate(string $date): void
+public function setDate(string|DateTimeInterface $date): void
 public function getModifiedDate(): ?string
 public function getDateEvents(): array
 </code></pre>
 
-<p>Date of publication (dc:date). Should be in a valid date format (preferably ISO 8601).</p>
+<p>Date of publication (dc:date). <code>setDate()</code> accepts <a href="https://www.w3.org/TR/NOTE-datetime">W3CDTF</a>, the format EPUB uses, and throws an <code>Exception</code> for anything else: <code>YYYY</code>, <code>YYYY-MM</code>, <code>YYYY-MM-DD</code>, or a date-time with a time zone (<code>2020-07-31T10:20:30Z</code>, <code>2020-07-31T10:20+02:00</code>). A <code>DateTimeInterface</code> is written as a date-time with its own offset (<code>2020-07-31T10:20:30+02:00</code>).</p>
 <ul>
 <li><code>getDate()</code>/<code>setDate()</code> use the publication date: the <code>dc:date</code> with the EPUB 2 <code>opf:event="publication"</code>, or else one without an event, or else the first. Dates of other events are kept.</li>
-<li><code>getModifiedDate()</code> returns the EPUB 3 <code>dcterms:modified</code> property, or else the EPUB 2 <code>dc:date</code> with <code>opf:event="modification"</code>, or <code>null</code>. <code>save()</code> keeps both up to date.</li>
+<li><code>getModifiedDate()</code> returns the EPUB 3 <code>dcterms:modified</code> property, or else the EPUB 2 <code>dc:date</code> with <code>opf:event="modification"</code>, or <code>null</code>. <code>save()</code> keeps both up to date: it only touches the book-level <code>dcterms:modified</code> (never a refinement of another element with that property), and adds it when the package only has refinements.</li>
 <li><code>getDateEvents()</code> returns every <code>dc:date</code> keyed by its <code>opf:event</code> (<code>""</code> for a date without one), e.g. <code>['publication' =&gt; '1999-01-01', 'modification' =&gt; '2020-05-05']</code>.</li>
 </ul>
 <h3 id="language">Language<a class="headerlink" href="#language" title="Permanent link">&para;</a></h3>
@@ -255,7 +265,80 @@ public function getLanguages(): array&lt;int, string&gt;
 public function setLanguages(array&lt;int, string&gt; $languages): void
 </code></pre>
 
-<p>The language of the resource (dc:language). Use BCP 47 language codes (e.g., "en", "fr"). <code>getLanguage()</code>/<code>setLanguage()</code> work on the main (first) language; <code>getLanguages()</code>/<code>setLanguages()</code> on all of them, for multilingual books. At least one language is required.</p>
+<p>The language of the resource (dc:language). Use BCP 47 language tags (e.g., "en", "pt-BR", "zh-Hant"). <code>setLanguage()</code> and <code>setLanguages()</code> throw an <code>Exception</code> for a value that is not a well-formed tag (<code>"English"</code> or <code>"en_US"</code>); only the syntax is checked, not whether the language is registered. <code>getLanguage()</code>/<code>setLanguage()</code> work on the main (first) language; <code>getLanguages()</code>/<code>setLanguages()</code> on all of them, for multilingual books. At least one language is required.</p>
+<h3 id="accessibility">Accessibility<a class="headerlink" href="#accessibility" title="Permanent link">&para;</a></h3>
+<pre class="codehilite"><code class="language-php">public function getAccessModes(): array&lt;int, string&gt;
+public function setAccessModes(array&lt;int, string&gt; $modes): void
+public function getAccessModesSufficient(): array&lt;int, string&gt;
+public function setAccessModesSufficient(array&lt;int, string&gt; $sets): void
+public function getAccessibilityFeatures(): array&lt;int, string&gt;
+public function setAccessibilityFeatures(array&lt;int, string&gt; $features): void
+public function getAccessibilityHazards(): array&lt;int, string&gt;
+public function setAccessibilityHazards(array&lt;int, string&gt; $hazards): void
+public function getAccessibilitySummary(): ?string
+public function setAccessibilitySummary(?string $summary): void
+public function getConformsTo(): ?string
+public function setConformsTo(?string $conformance): void
+public function getCertifiedBy(): ?string
+public function setCertifiedBy(?string $certifier): void
+</code></pre>
+
+<p>Accessibility metadata as described by <a href="https://www.w3.org/TR/epub-a11y-11/">EPUB Accessibility 1.1</a>; the European Accessibility Act asks for it for e-books sold in the EU.</p>
+<table>
+<thead>
+<tr>
+<th>Methods</th>
+<th>Property</th>
+<th>Example values</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>getAccessModes()</code> / <code>setAccessModes()</code></td>
+<td><code>schema:accessMode</code></td>
+<td><code>textual</code>, <code>visual</code>, <code>auditory</code>, <code>tactile</code></td>
+</tr>
+<tr>
+<td><code>getAccessModesSufficient()</code> / <code>setAccessModesSufficient()</code></td>
+<td><code>schema:accessModeSufficient</code></td>
+<td><code>textual,visual</code> (each value is a comma-separated set), <code>textual</code></td>
+</tr>
+<tr>
+<td><code>getAccessibilityFeatures()</code> / <code>setAccessibilityFeatures()</code></td>
+<td><code>schema:accessibilityFeature</code></td>
+<td><code>alternativeText</code>, <code>tableOfContents</code>, <code>structuralNavigation</code>, <code>none</code></td>
+</tr>
+<tr>
+<td><code>getAccessibilityHazards()</code> / <code>setAccessibilityHazards()</code></td>
+<td><code>schema:accessibilityHazard</code></td>
+<td><code>none</code>, <code>unknown</code>, <code>noFlashingHazard</code>, <code>flashing</code></td>
+</tr>
+<tr>
+<td><code>getAccessibilitySummary()</code> / <code>setAccessibilitySummary()</code></td>
+<td><code>schema:accessibilitySummary</code></td>
+<td>free text</td>
+</tr>
+<tr>
+<td><code>getConformsTo()</code> / <code>setConformsTo()</code></td>
+<td><code>dcterms:conformsTo</code></td>
+<td><code>EPUB Accessibility 1.1 - WCAG 2.1 Level AA</code></td>
+</tr>
+<tr>
+<td><code>getCertifiedBy()</code> / <code>setCertifiedBy()</code></td>
+<td><code>a11y:certifiedBy</code></td>
+<td>the certifier's name</td>
+</tr>
+</tbody>
+</table>
+<p>The list methods read and replace every value in order; the single-value ones return <code>null</code> when absent, and <code>null</code> or <code>""</code> removes the value. EPUB 3 packages store each as a <code>&lt;meta property="..."&gt;</code> element; EPUB 2 packages as <code>&lt;meta name="..." content="..."/&gt;</code>, which the specification allows. The values are not checked against the vocabularies. <code>EpubFile::validate()</code> warns when an EPUB 3 book has no access mode, feature, hazard or summary (see <a href="../epub-file/#validating">Validating</a>).</p>
+<pre class="codehilite"><code class="language-php">$metadata-&gt;setAccessModes(['textual', 'visual']);
+$metadata-&gt;setAccessModesSufficient(['textual']);
+$metadata-&gt;setAccessibilityFeatures(['alternativeText', 'tableOfContents']);
+$metadata-&gt;setAccessibilityHazards(['none']);
+$metadata-&gt;setAccessibilitySummary('All images have text alternatives.');
+$metadata-&gt;setConformsTo('EPUB Accessibility 1.1 - WCAG 2.1 Level AA');
+</code></pre>
+
 <h3 id="subject">Subject<a class="headerlink" href="#subject" title="Permanent link">&para;</a></h3>
 <pre class="codehilite"><code class="language-php">public function getSubject(): string
 public function setSubject(string $subject): void
@@ -363,12 +446,15 @@ $epubFile-&gt;save();
 <li><code>InteractsWithSubject</code> - Subject handling</li>
 <li><code>InteractsWithIdentifier</code> - Identifier handling</li>
 <li><code>InteractsWithSeries</code> - Series handling (EPUB 3 collections and Calibre metas)</li>
+<li><code>InteractsWithAccessibility</code> - Accessibility metadata</li>
 </ul>
 <p>Each trait is a thin layer over shared protected helpers in <code>Metadata</code> (<code>getDcValue()</code>, <code>getDcValues()</code>, <code>setDcValue()</code>, <code>setDcValues()</code>), which look up elements inside <code>&lt;metadata&gt;</code> by namespace URI rather than by prefix.</p>
 <h2 id="error-handling">Error Handling<a class="headerlink" href="#error-handling" title="Permanent link">&para;</a></h2>
 <ul>
 <li>The constructor throws <code>InvalidEpubException</code> if the package has no <code>&lt;metadata&gt;</code> element.</li>
 <li><code>setIdentifiers([])</code> throws an <code>Exception</code>, because a package needs at least one identifier.</li>
+<li><code>setLanguage()</code>/<code>setLanguages()</code> throw an <code>Exception</code> for a malformed BCP 47 tag, and <code>setDate()</code> for a date that is not W3CDTF.</li>
+<li><code>setCreators()</code> and <code>setContributors()</code> throw an <code>Exception</code> for an empty name.</li>
 <li><code>setTitle()</code>, <code>setLanguage()</code> and <code>setIdentifiers()</code> throw an <code>Exception</code> for an empty or whitespace-only value, because the OPF specification requires these elements to have content.</li>
 <li>Every setter (including <code>setMeta()</code> and <code>setProperty()</code>) throws an <code>Exception</code> for a value that is not valid UTF-8 or contains a character XML cannot store (control characters other than tab, newline and carriage return). Convert legacy encodings first, e.g. with <code>mb_convert_encoding($value, 'UTF-8', 'ISO-8859-1')</code>. The package is left unchanged when a value is rejected, even if it was one of several in a list.</li>
 <li><code>save()</code> throws an <code>Exception</code> if the OPF file cannot be written.</li>

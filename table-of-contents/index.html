@@ -143,10 +143,13 @@
 <p><strong><code>getEntries(): array</code></strong>: The entries of the navigation document's <code>toc</code> nav, or, for a book without a navigation document, of the NCX. Returns <code>[]</code> when the book has neither.</p>
 </li>
 <li>
-<p><strong><code>setEntries(array $entries): void</code></strong>: Replaces the entries in the navigation document <strong>and</strong> in the NCX, whichever the book has, so EPUB 3 books that keep an NCX for older readers stay consistent. The <code>toc</code> heading and other navs (landmarks, page list) are kept; a missing <code>toc</code> nav is created. The NCX has no unlinked entries, so an entry without a path is left out there and its children take its place. Throws an <code>Exception</code> when the book has neither file, when an entry points outside the book or is not valid XML text, or when a file cannot be written.</p>
+<p><strong><code>setEntries(array $entries): void</code></strong>: Replaces the entries in the navigation document <strong>and</strong> in the NCX, whichever the book has, so EPUB 3 books that keep an NCX for older readers stay consistent. The <code>toc</code> heading and other navs (landmarks, page list) are kept; a missing <code>toc</code> nav is created. The NCX has no unlinked entries, so an entry without a path is left out there and its children take its place. Throws an <code>Exception</code> when <code>$entries</code> is empty (a table of contents needs an entry), when the book has neither file, when an entry points outside the book or is not valid XML text, or when a file cannot be written.</p>
 </li>
 <li>
 <p><strong><code>addEntry(TocEntry $entry): void</code></strong>: Appends a top-level entry.</p>
+</li>
+<li>
+<p><strong><code>generateFromHeadings(int $maxLevel = 3): array</code></strong>: Builds the table of contents from the headings <code>h1</code> to <code>h$maxLevel</code> of the spine documents, in reading order, sets it with <code>setEntries()</code> and returns the entries. Headings nest by level (an <code>h2</code> after an <code>h1</code> is its child, also across documents). A heading without an <code>id</code> gets one (<code>toc-1</code>, <code>toc-2</code>, ..., unique in its document), which rewrites that document. Documents that are not well-formed XML, non-linear spine items, the navigation document and headings without text are skipped. Throws an <code>Exception</code> when <code>$maxLevel</code> is not 1 to 6, when the object has no spine (use <code>EpubFile::getTableOfContents()</code>), when the book has no navigation document or NCX, or when no heading is found (a table of contents needs an entry; nothing is changed then).</p>
 </li>
 <li>
 <p><strong><code>isAvailable(): bool</code></strong>: Whether the book has a navigation document or an NCX that can hold a table of contents, i.e. whether <code>setEntries()</code> can work.</p>
@@ -155,7 +158,7 @@
 <p><strong><code>getBook(): ?EpubFile</code></strong>: The book this table of contents belongs to, when it came from <code>EpubFile::getTableOfContents()</code>. Holding the object keeps the book's extracted files alive, so <code>EpubFile::open($path)-&gt;getTableOfContents()</code> is safe to use on its own.</p>
 </li>
 </ul>
-<p>Deleting a file with <code>ContentManager::deleteContent()</code> removes its entries, and <code>EpubFile::save()</code> keeps the NCX <code>docTitle</code> in step with the book title.</p>
+<p>Deleting a file with <code>ContentManager::deleteContent()</code> removes its entries (if that removes the last one, the table of contents stays empty and <code>EpubFile::validate()</code> reports <code>NAV_EMPTY</code> / <code>NCX_EMPTY</code>), and <code>EpubFile::save()</code> keeps the NCX <code>docTitle</code> in step with the book title. Whenever the NCX is written, its <code>dtb:depth</code> meta is set to the real nesting depth of the entries (created when missing, as long as the NCX has a <code>&lt;head&gt;</code>).</p>
 <h2 id="usage-example">Usage Example<a class="headerlink" href="#usage-example" title="Permanent link">&para;</a></h2>
 <pre class="codehilite"><code class="language-php">use PhpEpub\EpubFile;
 use PhpEpub\TocEntry;
@@ -171,6 +174,9 @@ $epubFile-&gt;getContentManager()-&gt;addContent('EPUB/text/epilogue.xhtml', $xh
 $item = $epubFile-&gt;getManifest()-&gt;findByPath('EPUB/text/epilogue.xhtml');
 $epubFile-&gt;getSpine()-&gt;add($item-&gt;id);
 $epubFile-&gt;getTableOfContents()-&gt;addEntry(new TocEntry('Epilogue', 'EPUB/text/epilogue.xhtml'));
+
+// Or build the whole table of contents from the chapters' h1 to h3 headings.
+$epubFile-&gt;getTableOfContents()-&gt;generateFromHeadings();
 
 $epubFile-&gt;save();
 </code></pre>

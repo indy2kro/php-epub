@@ -86,6 +86,8 @@
     <ul class="current">
     <li class="toctree-l3"><a class="reference internal" href="#key-methods">Key Methods</a>
     </li>
+    <li class="toctree-l3"><a class="reference internal" href="#untrusted-books">Untrusted books</a>
+    </li>
     <li class="toctree-l3"><a class="reference internal" href="#usage-example">Usage Example</a>
     </li>
     </ul>
@@ -138,6 +140,9 @@
 <p><strong><code>convert(string $inputFile, string $outputPath): void</code></strong>: Converts an <code>.epub</code> file, or a directory with an extracted EPUB (packaged into a temporary <code>.epub</code> first, which is removed afterwards). The output extension selects the format. Calibre is started directly, without a shell, so no argument is ever interpreted; its output (including stderr) is included in the exception message when the conversion fails. A conversion that runs longer than <code>timeout</code> is stopped (the <code>ebook-convert</code> process is killed) and reported with an exception. Throws an exception if Calibre or the input is missing, or if the conversion fails.</p>
 </li>
 </ul>
+<p>A relative input or output path that starts with <code>-</code> is passed to Calibre as <code>./-name</code> (<code>.\-name</code> on Windows), so Calibre never reads it as an option.</p>
+<h2 id="untrusted-books">Untrusted books<a class="headerlink" href="#untrusted-books" title="Permanent link">&para;</a></h2>
+<p>Unlike <code>TCPDFAdapter</code> and <code>DompdfAdapter</code>, which sanitise the book and confine every resource to it (see <a href="../../converter/#how-the-pdf-adapters-read-a-book">Converter</a>), <code>CalibreAdapter</code> hands the book to Calibre unchanged. Whether Calibre keeps the book's references inside the book depends on its version. When you convert books you do not trust, keep Calibre up to date, or run <code>ebook-convert</code> in a sandbox (a container, or an unprivileged user without access to files that matter).</p>
 <h2 id="usage-example">Usage Example<a class="headerlink" href="#usage-example" title="Permanent link">&para;</a></h2>
 <pre class="codehilite"><code class="language-php">use PhpEpub\Converters\CalibreAdapter;
 

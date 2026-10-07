@@ -186,11 +186,11 @@
 <h3 id="spine">Spine<a class="headerlink" href="#spine" title="Permanent link">&para;</a></h3>
 <p>The reading order: <code>SpineItem</code>s with their manifest item and <code>linear</code> flag, and adding, removing and moving entries.</p>
 <h3 id="contentmanager">ContentManager<a class="headerlink" href="#contentmanager" title="Permanent link">&para;</a></h3>
-<p>File operations on the extracted book (add, update, delete, read), keeping the manifest and spine in sync. Paths are relative to the book root; the package document itself is managed only through <code>Metadata</code>, <code>Manifest</code> and <code>Spine</code>.</p>
+<p>File operations on the extracted book (add, update, delete, move, read), keeping the manifest and spine in sync and refusing XHTML that is not well-formed; moving a file rewrites the references to it. Paths are relative to the book root; the package document itself is managed only through <code>Metadata</code>, <code>Manifest</code> and <code>Spine</code>.</p>
 <h3 id="tableofcontents">TableOfContents<a class="headerlink" href="#tableofcontents" title="Permanent link">&para;</a></h3>
 <p>Reads and edits the EPUB 3 navigation document's <code>toc</code> nav and the EPUB 2 NCX as <code>TocEntry</code> trees, writing both when a book has both.</p>
 <h3 id="validator">Validator<a class="headerlink" href="#validator" title="Permanent link">&para;</a></h3>
-<p><code>EpubFile::validate()</code> runs it to report common structural problems as <code>ValidationIssue</code>s: required metadata, duplicate ids, manifest and spine consistency, navigation.</p>
+<p><code>EpubFile::validate()</code> runs it to report common structural problems as <code>ValidationIssue</code>s: required metadata, duplicate ids, manifest and spine consistency, media types and manifest properties, navigation, accessibility metadata.</p>
 <h3 id="parser-and-xmlparser">Parser and XmlParser<a class="headerlink" href="#parser-and-xmlparser" title="Permanent link">&para;</a></h3>
 <p><code>Parser</code> reads <code>META-INF/container.xml</code> and locates and checks the OPF; problems reading systems tolerate (a wrong <code>mimetype</code>, a broken NCX) are left to <code>Validator</code>. <code>XmlParser</code> loads XML without network access and rejects entity declarations.</p>
 <h3 id="ziphandler">ZipHandler<a class="headerlink" href="#ziphandler" title="Permanent link">&para;</a></h3>

@@ -140,7 +140,7 @@
 <p>When it is created by <code>EpubFile</code> (or given a <code>Manifest</code> and <code>Spine</code>), it keeps the OPF in sync:</p>
 <ul>
 <li><code>addContent()</code> adds new files to the manifest, with a media type guessed from the extension.</li>
-<li>In EPUB 3 books, <code>addContent()</code> and <code>updateContent()</code> set the manifest properties an XHTML document needs because of its content, and remove those it no longer needs: <code>svg</code> (inline SVG), <code>mathml</code>, <code>scripted</code> (<code>&lt;script&gt;</code> or <code>&lt;form&gt;</code>) and <code>remote-resources</code> (a resource loaded from <code>http(s)://</code>; links do not count). Other properties, such as <code>nav</code>, are kept, and a document that is not well-formed XML keeps its properties.</li>
+<li>In EPUB 3 books, <code>addContent()</code> and <code>updateContent()</code> set the manifest properties an XHTML document needs because of its content, and remove those it no longer needs: <code>svg</code> (inline SVG), <code>mathml</code>, <code>scripted</code> (<code>&lt;script&gt;</code> or <code>&lt;form&gt;</code>) and <code>remote-resources</code> (a resource loaded from <code>http(s)://</code>; links do not count). Other properties, such as <code>nav</code>, are kept, and the others are untouched.</li>
 <li><code>deleteContent()</code> removes the file's manifest item and its spine entry, plus package references to it (EPUB 2 cover meta, refinements, <code>spine@toc</code>, <code>fallback</code>/<code>media-overlay</code> of other items, <code>&lt;guide&gt;</code> references) and its table-of-contents entries (an entry with children stays as an unlinked heading in the navigation document; the NCX promotes the children).</li>
 </ul>
 <p>Adding a file does not put it in the reading order; call <code>Spine::add()</code> for that.</p>
@@ -168,20 +168,26 @@ $contentManager = $epubFile-&gt;getContentManager();
 <pre class="codehilite"><code class="language-php">public function addContent(string $filePath, string $content): void
 </code></pre>
 
-<p>Creates (or overwrites) a file, creating missing directories. New files are added to the manifest, except container files (<code>mimetype</code>, <code>META-INF/…</code>). Throws an exception if the file cannot be written.</p>
+<p>Creates (or overwrites) a file, creating missing directories. New files are added to the manifest, except container files (<code>mimetype</code>, <code>META-INF/…</code>). An XHTML document (<code>.xhtml</code>, <code>.html</code> or <code>.htm</code>, or a manifest item with media type <code>application/xhtml+xml</code>) must be well-formed XML without entity declarations, or an exception is thrown and nothing is written. Throws an exception if the file cannot be written.</p>
 <pre class="codehilite"><code class="language-php">public function updateContent(string $filePath, string $newContent): void
 </code></pre>
 
-<p>Updates an existing file's content. Throws an exception if the file doesn't exist.</p>
+<p>Updates an existing file's content. XHTML must stay well-formed, as for <code>addContent()</code>. Throws an exception if the file doesn't exist or the XHTML is not well-formed.</p>
 <pre class="codehilite"><code class="language-php">public function deleteContent(string $filePath): void
 </code></pre>
 
-<p>Deletes a file, its manifest item and its spine entry. Throws an exception if the file doesn't exist or cannot be deleted.</p>
-<pre class="codehilite"><code class="language-php">public function moveContent(string $from, string $to): void
+<p>Deletes a file, its manifest item and its spine entry. Deleting the last file the table of contents links to leaves the table of contents empty instead of failing; <code>EpubFile::validate()</code> reports it (<code>NAV_EMPTY</code> / <code>NCX_EMPTY</code>). Throws an exception if the file doesn't exist or cannot be deleted.</p>
+<pre class="codehilite"><code class="language-php">public function moveContent(string $from, string $to, bool $updateReferences = true): void
 </code></pre>
 
-<p>Moves or renames a file. Its manifest item keeps its id, so its place in the reading order is unchanged, and points at the new path; <code>&lt;guide&gt;</code> references, table-of-contents entries and the <code>META-INF/encryption.xml</code> entry of an obfuscated font follow it. Moving the navigation document rewrites its links for the new location.</p>
-<p>References inside content documents are not rewritten: links and images in other documents that point at the moved file, and relative links inside a document moved to another directory, keep their old targets; <code>EpubFile::validate()</code> reports those that break (<code>CONTENT_REFERENCE_MISSING</code>). Throws an exception if either path is the package document or leaves the book, the file does not exist, the target already exists, or the file cannot be moved.</p>
+<p>Moves or renames a file. Its manifest item keeps its id, so its place in the reading order is unchanged, and points at the new path; <code>&lt;guide&gt;</code> references, table-of-contents entries and the <code>META-INF/encryption.xml</code> entry of an obfuscated font follow it. Moving the navigation document rewrites its links for the new location. A case-only rename (<code>ch.xhtml</code> to <code>Ch.xhtml</code>) also works on case-insensitive filesystems.</p>
+<p>References inside content documents follow the move (pass <code>$updateReferences = false</code> to leave them alone; <code>EpubFile::validate()</code> then reports those that break, <code>CONTENT_REFERENCE_MISSING</code>):</p>
+<ul>
+<li>In XHTML and SVG documents, the attributes <code>src</code>, <code>poster</code>, <code>data</code>, and <code>href</code> (including <code>xlink:href</code>) on <code>a</code>, <code>area</code>, <code>link</code>, <code>image</code> and <code>use</code> that point at the moved file are rewritten.</li>
+<li>In stylesheets, <code>&lt;style&gt;</code> elements and <code>style</code> attributes, <code>url(...)</code> values and <code>@import "..."</code> strings are rewritten.</li>
+<li>A document that moves to another directory gets its own relative references recomputed, so they still reach the same files.</li>
+</ul>
+<p>Query strings and fragments are kept. Only documents that change are written, and they are re-serialized with DOM, so details such as quote style, the XML declaration or whitespace inside tags can differ. Documents that are not well-formed XML are left unchanged. Throws an exception if either path is the package document or leaves the book, the file does not exist, the target already exists, or the file cannot be moved or a document cannot be rewritten.</p>
 <pre class="codehilite"><code class="language-php">$epubFile-&gt;getContentManager()-&gt;moveContent('EPUB/chapter1.xhtml', 'EPUB/text/chapter-01.xhtml');
 </code></pre>
 

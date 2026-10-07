@@ -134,11 +134,11 @@ composer require tecnickcom/tcpdf
 </code></pre>
 
 <h3 id="tcpdf-core-fonts">TCPDF core fonts<a class="headerlink" href="#tcpdf-core-fonts" title="Permanent link">&para;</a></h3>
-<p>TCPDF 7 needs the 14 standard PDF core fonts (Helvetica, Times, Courier, …) as JSON definitions, which Composer packages do not ship. Generate them once after installing TCPDF (and again after updating <code>tecnickcom/tc-lib-pdf-font</code>):</p>
+<p>TCPDF 7 needs the 14 standard PDF core fonts (Helvetica, Times, Courier, …) as JSON definitions, which Composer packages do not ship, and <code>TCPDFAdapter</code> uses DejaVu Sans (regular, bold, italic and bold italic) by default, which covers Latin, Greek, Cyrillic, Hebrew and Arabic. Generate them once after installing TCPDF (and again after updating <code>tecnickcom/tc-lib-pdf-font</code>, or php-epub, when you installed TCPDF before DejaVu Sans was added; fonts already generated are skipped):</p>
 <pre class="codehilite"><code>php vendor/indy2kro/php-epub/scripts/generate-core-fonts.php
 </code></pre>
 
-<p>The script downloads the Adobe Core14 AFM files over HTTPS (certificates verified), checks each file against a pinned SHA-256 hash, and writes the definitions into <code>vendor/tecnickcom/tc-lib-pdf-font/target/fonts/</code>, where TCPDF finds them automatically. It exits without doing anything when TCPDF is not installed.</p>
+<p>The script downloads the Adobe Core14 AFM files and the DejaVu Sans TTF files over HTTPS (certificates verified), checks each file against a pinned SHA-256 hash, and writes the definitions into <code>vendor/tecnickcom/tc-lib-pdf-font/target/fonts/</code>, where TCPDF finds them automatically. It exits without doing anything when TCPDF is not installed.</p>
 <p>You can make this automatic in your own <code>composer.json</code>:</p>
 <pre class="codehilite"><code class="language-json">&quot;scripts&quot;: {
     &quot;post-install-cmd&quot;: [&quot;@php vendor/indy2kro/php-epub/scripts/generate-core-fonts.php&quot;],

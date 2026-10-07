@@ -127,10 +127,55 @@
 <h2 id="key-methods">Key Methods<a class="headerlink" href="#key-methods" title="Permanent link">&para;</a></h2>
 <ul>
 <li>
-<p><strong><code>__construct(array $styles = [])</code></strong>: Optional styling parameters: <code>font</code> (default <code>Arial</code>), <code>font_size</code> in points (default <code>12</code>), <code>paper_size</code> (default <code>A4</code>), <code>orientation</code> (default <code>portrait</code>) and <code>margin_top</code>/<code>margin_right</code>/<code>margin_bottom</code>/<code>margin_left</code> in mm, as in <code>TCPDFAdapter</code>. Without any margin option Dompdf keeps its own default margins; once one is given, sides that are not given are <code>0</code>. Values of the wrong type fall back to the defaults. Dompdf cannot write a PDF outline, so use <code>TCPDFAdapter</code> when you need chapter bookmarks.</p>
+<p><strong><code>__construct(array $styles = [])</code></strong>: Optional styling parameters:</p>
+<table>
+<thead>
+<tr>
+<th>Style</th>
+<th>Type</th>
+<th>Default</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>font</code></td>
+<td>string</td>
+<td><code>DejaVu Sans</code></td>
+<td>A font family Dompdf knows.</td>
+</tr>
+<tr>
+<td><code>font_size</code></td>
+<td>int or float</td>
+<td><code>12</code></td>
+<td>In points; greater than zero.</td>
+</tr>
+<tr>
+<td><code>paper_size</code></td>
+<td>string</td>
+<td><code>A4</code></td>
+<td>A size Dompdf knows (any case), as in <code>TCPDFAdapter</code>.</td>
+</tr>
+<tr>
+<td><code>orientation</code></td>
+<td>string</td>
+<td><code>portrait</code></td>
+<td><code>portrait</code> or <code>landscape</code>.</td>
+</tr>
+<tr>
+<td><code>margin_top</code>, <code>margin_right</code>, <code>margin_bottom</code>, <code>margin_left</code></td>
+<td>int or float</td>
+<td>none</td>
+<td>In mm (<code>12.5</code> is fine; not negative), as in <code>TCPDFAdapter</code>. Without any margin option Dompdf keeps its own default margins; once one is given, sides that are not given are <code>0</code>.</td>
+</tr>
+</tbody>
+</table>
+<p>The constructor throws an <code>Exception</code> for a style it does not know (the message lists the valid ones), a value of the wrong type (a numeric string is not a number), an unusable value (a negative margin, an unknown orientation) and a paper size Dompdf does not know (Dompdf itself would fall back to <code>letter</code> without a word).</p>
+<p><strong>Fonts and languages:</strong> the default font is DejaVu Sans, which Dompdf ships and which covers Latin, Greek, Cyrillic, Hebrew and Arabic, not only Latin-1 like the PDF core fonts (<code>Arial</code> is mapped to Helvetica). Chinese, Japanese and Korean need a font installed in Dompdf: pass its family as <code>font</code>, which always wins. Books with <code>page-progression-direction="rtl"</code> in the spine, or (when the spine says nothing) with a primary language of <code>ar</code>, <code>he</code>, <code>fa</code>, <code>ur</code>, <code>yi</code>, <code>ps</code>, <code>sd</code>, <code>ug</code> or <code>dv</code>, get <code>dir="rtl"</code> on the generated <code>&lt;html&gt;</code> and <code>&lt;body&gt;</code>; the book's language is set as <code>lang</code>. Dompdf does not shape Arabic script, so Arabic letters are not joined.</p>
+<p>Dompdf cannot write a PDF outline, so use <code>TCPDFAdapter</code> when you need chapter bookmarks.</p>
 </li>
 <li>
-<p><strong><code>convert(string $epubDirectory, string $outputPath): void</code></strong>: Renders every spine document in reading order, each on a new page, sets the PDF title and author from the EPUB metadata, and writes the PDF. Throws a <code>ConversionException</code> if the book cannot be read or the PDF cannot be written.</p>
+<p><strong><code>convert(string $epubDirectory, string $outputPath): void</code></strong>: Renders every spine document in reading order, each on a new page, sets the PDF title and author from the EPUB metadata, and writes the PDF. Throws a <code>ConversionException</code> if the book cannot be read, Dompdf fails (its exception is kept as the previous exception) or the PDF cannot be written.</p>
 </li>
 <li>
 <p><strong><code>buildHtml(string $epubDirectory): string</code></strong>: Returns the HTML document that <code>convert()</code> renders, e.g. for previews or debugging.</p>

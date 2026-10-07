@@ -173,6 +173,12 @@
 </code></pre>
 
 <p>Shortcut for <code>new EpubFile(...)</code> followed by <code>load()</code>.</p>
+<pre class="codehilite"><code class="language-php">public static function openString(string $data, ?ZipHandler $zipHandler = null, ?XmlParser $xmlParser = null): EpubFile
+public static function openStream($stream, ?ZipHandler $zipHandler = null, ?XmlParser $xmlParser = null): EpubFile
+</code></pre>
+
+<p>Open a book held in a string (an upload, an HTTP response) or read from a stream (from its current position to the end; the stream is not rewound and stays open). <code>ZipArchive</code> needs a real file, so the data is buffered in a private temporary directory (random name, mode <code>0700</code>) that is deleted again, also on failure. The same ZIP size, entry and compression-ratio limits apply as for files, and a book that is not a valid EPUB throws as it would from <code>open()</code>.</p>
+<p>Such a book has no file: <code>save()</code> without a path throws an exception (pass a path, or use <code>saveToString()</code> / <code>saveToStream()</code>), and <code>load()</code> throws as well, because there is nothing to reload from; open the data again instead.</p>
 <h3 id="loading-and-saving">Loading and Saving<a class="headerlink" href="#loading-and-saving" title="Permanent link">&para;</a></h3>
 <pre class="codehilite"><code class="language-php">public function load(): void
 </code></pre>
@@ -187,7 +193,18 @@
 <pre class="codehilite"><code class="language-php">public function save(?string $filePath = null): void
 </code></pre>
 
-<p>Saves the modified EPUB back to disk. If <code>$filePath</code> is null, overwrites the original file. Pending metadata, manifest and spine changes are written to the OPF first. Throws an exception if called before <code>load()</code>.</p>
+<p>Saves the modified EPUB back to disk. If <code>$filePath</code> is null, overwrites the original file. Pending metadata, manifest and spine changes are written to the OPF first. Throws an exception if called before <code>load()</code>, or, for a book opened with <code>openString()</code> / <code>openStream()</code>, when <code>$filePath</code> is null.</p>
+<pre class="codehilite"><code class="language-php">public function saveToString(): string
+public function saveToStream($stream): void
+</code></pre>
+
+<p>Package the book exactly as <code>save()</code> does and return the EPUB's bytes, or write them to a writable stream at its current position (the stream stays open; it is not rewound). They work for any loaded book and use the same private temporary directory as <code>openString()</code>.</p>
+<pre class="codehilite"><code class="language-php">$epubFile = EpubFile::openString($request-&gt;getBody()-&gt;getContents());
+$epubFile-&gt;getMetadata()-&gt;setTitle('Edited');
+header('Content-Type: application/epub+zip');
+$epubFile-&gt;saveToStream(fopen('php://output', 'wb'));
+</code></pre>
+
 <h3 id="accessing-components">Accessing Components<a class="headerlink" href="#accessing-components" title="Permanent link">&para;</a></h3>
 <pre class="codehilite"><code class="language-php">public function getMetadata(): Metadata
 </code></pre>
@@ -211,7 +228,7 @@ public function addChapter(string $title, string $body, ?string $path = null): M
 </code></pre>
 
 <p><code>create()</code> prepares a new EPUB 3 book (package document with title, language, identifier and <code>dcterms:modified</code>, plus a navigation document) and returns it opened, like <code>open()</code>. Nothing is written to <code>$filePath</code> until <code>save()</code>. Without <code>$identifier</code>, a random <code>urn:uuid:…</code> is used.</p>
-<p><code>addChapter()</code> writes an XHTML document with the given title and body markup, adds it to the manifest and the reading order, and appends it to the table of contents when the book has one. It works on any loaded book; by default chapters are stored as <code>text/chapter-N.xhtml</code> next to the OPF. The body is inserted as it is, so it must be well-formed XHTML.</p>
+<p><code>addChapter()</code> writes an XHTML document with the given title and body markup, adds it to the manifest and the reading order, and appends it to the table of contents when the book has one. It works on any loaded book; by default chapters are stored as <code>text/chapter-N.xhtml</code> next to the OPF. A well-formed XHTML body is inserted as it is; HTML-ish markup that is not (named entities such as <code>&amp;nbsp;</code>, void tags such as <code>&lt;br&gt;</code>, unclosed tags) is parsed as an HTML fragment with libxml and written as XHTML: entities become characters, void elements self-close and open tags are closed.</p>
 <p>A book needs at least one chapter to be valid.</p>
 <pre class="codehilite"><code class="language-php">$epubFile = EpubFile::create('/path/to/new.epub', 'My Book', 'en');
 $epubFile-&gt;getMetadata()-&gt;setAuthors(['Jane Doe']);
@@ -255,6 +272,16 @@ $epubFile-&gt;save();
 <td>An EPUB 3 package has no <code>dcterms:modified</code></td>
 </tr>
 <tr>
+<td><code>METADATA_LANGUAGE_INVALID</code></td>
+<td>error</td>
+<td>A <code>dc:language</code> is not a well-formed BCP 47 tag (e.g. <code>English</code>)</td>
+</tr>
+<tr>
+<td><code>METADATA_DATE_INVALID</code></td>
+<td>warning</td>
+<td>A <code>dc:date</code> is not W3CDTF (e.g. <code>July 2020</code>)</td>
+</tr>
+<tr>
 <td><code>DUPLICATE_ID</code></td>
 <td>error</td>
 <td>An <code>id</code> is used more than once in the package document</td>
@@ -263,6 +290,11 @@ $epubFile-&gt;save();
 <td><code>MANIFEST_HREF_OUTSIDE</code>, <code>MANIFEST_FILE_MISSING</code></td>
 <td>error</td>
 <td>A manifest item points outside the book, or its file is missing</td>
+</tr>
+<tr>
+<td><code>FILE_NAME_INVALID</code></td>
+<td>warning</td>
+<td>A file name contains a character OCF forbids (<code>" * : &lt; &gt; ? \</code>, DEL, C0 control characters) or ends with a dot; such files cannot be created on every system</td>
 </tr>
 <tr>
 <td><code>FILE_NOT_IN_MANIFEST</code></td>
@@ -285,6 +317,26 @@ $epubFile-&gt;save();
 <td>An XHTML content document is not well-formed XML</td>
 </tr>
 <tr>
+<td><code>MEDIA_TYPE_MISMATCH</code></td>
+<td>error</td>
+<td>A manifest item declared as a JPEG, PNG, GIF or WebP image holds another image type, or one declared as XHTML does not look like XML at all. Only the first 512 KiB of a file are read, and content that is not recognised is not judged</td>
+</tr>
+<tr>
+<td><code>MANIFEST_PROPERTY_MISSING</code></td>
+<td>error</td>
+<td>An EPUB 3 XHTML document needs a manifest property it lacks: <code>svg</code>, <code>mathml</code>, <code>scripted</code> or <code>remote-resources</code> (documents above 8 MiB are not examined)</td>
+</tr>
+<tr>
+<td><code>MANIFEST_PROPERTY_UNNEEDED</code></td>
+<td>warning</td>
+<td>An EPUB 3 XHTML document declares one of those properties, but its content does not need it</td>
+</tr>
+<tr>
+<td><code>COVER_NOT_IMAGE</code></td>
+<td>error</td>
+<td>A manifest item with the <code>cover-image</code> property is not an image</td>
+</tr>
+<tr>
 <td><code>CONTENT_REFERENCE_MISSING</code>, <code>CONTENT_REFERENCE_NOT_IN_MANIFEST</code></td>
 <td>error</td>
 <td>A content document refers (<code>src</code>, <code>href</code>, <code>data</code>, <code>poster</code>) to a local file that is missing or outside the book, or that is not in the manifest; remote URLs, <code>data:</code> URIs and links within the document are not checked</td>
@@ -300,9 +352,19 @@ $epubFile-&gt;save();
 <td>The navigation document is not well-formed / the NCX is not well-formed or has no NCX namespace or <code>navMap</code></td>
 </tr>
 <tr>
+<td><code>NAV_EMPTY</code> / <code>NCX_EMPTY</code></td>
+<td>error</td>
+<td>The <code>toc</code> nav of the navigation document has no list item / the NCX <code>navMap</code> has no <code>navPoint</code> (a table of contents needs an entry; deleting the last linked file leaves it empty)</td>
+</tr>
+<tr>
 <td><code>TOC_LINK_NOT_IN_MANIFEST</code></td>
 <td>error</td>
 <td>The table of contents links to a file that is not in the manifest</td>
+</tr>
+<tr>
+<td><code>ACCESSIBILITY_ACCESS_MODE_MISSING</code>, <code>ACCESSIBILITY_FEATURE_MISSING</code>, <code>ACCESSIBILITY_HAZARD_MISSING</code>, <code>ACCESSIBILITY_SUMMARY_MISSING</code></td>
+<td>warning</td>
+<td>An EPUB 3 book has no <code>schema:accessMode</code>, <code>schema:accessibilityFeature</code>, <code>schema:accessibilityHazard</code> or <code>schema:accessibilitySummary</code> metadata (see <a href="../metadata/#accessibility">accessibility metadata</a>); a new book from <code>create()</code> starts without them</td>
 </tr>
 </tbody>
 </table>
