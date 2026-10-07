@@ -144,10 +144,18 @@ public function getCoverImage(): ?ManifestItem
 Returns the cover, looking in order at: the manifest item with the EPUB 3 `cover-image` property; the item named by the EPUB 2 `<meta name="cover">` (by id, or by href as some books write it); the EPUB 2 `<guide>` cover reference, which names either the image itself or a cover page whose first image (`<img>` or SVG `<image>`) is used. Returns `null` when the book has no cover. Read the bytes with `getContentManager()->getContent($cover->path)`.
 
 ```php
-public function setCoverImage(string $imageData, string $mediaType, ?string $path = null): ManifestItem
+public function setCoverImage(string $imageData, string $mediaType, ?string $path = null, bool $deletePrevious = false): ManifestItem
 ```
 
-Stores the image (by default as `images/cover.<ext>` next to the OPF file), adds it to the manifest and marks it as the cover: the `cover-image` property for EPUB 3 (removed from any previous cover) and `<meta name="cover">` for EPUB 2 compatibility. When `$path` is already in the manifest, that item is reused and its media type updated. The previous image file stays in the book. Throws if `$mediaType` is not an `image/…` type.
+Stores the image (by default as `images/cover.<ext>` next to the OPF file), adds it to the manifest and marks it as the cover: the `cover-image` property for EPUB 3 (removed from any previous cover) and `<meta name="cover">` for EPUB 2 compatibility. When `$path` is already in the manifest, that item is reused and its media type updated. The previous image file stays in the book unless `$deletePrevious` is `true`.
+
+Throws if `$mediaType` is not an `image/…` type, or if JPEG, PNG, GIF or WebP data does not match it (for example PNG bytes declared as `image/jpeg`); other formats, such as SVG, are stored as declared. Nothing is written when it throws.
+
+```php
+public function removeCoverImage(bool $deleteFile = false): void
+```
+
+Unmarks the cover: removes the `cover-image` property, `<meta name="cover">` and `<guide>` cover references, so `getCoverImage()` returns `null` afterwards. With `$deleteFile`, the image is also deleted from the book (with its manifest item). A cover page in the reading order stays.
 
 ### Converting
 

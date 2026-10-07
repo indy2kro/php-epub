@@ -18,6 +18,7 @@ class Metadata
     use Traits\InteractsWithLanguage;
     use Traits\InteractsWithSubject;
     use Traits\InteractsWithIdentifier;
+    use Traits\InteractsWithSeries;
 
     public const string OPF_NAMESPACE = 'http://www.idpf.org/2007/opf';
 
@@ -27,6 +28,14 @@ class Metadata
      * Dublin Core elements the OPF specification requires with a non-empty value.
      */
     private const array REQUIRED_ELEMENTS = ['title', 'language', 'identifier'];
+
+    /**
+     * The fifteen Dublin Core Metadata Element Set elements.
+     */
+    private const array DUBLIN_CORE_ELEMENTS = [
+        'contributor', 'coverage', 'creator', 'date', 'description', 'format', 'identifier', 'language',
+        'publisher', 'relation', 'rights', 'source', 'subject', 'title', 'type',
+    ];
 
     private readonly SimpleXMLElement $metadataNode;
 
@@ -81,7 +90,9 @@ class Metadata
 
     /**
      * Records that the package changed outside the Dublin Core fields (e.g. manifest or spine),
-     * so the next save() writes the OPF and refreshes the EPUB 3 modified date.
+     * so the next save() writes the OPF and refreshes the modification date.
+     *
+     * @internal Called by EpubFile::save() when the manifest or spine changed.
      */
     public function markModified(): void
     {
@@ -210,6 +221,36 @@ class Metadata
         $this->modified = true;
     }
 
+    /**
+     * Gets the values of every dc:<element> (e.g. "rights", "source", "type"), in document order.
+     *
+     * @return list<string>
+     *
+     * @throws Exception If $element is not one of the fifteen Dublin Core elements.
+     */
+    public function getDublinCoreValues(string $element): array
+    {
+        return $this->getDcValues($this->dublinCoreElement($element));
+    }
+
+    /**
+     * Replaces every dc:<element> by one element per value; [] removes them all. Elements are reused
+     * in order, so ids and refinements of unchanged values survive. Title and language need at least
+     * one non-empty value; identifiers are set with setIdentifiers(), which keeps the unique identifier.
+     *
+     * @param list<string> $values
+     *
+     * @throws Exception If $element is not a Dublin Core element or is "identifier", or a value is invalid.
+     */
+    public function setDublinCoreValues(string $element, array $values): void
+    {
+        if ($this->dublinCoreElement($element) === 'identifier') {
+            throw new Exception('Set identifiers with setIdentifiers(), which keeps the unique identifier');
+        }
+
+        $this->setDcValues($element, $values);
+    }
+
     public function getOpfFilePath(): string
     {
         return $this->opfFilePath;
@@ -325,6 +366,14 @@ class Metadata
         }
 
         return null;
+    }
+
+    /**
+     * @throws Exception If the name is not a Dublin Core element.
+     */
+    private function dublinCoreElement(string $element): string
+    {
+        return in_array($element, self::DUBLIN_CORE_ELEMENTS, true) ? $element : throw new Exception("Not a Dublin Core element: {$element}");
     }
 
     /**

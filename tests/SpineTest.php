@@ -8,6 +8,7 @@ use PhpEpub\Exception;
 use PhpEpub\Manifest;
 use PhpEpub\Spine;
 use PhpEpub\Test\Support\EpubBuilder;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use SimpleXMLElement;
 
@@ -130,6 +131,97 @@ final class SpineTest extends TestCase
         $spine->markSaved();
 
         $this->assertFalse($spine->isModified());
+    }
+
+    public function testSetLinearChangesAnExistingEntryAndKeepsItsAttributes(): void
+    {
+        $spine = $this->spine();
+
+        $spine->setLinear('chapter', false);
+        $spine->setLinear('notes', true);
+
+        $items = (new Spine($this->opfXml))->getItems();
+        $this->assertFalse($items[0]->linear);
+        $this->assertTrue($items[1]->linear);
+        $this->assertStringContainsString('<itemref idref="chapter" id="ref-chapter" properties="page-spread-left" linear="no"/>', (string) $this->opfXml->asXML());
+        $this->assertStringContainsString('<itemref idref="notes"/>', (string) $this->opfXml->asXML());
+        $this->assertTrue($spine->isModified());
+    }
+
+    public function testSetLinearRejectsAnItemNotInTheSpine(): void
+    {
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('Item "extra" is not in the spine');
+
+        $this->spine()->setLinear('extra', false);
+    }
+
+    public function testPageProgressionDirection(): void
+    {
+        $spine = $this->spine();
+        $this->assertNull($spine->getPageProgressionDirection());
+
+        $spine->setPageProgressionDirection('rtl');
+        $this->assertSame('rtl', (new Spine($this->opfXml))->getPageProgressionDirection());
+
+        $spine->setPageProgressionDirection(null);
+        $this->assertNull((new Spine($this->opfXml))->getPageProgressionDirection());
+        $this->assertTrue($spine->isModified());
+    }
+
+    public function testPageProgressionDirectionRejectsOtherValues(): void
+    {
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('page-progression-direction must be "ltr", "rtl" or "default", got: up');
+
+        $this->spine()->setPageProgressionDirection('up');
+    }
+
+    public function testPageProgressionDirectionIsEpub3Only(): void
+    {
+        $opfXml = new SimpleXMLElement(str_replace('version="3.0"', 'version="2.0"', EpubBuilder::opf()));
+
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('EPUB 3');
+
+        (new Spine($opfXml))->setPageProgressionDirection('rtl');
+    }
+
+    #[DataProvider('positionsOutOfRange')]
+    public function testPositionsOutOfRangeAreRejected(string $method, int $position): void
+    {
+        $spine = $this->spine();
+
+        try {
+            $method === 'add' ? $spine->add('extra', $position) : $spine->move('notes', $position);
+            $this->fail("Expected an exception for position {$position}.");
+        } catch (Exception $exception) {
+            $this->assertStringContainsString("Position {$position} is outside the spine", $exception->getMessage());
+        }
+
+        $this->assertSame(['chapter', 'notes'], $spine->get());
+        $this->assertFalse($spine->isModified());
+    }
+
+    /**
+     * @return iterable<string, array{string, int}>
+     */
+    public static function positionsOutOfRange(): iterable
+    {
+        yield 'add before the start' => ['add', -1];
+        yield 'add past the end' => ['add', 3];
+        yield 'move before the start' => ['move', -1];
+        yield 'move past the end' => ['move', 2];
+    }
+
+    public function testTheLastPositionsAreAllowed(): void
+    {
+        $spine = $this->spine();
+
+        $spine->add('extra', 2);
+        $spine->move('chapter', 2);
+
+        $this->assertSame(['notes', 'extra', 'chapter'], $spine->get());
     }
 
     private function spine(): Spine

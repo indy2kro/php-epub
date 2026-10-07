@@ -23,6 +23,11 @@ final class EpubBuilder
     public const string PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
 
     /**
+     * A 1x1 JPEG.
+     */
+    public const string JPEG = '/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=';
+
+    /**
      * A small EPUB 3 book that passes EPUBCheck: navigation document, dcterms:modified
      * and complete XHTML documents.
      */
@@ -123,6 +128,13 @@ XML);
     public function withFile(string $path, string $content): self
     {
         $this->files[$path] = $content;
+
+        return $this;
+    }
+
+    public function withoutFile(string $path): self
+    {
+        unset($this->files[$path]);
 
         return $this;
     }

@@ -77,7 +77,7 @@ The target was 30 items; the audit found 28, and none were added just to reach t
   A probe confirmed that a deleted chapter's nav/NCX entry stays, which EPUBCheck reports as an error (RSC-007), while `validate()` only warns.
 - [ ] **BUG-05** Do not let `load()` discard a book made with `create()` that was never saved — `src/EpubFile.php:104-145` — S · low
   `load()` re-extracts `$filePath`, which does not exist yet for an unsaved new book, so it throws and cleans up the work in progress.
-- [ ] **BUG-06** Check that cover bytes match the declared image media type — `src/EpubFile.php:302-335` — S · low
+- [x] **BUG-06** Check that cover bytes match the declared image media type — `src/EpubFile.php:302-335` — S · low
   `setCoverImage()` trusts the media type, so PNG bytes declared as `image/jpeg` produce a book that EPUBCheck and some readers reject. `getimagesizefromstring()` can detect the real type.
 - [ ] **BUG-07** Report entries that differ only by case when extracting on case-insensitive filesystems — `src/ZipHandler.php:46-90` — S · low
   On Windows and macOS `Text/a.xhtml` and `text/a.xhtml` extract to the same file, so one silently replaces the other.
@@ -97,13 +97,13 @@ The target was 30 items; the audit found 28, and none were added just to reach t
 
 ### Features
 
-- [ ] **FEAT-01** Series API that reads and writes both `calibre:series`/`calibre:series_index` and EPUB 3 `belongs-to-collection` (`collection-type` series, `group-position`) — `src/Metadata.php:94-200` — M · med
+- [x] **FEAT-01** Series API that reads and writes both `calibre:series`/`calibre:series_index` and EPUB 3 `belongs-to-collection` (`collection-type` series, `group-position`) — `src/Metadata.php:94-200` — M · med
   Series is the most common metadata after title and author, and the two conventions disagree, so callers have to know about and update both by hand.
 - [ ] **FEAT-02** Check XHTML content documents in `validate()`: well-formedness and local references (`img`, `link`, `a`) that are missing or not in the manifest — `src/Validator.php` — M · med
   Broken references are EPUBCheck's most common errors and `addChapter()` inserts caller markup as is, but `validate()` never looks inside content documents.
-- [ ] **FEAT-03** Access the remaining Dublin Core elements (rights, source, type, format, relation, coverage) and all languages — `src/Metadata.php:180-260`, `src/Traits/InteractsWithLanguage.php` — S · low
+- [x] **FEAT-03** Access the remaining Dublin Core elements (rights, source, type, format, relation, coverage) and all languages — `src/Metadata.php:180-260`, `src/Traits/InteractsWithLanguage.php` — S · low
   Only eight DC elements have accessors and `getDcValues()` is protected, so `dc:rights` (licence text) and multilingual books cannot be handled.
-- [ ] **FEAT-04** Typed identifier lookup (`getIsbn()`, schemes from `opf:scheme`, `identifier-type` refinements and `urn:` prefixes) — `src/Traits/InteractsWithIdentifier.php:12-49` — S · low
+- [x] **FEAT-04** Typed identifier lookup (`getIsbn()`, schemes from `opf:scheme`, `identifier-type` refinements and `urn:` prefixes) — `src/Traits/InteractsWithIdentifier.php:12-49` — S · low
   `getIdentifiers()` returns bare strings, so finding the ISBN means reimplementing the EPUB 2 and EPUB 3 scheme conventions.
 - [ ] **FEAT-05** Rename or move content files and update every reference (manifest href, spine, table of contents, guide) — `src/ContentManager.php` — M · low
   Reorganising a book's files today means deleting and re-adding content, which loses the manifest id, spine position and TOC entries.
@@ -112,11 +112,11 @@ The target was 30 items; the audit found 28, and none were added just to reach t
 
 ### Public API
 
-- [ ] **UX-01** Add `removeCoverImage()` and an option to delete the previous cover file — `src/EpubFile.php:302-335` — S · low
+- [x] **UX-01** Add `removeCoverImage()` and an option to delete the previous cover file — `src/EpubFile.php:302-335` — S · low
   Replacing a cover leaves the old image in the book, and a cover cannot be removed without manual manifest and meta edits.
-- [ ] **UX-02** Spine: `setLinear()` for existing entries, `page-progression-direction`, and bounds checks in `move()`/`add()` — `src/Spine.php:73-119` — S · low
+- [x] **UX-02** Spine: `setLinear()` for existing entries, `page-progression-direction`, and bounds checks in `move()`/`add()` — `src/Spine.php:73-119` — S · low
   `linear` can only be set when adding, right-to-left books cannot be configured, and an out-of-range or negative position is silently clamped or counted from the end.
-- [ ] **UX-03** Mark `Manifest`/`Spine` `markSaved()` and `Metadata` `markModified()` as internal, or document them — `src/Manifest.php`, `src/Spine.php`, `src/Metadata.php:74-81` — S · low
+- [x] **UX-03** Mark `Manifest`/`Spine` `markSaved()` and `Metadata` `markModified()` as internal, or document them — `src/Manifest.php`, `src/Spine.php`, `src/Metadata.php:74-81` — S · low
   They are public only so `EpubFile` can coordinate saving, and calling them out of order makes `save()` skip writing the package.
 
 ### Documentation
