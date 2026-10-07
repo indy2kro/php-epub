@@ -239,18 +239,7 @@ class Manifest
      */
     public function pathToHref(string $path): string
     {
-        $segments = explode('/', $this->paths->normalize($path));
-        $base = $this->opfDirectory === '' ? [] : explode('/', $this->opfDirectory);
-
-        // Drop the common leading directories, then climb out of the rest of the OPF directory.
-        while ($base !== [] && count($segments) > 1 && $base[0] === $segments[0]) {
-            array_shift($base);
-            array_shift($segments);
-        }
-
-        $relative = array_merge(array_fill(0, count($base), '..'), array_map(rawurlencode(...), $segments));
-
-        return implode('/', $relative);
+        return $this->paths->relativeHref($this->opfDirectory, $path);
     }
 
     /**

@@ -79,6 +79,14 @@ public function getContentManager(): ContentManager
 
 Returns the ContentManager for adding/updating/deleting content files. Throws an exception if called before `load()`.
 
+### Table of Contents
+
+```php
+public function getTableOfContents(): TableOfContents
+```
+
+Returns the [TableOfContents](table-of-contents.md) for reading and editing the EPUB 3 navigation document and the EPUB 2 NCX. It keeps the `EpubFile` (and its extracted files) alive, so `EpubFile::open($path)->getTableOfContents()->getEntries()` works. Throws an exception if called before `load()`.
+
 ### Cover Image
 
 ```php

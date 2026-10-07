@@ -7,6 +7,7 @@ namespace PhpEpub;
 use DOMDocument;
 use PhpEpub\Converters\ConverterInterface;
 use PhpEpub\Util\FileSystemHelper;
+use PhpEpub\Util\PathResolver;
 use SimpleXMLElement;
 use Throwable;
 
@@ -345,6 +346,19 @@ class EpubFile
         }
 
         return $this->manifest;
+    }
+
+    /**
+     * The table of contents (EPUB 3 navigation document and EPUB 2 NCX). Changes are written
+     * to those files immediately and saved with the book.
+     */
+    public function getTableOfContents(): TableOfContents
+    {
+        if ($this->tempDir === null || $this->manifest === null) {
+            throw new Exception('EPUB file must be loaded before accessing the table of contents.');
+        }
+
+        return new TableOfContents($this->tempDir, $this->manifest, $this->xmlParser, new PathResolver(), $this);
     }
 
     public function getContentManager(): ContentManager

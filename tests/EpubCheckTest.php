@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PhpEpub\Test;
 
 use PhpEpub\EpubFile;
+use PhpEpub\TocEntry;
 use PhpEpub\Test\Support\EpubBuilder;
 use PhpEpub\Util\FileSystemHelper;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -85,8 +86,11 @@ final class EpubCheckTest extends TestCase
 
         yield 'added and removed content' => [static function (EpubFile $epubFile): void {
             $content = $epubFile->getContentManager();
-            $content->addContent('EPUB/text/added.xhtml', EpubBuilder::xhtml('Added', '<h1>Added</h1><p>New chapter.</p>'));
+            $content->addContent('EPUB/text/added.xhtml', EpubBuilder::xhtml('Added', '<h1>Added</h1><p>New chapter.</p><h2 id="section">Section</h2>'));
             $epubFile->getSpine()->add('added-xhtml');
+            $epubFile->getTableOfContents()->addEntry(new TocEntry('Added', 'EPUB/text/added.xhtml', null, [
+                new TocEntry('Added section', 'EPUB/text/added.xhtml', 'section'),
+            ]));
             $content->addContent('EPUB/css/extra.css', 'h1 { color: black; }');
             $content->deleteContent('EPUB/css/extra.css');
         }];
