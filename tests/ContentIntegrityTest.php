@@ -371,6 +371,11 @@ final class ContentIntegrityTest extends TestCase
     public function testGenerateFromHeadingsBuildsNestedEntriesInReadingOrder(): void
     {
         $epubFile = EpubFile::create($this->tmpDir . '/new.epub', 'Headings');
+        // Described, so validate() below only reports the broken chapter.
+        $epubFile->getMetadata()->setAccessModes(['textual']);
+        $epubFile->getMetadata()->setAccessibilityFeatures(['none']);
+        $epubFile->getMetadata()->setAccessibilityHazards(['none']);
+        $epubFile->getMetadata()->setAccessibilitySummary('Text only.');
         $one = $epubFile->addChapter('One', '<h1 id="a">One</h1><h2>Sub &amp;  more</h2><h2 id="x">Sub2</h2><h3>Deep</h3><h4>Too deep</h4><h1>   </h1>');
         $two = $epubFile->addChapter('Two', '<p id="toc-1">taken</p><h2>Starts deeper</h2><h1>Two</h1>');
         $aside = $epubFile->addChapter('Aside', '<h1>Auxiliary</h1>');
@@ -456,7 +461,7 @@ final class ContentIntegrityTest extends TestCase
         $xhtml = static fn (string $body, string $head = ''): string => '<?xml version="1.0" encoding="UTF-8"?><html xmlns="http://www.w3.org/1999/xhtml"'
             . ' xmlns:epub="http://www.idpf.org/2007/ops" xmlns:xlink="http://www.w3.org/1999/xlink"><head><title>T</title>' . $head . "</head><body id=\"top\">{$body}</body></html>";
         $items = '<item id="ch1" href="text/ch1.xhtml" media-type="application/xhtml+xml"/>'
-            . '<item id="ch2" href="text/ch2.xhtml" media-type="application/xhtml+xml"/>'
+            . '<item id="ch2" href="text/ch2.xhtml" media-type="application/xhtml+xml" properties="svg"/>'
             . '<item id="plain" href="text/plain.xhtml" media-type="application/xhtml+xml"/>'
             . '<item id="broken" href="text/broken.xhtml" media-type="application/xhtml+xml"/>'
             . '<item id="css" href="css/style.css" media-type="text/css"/>'
