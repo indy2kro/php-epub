@@ -192,7 +192,7 @@
 <h3 id="validator">Validator<a class="headerlink" href="#validator" title="Permanent link">&para;</a></h3>
 <p><code>EpubFile::validate()</code> runs it to report common structural problems as <code>ValidationIssue</code>s: required metadata, duplicate ids, manifest and spine consistency, navigation.</p>
 <h3 id="parser-and-xmlparser">Parser and XmlParser<a class="headerlink" href="#parser-and-xmlparser" title="Permanent link">&para;</a></h3>
-<p><code>Parser</code> checks the container (<code>mimetype</code>, <code>META-INF/container.xml</code>) and locates and validates the OPF and NCX. <code>XmlParser</code> loads XML without network access and rejects entity declarations.</p>
+<p><code>Parser</code> reads <code>META-INF/container.xml</code> and locates and checks the OPF; problems reading systems tolerate (a wrong <code>mimetype</code>, a broken NCX) are left to <code>Validator</code>. <code>XmlParser</code> loads XML without network access and rejects entity declarations.</p>
 <h3 id="ziphandler">ZipHandler<a class="headerlink" href="#ziphandler" title="Permanent link">&para;</a></h3>
 <p>Extracts archives with limits (entry count, total size, compression ratio) and writes OCF-valid archives (<code>mimetype</code> first and uncompressed, <code>/</code> separators).</p>
 <h3 id="converters">Converters<a class="headerlink" href="#converters" title="Permanent link">&para;</a></h3>

@@ -135,7 +135,7 @@ It provides methods to extract contents from a ZIP file and to compress a direct
 <h2 id="key-methods">Key Methods<a class="headerlink" href="#key-methods" title="Permanent link">&para;</a></h2>
 <ul>
 <li>
-<p><strong><code>extract(string $zipFilePath, string $destination): void</code></strong>: Extracts the contents of a ZIP file to the specified directory. Entry names that are absolute or contain <code>..</code> segments escaping the destination are rejected. Throws a <code>ZipException</code> if the ZIP file cannot be opened or extracted, or if a limit is exceeded.</p>
+<p><strong><code>extract(string $zipFilePath, string $destination): void</code></strong>: Extracts the contents of a ZIP file to the specified directory. Entry names that are absolute or contain <code>..</code> segments escaping the destination are rejected, as are file entries whose names differ only in (ASCII) case, which OCF forbids and which would overwrite each other on Windows and macOS. Throws a <code>ZipException</code> if the ZIP file cannot be opened or extracted, or if a limit is exceeded.</p>
 </li>
 <li>
 <p><strong><code>compress(string $source, string $zipFilePath): void</code></strong>: Compresses a directory into a ZIP file at the specified path. The <code>mimetype</code> file is written first and uncompressed, and entry names always use <code>/</code>, as the EPUB OCF specification requires. Entries are written in sorted order with a fixed modification time and fixed Unix permissions, so saving the same book twice produces identical archives (ZIP stores local time, so this holds within one time zone). Throws a <code>ZipException</code> if the ZIP file cannot be created or if the source directory is invalid.</p>

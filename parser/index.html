@@ -74,7 +74,7 @@
                   </li>
                   <li class="toctree-l1 current"><a class="reference internal current" href="#">Parser</a>
     <ul class="current">
-    <li class="toctree-l2"><a class="reference internal" href="#key-methods">Key Methods</a>
+    <li class="toctree-l2"><a class="reference internal" href="#methods">Methods</a>
     </li>
     <li class="toctree-l2"><a class="reference internal" href="#usage-example">Usage Example</a>
     </li>
@@ -122,31 +122,18 @@
             <div class="section" itemprop="articleBody">
               
                 <h1 id="parser">Parser<a class="headerlink" href="#parser" title="Permanent link">&para;</a></h1>
-<p>The <code>Parser</code> class in the PHP EPUB Processor library is responsible for parsing the structure of an EPUB file.
-It validates the essential components of the EPUB, such as the mimetype, OPF, and NCX files,
-ensuring that the EPUB file is correctly structured and ready for further processing.
-Container, package and NCX documents are matched by namespace URI, so prefixed elements (e.g. <code>&lt;opf:package&gt;</code>) work as well.</p>
-<h2 id="key-methods">Key Methods<a class="headerlink" href="#key-methods" title="Permanent link">&para;</a></h2>
+<p>The <code>Parser</code> class locates the package document (OPF) of an extracted EPUB and checks that it can be read. <code>EpubFile</code> uses it when loading a book.
+Container and package documents are matched by namespace URI, so prefixed elements (e.g. <code>&lt;opf:package&gt;</code>) work as well.</p>
+<h2 id="methods">Methods<a class="headerlink" href="#methods" title="Permanent link">&para;</a></h2>
 <ul>
 <li>
-<p><strong><code>__construct(XmlParser $xmlParser = new XmlParser())</code></strong>: Initializes the <code>Parser</code> with an <code>XmlParser</code> instance, which is used for XML parsing tasks.</p>
+<p><strong><code>__construct(XmlParser $xmlParser = new XmlParser(), PathResolver $paths = new PathResolver())</code></strong>: The <code>XmlParser</code> reads the container and package documents with its protections against hostile XML.</p>
 </li>
 <li>
-<p><strong><code>parse(string $directory): string</code></strong>: Parses the EPUB file structure within the specified directory. It validates the mimetype, extracts the OPF path from the container, and validates the OPF file. Returns the path to the OPF file.</p>
-</li>
-<li>
-<p><strong><code>validateMimetype(string $directory): void</code></strong>: Validates the presence and content of the mimetype file, ensuring it is correctly set to <code>application/epub+zip</code>.</p>
-</li>
-<li>
-<p><strong><code>extractOpfPath(string $containerPath): string</code></strong>: Extracts the OPF file path from the <code>container.xml</code> file, which defines the location of the OPF file within the EPUB. When the container lists several rootfiles (e.g. another rendition), the one with media type <code>application/oebps-package+xml</code> is used.</p>
-</li>
-<li>
-<p><strong><code>validateOpf(string $opfPath): void</code></strong>: Validates the OPF file and checks for the presence of the NCX file, ensuring the EPUB's manifest and navigation are correctly defined.</p>
-</li>
-<li>
-<p><strong><code>validateNcx(string $ncxPath): void</code></strong>: Validates the NCX file, ensuring it contains a valid <code>navMap</code> element for navigation.</p>
+<p><strong><code>parse(string $directory): string</code></strong>: Returns the OPF path relative to <code>$directory</code> (with <code>/</code> separators). The path comes from <code>META-INF/container.xml</code>; when the container lists several rootfiles (e.g. another rendition), the one with media type <code>application/oebps-package+xml</code> is used.</p>
 </li>
 </ul>
+<p>It throws an <code>InvalidEpubException</code> only when the book has no readable package: no container or rootfile, an OPF path outside the book, or an OPF that is not XML, not in the OPF namespace or has no manifest. Problems that reading systems tolerate do not stop a book from loading: a missing or wrong <code>mimetype</code> file and a broken NCX are reported by <a href="../epub-file/#validating"><code>EpubFile::validate()</code></a> instead (<code>MIMETYPE_INVALID</code>, <code>NCX_INVALID</code>), and <code>EpubFile::save()</code> writes the right <code>mimetype</code>.</p>
 <h2 id="usage-example">Usage Example<a class="headerlink" href="#usage-example" title="Permanent link">&para;</a></h2>
 <pre class="codehilite"><code class="language-php">use PhpEpub\Parser;
 use PhpEpub\XmlParser;

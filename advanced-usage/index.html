@@ -169,7 +169,7 @@ $contentManager-&gt;updateContent($contentFile, $modifiedContent);
 <p><code>EpubFile::save()</code> writes everything that changed since <code>load()</code>:</p>
 <ol>
 <li>Pending metadata, manifest and spine changes are written to the OPF file (the modification date is refreshed, and the NCX <code>docTitle</code> follows the title). Calling <code>Metadata::save()</code> yourself first is optional.</li>
-<li>The extracted directory is packaged as an OCF-valid archive: <code>mimetype</code> first and uncompressed, <code>/</code> separators on every OS.</li>
+<li>The extracted directory is packaged as an OCF-valid archive: <code>mimetype</code> first, uncompressed and exactly <code>application/epub+zip</code> (a wrong one is corrected), <code>/</code> separators on every OS.</li>
 </ol>
 <p>Changes are only in the temporary directory until <code>save()</code> is called; <code>load()</code> again or <code>cleanup()</code> discards them.</p>
 <h4 id="save-to-the-same-file">Save to the Same File<a class="headerlink" href="#save-to-the-same-file" title="Permanent link">&para;</a></h4>

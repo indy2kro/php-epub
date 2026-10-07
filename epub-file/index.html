@@ -182,7 +182,7 @@
 - Parses <code>container.xml</code> to locate the OPF file
 - Parses the OPF file to extract metadata, manifest and spine
 - Initializes the ContentManager for file operations</p>
-<p>Calling <code>load()</code> again discards the previous extraction (and any unsaved changes) and starts from the file on disk.</p>
+<p>Calling <code>load()</code> again discards the previous extraction (and any unsaved changes) and starts from the file on disk. A book made with <code>create()</code> that was never saved has no file yet: <code>load()</code> then throws and keeps the book.</p>
 <p>Throws an exception if the file cannot be opened or the EPUB structure is invalid.</p>
 <pre class="codehilite"><code class="language-php">public function save(?string $filePath = null): void
 </code></pre>
@@ -235,6 +235,11 @@ $epubFile-&gt;save();
 </thead>
 <tbody>
 <tr>
+<td><code>MIMETYPE_INVALID</code></td>
+<td>warning</td>
+<td>The <code>mimetype</code> file is missing or not exactly <code>application/epub+zip</code> (<code>save()</code> writes the right one)</td>
+</tr>
+<tr>
 <td><code>METADATA_TITLE_MISSING</code>, <code>METADATA_LANGUAGE_MISSING</code>, <code>METADATA_IDENTIFIER_MISSING</code></td>
 <td>error</td>
 <td>A required Dublin Core element is missing or empty</td>
@@ -278,6 +283,11 @@ $epubFile-&gt;save();
 <td><code>NAV_MISSING</code> / <code>NCX_MISSING</code></td>
 <td>error</td>
 <td>An EPUB 3 book has no navigation document / an EPUB 2 book has no NCX</td>
+</tr>
+<tr>
+<td><code>NAV_INVALID</code> / <code>NCX_INVALID</code></td>
+<td>error</td>
+<td>The navigation document is not well-formed / the NCX is not well-formed or has no NCX namespace or <code>navMap</code></td>
 </tr>
 <tr>
 <td><code>TOC_LINK_NOT_IN_MANIFEST</code></td>

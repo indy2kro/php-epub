@@ -275,17 +275,17 @@ No source changes were made while compiling this list.</p>
 <ul>
 <li>[x] <strong>BUG-01</strong> Keep IDPF-obfuscated fonts readable when the unique identifier changes (re-obfuscate, or refuse the change) — <code>src/Traits/InteractsWithIdentifier.php:35-49</code>, <code>src/EpubFile.php:236-247</code> — M · high
   Font obfuscation XORs fonts with a key derived from the unique identifier, and nothing reads <code>META-INF/encryption.xml</code>, so <code>setIdentifiers()</code> on such a book silently turns every embedded font into garbage.</li>
-<li>[ ] <strong>BUG-02</strong> Open books with recoverable structure problems (an EPUB 3 book with a broken or navMap-less NCX, a missing or padded mimetype) and report them through <code>validate()</code> — <code>src/Parser.php:48-60,130-156</code> — M · med
+<li>[x] <strong>BUG-02</strong> Open books with recoverable structure problems (an EPUB 3 book with a broken or navMap-less NCX, a missing or padded mimetype) and report them through <code>validate()</code> — <code>src/Parser.php:48-60,130-156</code> — M · med
   <code>Parser</code> throws on the first problem, so an EPUB 3 book whose optional legacy NCX is broken cannot be loaded or repaired with the library, although every reader opens it.</li>
 <li>[x] <strong>BUG-03</strong> Set the EPUB 3 manifest properties (<code>svg</code>, <code>mathml</code>, <code>scripted</code>, <code>remote-resources</code>) for XHTML added or updated through <code>ContentManager</code>/<code>addChapter()</code> — <code>src/ContentManager.php:89-130</code>, <code>src/EpubFile.php:162-188</code> — M · med
   EPUB 3 requires these properties on content that uses those features, so <code>addChapter()</code> with an inline <code>&lt;svg&gt;</code> or <code>&lt;math&gt;</code> body produces a book EPUBCheck rejects (OPF-014).</li>
 <li>[x] <strong>BUG-04</strong> Remove table-of-contents entries for files that <code>deleteContent()</code>/<code>Manifest::remove()</code> drop, and report dangling TOC links as errors — <code>src/ContentManager.php:135-160</code>, <code>src/Validator.php:180-200</code> — S · med
   A probe confirmed that a deleted chapter's nav/NCX entry stays, which EPUBCheck reports as an error (RSC-007), while <code>validate()</code> only warns.</li>
-<li>[ ] <strong>BUG-05</strong> Do not let <code>load()</code> discard a book made with <code>create()</code> that was never saved — <code>src/EpubFile.php:104-145</code> — S · low
+<li>[x] <strong>BUG-05</strong> Do not let <code>load()</code> discard a book made with <code>create()</code> that was never saved — <code>src/EpubFile.php:104-145</code> — S · low
   <code>load()</code> re-extracts <code>$filePath</code>, which does not exist yet for an unsaved new book, so it throws and cleans up the work in progress.</li>
 <li>[ ] <strong>BUG-06</strong> Check that cover bytes match the declared image media type — <code>src/EpubFile.php:302-335</code> — S · low
   <code>setCoverImage()</code> trusts the media type, so PNG bytes declared as <code>image/jpeg</code> produce a book that EPUBCheck and some readers reject. <code>getimagesizefromstring()</code> can detect the real type.</li>
-<li>[ ] <strong>BUG-07</strong> Report entries that differ only by case when extracting on case-insensitive filesystems — <code>src/ZipHandler.php:46-90</code> — S · low
+<li>[x] <strong>BUG-07</strong> Report entries that differ only by case when extracting on case-insensitive filesystems — <code>src/ZipHandler.php:46-90</code> — S · low
   On Windows and macOS <code>Text/a.xhtml</code> and <code>text/a.xhtml</code> extract to the same file, so one silently replaces the other.</li>
 <li>[x] <strong>BUG-08</strong> Update the EPUB 2 <code>opf:event="modification"</code> date on save, as <code>dcterms:modified</code> is for EPUB 3 — <code>src/Metadata.php:51-64</code> — S · low
   <code>getModifiedDate()</code> reports the EPUB 2 modification event, which <code>save()</code> never touches, so the date stays at its original value after edits.</li>
