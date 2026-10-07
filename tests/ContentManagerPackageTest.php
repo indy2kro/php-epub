@@ -11,6 +11,7 @@ use PhpEpub\Manifest;
 use PhpEpub\ManifestItem;
 use PhpEpub\Spine;
 use PhpEpub\Test\Support\EpubBuilder;
+use PhpEpub\TocEntry;
 use PhpEpub\Util\FileSystemHelper;
 use PhpEpub\XmlParser;
 use PHPUnit\Framework\TestCase;
@@ -224,6 +225,102 @@ final class ContentManagerPackageTest extends TestCase
         $item = $epubFile->addChapter('Drawing', '<svg xmlns="http://www.w3.org/2000/svg"><rect/></svg>');
 
         $this->assertSame('svg', $item->properties);
+    }
+
+    public function testMoveContentKeepsTheItemAndUpdatesEveryReference(): void
+    {
+        $opf = str_replace(
+            ['<spine>', '</package>'],
+            ['<spine toc="ncx">', '<guide><reference type="text" title="Start" href="chapter.xhtml"/></guide></package>'],
+            EpubBuilder::opf(
+                '<item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>'
+                . '<item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>'
+                . '<item id="font" href="font.otf" media-type="font/otf"/>'
+            )
+        );
+        $epubFile = EpubFile::open(EpubBuilder::minimal()
+            ->withFile('EPUB/package.opf', $opf)
+            ->withFile('EPUB/nav.xhtml', EpubBuilder::xhtml('Nav', '<nav epub:type="toc"><ol><li><a href="chapter.xhtml#top">Chapter</a></li></ol></nav>'))
+            ->withFile('EPUB/toc.ncx', '<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1"><head/><docTitle><text>T</text></docTitle><navMap>'
+                . '<navPoint id="p1" playOrder="1"><navLabel><text>Chapter</text></navLabel><content src="chapter.xhtml#top"/></navPoint></navMap></ncx>')
+            ->withFile('EPUB/font.otf', 'font')
+            ->withFile('META-INF/encryption.xml', '<encryption xmlns="urn:oasis:names:tc:opendocument:xmlns:container" xmlns:enc="http://www.w3.org/2001/04/xmlenc#">'
+                . '<enc:EncryptedData><enc:EncryptionMethod Algorithm="http://www.idpf.org/2008/embedding"/>'
+                . '<enc:CipherData><enc:CipherReference URI="EPUB/font.otf"/></enc:CipherData></enc:EncryptedData></encryption>')
+            ->buildEpub($this->tmpDir . '/in.epub'));
+        $content = $epubFile->getContentManager();
+
+        $content->moveContent('EPUB/chapter.xhtml', 'EPUB/text/chapter one.xhtml');
+        $content->moveContent('EPUB/font.otf', 'EPUB/fonts/body.otf');
+
+        $chapter = $epubFile->getManifest()->get('chapter');
+        $this->assertSame('text/chapter%20one.xhtml', $chapter?->href);
+        $this->assertSame('EPUB/text/chapter one.xhtml', $chapter->path);
+        $this->assertSame(['chapter'], $epubFile->getSpine()->get());
+        $this->assertSame('EPUB/text/chapter one.xhtml', $epubFile->getManifest()->getGuidePath('text'));
+        $this->assertEquals([new TocEntry('Chapter', 'EPUB/text/chapter one.xhtml', 'top')], $epubFile->getTableOfContents()->getEntries());
+        $this->assertStringContainsString('src="text/chapter%20one.xhtml#top"', $content->getContent('EPUB/toc.ncx'));
+        $this->assertStringContainsString('URI="EPUB/fonts/body.otf"', $content->getContent('META-INF/encryption.xml'));
+        $this->assertSame('font', $content->getContent('EPUB/fonts/body.otf'));
+        $this->assertNotContains('EPUB/chapter.xhtml', $content->getContentPaths());
+    }
+
+    public function testMoveContentRefusesToOverwriteOrToMoveThePackage(): void
+    {
+        [$contentManager] = $this->open();
+        $contentManager->addContent('EPUB/other.xhtml', '<html/>');
+
+        $refused = [
+            ['EPUB/chapter.xhtml', 'EPUB/other.xhtml', 'already exists'],
+            ['EPUB/missing.xhtml', 'EPUB/new.xhtml', 'does not exist'],
+            ['EPUB/package.opf', 'EPUB/moved.opf', 'package document'],
+            ['EPUB/chapter.xhtml', '../outside.xhtml', 'outside the EPUB'],
+        ];
+
+        foreach ($refused as [$from, $to, $message]) {
+            try {
+                $contentManager->moveContent($from, $to);
+                $this->fail("Expected an exception for moving {$from} to {$to}.");
+            } catch (Exception $exception) {
+                $this->assertStringContainsString($message, $exception->getMessage());
+            }
+        }
+
+        $this->assertFileExists($this->tmpDir . '/book/EPUB/chapter.xhtml');
+    }
+
+    public function testMovingTheNavigationDocumentKeepsItsLinksWorking(): void
+    {
+        $epubFile = EpubFile::open(EpubBuilder::epub3()->buildEpub($this->tmpDir . '/in.epub'));
+
+        $epubFile->getContentManager()->moveContent('EPUB/nav.xhtml', 'EPUB/navigation/toc.xhtml');
+
+        $this->assertEquals([new TocEntry('Chapter', 'EPUB/text/chapter.xhtml')], $epubFile->getTableOfContents()->getEntries());
+        $this->assertStringContainsString('href="../text/chapter.xhtml"', $epubFile->getContentManager()->getContent('EPUB/navigation/toc.xhtml'));
+    }
+
+    public function testMoveContentWorksWhenTheNavigationAndEncryptionFilesAreBroken(): void
+    {
+        $epubFile = EpubFile::open(EpubBuilder::epub3()
+            ->withFile('EPUB/nav.xhtml', '<html><body><nav')
+            ->withFile('META-INF/encryption.xml', '<encryption')
+            ->buildEpub($this->tmpDir . '/in.epub'));
+
+        $epubFile->getContentManager()->moveContent('EPUB/text/chapter.xhtml', 'EPUB/chapter.xhtml');
+
+        $this->assertSame('EPUB/chapter.xhtml', $epubFile->getManifest()->get('chapter')?->path);
+        $this->assertSame('<encryption', $epubFile->getContentManager()->getContent('META-INF/encryption.xml'));
+    }
+
+    public function testMoveContentOfAFileOutsideTheManifest(): void
+    {
+        [$contentManager, $manifest] = $this->open();
+        file_put_contents($this->tmpDir . '/book/EPUB/notes.txt', 'notes');
+
+        $contentManager->moveContent('EPUB/notes.txt', 'EPUB/misc/notes.txt');
+
+        $this->assertSame('notes', $contentManager->getContent('EPUB/misc/notes.txt'));
+        $this->assertNull($manifest->findByPath('EPUB/misc/notes.txt'));
     }
 
     private static function xhtml(string $body): string

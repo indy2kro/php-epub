@@ -105,9 +105,9 @@ The target was 30 items; the audit found 28, and none were added just to reach t
   Only eight DC elements have accessors and `getDcValues()` is protected, so `dc:rights` (licence text) and multilingual books cannot be handled.
 - [x] **FEAT-04** Typed identifier lookup (`getIsbn()`, schemes from `opf:scheme`, `identifier-type` refinements and `urn:` prefixes) — `src/Traits/InteractsWithIdentifier.php:12-49` — S · low
   `getIdentifiers()` returns bare strings, so finding the ISBN means reimplementing the EPUB 2 and EPUB 3 scheme conventions.
-- [ ] **FEAT-05** Rename or move content files and update every reference (manifest href, spine, table of contents, guide) — `src/ContentManager.php` — M · low
+- [x] **FEAT-05** Rename or move content files and update every reference (manifest href, spine, table of contents, guide) — `src/ContentManager.php` — M · low
   Reorganising a book's files today means deleting and re-adding content, which loses the manifest id, spine position and TOC entries.
-- [ ] **FEAT-06** Make manifest lookups fast for large books (index items by id and path) — `src/Manifest.php:74-110,330-360` — M · low
+- [x] **FEAT-06** Make manifest lookups fast for large books (index items by id and path) — `src/Manifest.php:74-110,330-360` — M · low
   A probe showed that adding 1,500 small files with `addContent()` takes 5.5 s, because every add rescans the manifest and every id check scans the whole package, which makes image-heavy books (comics) slow to build.
 
 ### Public API

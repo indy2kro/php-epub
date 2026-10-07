@@ -166,6 +166,65 @@ class ContentManager
     }
 
     /**
+     * Moves or renames a file of the EPUB. Its manifest item keeps its id (so the reading order is
+     * unchanged) and points at the new path, and the <guide>, the table of contents and
+     * META-INF/encryption.xml (obfuscated fonts) follow it.
+     *
+     * References inside content documents, such as links and images in other chapters or relative
+     * links in a document moved to another directory, are not rewritten; EpubFile::validate()
+     * reports those that break.
+     *
+     * @param string $from The current path relative to the book root.
+     * @param string $to The new path relative to the book root; it must not exist yet.
+     *
+     * @throws Exception If either path is the package document or leaves the book, the file does not
+     *                   exist, the target exists, or the file cannot be moved.
+     */
+    public function moveContent(string $from, string $to): void
+    {
+        $this->refusePackageDocument($from);
+        $this->refusePackageDocument($to);
+        $source = $this->paths->resolve($this->contentDirectory, $from);
+        $target = $this->paths->resolve($this->contentDirectory, $to);
+        if (! is_file($source)) {
+            throw new Exception("Content file does not exist: {$source}");
+        }
+
+        if (file_exists($target)) {
+            throw new Exception("Cannot move {$from}: {$to} already exists");
+        }
+
+        $fromPath = $this->paths->normalize($from);
+        $toPath = $this->paths->normalize($to);
+
+        // Read the table of contents first: moving the navigation document changes how its links resolve.
+        $toc = $this->manifest instanceof Manifest ? new TableOfContents($this->contentDirectory, $this->manifest) : null;
+        try {
+            $entries = $toc?->getEntries() ?? [];
+        } catch (Exception) {
+            $entries = [];
+        }
+
+        $directory = dirname($target);
+        $moved = (is_dir($directory) || @mkdir($directory, 0777, true)) && @rename($source, $target);
+        $moved || throw new Exception("Failed to move {$from} to {$to}");
+
+        $item = $this->manifest?->findByPath($fromPath);
+        if ($item instanceof ManifestItem) {
+            $this->manifest->moveItem($item->id, $toPath);
+        }
+
+        // A moved navigation document is rewritten too: its links are relative to where it is.
+        $movedEntries = $this->entriesMoved($entries, $fromPath, $toPath);
+        $isNav = $item instanceof ManifestItem && in_array('nav', explode(' ', $item->properties), true);
+        if ($toc instanceof TableOfContents && ($movedEntries != $entries || $isNav)) {
+            $toc->setEntries($movedEntries);
+        }
+
+        $this->moveEncryptionReference($fromPath, $toPath);
+    }
+
+    /**
      * Retrieves the content of a file in the EPUB.
      *
      * @param string $filePath The path of the content to retrieve.
@@ -234,6 +293,56 @@ class ContentManager
         $kept = $this->entriesWithout($entries, $path);
         if ($kept != $entries) {
             $toc->setEntries($kept);
+        }
+    }
+
+    /**
+     * @param list<TocEntry> $entries
+     *
+     * @return list<TocEntry>
+     */
+    private function entriesMoved(array $entries, string $from, string $to): array
+    {
+        return array_map(
+            fn (TocEntry $entry): TocEntry => new TocEntry(
+                $entry->title,
+                $entry->path === $from ? $to : $entry->path,
+                $entry->fragment,
+                $this->entriesMoved($entry->children, $from, $to)
+            ),
+            $entries
+        );
+    }
+
+    /**
+     * Points the META-INF/encryption.xml entry of a moved file (an obfuscated font) at its new path.
+     * A missing or unreadable encryption.xml is left alone.
+     */
+    private function moveEncryptionReference(string $from, string $to): void
+    {
+        $file = $this->contentDirectory . DIRECTORY_SEPARATOR . 'META-INF' . DIRECTORY_SEPARATOR . 'encryption.xml';
+        if (! is_file($file)) {
+            return;
+        }
+
+        $xmlParser = new XmlParser();
+        try {
+            $encryption = $xmlParser->parse($file);
+        } catch (XmlException) {
+            return;
+        }
+
+        $encryption->registerXPathNamespace('enc', 'http://www.w3.org/2001/04/xmlenc#');
+        $changed = false;
+        foreach ($encryption->xpath('//enc:CipherReference') ?: [] as $reference) {
+            if (rawurldecode((string) $reference['URI']) === $from) {
+                $reference['URI'] = implode('/', array_map(rawurlencode(...), explode('/', $to)));
+                $changed = true;
+            }
+        }
+
+        if ($changed) {
+            $xmlParser->save($encryption, $file);
         }
     }
 

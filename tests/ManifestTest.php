@@ -41,6 +41,54 @@ final class ManifestTest extends TestCase
         $this->assertNull($manifest->findByPath('EPUB/other.xhtml'));
     }
 
+    public function testLookupsFollowEveryChange(): void
+    {
+        $manifest = $this->manifest();
+        $this->assertCount(1, $manifest->getItems());
+
+        $added = $manifest->add('EPUB/images/a.png');
+        $this->assertSame($added, $manifest->findByPath('EPUB/images/a.png'));
+        $this->assertSame($added, $manifest->get($added->id));
+        $this->assertSame(['chapter', $added->id], array_map(static fn ($item): string => $item->id, $manifest->getItems()));
+
+        $manifest->setMediaType($added->id, 'image/webp');
+        $this->assertSame('image/webp', $manifest->findByPath('EPUB/images/a.png')?->mediaType);
+
+        $manifest->addProperty($added->id, 'cover-image');
+        $this->assertSame('cover-image', $manifest->get($added->id)?->properties);
+
+        $manifest->removeProperty($added->id, 'cover-image');
+        $this->assertSame('', $manifest->get($added->id)?->properties);
+
+        $manifest->remove($added->id);
+        $this->assertNull($manifest->get($added->id));
+        $this->assertNull($manifest->findByPath('EPUB/images/a.png'));
+        $this->assertCount(1, $manifest->getItems());
+    }
+
+    public function testMoveItemRefusesAPathAnotherItemHas(): void
+    {
+        $manifest = $this->manifest('<item id="other" href="other.xhtml" media-type="application/xhtml+xml"/>');
+
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('File is already in the manifest: EPUB/other.xhtml');
+
+        $manifest->moveItem('chapter', 'EPUB/other.xhtml');
+    }
+
+    public function testDuplicatePathsAndIdsResolveToTheFirstItem(): void
+    {
+        $manifest = $this->manifest(
+            '<item id="first" href="dup.xhtml" media-type="application/xhtml+xml"/>'
+            . '<item id="second" href="dup.xhtml" media-type="application/xhtml+xml"/>'
+            . '<item id="first" href="other.xhtml" media-type="application/xhtml+xml"/>'
+        );
+
+        $this->assertSame('first', $manifest->findByPath('EPUB/dup.xhtml')?->id);
+        $this->assertSame('dup.xhtml', $manifest->get('first')?->href);
+        $this->assertCount(4, $manifest->getItems());
+    }
+
     public function testPathAndHrefConversion(): void
     {
         $manifest = $this->manifest();

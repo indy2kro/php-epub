@@ -60,6 +60,29 @@ class Manifest
     private bool $modified = false;
 
     /**
+     * The items in document order, built on first use so lookups stay fast in large books;
+     * add() extends it and every other change drops it (see forgetItems()).
+     *
+     * @var list<ManifestItem>|null
+     */
+    private ?array $items = null;
+
+    /**
+     * @var array<string, ManifestItem> The first item of each path.
+     */
+    private array $itemsByPath = [];
+
+    /**
+     * @var array<string, ManifestItem> The first item of each id.
+     */
+    private array $itemsById = [];
+
+    /**
+     * @var array<string, SimpleXMLElement> The <item> of each id in $itemsById.
+     */
+    private array $nodesById = [];
+
+    /**
      * @param SimpleXMLElement $opfXml The parsed OPF package document.
      * @param string $opfPath The OPF path relative to the book root (as returned by Parser::parse()).
      *
@@ -86,14 +109,14 @@ class Manifest
      */
     public function getItems(): array
     {
-        return array_map($this->toItem(...), $this->itemNodes());
+        return $this->items();
     }
 
     public function get(string $id): ?ManifestItem
     {
-        $node = $this->findNode($id);
+        $this->items();
 
-        return $node instanceof SimpleXMLElement ? $this->toItem($node) : null;
+        return $this->itemsById[$id] ?? null;
     }
 
     /**
@@ -102,14 +125,9 @@ class Manifest
     public function findByPath(string $path): ?ManifestItem
     {
         $path = $this->paths->normalize($path);
+        $this->items();
 
-        foreach ($this->getItems() as $item) {
-            if ($item->path === $path) {
-                return $item;
-            }
-        }
-
-        return null;
+        return $this->itemsByPath[$path] ?? null;
     }
 
     /**
@@ -139,7 +157,8 @@ class Manifest
         $item->addAttribute('media-type', $mediaType ?? $this->guessMediaType($path));
         $this->modified = true;
 
-        return $this->toItem($item);
+        // A new item goes last, so the index only needs extending.
+        return $this->items === null ? $this->toItem($item) : $this->indexItem($item);
     }
 
     /**
@@ -159,6 +178,37 @@ class Manifest
         unset($node[0]);
         $this->removeReferences($id, $href);
         $this->modified = true;
+        $this->forgetItems();
+    }
+
+    /**
+     * Points an item at another file (path relative to the book root), keeping its id, and updates
+     * the <guide> references to its old file. The file itself is not moved; ContentManager::moveContent()
+     * moves both.
+     *
+     * @throws Exception If no item has this id, or another item already has the path.
+     */
+    public function moveItem(string $id, string $path): void
+    {
+        $path = $this->paths->normalize($path);
+        $node = $this->requireNode($id);
+        $other = $this->findByPath($path);
+        if ($other instanceof ManifestItem && $other->id !== $id) {
+            throw new Exception("File is already in the manifest: {$path}");
+        }
+
+        $oldPath = $this->tryHrefToPath((string) $node['href']);
+        $node['href'] = $this->pathToHref($path);
+
+        foreach ($this->query('/opf:package/opf:guide/opf:reference') as $reference) {
+            [, $fragment] = array_pad(explode('#', (string) $reference['href'], 2), 2, null);
+            if ($oldPath !== null && $this->tryHrefToPath((string) $reference['href']) === $oldPath) {
+                $reference['href'] = $this->pathToHref($path) . ($fragment === null ? '' : '#' . $fragment);
+            }
+        }
+
+        $this->modified = true;
+        $this->forgetItems();
     }
 
     /**
@@ -174,6 +224,7 @@ class Manifest
         if ((string) $node['media-type'] !== $mediaType) {
             $node['media-type'] = $mediaType;
             $this->modified = true;
+            $this->forgetItems();
         }
     }
 
@@ -409,17 +460,59 @@ class Manifest
         }
 
         $this->modified = true;
+        $this->forgetItems();
     }
 
     private function findNode(string $id): ?SimpleXMLElement
     {
-        foreach ($this->itemNodes() as $node) {
-            if ((string) $node['id'] === $id) {
-                return $node;
+        $this->items();
+
+        return $this->nodesById[$id] ?? null;
+    }
+
+    /**
+     * @return list<ManifestItem>
+     */
+    private function items(): array
+    {
+        if ($this->items === null) {
+            $this->items = [];
+            $this->itemsByPath = [];
+            $this->itemsById = [];
+            $this->nodesById = [];
+            foreach ($this->itemNodes() as $node) {
+                $this->indexItem($node);
             }
         }
 
-        return null;
+        return $this->items;
+    }
+
+    /**
+     * Appends an <item> to the index; with duplicate paths or ids the first item wins, as in the document.
+     */
+    private function indexItem(SimpleXMLElement $node): ManifestItem
+    {
+        $item = $this->toItem($node);
+        $this->items[] = $item;
+        if ($item->path !== '') {
+            $this->itemsByPath[$item->path] ??= $item;
+        }
+
+        if (! isset($this->itemsById[$item->id])) {
+            $this->itemsById[$item->id] = $item;
+            $this->nodesById[$item->id] = $node;
+        }
+
+        return $item;
+    }
+
+    /**
+     * Drops the index after a change to existing items; the next lookup rebuilds it.
+     */
+    private function forgetItems(): void
+    {
+        $this->items = null;
     }
 
     /**
