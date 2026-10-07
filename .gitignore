@@ -5,3 +5,5 @@
 /.phpunit.result.cache
 /.phpunit.cache
 /.phpcs-cache
+/.claude/*
+!/.claude/skills/
