@@ -585,6 +585,37 @@ class EpubFile
     }
 
     /**
+     * The plain text of the book's XHTML and HTML documents in reading order, e.g. for a search index or a
+     * word count: path (relative to the book root) => text, as ContentManager::getText() reads each.
+     * Spine items that are not XHTML or HTML documents, or whose file is missing, are left out.
+     *
+     * @param bool $linearOnly Skip the auxiliary content of the spine (linear="no"), such as notes.
+     *
+     * @return array<string, string>
+     *
+     * @throws Exception If the book is not loaded or a document cannot be read.
+     */
+    public function getText(bool $linearOnly = true): array
+    {
+        $contentManager = $this->getContentManager();
+        $existing = array_flip($contentManager->getContentPaths());
+
+        $texts = [];
+        foreach ($this->getSpine()->getItems() as $spineItem) {
+            $item = $spineItem->item;
+            if (! $item instanceof ManifestItem || ! in_array($item->mediaType, ['application/xhtml+xml', 'text/html'], true)) {
+                continue;
+            }
+
+            if (($spineItem->linear || ! $linearOnly) && isset($existing[$item->path])) {
+                $texts[$item->path] = $contentManager->getText($item->path);
+            }
+        }
+
+        return $texts;
+    }
+
+    /**
      * Deletes an item's file with its manifest item and the references to it; an item whose
      * file is missing is only removed from the manifest.
      */

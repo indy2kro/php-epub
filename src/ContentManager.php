@@ -6,6 +6,7 @@ namespace PhpEpub;
 
 use PhpEpub\Util\ContentDocumentProperties;
 use PhpEpub\Util\FileSystemHelper;
+use PhpEpub\Util\HtmlText;
 use PhpEpub\Util\PathResolver;
 use PhpEpub\Util\ReferenceRewriter;
 
@@ -347,6 +348,20 @@ class ContentManager
 
         return FontObfuscation::key($algorithm, $identifier)
             ?? throw new Exception("An obfuscated font needs a urn:uuid unique identifier, not: {$identifier}");
+    }
+
+    /**
+     * The plain text of an XHTML (or HTML) document: one line per paragraph, heading, list item, table row
+     * and line break, with white space collapsed and entities decoded. Scripts and styles are left out. The
+     * document is read in its declared encoding (UTF-8 or UTF-16) and need not be well-formed.
+     *
+     * @param string $filePath The path of the document relative to the book root.
+     *
+     * @throws Exception If the file cannot be read.
+     */
+    public function getText(string $filePath): string
+    {
+        return HtmlText::extract($this->getContent($filePath));
     }
 
     /**
