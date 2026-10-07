@@ -152,5 +152,5 @@ Effort: S = one file, under 30 min · M = one class plus tests · L = cross-cutt
 
 - [x] **SWEEP-01** Validate every string written into the OPF (metadata values, `setMeta`/`setProperty`, manifest ids and media types) as UTF-8 with only XML 1.0 characters, and throw otherwise — `src/Metadata.php:104-153,253-263`, `src/Manifest.php:110-129` — S · high
   Probe: a Latin-1 title is written as raw bytes into the UTF-8 OPF, which then fails to parse, so the saved book cannot be reopened; control characters are stripped by `setText()` and make `addChild()` drop the whole value.
-- [ ] **SWEEP-02** Close the remaining coverage holes: `ZipHandler` (3/6 methods), `FileSystemHelper` (77.8% lines), `ContentManager` (6/8 methods), `TCPDFAdapter` (5/6), `EpubFile` (14/15) — `tests/` — M · low
+- [x] **SWEEP-02** Close the remaining coverage holes: `ZipHandler` (3/6 methods), `FileSystemHelper` (77.8% lines), `ContentManager` (6/8 methods), `TCPDFAdapter` (5/6), `EpubFile` (14/15) — `tests/` — M · low
   These are the error paths left after round one (failed writes, unreadable entries, cleanup failures).
