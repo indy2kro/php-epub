@@ -77,9 +77,9 @@ Effort: S = one file, under 30 min · M = one class plus tests · L = cross-cutt
   Multi-rendition containers may list another rootfile first.
 - [x] **BUG-06** Make cloned `EpubFile` instances safe (copy the extraction, or forbid `__clone`) — `src/EpubFile.php:56-68` — S · low
   A clone shares the temp dir, so the first destructor deletes the book under the other instance.
-- [ ] **BUG-07** Update the manifest media type when `setCoverImage()` reuses an existing path — `src/EpubFile.php:172` — S · low
+- [x] **BUG-07** Update the manifest media type when `setCoverImage()` reuses an existing path — `src/EpubFile.php:172` — S · low
   Replacing `images/cover.jpg` with PNG bytes keeps `media-type="image/jpeg"`.
-- [ ] **BUG-08** Fall back to `<guide><reference type="cover">` and href-valued `<meta name="cover">` in `getCoverImage()` — `src/EpubFile.php:129-142` — S · low
+- [x] **BUG-08** Fall back to `<guide><reference type="cover">` and href-valued `<meta name="cover">` in `getCoverImage()` — `src/EpubFile.php:129-142` — S · low
   Many EPUB 2 books name the cover that way, and `getCoverImage()` returns null for them.
 - [x] **BUG-09** Report `deleteDirectory()` failures instead of emitting warnings from the destructor — `src/Util/FileSystemHelper.php:34-65` — S · low
   Recursive results are ignored, and a locked Windows file raises warnings from `__destruct` and leaks the temp dir silently.
@@ -129,7 +129,7 @@ Effort: S = one file, under 30 min · M = one class plus tests · L = cross-cutt
 
 ### Documentation
 
-- [ ] **DOC-01** Refresh the README: `EpubFile::open()`/`convert()`, cover, manifest/spine editing, exceptions, and an accurate "Validation" claim — `README.md:11-60` — S · low
+- [x] **DOC-01** Refresh the README: `EpubFile::open()`/`convert()`, cover, manifest/spine editing, exceptions, and an accurate "Validation" claim — `README.md:11-60` — S · low
   It still shows `load()` plus converting an extracted directory and advertises content validation the library does not do.
 
 ### Tests
@@ -139,18 +139,18 @@ Effort: S = one file, under 30 min · M = one class plus tests · L = cross-cutt
 
 ### CI and packaging
 
-- [ ] **CI-01** Test the lowest supported dependencies (`composer update --prefer-lowest`, TCPDF 6.8) — `.github/workflows/tests.yml`, `composer.json` — S · med
+- [x] **CI-01** Test the lowest supported dependencies (`composer update --prefer-lowest`, TCPDF 6.8) — `.github/workflows/tests.yml`, `composer.json` — S · med
   `tecnickcom/tcpdf: ^6.8 || ^7.0` is allowed but CI always resolves 7.x, so the TCPDF 6 path is never run.
-- [ ] **CI-02** Install Calibre in one CI job so the skipped real-conversion tests run — `tests/Converters/CalibreAdapterRealTest.php:26`, `.github/workflows/tests.yml` — S · low
+- [x] **CI-02** Install Calibre in one CI job so the skipped real-conversion tests run — `tests/Converters/CalibreAdapterRealTest.php:26`, `.github/workflows/tests.yml` — S · low
   The adapter is only ever tested against a mocked `exec()`.
-- [ ] **CI-03** Build the docs with `mkdocs build --strict` on pull requests — `.github/workflows/deploy-docs.yml:47` — S · low
+- [x] **CI-03** Build the docs with `mkdocs build --strict` on pull requests — `.github/workflows/deploy-docs.yml:47` — S · low
   Broken nav entries and links are only noticed after they reach the published site.
-- [ ] **CI-04** Declare the extensions the library uses (`ext-simplexml`, `ext-libxml`, `ext-ctype`) in `require` — `composer.json`, `src/Manifest.php:298`, `src/XmlParser.php:38-41` — S · low
+- [x] **CI-04** Declare the extensions the library uses (`ext-simplexml`, `ext-libxml`, `ext-ctype`) in `require` — `composer.json`, `src/Manifest.php:298`, `src/XmlParser.php:38-41` — S · low
   Minimal builds (e.g. Alpine's split packages) install cleanly and then fail at runtime.
 
 ### Sweeps
 
 - [x] **SWEEP-01** Validate every string written into the OPF (metadata values, `setMeta`/`setProperty`, manifest ids and media types) as UTF-8 with only XML 1.0 characters, and throw otherwise — `src/Metadata.php:104-153,253-263`, `src/Manifest.php:110-129` — S · high
   Probe: a Latin-1 title is written as raw bytes into the UTF-8 OPF, which then fails to parse, so the saved book cannot be reopened; control characters are stripped by `setText()` and make `addChild()` drop the whole value.
-- [ ] **SWEEP-02** Close the remaining coverage holes: `ZipHandler` (3/6 methods), `FileSystemHelper` (77.8% lines), `ContentManager` (6/8 methods), `TCPDFAdapter` (5/6), `EpubFile` (14/15) — `tests/` — M · low
+- [x] **SWEEP-02** Close the remaining coverage holes: `ZipHandler` (3/6 methods), `FileSystemHelper` (77.8% lines), `ContentManager` (6/8 methods), `TCPDFAdapter` (5/6), `EpubFile` (14/15) — `tests/` — M · low
   These are the error paths left after round one (failed writes, unreadable entries, cleanup failures).

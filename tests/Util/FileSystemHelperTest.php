@@ -195,6 +195,28 @@ final class FileSystemHelperTest extends TestCase
         }
     }
 
+    public function testDeleteDirectoryReportsADirectoryItCannotList(): void
+    {
+        if (DIRECTORY_SEPARATOR === '\\') {
+            $this->markTestSkipped('Windows has no "write and enter, but not list" directory permission.');
+        }
+
+        $base = $this->fixturesDir . DIRECTORY_SEPARATOR . 'tmp' . DIRECTORY_SEPARATOR . 'unlistable';
+        mkdir($base . DIRECTORY_SEPARATOR . 'inner', 0777, true);
+        chmod($base . DIRECTORY_SEPARATOR . 'inner', 0300);
+
+        try {
+            if (is_readable($base . DIRECTORY_SEPARATOR . 'inner')) {
+                $this->markTestSkipped('Unreadable directories are readable here (e.g. running as root).');
+            }
+
+            $this->assertFalse($this->helper->deleteDirectory($base));
+        } finally {
+            chmod($base . DIRECTORY_SEPARATOR . 'inner', 0777);
+            $this->helper->deleteDirectory($base);
+        }
+    }
+
     public function testDeleteDirectoryReportsFailureWithoutWarnings(): void
     {
         $base = $this->fixturesDir . DIRECTORY_SEPARATOR . 'tmp' . DIRECTORY_SEPARATOR . 'undeletable';
