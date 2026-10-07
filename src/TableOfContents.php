@@ -120,15 +120,17 @@ final readonly class TableOfContents
     }
 
     /**
-     * Writes the book title into the NCX docTitle, which EPUB 2 reading systems show, creating it
-     * when missing. EpubFile::save() calls this after metadata changes. Nothing is written without
-     * an NCX, when its docTitle already matches, or when it cannot be parsed (validate() reports that).
+     * Keeps the NCX in step with the package: its dtb:uid meta must equal the unique identifier
+     * (EPUBCheck reports a mismatch), and its docTitle, which EPUB 2 reading systems show, is the
+     * book title. Missing elements are created; an empty value is left alone. EpubFile::save() calls
+     * this after metadata changes. Nothing is written without an NCX, when it already matches, or
+     * when it cannot be parsed (validate() reports that).
      *
      * @internal
      *
      * @throws Exception If the NCX cannot be written.
      */
-    public function syncNcxTitle(string $title): void
+    public function syncNcx(string $title, ?string $uniqueIdentifier): void
     {
         $ncxPath = $this->ncxPath();
         if ($ncxPath === null) {
@@ -143,21 +145,40 @@ final readonly class TableOfContents
 
         $document = $this->document($root);
         $namespace = (string) $root->namespaceURI;
+        $changed = false;
 
-        $docTitle = $this->childElements($root, 'docTitle')[0] ?? null;
-        if (! $docTitle instanceof DOMElement) {
-            // docTitle follows head.
-            $head = $this->childElements($root, 'head')[0] ?? null;
-            $docTitle = $root->insertBefore($document->createElementNS($namespace, 'docTitle'), $head->nextSibling ?? $root->firstChild);
+        // head comes first, docTitle follows it.
+        $head = $this->childElements($root, 'head')[0] ?? null;
+        if ($uniqueIdentifier !== null && $uniqueIdentifier !== '') {
+            $head ??= $root->insertBefore($document->createElementNS($namespace, 'head'), $root->firstChild);
+            $uid = array_values(array_filter(
+                $this->childElements($head, 'meta'),
+                static fn (DOMElement $meta): bool => $meta->getAttribute('name') === 'dtb:uid'
+            ))[0] ?? null;
+            if (! $uid instanceof DOMElement) {
+                $uid = $head->insertBefore($document->createElementNS($namespace, 'meta'), $head->firstChild);
+                $uid->setAttribute('name', 'dtb:uid');
+            }
+
+            if ($uid->getAttribute('content') !== $uniqueIdentifier) {
+                $uid->setAttribute('content', $uniqueIdentifier);
+                $changed = true;
+            }
         }
 
-        $text = $this->childElements($docTitle, 'text')[0] ?? $docTitle->appendChild($document->createElementNS($namespace, 'text'));
-        if ($text->textContent === $title) {
-            return;
+        if ($title !== '') {
+            $docTitle = $this->childElements($root, 'docTitle')[0]
+                ?? $root->insertBefore($document->createElementNS($namespace, 'docTitle'), $head->nextSibling ?? $root->firstChild);
+            $text = $this->childElements($docTitle, 'text')[0] ?? $docTitle->appendChild($document->createElementNS($namespace, 'text'));
+            if ($text->textContent !== $title) {
+                $text->textContent = $title;
+                $changed = true;
+            }
         }
 
-        $text->textContent = $title;
-        $this->save($root, $ncxPath);
+        if ($changed) {
+            $this->save($root, $ncxPath);
+        }
     }
 
     private function navPath(): ?string

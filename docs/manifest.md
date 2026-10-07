@@ -40,8 +40,7 @@ Manifest `href`s are URLs relative to the OPF file (for example `text/chapter%20
 ```php
 use PhpEpub\EpubFile;
 
-$epubFile = new EpubFile('/path/to/your.epub');
-$epubFile->load();
+$epubFile = EpubFile::open('/path/to/your.epub');
 
 $manifest = $epubFile->getManifest();
 

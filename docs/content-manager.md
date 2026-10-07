@@ -29,7 +29,7 @@ Initializes the ContentManager with the path to the extracted EPUB. Throws an ex
 Typically, you'll get this from EpubFile:
 
 ```php
-$epubFile->load();
+$epubFile = EpubFile::open('/path/to/book.epub');
 $contentManager = $epubFile->getContentManager();
 ```
 
@@ -76,8 +76,7 @@ Returns the content of a file. Throws an exception if the file doesn't exist or 
 ```php
 use PhpEpub\EpubFile;
 
-$epubFile = new EpubFile('/path/to/book.epub');
-$epubFile->load();
+$epubFile = EpubFile::open('/path/to/book.epub');
 
 $content = $epubFile->getContentManager();
 

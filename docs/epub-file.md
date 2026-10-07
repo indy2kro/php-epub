@@ -119,6 +119,8 @@ Checks the book, including unsaved changes, and returns a list of `PhpEpub\Valid
 | `FILE_NOT_IN_MANIFEST` | warning | A file of the publication is not listed in the manifest |
 | `SPINE_EMPTY`, `SPINE_UNKNOWN_IDREF`, `SPINE_DUPLICATE_IDREF` | error | The reading order is empty, or refers to an unknown or repeated item |
 | `SPINE_NOT_CONTENT` | warning | A spine item is not a content document and has no fallback |
+| `CONTENT_NOT_WELL_FORMED` | error | An XHTML content document is not well-formed XML |
+| `CONTENT_REFERENCE_MISSING`, `CONTENT_REFERENCE_NOT_IN_MANIFEST` | error | A content document refers (`src`, `href`, `data`, `poster`) to a local file that is missing or outside the book, or that is not in the manifest; remote URLs, `data:` URIs and links within the document are not checked |
 | `NAV_MISSING` / `NCX_MISSING` | error | An EPUB 3 book has no navigation document / an EPUB 2 book has no NCX |
 | `NAV_INVALID` / `NCX_INVALID` | error | The navigation document is not well-formed / the NCX is not well-formed or has no NCX namespace or `navMap` |
 | `TOC_LINK_NOT_IN_MANIFEST` | error | The table of contents links to a file that is not in the manifest |
@@ -188,8 +190,7 @@ Returns the path to the temporary directory where EPUB contents are extracted. R
 ```php
 use PhpEpub\EpubFile;
 
-$epubFile = new EpubFile('/path/to/your.epub');
-$epubFile->load();
+$epubFile = EpubFile::open('/path/to/your.epub');
 
 // Access and modify metadata
 $metadata = $epubFile->getMetadata();

@@ -1,0 +1,19 @@
+# Codecov settings (https://docs.codecov.com/docs/codecovyml-reference).
+#
+# Without this file the patch target is the project's current coverage (about 99.5%),
+# so a single defensive line that tests cannot reach (e.g. a failing mkdir()) fails a PR.
+coverage:
+  status:
+    project:
+      default:
+        # Compare with the base commit; small drops from refactoring are tolerated.
+        target: auto
+        threshold: 0.5%
+    patch:
+      default:
+        # New code must be well covered, but not to the last line.
+        target: 95%
+
+comment:
+  layout: "condensed_header, diff, files"
+  require_changes: true

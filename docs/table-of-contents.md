@@ -25,6 +25,11 @@ Each entry is a `PhpEpub\TocEntry`:
 
 - **`addEntry(TocEntry $entry): void`**: Appends a top-level entry.
 
+- **`isAvailable(): bool`**: Whether the book has a navigation document or an NCX that can hold a table of contents, i.e. whether `setEntries()` can work.
+
+- **`getBook(): ?EpubFile`**: The book this table of contents belongs to, when it came from `EpubFile::getTableOfContents()`. Holding the object keeps the book's extracted files alive, so `EpubFile::open($path)->getTableOfContents()` is safe to use on its own.
+
+Deleting a file with `ContentManager::deleteContent()` removes its entries, and `EpubFile::save()` keeps the NCX `docTitle` in step with the book title.
 ## Usage Example
 
 ```php

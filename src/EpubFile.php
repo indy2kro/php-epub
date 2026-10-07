@@ -514,11 +514,8 @@ class EpubFile
 
             $this->rekeyObfuscatedFonts();
 
-            // The NCX repeats the title for EPUB 2 reading systems.
-            $title = $metadata->getTitle();
-            if ($title !== '') {
-                $this->getTableOfContents()->syncNcxTitle($title);
-            }
+            // The NCX repeats the title (for EPUB 2 reading systems) and the unique identifier.
+            $this->getTableOfContents()->syncNcx($metadata->getTitle(), $metadata->getUniqueIdentifier());
         }
     }
 

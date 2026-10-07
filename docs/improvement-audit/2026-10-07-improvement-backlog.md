@@ -99,7 +99,7 @@ The target was 30 items; the audit found 28, and none were added just to reach t
 
 - [x] **FEAT-01** Series API that reads and writes both `calibre:series`/`calibre:series_index` and EPUB 3 `belongs-to-collection` (`collection-type` series, `group-position`) — `src/Metadata.php:94-200` — M · med
   Series is the most common metadata after title and author, and the two conventions disagree, so callers have to know about and update both by hand.
-- [ ] **FEAT-02** Check XHTML content documents in `validate()`: well-formedness and local references (`img`, `link`, `a`) that are missing or not in the manifest — `src/Validator.php` — M · med
+- [x] **FEAT-02** Check XHTML content documents in `validate()`: well-formedness and local references (`img`, `link`, `a`) that are missing or not in the manifest — `src/Validator.php` — M · med
   Broken references are EPUBCheck's most common errors and `addChapter()` inserts caller markup as is, but `validate()` never looks inside content documents.
 - [x] **FEAT-03** Access the remaining Dublin Core elements (rights, source, type, format, relation, coverage) and all languages — `src/Metadata.php:180-260`, `src/Traits/InteractsWithLanguage.php` — S · low
   Only eight DC elements have accessors and `getDcValues()` is protected, so `dc:rights` (licence text) and multilingual books cannot be handled.
@@ -121,21 +121,21 @@ The target was 30 items; the audit found 28, and none were added just to reach t
 
 ### Documentation
 
-- [ ] **DOC-01** Refresh `basic-usage.md` and `advanced-usage.md` for `open()`/`convert()`, `create()`/`addChapter()`, the table of contents and `validate()` — `docs/basic-usage.md`, `docs/advanced-usage.md:10-90` — S · low
+- [x] **DOC-01** Refresh `basic-usage.md` and `advanced-usage.md` for `open()`/`convert()`, `create()`/`addChapter()`, the table of contents and `validate()` — `docs/basic-usage.md`, `docs/advanced-usage.md:10-90` — S · low
   The guides still show `new EpubFile()` plus `load()` and converting an extracted directory directly, and never mention the newer, simpler APIs.
-- [ ] **DOC-02** Document only the public `Parser` API, and document the `TableOfContents` `getBook()`/`isAvailable()` methods — `docs/parser.md:10-20`, `docs/table-of-contents.md` — S · low
+- [x] **DOC-02** Document only the public `Parser` API, and document the `TableOfContents` `getBook()`/`isAvailable()` methods — `docs/parser.md:10-20`, `docs/table-of-contents.md` — S · low
   `parser.md` tells readers they can call `validateMimetype()`, `extractOpfPath()`, `validateOpf()` and `validateNcx()`, which are private, while two public `TableOfContents` methods are undocumented.
 
 ### Tests
 
-- [ ] **TEST-01** Run EPUBCheck on saved EPUB 2 books too (NCX writing, `opf:role`/`opf:file-as`, guide) — `tests/EpubCheckTest.php`, `tests/Support/EpubBuilder.php` — S · med
+- [x] **TEST-01** Run EPUBCheck on saved EPUB 2 books too (NCX writing, `opf:role`/`opf:file-as`, guide) — `tests/EpubCheckTest.php`, `tests/Support/EpubBuilder.php` — S · med
   Every EPUBCheck scenario is EPUB 3, so the EPUB 2 writers (NCX navPoints, `opf:*` attributes, guide cleanup) are never checked against the validator.
-- [ ] **TEST-02** Round-trip every fixture book through open, `validate()`, save and EPUBCheck — `tests/fixtures/valid_*.epub`, `tests/EpubFileTest.php:190-300` — S · low
+- [x] **TEST-02** Round-trip every fixture book through open, `validate()`, save and EPUBCheck — `tests/fixtures/valid_*.epub`, `tests/EpubFileTest.php:190-300` — S · low
   The six real-world fixtures are only loaded and saved; nothing checks that the library's output for them stays valid or that `validate()` agrees with EPUBCheck.
 
 ### CI
 
-- [ ] **CI-01** Add `codecov.yml` with an explicit patch target and threshold — `.github/workflows/tests.yml` — S · low
+- [x] **CI-01** Add `codecov.yml` with an explicit patch target and threshold — `.github/workflows/tests.yml` — S · low
   Without a config Codecov's patch target is the project's current coverage (about 99.5%), so a single unreachable defensive line fails a PR; three round-2 PRs needed workarounds for it.
 
 ### Sweeps
