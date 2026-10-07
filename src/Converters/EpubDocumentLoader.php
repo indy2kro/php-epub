@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace PhpEpub\Converters;
 
 use DOMAttr;
+use DOMComment;
 use DOMDocument;
 use DOMElement;
+use DOMProcessingInstruction;
+use DOMXPath;
 use PhpEpub\ConversionException;
 use PhpEpub\InvalidEpubException;
 use PhpEpub\Manifest;
@@ -16,6 +19,7 @@ use PhpEpub\Parser;
 use PhpEpub\Spine;
 use PhpEpub\Util\FileSystemHelper;
 use PhpEpub\Util\PathResolver;
+use PhpEpub\XmlException;
 use PhpEpub\XmlParser;
 
 /**
@@ -27,8 +31,13 @@ use PhpEpub\XmlParser;
  * poster, ...) are rewritten to absolute paths of files inside the book; anything
  * else (absolute paths, other schemes, remote URLs, paths escaping the book,
  * missing files) is blanked so renderers never read outside the book.
+ *
+ * Renderers follow the references inside SVG images too, so every SVG (file or data: URI)
+ * is inlined as a sanitised data: URI whose references are confined the same way, and
+ * every other data: URI is re-encoded as base64 (renderers read any source containing
+ * "<svg" as SVG markup, whatever its declared type).
  */
-final readonly class EpubDocumentLoader
+final class EpubDocumentLoader
 {
     private const array XHTML_MEDIA_TYPES = ['application/xhtml+xml', 'text/html'];
 
@@ -48,9 +57,27 @@ final readonly class EpubDocumentLoader
      */
     private const array REMOVED_ATTRIBUTES = ['srcset'];
 
+    /**
+     * SVG elements that run code or embed (X)HTML.
+     */
+    private const array REMOVED_SVG_ELEMENTS = ['script', 'foreignobject'];
+
+    /**
+     * How deeply data: SVGs may nest inside SVGs.
+     */
+    private const int SVG_NESTING_LIMIT = 4;
+
+    /**
+     * The most SVG markup, in bytes, inlined per book; later SVG references are blanked,
+     * so a chapter repeating a large SVG cannot multiply the size of the output.
+     */
+    private const int SVG_BUDGET = 16 * 1024 * 1024;
+
+    private int $svgBudget = self::SVG_BUDGET;
+
     public function __construct(
-        private XmlParser $xmlParser = new XmlParser(),
-        private PathResolver $paths = new PathResolver()
+        private readonly XmlParser $xmlParser = new XmlParser(),
+        private readonly PathResolver $paths = new PathResolver()
     ) {
     }
 
@@ -63,6 +90,8 @@ final readonly class EpubDocumentLoader
         if ($root === false) {
             throw new ConversionException("EPUB directory does not exist: {$epubDirectory}");
         }
+
+        $this->svgBudget = self::SVG_BUDGET;
 
         if (is_file($root . DIRECTORY_SEPARATOR . 'META-INF' . DIRECTORY_SEPARATOR . 'container.xml')) {
             return $this->loadPackage($root);
@@ -250,8 +279,10 @@ final readonly class EpubDocumentLoader
      * Makes book CSS safe to render: escapes are decoded (and stray backslashes dropped, so the
      * renderer cannot decode anything again), comments, @import and image-set() are removed, and
      * every url() is rewritten to a file inside the book (or blanked).
+     *
+     * @param int $svgDepth How many SVG documents enclose the CSS (see resolveSource()).
      */
-    private function sanitizeCss(string $css, string $root, string $directory): string
+    private function sanitizeCss(string $css, string $root, string $directory, int $svgDepth = 0): string
     {
         $css = (string) preg_replace_callback(
             '/\\\\(?:([0-9a-fA-F]{1,6})\s?|(.))/su',
@@ -265,7 +296,11 @@ final readonly class EpubDocumentLoader
 
         $css = (string) preg_replace_callback(
             '/url\s*\(\s*(["\']?)(.*?)\1\s*\)/is',
-            fn (array $match): string => 'url("' . str_replace('"', '%22', $this->resolveSource($root, $directory, $match[2])) . '")',
+            function (array $match) use ($root, $directory, $svgDepth): string {
+                $source = $this->resolveSource($root, $directory, $match[2], $svgDepth);
+
+                return str_starts_with($source, '#') ? "url({$source})" : 'url("' . str_replace('"', '%22', $source) . '")';
+            },
             $css
         );
 
@@ -274,11 +309,22 @@ final readonly class EpubDocumentLoader
         return trim((string) preg_replace('/@import\b[^;]*;?/i', '', $css));
     }
 
-    private function resolveSource(string $root, string $directory, string $source): string
+    /**
+     * Rewrites a resource reference to the absolute path of a file inside the book, a data: URI
+     * (SVG files are inlined, see the class comment) or "" when it is not confined to the book.
+     *
+     * @param int $svgDepth How many SVG documents enclose the reference. Inside an SVG, references
+     *                      to its own elements (#id) are kept and SVG files are not inlined.
+     */
+    private function resolveSource(string $root, string $directory, string $source, int $svgDepth = 0): string
     {
         $source = trim($source);
 
         if (str_starts_with(strtolower($source), 'data:')) {
+            return $this->sanitizeDataUri($root, $directory, $source, $svgDepth);
+        }
+
+        if ($svgDepth > 0 && preg_match('/^#[\w.:-]*$/u', $source) === 1) {
             return $source;
         }
 
@@ -294,10 +340,122 @@ final readonly class EpubDocumentLoader
         }
 
         $real = realpath($file);
-        if ($real === false || ! is_file($real) || ! str_starts_with($real, $root . DIRECTORY_SEPARATOR)) {
+        // A path holding "<svg" would be read as SVG markup.
+        if ($real === false || ! is_file($real) || ! str_starts_with($real, $root . DIRECTORY_SEPARATOR) || strpbrk($real, '<>') !== false) {
             return '';
         }
 
+        if (strtolower(pathinfo($real, PATHINFO_EXTENSION)) === 'svg') {
+            return $svgDepth === 0 ? $this->inlineSvgFile($root, $real) : '';
+        }
+
         return str_replace('\\', '/', $real);
+    }
+
+    /**
+     * An SVG file as a sanitised data: URI, with references relative to the file; "" when it is
+     * unreadable, not a usable SVG document, or over the remaining SVG budget.
+     */
+    private function inlineSvgFile(string $root, string $file): string
+    {
+        $size = filesize($file);
+        $svg = $size !== false && $size <= $this->svgBudget ? FileSystemHelper::readFile($file) : null;
+        if ($svg === null) {
+            return '';
+        }
+
+        $relative = str_replace('\\', '/', substr($file, strlen($root) + 1));
+        $directory = dirname($relative) === '.' ? '' : dirname($relative) . '/';
+
+        return $this->svgDataUri($root, $directory, $svg, 1);
+    }
+
+    /**
+     * Decodes a data: URI and re-encodes it as base64; SVG content is sanitised first.
+     * "" when the URI is malformed.
+     */
+    private function sanitizeDataUri(string $root, string $directory, string $uri, int $svgDepth): string
+    {
+        if (preg_match('#^data:([a-z0-9.+-]+/[a-z0-9.+-]+)((?:;[^,;]*)*),(.*)$#is', $uri, $match) !== 1) {
+            return '';
+        }
+
+        $mediaType = strtolower($match[1]);
+        $data = in_array('base64', array_map(trim(...), explode(';', strtolower($match[2]))), true)
+            ? base64_decode((string) preg_replace('/\s+/', '', rawurldecode($match[3])), true)
+            : rawurldecode($match[3]);
+        if ($data === false) {
+            return '';
+        }
+
+        if ($mediaType === 'image/svg+xml') {
+            return $svgDepth < self::SVG_NESTING_LIMIT ? $this->svgDataUri($root, $directory, $data, $svgDepth + 1) : '';
+        }
+
+        return "data:{$mediaType};base64," . base64_encode($data);
+    }
+
+    /**
+     * Sanitised SVG markup as a base64 data: URI, charged to the SVG budget; "" when the markup
+     * is not a well-formed SVG document (entity declarations are rejected) or over the budget.
+     *
+     * @param int $svgDepth The nesting depth of this SVG, from 1.
+     */
+    private function svgDataUri(string $root, string $directory, string $svg, int $svgDepth): string
+    {
+        try {
+            $svgElement = dom_import_simplexml($this->xmlParser->parseString($svg, 'SVG image'));
+        } catch (XmlException) {
+            return '';
+        }
+
+        $document = $svgElement->ownerDocument;
+        if (! $document instanceof DOMDocument || strtolower($svgElement->localName ?? '') !== 'svg') {
+            return '';
+        }
+
+        // Processing instructions (xml-stylesheet) and comments.
+        foreach (iterator_to_array((new DOMXPath($document))->query('//processing-instruction() | //comment()') ?: []) as $node) {
+            if ($node instanceof DOMProcessingInstruction || $node instanceof DOMComment) {
+                $node->parentNode?->removeChild($node);
+            }
+        }
+
+        foreach (iterator_to_array($document->getElementsByTagName('*')) as $element) {
+            $this->sanitizeSvgElement($element, $root, $directory, $svgDepth);
+        }
+
+        $markup = (string) $document->saveXML($svgElement);
+        $fits = strlen($markup) <= $this->svgBudget;
+        $this->svgBudget -= $fits ? strlen($markup) : 0;
+
+        return $fits ? 'data:image/svg+xml;base64,' . base64_encode($markup) : '';
+    }
+
+    private function sanitizeSvgElement(DOMElement $element, string $root, string $directory, int $svgDepth): void
+    {
+        $tag = strtolower($element->localName ?? '');
+
+        if (in_array($tag, self::REMOVED_SVG_ELEMENTS, true)) {
+            $element->parentNode?->removeChild($element);
+
+            return;
+        }
+
+        if ($tag === 'style') {
+            $element->textContent = $this->sanitizeCss($element->textContent, $root, $directory, $svgDepth);
+        }
+
+        foreach (iterator_to_array($element->attributes ?? []) as $attribute) {
+            $name = strtolower($attribute->localName ?? '');
+
+            if (str_starts_with($name, 'on')) {
+                $element->removeAttributeNode($attribute);
+            } elseif ($name === 'href') {
+                $attribute->value = $this->resolveSource($root, $directory, $attribute->value, $svgDepth);
+            } elseif ($name === 'style' || str_contains(strtolower($attribute->value), 'url(')) {
+                $attribute->value = $this->sanitizeCss($attribute->value, $root, $directory, $svgDepth);
+            }
+        }
     }
 }

@@ -95,14 +95,21 @@ class TCPDFAdapter implements ConverterInterface
         $pdf->SetAutoPageBreak(true, $this->intStyle('margin_bottom'));
         $pdf->SetFont($this->stringStyle('font'), '', $this->intStyle('font_size'));
 
-        foreach ($document->chapters as $index => $chapter) {
-            $pdf->AddPage();
-            if ($this->boolStyle('bookmarks')) {
-                $title = $document->chapterTitles[$index] ?? '';
-                $pdf->Bookmark($title !== '' ? $title : 'Chapter ' . ($index + 1), 0, 0);
-            }
+        $svgFiles = [];
+        try {
+            foreach ($document->chapters as $index => $chapter) {
+                $pdf->AddPage();
+                if ($this->boolStyle('bookmarks')) {
+                    $title = $document->chapterTitles[$index] ?? '';
+                    $pdf->Bookmark($title !== '' ? $title : 'Chapter ' . ($index + 1), 0, 0);
+                }
 
-            $pdf->writeHTML($this->chapterHtml($document, $chapter), true, false, true, false, '');
+                $pdf->writeHTML($this->chapterHtml($document, $this->svgImagesAsFiles($chapter, $svgFiles)), true, false, true, false, '');
+            }
+        } finally {
+            foreach ($svgFiles as $file) {
+                @unlink($file);
+            }
         }
 
         if ($document->chapters === []) {
@@ -130,6 +137,30 @@ class TCPDFAdapter implements ConverterInterface
     protected function chapterHtml(EpubDocument $document, string $chapter): string
     {
         return ($document->styles === [] ? '' : '<style>' . EpubDocument::styleSheet($document->styles) . '</style>') . $chapter;
+    }
+
+    /**
+     * TCPDF only renders an <img> as SVG when its source ends in ".svg", so the sanitised SVG
+     * data: URIs of EpubDocumentLoader are written to temporary files for the conversion.
+     *
+     * @param list<string> $files The temporary files, for createPdf() to delete.
+     */
+    private function svgImagesAsFiles(string $html, array &$files): string
+    {
+        return (string) preg_replace_callback(
+            '#\bsrc="data:image/svg\+xml;base64,([A-Za-z0-9+/=]+)"#',
+            static function (array $match) use (&$files): string {
+                // tempnam() reserves a unique name; the SVG goes next to it with the extension TCPDF needs.
+                $reserved = (string) tempnam(sys_get_temp_dir(), 'epub_svg_');
+                $file = $reserved . '.svg';
+                array_push($files, $reserved, $file);
+
+                return $reserved !== '' && @file_put_contents($file, (string) base64_decode($match[1], true)) !== false
+                    ? 'src="' . htmlspecialchars(str_replace('\\', '/', $file)) . '"'
+                    : $match[0];
+            },
+            $html
+        );
     }
 
     private function stringStyle(string $name): string
