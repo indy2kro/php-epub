@@ -73,7 +73,8 @@ final class FileSystemHelperTest extends TestCase
     public function testFindExecutableLooksUpBareNamesOnThePath(): void
     {
         $directory = dirname(PHP_BINARY);
-        $name = pathinfo(PHP_BINARY, PATHINFO_FILENAME);
+        // Only Windows needs the extension removed; elsewhere names like "php8.3" are the whole program name.
+        $name = DIRECTORY_SEPARATOR === '\\' ? pathinfo(PHP_BINARY, PATHINFO_FILENAME) : basename(PHP_BINARY);
         $path = getenv('PATH');
         putenv('PATH=' . $this->fixturesDir . PATH_SEPARATOR . PATH_SEPARATOR . $directory);
 
