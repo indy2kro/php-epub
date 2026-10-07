@@ -3,18 +3,18 @@
 <head>
     <meta charset="utf-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="author" content="indy2kro" /><link rel="canonical" href="https://indy2kro.github.io/php-epub/spine/" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="author" content="indy2kro" /><link rel="canonical" href="https://indy2kro.github.io/php-epub/table-of-contents/" />
       <link rel="shortcut icon" href="../img/favicon.ico" />
-    <title>Spine - PHP EPUB</title>
+    <title>TableOfContents - PHP EPUB</title>
     <link rel="stylesheet" href="../css/theme.css" />
     <link rel="stylesheet" href="../css/theme_extra.css" />
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
     
       <script>
         // Current page data
-        var mkdocs_page_name = "Spine";
-        var mkdocs_page_input_path = "spine.md";
-        var mkdocs_page_url = "/php-epub/spine/";
+        var mkdocs_page_name = "TableOfContents";
+        var mkdocs_page_input_path = "table-of-contents.md";
+        var mkdocs_page_url = "/php-epub/table-of-contents/";
       </script>
     
     <!--[if lt IE 9]>
@@ -68,15 +68,17 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../manifest/">Manifest</a>
                   </li>
-                  <li class="toctree-l1 current"><a class="reference internal current" href="#">Spine</a>
+                  <li class="toctree-l1"><a class="reference internal" href="../spine/">Spine</a>
+                  </li>
+                  <li class="toctree-l1 current"><a class="reference internal current" href="#">TableOfContents</a>
     <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#entries">Entries</a>
+    </li>
     <li class="toctree-l2"><a class="reference internal" href="#key-methods">Key Methods</a>
     </li>
     <li class="toctree-l2"><a class="reference internal" href="#usage-example">Usage Example</a>
     </li>
     </ul>
-                  </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../table-of-contents/">TableOfContents</a>
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../parser/">Parser</a>
                   </li>
@@ -112,7 +114,7 @@
   <ul class="wy-breadcrumbs">
     <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
           <li class="breadcrumb-item">Classes</li>
-      <li class="breadcrumb-item active">Spine</li>
+      <li class="breadcrumb-item active">TableOfContents</li>
     <li class="wy-breadcrumbs-aside">
     </li>
   </ul>
@@ -121,56 +123,58 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
             <div class="section" itemprop="articleBody">
               
-                <h1 id="spine">Spine<a class="headerlink" href="#spine" title="Permanent link">&para;</a></h1>
-<p>The <code>Spine</code> class manages the reading order of the content within an EPUB file: the <code>&lt;spine&gt;</code> section of the OPF file.</p>
+                <h1 id="tableofcontents">TableOfContents<a class="headerlink" href="#tableofcontents" title="Permanent link">&para;</a></h1>
+<p><code>TableOfContents</code> reads and edits a book's table of contents: the <code>toc</code> nav of the EPUB 3 navigation document and the EPUB 2 NCX. Get it from a loaded book:</p>
+<pre class="codehilite"><code class="language-php">$toc = $epubFile-&gt;getTableOfContents();
+</code></pre>
+
+<p>Changes are written to the navigation document and NCX straight away and saved with the book by <code>EpubFile::save()</code>.</p>
+<h2 id="entries">Entries<a class="headerlink" href="#entries" title="Permanent link">&para;</a></h2>
+<p>Each entry is a <code>PhpEpub\TocEntry</code>:</p>
+<ul>
+<li><code>title</code>: the text shown in the table of contents.</li>
+<li><code>path</code>: the target file relative to the book root (e.g. <code>EPUB/text/ch1.xhtml</code>), or <code>""</code> for a heading without a link. Links to remote URLs or outside the book are read as <code>""</code>.</li>
+<li><code>fragment</code>: the anchor inside the file, without <code>#</code>, or <code>null</code>.</li>
+<li><code>children</code>: nested entries.</li>
+</ul>
 <h2 id="key-methods">Key Methods<a class="headerlink" href="#key-methods" title="Permanent link">&para;</a></h2>
 <ul>
 <li>
-<p><strong><code>__construct(SimpleXMLElement $opfXml, ?Manifest $manifest = null)</code></strong>: Parses the spine. The manifest is optional; it is needed to resolve items in <code>getItems()</code> and to validate <code>add()</code>.</p>
+<p><strong><code>getEntries(): array</code></strong>: The entries of the navigation document's <code>toc</code> nav, or, for a book without a navigation document, of the NCX. Returns <code>[]</code> when the book has neither.</p>
 </li>
 <li>
-<p><strong><code>get(): array</code></strong>: Returns the manifest item ids (idrefs) in reading order.</p>
+<p><strong><code>setEntries(array $entries): void</code></strong>: Replaces the entries in the navigation document <strong>and</strong> in the NCX, whichever the book has, so EPUB 3 books that keep an NCX for older readers stay consistent. The <code>toc</code> heading and other navs (landmarks, page list) are kept; a missing <code>toc</code> nav is created. The NCX has no unlinked entries, so an entry without a path is left out there and its children take its place. Throws an <code>Exception</code> when the book has neither file, when an entry points outside the book or is not valid XML text, or when a file cannot be written.</p>
 </li>
 <li>
-<p><strong><code>getItems(): array</code></strong>: Returns <code>SpineItem</code> objects in reading order. Each has <code>idref</code>, <code>linear</code> (<code>false</code> for auxiliary content marked <code>linear="no"</code>, such as notes) and <code>item</code>, the referenced <code>ManifestItem</code> (with its <code>path</code> relative to the book root), or <code>null</code> without a manifest.</p>
-</li>
-<li>
-<p><strong><code>contains(string $idref): bool</code></strong>: Whether an item is in the reading order.</p>
-</li>
-<li>
-<p><strong><code>add(string $idref, ?int $position = null, bool $linear = true): void</code></strong>: Adds a manifest item to the reading order, at a zero-based position or at the end. Throws if the item is not in the manifest or is already in the spine.</p>
-</li>
-<li>
-<p><strong><code>remove(string $idref): void</code></strong>: Removes an item from the reading order (the manifest is not touched). Throws if it is not in the spine.</p>
-</li>
-<li>
-<p><strong><code>move(string $idref, int $position): void</code></strong>: Moves an item to a new zero-based position.</p>
+<p><strong><code>addEntry(TocEntry $entry): void</code></strong>: Appends a top-level entry.</p>
 </li>
 </ul>
-<p>Changes are made to the OPF in memory; <code>EpubFile::save()</code> writes them (and refreshes the EPUB 3 modified date). Other <code>&lt;itemref&gt;</code> attributes, such as <code>id</code> and <code>properties</code>, are kept.</p>
 <h2 id="usage-example">Usage Example<a class="headerlink" href="#usage-example" title="Permanent link">&para;</a></h2>
 <pre class="codehilite"><code class="language-php">use PhpEpub\EpubFile;
+use PhpEpub\TocEntry;
 
-$epubFile = new EpubFile('/path/to/your.epub');
-$epubFile-&gt;load();
+$epubFile = EpubFile::open('/path/to/book.epub');
 
-$spine = $epubFile-&gt;getSpine();
-
-foreach ($spine-&gt;getItems() as $spineItem) {
-    $type = $spineItem-&gt;linear ? 'main' : 'auxiliary';
-    echo &quot;{$spineItem-&gt;idref} ({$type}): {$spineItem-&gt;item?-&gt;path}\n&quot;;
+foreach ($epubFile-&gt;getTableOfContents()-&gt;getEntries() as $entry) {
+    echo $entry-&gt;title, ' -&gt; ', $entry-&gt;path, &quot;\n&quot;;
 }
 
-// Show the notes right after the first chapter, then save.
-$spine-&gt;move('notes', 1);
+// Add a chapter: file, manifest and reading order, then the table of contents.
+$epubFile-&gt;getContentManager()-&gt;addContent('EPUB/text/epilogue.xhtml', $xhtml);
+$item = $epubFile-&gt;getManifest()-&gt;findByPath('EPUB/text/epilogue.xhtml');
+$epubFile-&gt;getSpine()-&gt;add($item-&gt;id);
+$epubFile-&gt;getTableOfContents()-&gt;addEntry(new TocEntry('Epilogue', 'EPUB/text/epilogue.xhtml'));
+
 $epubFile-&gt;save();
 </code></pre>
+
+<p>In an EPUB 3 navigation document, an entry without a link (a <code>&lt;span&gt;</code>) must have children; EPUBCheck reports a childless one.</p>
               
             </div>
           </div><footer>
     <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
-        <a href="../manifest/" class="btn btn-neutral float-left" title="Manifest"><span class="icon icon-circle-arrow-left"></span> Previous</a>
-        <a href="../table-of-contents/" class="btn btn-neutral float-right" title="TableOfContents">Next <span class="icon icon-circle-arrow-right"></span></a>
+        <a href="../spine/" class="btn btn-neutral float-left" title="Spine"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../parser/" class="btn btn-neutral float-right" title="Parser">Next <span class="icon icon-circle-arrow-right"></span></a>
     </div>
 
   <hr/>
@@ -193,10 +197,10 @@ $epubFile-&gt;save();
   <span class="rst-current-version" data-toggle="rst-current-version">
     
     
-      <span><a href="../manifest/" style="color: #fcfcfc">&laquo; Previous</a></span>
+      <span><a href="../spine/" style="color: #fcfcfc">&laquo; Previous</a></span>
     
     
-      <span><a href="../table-of-contents/" style="color: #fcfcfc">Next &raquo;</a></span>
+      <span><a href="../parser/" style="color: #fcfcfc">Next &raquo;</a></span>
     
   </span>
 </div>

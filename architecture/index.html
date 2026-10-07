@@ -71,6 +71,10 @@
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#contentmanager">ContentManager</a>
     </li>
+    <li class="toctree-l3"><a class="reference internal" href="#tableofcontents">TableOfContents</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#validator">Validator</a>
+    </li>
     <li class="toctree-l3"><a class="reference internal" href="#parser-and-xmlparser">Parser and XmlParser</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ziphandler">ZipHandler</a>
@@ -101,6 +105,8 @@
                   <li class="toctree-l1"><a class="reference internal" href="../manifest/">Manifest</a>
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../spine/">Spine</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../table-of-contents/">TableOfContents</a>
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../parser/">Parser</a>
                   </li>
@@ -172,7 +178,7 @@
 
 <h2 id="core-components">Core Components<a class="headerlink" href="#core-components" title="Permanent link">&para;</a></h2>
 <h3 id="epubfile">EpubFile<a class="headerlink" href="#epubfile" title="Permanent link">&para;</a></h3>
-<p>The facade. <code>open()</code>/<code>load()</code> extract and parse the book, <code>save()</code> writes pending package edits and creates the archive, <code>convert()</code> runs a converter on the book including unsaved edits. It also handles the cover image (<code>getCoverImage()</code>, <code>setCoverImage()</code>). <code>cleanup()</code> (called by the destructor) deletes the extraction and unloads the book.</p>
+<p>The facade. <code>open()</code>/<code>load()</code> extract and parse the book, <code>create()</code> starts a new one (with <code>addChapter()</code> to fill it), <code>save()</code> writes pending package edits and creates the archive, <code>convert()</code> runs a converter on the book including unsaved edits. It also handles the cover image (<code>getCoverImage()</code>, <code>setCoverImage()</code>). <code>cleanup()</code> (called by the destructor) deletes the extraction and unloads the book.</p>
 <h3 id="metadata">Metadata<a class="headerlink" href="#metadata" title="Permanent link">&para;</a></h3>
 <p>Reads and edits the <code>&lt;metadata&gt;</code> element. Each Dublin Core field has a trait in <code>src/Traits/</code> (title, authors and creators, contributors, description, publisher, date, language, subject, identifier); <code>getMeta()</code>/<code>setMeta()</code> and <code>getProperty()</code>/<code>setProperty()</code> cover other <code>&lt;meta&gt;</code> elements. Values are checked with <code>Util\XmlText</code> before they are written.</p>
 <h3 id="manifest">Manifest<a class="headerlink" href="#manifest" title="Permanent link">&para;</a></h3>
@@ -181,6 +187,10 @@
 <p>The reading order: <code>SpineItem</code>s with their manifest item and <code>linear</code> flag, and adding, removing and moving entries.</p>
 <h3 id="contentmanager">ContentManager<a class="headerlink" href="#contentmanager" title="Permanent link">&para;</a></h3>
 <p>File operations on the extracted book (add, update, delete, read), keeping the manifest and spine in sync. Paths are relative to the book root; the package document itself is managed only through <code>Metadata</code>, <code>Manifest</code> and <code>Spine</code>.</p>
+<h3 id="tableofcontents">TableOfContents<a class="headerlink" href="#tableofcontents" title="Permanent link">&para;</a></h3>
+<p>Reads and edits the EPUB 3 navigation document's <code>toc</code> nav and the EPUB 2 NCX as <code>TocEntry</code> trees, writing both when a book has both.</p>
+<h3 id="validator">Validator<a class="headerlink" href="#validator" title="Permanent link">&para;</a></h3>
+<p><code>EpubFile::validate()</code> runs it to report common structural problems as <code>ValidationIssue</code>s: required metadata, duplicate ids, manifest and spine consistency, navigation.</p>
 <h3 id="parser-and-xmlparser">Parser and XmlParser<a class="headerlink" href="#parser-and-xmlparser" title="Permanent link">&para;</a></h3>
 <p><code>Parser</code> checks the container (<code>mimetype</code>, <code>META-INF/container.xml</code>) and locates and validates the OPF and NCX. <code>XmlParser</code> loads XML without network access and rejects entity declarations.</p>
 <h3 id="ziphandler">ZipHandler<a class="headerlink" href="#ziphandler" title="Permanent link">&para;</a></h3>
