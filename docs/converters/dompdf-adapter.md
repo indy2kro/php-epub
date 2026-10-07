@@ -4,7 +4,7 @@ The `DompdfAdapter` class converts EPUB content into PDF using the Dompdf librar
 
 ## Key Methods
 
-- **`__construct(array $styles = [])`**: Optional styling parameters: `font` (default `Arial`), `font_size` in points (default `12`), `paper_size` (default `A4`) and `orientation` (default `portrait`). Values of the wrong type fall back to the defaults.
+- **`__construct(array $styles = [])`**: Optional styling parameters: `font` (default `Arial`), `font_size` in points (default `12`), `paper_size` (default `A4`), `orientation` (default `portrait`) and `margin_top`/`margin_right`/`margin_bottom`/`margin_left` in mm, as in `TCPDFAdapter`. Without any margin option Dompdf keeps its own default margins; once one is given, sides that are not given are `0`. Values of the wrong type fall back to the defaults. Dompdf cannot write a PDF outline, so use `TCPDFAdapter` when you need chapter bookmarks.
 
 - **`convert(string $epubDirectory, string $outputPath): void`**: Renders every spine document in reading order, each on a new page, sets the PDF title and author from the EPUB metadata, and writes the PDF. Throws a `ConversionException` if the book cannot be read or the PDF cannot be written.
 

@@ -2,17 +2,19 @@
 
 # PHP EPUB Processor
 
-A PHP library for processing EPUB files, including parsing, metadata manipulation, and format conversion. This library provides tools to handle EPUB files efficiently, offering features like validation, content management, and conversion to other formats using various adapters.
+A PHP library for reading and editing EPUB 2 and EPUB 3 books: metadata, cover, manifest, reading order and content files, saved back as valid EPUB archives, plus conversion to PDF and other formats. Books are treated as untrusted input throughout.
 
 - [Documentation](https://indy2kro.github.io/php-epub/)
 
 ## Features
 
-- **EPUB Loading and Saving**: Easily load and save EPUB files.
-- **Metadata Management**: Read and update metadata such as title, authors, and language.
-- **Content Management**: Add, update, and delete content files within an EPUB.
-- **Validation**: Validate the structure and content of EPUB files.
-- **Conversion**: Convert EPUB files to PDF and other formats using adapters for TCPDF, Dompdf, and Calibre.
+- **Open and save**: `EpubFile::open()` extracts a book safely; `save()` writes an OCF-valid archive (checked with EPUBCheck in CI).
+- **Metadata**: title(s), authors, creators and contributors with roles, description, publisher, dates, language, subjects, identifiers, and any other `<meta>` element.
+- **Cover**: read and replace the cover image (EPUB 3 `cover-image` and EPUB 2 conventions).
+- **Package editing**: manifest items and reading order (spine); adding or deleting content keeps both in sync.
+- **Structure checks on load**: a missing or wrong `mimetype`, `container.xml`, package document or NCX is reported with an exception. This is not a full validator like EPUBCheck.
+- **Conversion**: PDF with TCPDF or Dompdf, and any format Calibre's `ebook-convert` supports.
+- **Hostile books**: paths are confined to the book, extraction is limited (zip bombs), XML entity declarations are refused, and PDF renderers cannot load anything outside the book. See [Handling Untrusted EPUBs](https://indy2kro.github.io/php-epub/advanced-usage/#handling-untrusted-epubs).
 
 ## Installation
 
@@ -24,49 +26,70 @@ composer require indy2kro/php-epub
 
 Ensure that you have the necessary PHP extensions and optional libraries installed for full functionality:
 
-- **Required**: `ext-dom`, `ext-xml`, `ext-zip`
-- **Optional**: `dompdf/dompdf`, `tecnickcom/tcpdf` for PDF conversion, `Calibre` for mobi conversion
+- **Required**: `ext-ctype`, `ext-dom`, `ext-libxml`, `ext-simplexml`, `ext-xml`, `ext-zip` (most PHP builds include all of them; on Alpine, for example, `php-ctype`, `php-dom`, `php-simplexml`, `php-xml` and `php-zip` are separate packages)
+- **Optional**: `dompdf/dompdf` or `tecnickcom/tcpdf` for PDF conversion, and [Calibre](https://calibre-ebook.com/) for other formats (MOBI, AZW3, DOCX, …)
 
 ## Usage
 
-Loading an EPUB File:
+### Open, edit and save
 
 ```php
 use PhpEpub\EpubFile;
 
-$epubFile = new EpubFile('/path/to/your.epub');
-$epubFile->load();
+$epubFile = EpubFile::open('/path/to/book.epub');
+
+$metadata = $epubFile->getMetadata();
+echo $metadata->getTitle();
+$metadata->setTitle('New Title');
+$metadata->setAuthors(['Jane Doe']);
+$metadata->addContributor('Ed Editor', 'edt');
+
+// Writes pending package changes, then packages the book (to a new file here).
+$epubFile->save('/path/to/edited.epub');
 ```
 
-## Converting to PDF
+### Cover, content and reading order
 
-Using TCPDF:
+```php
+$cover = $epubFile->getCoverImage();   // ManifestItem or null
+$epubFile->setCoverImage(file_get_contents('/path/to/cover.jpg'), 'image/jpeg');
+
+$content = $epubFile->getContentManager();
+$content->addContent('EPUB/text/epilogue.xhtml', $xhtml);   // added to the manifest
+$item = $epubFile->getManifest()->findByPath('EPUB/text/epilogue.xhtml');
+$epubFile->getSpine()->add($item->id);                       // and to the reading order
+
+$epubFile->save();
+```
+
+### Converting
 
 ```php
 use PhpEpub\Converters\TCPDFAdapter;
+use PhpEpub\Converters\CalibreAdapter;
 
-$adapter = new TCPDFAdapter();
-$adapter->convert('/path/to/extracted/epub', '/path/to/output.pdf');
+// Includes edits that have not been saved yet.
+$epubFile->convert(new TCPDFAdapter(), '/path/to/book.pdf');
+$epubFile->convert(new CalibreAdapter(['calibre_path' => '/usr/bin/ebook-convert']), '/path/to/book.mobi');
 ```
 
-## Managing Metadata
+### Errors
+
+All exceptions extend `PhpEpub\Exception`: `ZipException` for archive problems and extraction limits, `InvalidEpubException` (and its subclass `XmlException`) for invalid or unsafe books, and `ConversionException` for PDF conversion failures.
 
 ```php
-use PhpEpub\Metadata;
 use PhpEpub\EpubFile;
+use PhpEpub\InvalidEpubException;
+use PhpEpub\ZipException;
 
-$epubFilePath = '/path/to/your.epub';
-
-$epubFile = new EpubFile($epubFilePath);
-$epubFile->load();
-
-$metadata = $epubFile->getMetadata();
-$title = $metadata->getTitle();
-$metadata->setTitle('New Title');
-
-// Writes pending metadata changes, then packages the book
-$epubFile->save();
+try {
+    $epubFile = EpubFile::open($uploadedPath);
+} catch (ZipException | InvalidEpubException $e) {
+    // Not a readable EPUB.
+}
 ```
+
+See the [documentation](https://indy2kro.github.io/php-epub/) for every class and option.
 
 ## Code Quality
 
@@ -77,7 +100,7 @@ To maintain high standards of code quality, this project uses several tools:
 - **PHP CodeSniffer (PHPCS)**: Ensures code adheres to coding standards:
 
 ```bash
-vendor/bin/phpcs src/ tests/
+vendor/bin/phpcs src/ tests/ docs/
 ```
 
 - **PHPStan**: Static analysis tool for finding bugs:
@@ -86,10 +109,10 @@ vendor/bin/phpcs src/ tests/
 php -d memory_limit=512M vendor/bin/phpstan analyse --no-progress
 ```
 
-- **Rector**: Automated code refactoring and upgrades:
+- **Rector**: Automated code refactoring and upgrades (review with a dry run first):
 
 ```bash
-vendor/bin/rector
+vendor/bin/rector --dry-run
 ```
 
 ### Running All Code Quality Checks
@@ -101,7 +124,7 @@ Run all code quality tools at once:
 composer quality
 
 # Or run individually
-vendor/bin/phpunit && vendor/bin/phpcs src/ tests/ && php -d memory_limit=512M vendor/bin/phpstan analyse --no-progress
+vendor/bin/phpunit && vendor/bin/phpcs src/ tests/ docs/ && php -d memory_limit=512M vendor/bin/phpstan analyse --no-progress && vendor/bin/rector --dry-run
 ```
 
 ## AI Integration
@@ -120,3 +143,5 @@ To run the tests, use PHPUnit:
 ```bash
 vendor/bin/phpunit
 ```
+
+`tests/EpubCheckTest.php` also validates books saved by the library with [EPUBCheck](https://www.w3.org/publishing/epubcheck/) when `EPUBCHECK_JAR` points at `epubcheck.jar`, as the CI does.

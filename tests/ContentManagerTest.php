@@ -205,6 +205,62 @@ final class ContentManagerTest extends TestCase
         }
     }
 
+    public function testDeleteContentReportsAFileItCannotDelete(): void
+    {
+        file_put_contents($this->sampleFilePath, 'locked');
+        // Windows refuses to delete a read-only file; POSIX refuses to unlink from a read-only directory.
+        chmod($this->sampleFilePath, 0444);
+        chmod($this->contentDir, 0555);
+        $contentManager = new ContentManager($this->contentDir);
+
+        try {
+            if (DIRECTORY_SEPARATOR === '/' && is_writable($this->contentDir)) {
+                $this->markTestSkipped('Read-only directories are writable here (e.g. running as root).');
+            }
+
+            $this->expectException(Exception::class);
+            $this->expectExceptionMessage('Failed to delete content from:');
+
+            $contentManager->deleteContent('sample.txt');
+        } finally {
+            chmod($this->contentDir, 0777);
+            chmod($this->sampleFilePath, 0644);
+        }
+    }
+
+    public function testGetContentReportsAFileItCannotRead(): void
+    {
+        file_put_contents($this->sampleFilePath, 'secret');
+        // POSIX: no read permission. Windows: an exclusive lock blocks other readers (chmod only sets read-only there).
+        $handle = null;
+        if (DIRECTORY_SEPARATOR === '\\') {
+            $handle = fopen($this->sampleFilePath, 'r+');
+            $this->assertIsResource($handle);
+            flock($handle, LOCK_EX);
+        } else {
+            chmod($this->sampleFilePath, 0000);
+        }
+
+        $contentManager = new ContentManager($this->contentDir);
+
+        try {
+            if (DIRECTORY_SEPARATOR === '/' && is_readable($this->sampleFilePath)) {
+                $this->markTestSkipped('Unreadable files are readable here (e.g. running as root).');
+            }
+
+            $this->expectException(Exception::class);
+            $this->expectExceptionMessage('Failed to read content from:');
+
+            $contentManager->getContent('sample.txt');
+        } finally {
+            if (is_resource($handle)) {
+                flock($handle, LOCK_UN);
+                fclose($handle);
+            }
+            chmod($this->sampleFilePath, 0644);
+        }
+    }
+
     public function testAddContentToNonExistentDirectoryThrowsException(): void
     {
         $this->expectException(Exception::class);

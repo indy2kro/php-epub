@@ -39,10 +39,12 @@ try {
 
 `DompdfAdapter` and `TCPDFAdapter` render every XHTML document in the **spine**, in reading order, each starting on a new page, and take the PDF title and author from the EPUB metadata. A directory that only contains a `content.xhtml` file (the layout older versions required) is still accepted.
 
+The book's own CSS is kept: linked stylesheets (`<link rel="stylesheet">`, not alternate ones) and `<style>` blocks are collected once per book and applied after the adapter's defaults, so the book's styling wins. TCPDF and Dompdf each support only part of CSS, so complex layouts still render more simply than in a reader.
+
 Book content is treated as untrusted:
 
 - Each document is parsed with an HTML parser (not pattern-matched), so unquoted or unusually written attributes are handled too.
 - `<script>`, `<link>`, `<base>`, `<meta>`, `<iframe>`, `<object>`, `<embed>` and similar elements are removed, as are `on*` event attributes and `srcset`.
 - Resource attributes (`src`, `xlink:href`, `poster`, `background`, `data`, and `href` on anything but links) are rewritten to files inside the book; absolute paths, `file://`, remote URLs, paths escaping the book and missing files are blanked. `data:` URIs are kept.
-- `<style>` elements and `style` attributes that could load something (`url()`, `@import`, `image-set()`, CSS escapes) are removed.
+- CSS (stylesheets, `<style>` elements and `style` attributes) is sanitised: escapes are decoded so nothing is hidden behind them, `@import` and `image-set()` are removed, and every `url()` is rewritten to a file inside the book (relative to the stylesheet) or blanked. Stylesheets outside the book are ignored.
 - Dompdf runs with remote resources, PHP and JavaScript disabled, and its file access limited (`chroot`) to the book directory.

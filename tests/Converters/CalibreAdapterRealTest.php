@@ -6,6 +6,7 @@ namespace PhpEpub\Test\Converters;
 
 use PhpEpub\Converters\CalibreAdapter;
 use PhpEpub\Exception;
+use PhpEpub\Util\FileSystemHelper;
 use PHPUnit\Framework\TestCase;
 
 final class CalibreAdapterRealTest extends TestCase
@@ -20,11 +21,12 @@ final class CalibreAdapterRealTest extends TestCase
         $this->validFile = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'valid.epub';
         $this->invalidFile = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'invalid.epub';
         $this->outputMobiPath = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'output' . DIRECTORY_SEPARATOR . 'output.mobi';
-        $this->calibrePath = '/usr/bin/ebook-convert'; // Adjust this path to your Calibre installation
-
-        if (! file_exists($this->calibrePath)) {
-            $this->markTestSkipped('Calibre is not installed or the path is incorrect.');
+        $calibrePath = (new FileSystemHelper())->findExecutable('ebook-convert');
+        if ($calibrePath === null) {
+            $this->markTestSkipped('Calibre is not installed (ebook-convert is not on the PATH).');
         }
+
+        $this->calibrePath = $calibrePath;
 
         // Ensure the directories exist
         if (! is_dir(dirname($this->outputMobiPath))) {

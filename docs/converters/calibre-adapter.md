@@ -5,10 +5,11 @@ The `CalibreAdapter` class converts EPUB files to other formats (MOBI, AZW3, PDF
 ## Key Methods
 
 - **`__construct(array $options = [], FileSystemHelper $helper = new FileSystemHelper(), ZipHandler $zipHandler = new ZipHandler())`**: Options:
-    - `calibre_path`: path to `ebook-convert` (default `/usr/bin/ebook-convert`).
-    - `extra_args`: a **list** of extra `ebook-convert` arguments. Each one is shell-escaped individually. Passing a single string is deprecated: it is inserted into the command unescaped and triggers an `E_USER_DEPRECATED` notice.
+    - `calibre_path`: path to `ebook-convert`. When it is not given, `ebook-convert` is looked up on the `PATH`, then in the usual install locations (`/usr/bin`, `/usr/local/bin`, `/opt/calibre`, `/Applications/calibre.app/Contents/MacOS`, `C:\Program Files\Calibre2`, `C:\Program Files (x86)\Calibre2`); `convert()` throws if it is not found.
+    - `extra_args`: a **list** of extra `ebook-convert` arguments, each passed to Calibre exactly as given. Passing a single string is deprecated (it triggers an `E_USER_DEPRECATED` notice): it is split into arguments at spaces, with `"double"` or `'single'` quotes grouping words, and nothing else is interpreted.
+    - `timeout`: seconds before a conversion is stopped (default `600`); `null` waits indefinitely. Throws an `Exception` at construction for zero or a negative value.
 
-- **`convert(string $inputFile, string $outputPath): void`**: Converts an `.epub` file, or a directory with an extracted EPUB (packaged into a temporary `.epub` first, which is removed afterwards). The output extension selects the format. Every part of the command is escaped and Calibre's error output is included in the exception message. Throws an exception if Calibre or the input is missing, or if the conversion fails.
+- **`convert(string $inputFile, string $outputPath): void`**: Converts an `.epub` file, or a directory with an extracted EPUB (packaged into a temporary `.epub` first, which is removed afterwards). The output extension selects the format. Calibre is started directly, without a shell, so no argument is ever interpreted; its output (including stderr) is included in the exception message when the conversion fails. A conversion that runs longer than `timeout` is stopped (the `ebook-convert` process is killed) and reported with an exception. Throws an exception if Calibre or the input is missing, or if the conversion fails.
 
 ## Usage Example
 
@@ -18,6 +19,7 @@ use PhpEpub\Converters\CalibreAdapter;
 $calibreAdapter = new CalibreAdapter([
     'calibre_path' => '/usr/local/bin/ebook-convert',
     'extra_args' => ['--output-profile', 'kindle', '--title', $userSuppliedTitle],
+    'timeout' => 120,
 ]);
 
 try {
