@@ -121,7 +121,7 @@
 <h2 id="key-methods">Key Methods<a class="headerlink" href="#key-methods" title="Permanent link">&para;</a></h2>
 <ul>
 <li>
-<p><strong><code>__construct(array $styles = [])</code></strong>: Optional styling parameters: <code>font</code> (default <code>Arial</code>), <code>font_size</code> in points (default <code>12</code>), <code>paper_size</code> (default <code>A4</code>) and <code>orientation</code> (default <code>portrait</code>). Values of the wrong type fall back to the defaults.</p>
+<p><strong><code>__construct(array $styles = [])</code></strong>: Optional styling parameters: <code>font</code> (default <code>Arial</code>), <code>font_size</code> in points (default <code>12</code>), <code>paper_size</code> (default <code>A4</code>), <code>orientation</code> (default <code>portrait</code>) and <code>margin_top</code>/<code>margin_right</code>/<code>margin_bottom</code>/<code>margin_left</code> in mm, as in <code>TCPDFAdapter</code>. Without any margin option Dompdf keeps its own default margins; once one is given, sides that are not given are <code>0</code>. Values of the wrong type fall back to the defaults. Dompdf cannot write a PDF outline, so use <code>TCPDFAdapter</code> when you need chapter bookmarks.</p>
 </li>
 <li>
 <p><strong><code>convert(string $epubDirectory, string $outputPath): void</code></strong>: Renders every spine document in reading order, each on a new page, sets the PDF title and author from the EPUB metadata, and writes the PDF. Throws a <code>ConversionException</code> if the book cannot be read or the PDF cannot be written.</p>

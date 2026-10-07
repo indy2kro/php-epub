@@ -294,11 +294,11 @@ No source changes were made while compiling this list.</p>
 </ul>
 <h3 id="converters">Converters<a class="headerlink" href="#converters" title="Permanent link">&para;</a></h3>
 <ul>
-<li>[ ] <strong>CONV-01</strong> Run <code>ebook-convert</code> with a timeout (<code>proc_open</code>) and kill it on expiry — <code>src/Converters/CalibreAdapter.php:79-99</code>, <code>src/Util/FileSystemHelper.php:21-24</code> — S · med
+<li>[x] <strong>CONV-01</strong> Run <code>ebook-convert</code> with a timeout (<code>proc_open</code>) and kill it on expiry — <code>src/Converters/CalibreAdapter.php:79-99</code>, <code>src/Util/FileSystemHelper.php:21-24</code> — S · med
   <code>exec()</code> waits forever, so a hostile or simply huge book hangs the worker.</li>
-<li>[ ] <strong>CONV-02</strong> Carry the book's own CSS into the HTML renderers (sanitised, <code>url()</code> confined) — <code>src/Converters/EpubDocumentLoader.php:81-100</code>, <code>src/Converters/DompdfAdapter.php:97-107</code> — M · med
+<li>[x] <strong>CONV-02</strong> Carry the book's own CSS into the HTML renderers (sanitised, <code>url()</code> confined) — <code>src/Converters/EpubDocumentLoader.php:81-100</code>, <code>src/Converters/DompdfAdapter.php:97-107</code> — M · med
   Only <code>&lt;body&gt;</code> is kept, so stylesheets are dropped and every PDF loses the book's layout. Do after SEC-02.</li>
-<li>[ ] <strong>CONV-03</strong> Find <code>ebook-convert</code> on <code>PATH</code> (and the usual Windows/macOS locations) when <code>calibre_path</code> is not given — <code>src/Converters/CalibreAdapter.php:31-34</code> — S · low
+<li>[x] <strong>CONV-03</strong> Find <code>ebook-convert</code> on <code>PATH</code> (and the usual Windows/macOS locations) when <code>calibre_path</code> is not given — <code>src/Converters/CalibreAdapter.php:31-34</code> — S · low
   The <code>/usr/bin/ebook-convert</code> default fails on Windows, macOS and <code>/usr/local</code> installs.</li>
 <li>[ ] <strong>CONV-04</strong> Accept the same options in both PDF adapters (<code>paper_size</code>/<code>orientation</code> in TCPDF, margins in Dompdf) — <code>src/Converters/TCPDFAdapter.php:12-21</code>, <code>src/Converters/DompdfAdapter.php:13-18</code> — S · low
   Switching adapters silently ignores half of the caller's options.</li>
@@ -326,7 +326,7 @@ No source changes were made while compiling this list.</p>
   The library can only edit existing books, and the test suite already holds most of the code.</li>
 <li>[ ] <strong>FEAT-05</strong> Deterministic archives on save (sorted entries, fixed timestamps) — <code>src/ZipHandler.php:199-223</code> — S · low
   The same book saved twice differs byte for byte.</li>
-<li>[ ] <strong>FEAT-06</strong> PDF bookmarks/outline from the spine or TOC — <code>src/Converters/TCPDFAdapter.php:92-95</code>, <code>src/Converters/DompdfAdapter.php:97-107</code> — M · low
+<li>[x] <strong>FEAT-06</strong> PDF bookmarks/outline from the spine or TOC — <code>src/Converters/TCPDFAdapter.php:92-95</code>, <code>src/Converters/DompdfAdapter.php:97-107</code> — M · low
   Generated PDFs have no navigation.</li>
 </ul>
 <h3 id="documentation">Documentation<a class="headerlink" href="#documentation" title="Permanent link">&para;</a></h3>

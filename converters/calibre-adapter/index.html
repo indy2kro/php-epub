@@ -123,12 +123,13 @@
 <li>
 <p><strong><code>__construct(array $options = [], FileSystemHelper $helper = new FileSystemHelper(), ZipHandler $zipHandler = new ZipHandler())</code></strong>: Options:</p>
 <ul>
-<li><code>calibre_path</code>: path to <code>ebook-convert</code> (default <code>/usr/bin/ebook-convert</code>).</li>
-<li><code>extra_args</code>: a <strong>list</strong> of extra <code>ebook-convert</code> arguments. Each one is shell-escaped individually. Passing a single string is deprecated: it is inserted into the command unescaped and triggers an <code>E_USER_DEPRECATED</code> notice.</li>
+<li><code>calibre_path</code>: path to <code>ebook-convert</code>. When it is not given, <code>ebook-convert</code> is looked up on the <code>PATH</code>, then in the usual install locations (<code>/usr/bin</code>, <code>/usr/local/bin</code>, <code>/opt/calibre</code>, <code>/Applications/calibre.app/Contents/MacOS</code>, <code>C:\Program Files\Calibre2</code>, <code>C:\Program Files (x86)\Calibre2</code>); <code>convert()</code> throws if it is not found.</li>
+<li><code>extra_args</code>: a <strong>list</strong> of extra <code>ebook-convert</code> arguments, each passed to Calibre exactly as given. Passing a single string is deprecated (it triggers an <code>E_USER_DEPRECATED</code> notice): it is split into arguments at spaces, with <code>"double"</code> or <code>'single'</code> quotes grouping words, and nothing else is interpreted.</li>
+<li><code>timeout</code>: seconds before a conversion is stopped (default <code>600</code>); <code>null</code> waits indefinitely. Throws an <code>Exception</code> at construction for zero or a negative value.</li>
 </ul>
 </li>
 <li>
-<p><strong><code>convert(string $inputFile, string $outputPath): void</code></strong>: Converts an <code>.epub</code> file, or a directory with an extracted EPUB (packaged into a temporary <code>.epub</code> first, which is removed afterwards). The output extension selects the format. Every part of the command is escaped and Calibre's error output is included in the exception message. Throws an exception if Calibre or the input is missing, or if the conversion fails.</p>
+<p><strong><code>convert(string $inputFile, string $outputPath): void</code></strong>: Converts an <code>.epub</code> file, or a directory with an extracted EPUB (packaged into a temporary <code>.epub</code> first, which is removed afterwards). The output extension selects the format. Calibre is started directly, without a shell, so no argument is ever interpreted; its output (including stderr) is included in the exception message when the conversion fails. A conversion that runs longer than <code>timeout</code> is stopped (the <code>ebook-convert</code> process is killed) and reported with an exception. Throws an exception if Calibre or the input is missing, or if the conversion fails.</p>
 </li>
 </ul>
 <h2 id="usage-example">Usage Example<a class="headerlink" href="#usage-example" title="Permanent link">&para;</a></h2>
@@ -137,6 +138,7 @@
 $calibreAdapter = new CalibreAdapter([
     'calibre_path' =&gt; '/usr/local/bin/ebook-convert',
     'extra_args' =&gt; ['--output-profile', 'kindle', '--title', $userSuppliedTitle],
+    'timeout' =&gt; 120,
 ]);
 
 try {

@@ -237,11 +237,11 @@ $calibreAdapter-&gt;convert('/path/to/input.epub', '/path/to/output.mobi');
 </tr>
 <tr>
 <td>Scripts, local files and remote URLs in book HTML during PDF conversion</td>
-<td>Documents are parsed as HTML; scripts, embeds and resource-loading CSS are removed, every resource attribute is limited to files inside the book, and Dompdf runs without remote access, PHP or JavaScript, confined to the book directory</td>
+<td>Documents are parsed as HTML; scripts and embeds are removed, CSS <code>url()</code>s and every resource attribute are limited to files inside the book, and Dompdf runs without remote access, PHP or JavaScript, confined to the book directory</td>
 </tr>
 <tr>
-<td>Shell arguments for Calibre</td>
-<td>Every argument is escaped (pass <code>extra_args</code> as a list)</td>
+<td>Shell arguments for Calibre, and conversions that hang</td>
+<td>Calibre is started without a shell, so no argument is interpreted, and a conversion is stopped after <code>timeout</code> seconds (600 by default)</td>
 </tr>
 </tbody>
 </table>
