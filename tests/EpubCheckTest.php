@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PhpEpub\Test;
 
 use PhpEpub\EpubFile;
+use PhpEpub\TocEntry;
 use PhpEpub\Test\Support\EpubBuilder;
 use PhpEpub\Util\FileSystemHelper;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -58,6 +59,25 @@ final class EpubCheckTest extends TestCase
         $this->assertPassesEpubCheck($saved);
     }
 
+    public function testBookCreatedFromScratchIsValid(): void
+    {
+        $path = $this->tmpDir . DIRECTORY_SEPARATOR . 'created.epub';
+
+        $epubFile = EpubFile::create($path, 'Created From Scratch', 'en');
+        $epubFile->getMetadata()->setAuthors(['Ann Author']);
+        $epubFile->addChapter('Chapter One', '<h1>Chapter One</h1><p>First.</p>');
+        $epubFile->addChapter('Chapter Two', '<h1>Chapter Two</h1><p>Second.</p>');
+        $epubFile->setCoverImage((string) base64_decode(EpubBuilder::PNG, true), 'image/png');
+        $epubFile->save();
+        $epubFile->cleanup();
+
+        $reopened = EpubFile::open($path);
+        $this->assertCount(2, $reopened->getTableOfContents()->getEntries());
+        $reopened->cleanup();
+
+        $this->assertPassesEpubCheck($path);
+    }
+
     /**
      * @return iterable<string, array{\Closure(EpubFile): void}>
      */
@@ -85,8 +105,11 @@ final class EpubCheckTest extends TestCase
 
         yield 'added and removed content' => [static function (EpubFile $epubFile): void {
             $content = $epubFile->getContentManager();
-            $content->addContent('EPUB/text/added.xhtml', EpubBuilder::xhtml('Added', '<h1>Added</h1><p>New chapter.</p>'));
+            $content->addContent('EPUB/text/added.xhtml', EpubBuilder::xhtml('Added', '<h1>Added</h1><p>New chapter.</p><h2 id="section">Section</h2>'));
             $epubFile->getSpine()->add('added-xhtml');
+            $epubFile->getTableOfContents()->addEntry(new TocEntry('Added', 'EPUB/text/added.xhtml', null, [
+                new TocEntry('Added section', 'EPUB/text/added.xhtml', 'section'),
+            ]));
             $content->addContent('EPUB/css/extra.css', 'h1 { color: black; }');
             $content->deleteContent('EPUB/css/extra.css');
         }];

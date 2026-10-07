@@ -55,6 +55,26 @@ class PathResolver
     }
 
     /**
+     * Converts a path relative to the book root into a URL-encoded href relative to
+     * $fromDirectory (also relative to the book root; "" for the root itself).
+     *
+     * @throws InvalidEpubException If the path is absolute or escapes the book root.
+     */
+    public function relativeHref(string $fromDirectory, string $path): string
+    {
+        $segments = explode('/', $this->normalize($path));
+        $base = $fromDirectory === '' ? [] : explode('/', $this->normalize($fromDirectory));
+
+        // Drop the common leading directories, then climb out of the rest of $fromDirectory.
+        while ($base !== [] && count($segments) > 1 && $base[0] === $segments[0]) {
+            array_shift($base);
+            array_shift($segments);
+        }
+
+        return implode('/', array_merge(array_fill(0, count($base), '..'), array_map(rawurlencode(...), $segments)));
+    }
+
+    /**
      * Joins a book-relative path onto the directory holding the extracted book.
      *
      * @throws InvalidEpubException If the path is absolute or escapes the book root.

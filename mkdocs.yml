@@ -31,6 +31,7 @@ nav:
     - Metadata: metadata.md
     - Manifest: manifest.md
     - Spine: spine.md
+    - TableOfContents: table-of-contents.md
     - Parser: parser.md
     - XmlParser: xml-parser.md
     - ZipHandler: zip-handler.md

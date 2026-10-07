@@ -7,6 +7,8 @@ namespace PhpEpub;
 use DOMDocument;
 use PhpEpub\Converters\ConverterInterface;
 use PhpEpub\Util\FileSystemHelper;
+use PhpEpub\Util\PathResolver;
+use PhpEpub\Util\XmlText;
 use SimpleXMLElement;
 use Throwable;
 
@@ -102,28 +104,125 @@ class EpubFile
 
     public function load(): void
     {
+        $this->openWith(fn (string $directory) => $this->zipHandler->extract($this->filePath, $directory));
+    }
+
+    /**
+     * Creates a new, empty EPUB 3 book (with a navigation document) that save() writes to $filePath.
+     * Nothing is written to $filePath before save(). Add content with addChapter(); a book needs
+     * at least one chapter to be valid.
+     *
+     * @param string|null $identifier The unique identifier; a random "urn:uuid:…" when null.
+     *
+     * @throws Exception If a value is empty or not valid XML text, or the book cannot be prepared.
+     */
+    public static function create(string $filePath, string $title, string $language = 'en', ?string $identifier = null): self
+    {
+        $identifier ??= BookTemplate::uuidUrn();
+        XmlText::assertValid($title, $language, $identifier);
+        if (trim($title) === '' || trim($language) === '' || trim($identifier) === '') {
+            throw new Exception('A new book needs a title, a language and an identifier');
+        }
+
+        $epubFile = new self($filePath);
+        $epubFile->openWith(static function (string $directory) use ($title, $language, $identifier): void {
+            $files = [
+                'mimetype' => 'application/epub+zip',
+                'META-INF/container.xml' => BookTemplate::container('EPUB/package.opf'),
+                'EPUB/package.opf' => BookTemplate::package($title, $language, $identifier, 'nav.xhtml'),
+                'EPUB/nav.xhtml' => BookTemplate::navigation($title, $language),
+            ];
+
+            foreach ($files as $path => $content) {
+                $target = $directory . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $path);
+                $written = (is_dir(dirname($target)) || @mkdir(dirname($target), 0700, true)) && @file_put_contents($target, $content) !== false;
+                $written || throw new Exception("Failed to prepare the new book: {$path}");
+            }
+        });
+
+        return $epubFile;
+    }
+
+    /**
+     * Adds an XHTML chapter: writes the document, adds it to the manifest and the reading order,
+     * and appends it to the table of contents when the book has one.
+     *
+     * @param string $body The chapter's body markup (well-formed XHTML), inserted as it is.
+     * @param string|null $path Path relative to the book root; defaults to "text/chapter-N.xhtml" next to the OPF.
+     *
+     * @throws Exception If the book is not loaded, the title or body is not valid XML text, or a file cannot be written.
+     */
+    public function addChapter(string $title, string $body, ?string $path = null): ManifestItem
+    {
+        XmlText::assertValid($title, $body);
+        $manifest = $this->getManifest();
+        $spine = $this->getSpine();
+        $path ??= $this->unusedChapterPath();
+        $language = $this->getMetadata()->getLanguage();
+
+        $this->getContentManager()->addContent($path, BookTemplate::chapter($title, $language === '' ? 'en' : $language, $body));
+        $item = $manifest->findByPath($path) ?? throw new Exception("The chapter is not in the manifest: {$path}");
+
+        if (! $spine->contains($item->id)) {
+            $spine->add($item->id);
+        }
+
+        $toc = $this->getTableOfContents();
+        if ($toc->isAvailable()) {
+            $toc->addEntry(new TocEntry($title, $item->path));
+        }
+
+        return $item;
+    }
+
+    /**
+     * "text/chapter-N.xhtml" next to the OPF, with the first N not used by a file or manifest item.
+     */
+    private function unusedChapterPath(): string
+    {
+        $manifest = $this->getManifest();
+        $directory = dirname($manifest->getOpfPath());
+        $base = ($directory === '.' ? '' : $directory . '/') . 'text/chapter-';
+
+        for ($number = 1;; $number++) {
+            $path = $base . $number . '.xhtml';
+            $file = (string) $this->tempDir . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $path);
+            if (! $manifest->findByPath($path) instanceof ManifestItem && ! file_exists($file)) {
+                return $path;
+            }
+        }
+    }
+
+    /**
+     * Prepares a private temporary directory, lets $fill put a book into it, and opens the book.
+     *
+     * @param \Closure(string): void $fill
+     *
+     * @throws Exception
+     */
+    private function openWith(\Closure $fill): void
+    {
         // Loading again starts from the file on disk; drop the previous extraction
         // (if it cannot be deleted, it must not stop the new book from loading).
         $this->cleanupQuietly();
 
         // Unpredictable name and owner-only permissions: the extracted book may be private.
-        $this->tempDir = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'epub_' . bin2hex(random_bytes(16));
-        if (! mkdir($this->tempDir, 0700)) {
-            throw new Exception("Failed to create temporary directory: {$this->tempDir}");
-        }
+        $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'epub_' . bin2hex(random_bytes(16));
+        $this->tempDir = $directory;
+        @mkdir($directory, 0700) || throw new Exception("Failed to create temporary directory: {$directory}");
 
         try {
-            $this->zipHandler->extract($this->filePath, $this->tempDir);
+            $fill($directory);
 
-            $opfFilePath = $this->parser->parse($this->tempDir);
-            $opfFileFullPath = $this->tempDir . DIRECTORY_SEPARATOR . $opfFilePath;
+            $opfFilePath = $this->parser->parse($directory);
+            $opfFileFullPath = $directory . DIRECTORY_SEPARATOR . $opfFilePath;
 
             $this->opfXml = $this->xmlParser->parse($opfFileFullPath);
 
             $this->metadata = new Metadata($this->opfXml, $opfFileFullPath);
             $this->manifest = new Manifest($this->opfXml, $opfFilePath);
             $this->spine = new Spine($this->opfXml, $this->manifest);
-            $this->contentManager = new ContentManager($this->tempDir, $this->manifest, $this->spine);
+            $this->contentManager = new ContentManager($directory, $this->manifest, $this->spine);
         } catch (Throwable $throwable) {
             // Do not leave a half-loaded book (or its extracted files) behind,
             // and report why loading failed rather than a cleanup problem.
@@ -345,6 +444,36 @@ class EpubFile
         }
 
         return $this->manifest;
+    }
+
+    /**
+     * Checks the book for common structural problems (required metadata, manifest and spine
+     * consistency, navigation), including unsaved changes. A quick check, not a replacement for EPUBCheck.
+     *
+     * @return list<ValidationIssue> Empty when no problem was found.
+     *
+     * @throws Exception If the book is not loaded or its navigation cannot be parsed.
+     */
+    public function validate(): array
+    {
+        if ($this->tempDir === null || $this->opfXml === null || $this->metadata === null || $this->manifest === null || $this->spine === null) {
+            throw new Exception('EPUB file must be loaded before validating.');
+        }
+
+        return (new Validator($this->tempDir, $this->opfXml, $this->metadata, $this->manifest, $this->spine, $this->getTableOfContents()))->validate();
+    }
+
+    /**
+     * The table of contents (EPUB 3 navigation document and EPUB 2 NCX). Changes are written
+     * to those files immediately and saved with the book.
+     */
+    public function getTableOfContents(): TableOfContents
+    {
+        if ($this->tempDir === null || $this->manifest === null) {
+            throw new Exception('EPUB file must be loaded before accessing the table of contents.');
+        }
+
+        return new TableOfContents($this->tempDir, $this->manifest, $this->xmlParser, new PathResolver(), $this);
     }
 
     public function getContentManager(): ContentManager

@@ -11,7 +11,7 @@ It provides methods to extract contents from a ZIP file and to compress a direct
 
 - **`extract(string $zipFilePath, string $destination): void`**: Extracts the contents of a ZIP file to the specified directory. Entry names that are absolute or contain `..` segments escaping the destination are rejected. Throws a `ZipException` if the ZIP file cannot be opened or extracted, or if a limit is exceeded.
 
-- **`compress(string $source, string $zipFilePath): void`**: Compresses a directory into a ZIP file at the specified path. The `mimetype` file is written first and uncompressed, and entry names always use `/`, as the EPUB OCF specification requires. Throws a `ZipException` if the ZIP file cannot be created or if the source directory is invalid.
+- **`compress(string $source, string $zipFilePath): void`**: Compresses a directory into a ZIP file at the specified path. The `mimetype` file is written first and uncompressed, and entry names always use `/`, as the EPUB OCF specification requires. Entries are written in sorted order with a fixed modification time and fixed Unix permissions, so saving the same book twice produces identical archives (ZIP stores local time, so this holds within one time zone). Throws a `ZipException` if the ZIP file cannot be created or if the source directory is invalid.
 
 ## Exceptions
 

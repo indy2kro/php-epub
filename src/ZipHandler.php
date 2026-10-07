@@ -19,6 +19,13 @@ class ZipHandler
     private const int CHUNK_SIZE = 65536;
 
     /**
+     * Modification time of every saved entry, so archives do not depend on when the book was
+     * extracted or edited. 1980-01-02 UTC: ZIP stores local time and cannot go before 1980-01-01,
+     * so this stays valid in every time zone.
+     */
+    private const int FIXED_MTIME = 315619200;
+
+    /**
      * @param int $maxEntries Maximum number of entries an archive may contain.
      * @param int $maxUncompressedBytes Maximum total size of the extracted contents.
      * @param int $maxCompressionRatio Maximum uncompressed/compressed ratio for a single large entry.
@@ -194,13 +201,40 @@ class ZipHandler
         if (is_file($mimetypePath)) {
             $zip->addFile($mimetypePath, 'mimetype');
             $zip->setCompressionName('mimetype', ZipArchive::CM_STORE);
+            $this->normalizeEntry($zip, 'mimetype', false);
         }
 
+        // Entries are added in a fixed order with fixed times and permissions, so saving
+        // the same book twice (on any OS) produces the same bytes.
+        foreach ($this->entries($realSource) as $relativePath => $filePath) {
+            $isDirectory = is_dir($filePath);
+            if ($isDirectory) {
+                $zip->addEmptyDir($relativePath);
+            } else {
+                $zip->addFile($filePath, $relativePath);
+            }
+
+            $this->normalizeEntry($zip, $isDirectory ? $relativePath . '/' : $relativePath, $isDirectory);
+        }
+
+        if (! $zip->close()) {
+            throw new ZipException("Failed to finalize ZIP file: {$zipFilePath}");
+        }
+    }
+
+    /**
+     * Files and directories below $root (except "mimetype"), as ZIP entry name => path, sorted by name.
+     *
+     * @return array<string, string>
+     */
+    private function entries(string $root): array
+    {
         $files = new RecursiveIteratorIterator(
-            new RecursiveDirectoryIterator($realSource, RecursiveDirectoryIterator::SKIP_DOTS),
+            new RecursiveDirectoryIterator($root, RecursiveDirectoryIterator::SKIP_DOTS),
             RecursiveIteratorIterator::SELF_FIRST
         );
 
+        $entries = [];
         /** @var \SplFileInfo $file */
         foreach ($files as $file) {
             $filePath = $file->getRealPath();
@@ -209,21 +243,24 @@ class ZipHandler
             }
 
             // ZIP entry names always use "/", regardless of the host OS.
-            $relativePath = str_replace(DIRECTORY_SEPARATOR, '/', substr($filePath, strlen($realSource) + 1));
-
-            if ($relativePath === 'mimetype') {
-                continue;
-            }
-
-            if ($file->isDir()) {
-                $zip->addEmptyDir($relativePath);
-            } else {
-                $zip->addFile($filePath, $relativePath);
+            $relativePath = str_replace(DIRECTORY_SEPARATOR, '/', substr($filePath, strlen($root) + 1));
+            if ($relativePath !== 'mimetype') {
+                $entries[$relativePath] = $filePath;
             }
         }
 
-        if (! $zip->close()) {
-            throw new ZipException("Failed to finalize ZIP file: {$zipFilePath}");
-        }
+        ksort($entries, SORT_STRING);
+
+        return $entries;
+    }
+
+    /**
+     * Gives an entry a fixed modification time and Unix permissions (0644 files, 0755 directories).
+     */
+    private function normalizeEntry(ZipArchive $zip, string $name, bool $isDirectory): void
+    {
+        $zip->setMtimeName($name, self::FIXED_MTIME);
+        $mode = $isDirectory ? 040755 : 0100644;
+        $zip->setExternalAttributesName($name, ZipArchive::OPSYS_UNIX, $mode << 16);
     }
 }

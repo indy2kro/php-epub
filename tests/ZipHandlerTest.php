@@ -225,6 +225,42 @@ final class ZipHandlerTest extends TestCase
         $this->assertSame(ZipArchive::CM_STORE, $stat['comp_method']);
     }
 
+    public function testCompressIsDeterministic(): void
+    {
+        $this->createEpubTree();
+        $zipHandler = new ZipHandler();
+        $first = $this->outputZipPath . '.first';
+
+        $zipHandler->compress($this->compressDir, $first);
+        // Different file times (as after a later extraction) must not change the archive.
+        $files = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($this->compressDir, \FilesystemIterator::SKIP_DOTS), \RecursiveIteratorIterator::SELF_FIRST);
+        foreach ($files as $file) {
+            $this->assertInstanceOf(\SplFileInfo::class, $file);
+            touch($file->getPathname(), time() - 86_400 * 30);
+        }
+        $zipHandler->compress($this->compressDir, $this->outputZipPath);
+
+        try {
+            $this->assertSame(hash_file('sha256', $first), hash_file('sha256', $this->outputZipPath));
+        } finally {
+            unlink($first);
+        }
+
+        $zip = new ZipArchive();
+        $this->assertTrue($zip->open($this->outputZipPath));
+        $names = [];
+        for ($index = 0; $index < $zip->numFiles; $index++) {
+            $names[] = (string) $zip->getNameIndex($index);
+        }
+        $zip->close();
+
+        $rest = array_slice($names, 1);
+        $sorted = $rest;
+        sort($sorted, SORT_STRING);
+        $this->assertSame('mimetype', $names[0]);
+        $this->assertSame($sorted, $rest);
+    }
+
     public function testCompressUsesForwardSlashesInEntryNames(): void
     {
         $this->createEpubTree();

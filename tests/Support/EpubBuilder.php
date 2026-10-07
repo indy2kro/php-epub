@@ -115,6 +115,11 @@ XML;
 XML);
     }
 
+    public function getFile(string $path): ?string
+    {
+        return $this->files[$path] ?? null;
+    }
+
     public function withFile(string $path, string $content): self
     {
         $this->files[$path] = $content;

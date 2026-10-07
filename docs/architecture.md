@@ -32,7 +32,7 @@ This page gives an overview of how php-epub is put together.
 ## Core Components
 
 ### EpubFile
-The facade. `open()`/`load()` extract and parse the book, `save()` writes pending package edits and creates the archive, `convert()` runs a converter on the book including unsaved edits. It also handles the cover image (`getCoverImage()`, `setCoverImage()`). `cleanup()` (called by the destructor) deletes the extraction and unloads the book.
+The facade. `open()`/`load()` extract and parse the book, `create()` starts a new one (with `addChapter()` to fill it), `save()` writes pending package edits and creates the archive, `convert()` runs a converter on the book including unsaved edits. It also handles the cover image (`getCoverImage()`, `setCoverImage()`). `cleanup()` (called by the destructor) deletes the extraction and unloads the book.
 
 ### Metadata
 Reads and edits the `<metadata>` element. Each Dublin Core field has a trait in `src/Traits/` (title, authors and creators, contributors, description, publisher, date, language, subject, identifier); `getMeta()`/`setMeta()` and `getProperty()`/`setProperty()` cover other `<meta>` elements. Values are checked with `Util\XmlText` before they are written.
@@ -45,6 +45,12 @@ The reading order: `SpineItem`s with their manifest item and `linear` flag, and 
 
 ### ContentManager
 File operations on the extracted book (add, update, delete, read), keeping the manifest and spine in sync. Paths are relative to the book root; the package document itself is managed only through `Metadata`, `Manifest` and `Spine`.
+
+### TableOfContents
+Reads and edits the EPUB 3 navigation document's `toc` nav and the EPUB 2 NCX as `TocEntry` trees, writing both when a book has both.
+
+### Validator
+`EpubFile::validate()` runs it to report common structural problems as `ValidationIssue`s: required metadata, duplicate ids, manifest and spine consistency, navigation.
 
 ### Parser and XmlParser
 `Parser` checks the container (`mimetype`, `META-INF/container.xml`) and locates and validates the OPF and NCX. `XmlParser` loads XML without network access and rejects entity declarations.
