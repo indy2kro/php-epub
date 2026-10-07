@@ -135,9 +135,8 @@ class EpubFile
 
             foreach ($files as $path => $content) {
                 $target = $directory . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $path);
-                if ((! is_dir(dirname($target)) && ! @mkdir(dirname($target), 0700, true)) || @file_put_contents($target, $content) === false) {
-                    throw new Exception("Failed to prepare the new book: {$path}");
-                }
+                $written = (is_dir(dirname($target)) || @mkdir(dirname($target), 0700, true)) && @file_put_contents($target, $content) !== false;
+                $written || throw new Exception("Failed to prepare the new book: {$path}");
             }
         });
 
@@ -210,9 +209,7 @@ class EpubFile
         // Unpredictable name and owner-only permissions: the extracted book may be private.
         $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'epub_' . bin2hex(random_bytes(16));
         $this->tempDir = $directory;
-        if (! mkdir($directory, 0700)) {
-            throw new Exception("Failed to create temporary directory: {$directory}");
-        }
+        @mkdir($directory, 0700) || throw new Exception("Failed to create temporary directory: {$directory}");
 
         try {
             $fill($directory);
