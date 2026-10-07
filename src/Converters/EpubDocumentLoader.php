@@ -58,6 +58,17 @@ final class EpubDocumentLoader
     private const array REMOVED_ATTRIBUTES = ['srcset'];
 
     /**
+     * Elements with an id that get their link anchor in front of them rather than inside: void
+     * elements, links (no nested links) and list or table containers (whose children are items).
+     */
+    private const array ANCHORED_BEFORE_ELEMENTS = ['a', 'img', 'br', 'hr', 'input', 'wbr', 'ul', 'ol', 'dl', 'table'];
+
+    /**
+     * Table parts that cannot hold or be preceded by an anchor.
+     */
+    private const array UNANCHORED_ELEMENTS = ['thead', 'tbody', 'tfoot', 'tr', 'colgroup', 'col'];
+
+    /**
      * SVG elements that run code or embed (X)HTML.
      */
     private const array REMOVED_SVG_ELEMENTS = ['script', 'foreignobject'];
@@ -100,9 +111,9 @@ final class EpubDocumentLoader
         // Legacy layout: a single content.xhtml without an OPF package.
         if (is_file($root . DIRECTORY_SEPARATOR . 'content.xhtml')) {
             $styles = [];
-            $chapter = $this->prepareChapter($root, 'content.xhtml', $styles, $chapterTitle);
+            $chapter = $this->prepareChapter($root, 'content.xhtml', $styles, $chapterTitle, ['content.xhtml' => 0]);
 
-            return new EpubDocument('', [], [$chapter], array_values($styles), [$chapterTitle]);
+            return new EpubDocument('', [], [$chapter], array_values($styles), [$chapterTitle], $root);
         }
 
         throw new ConversionException("No EPUB package found in: {$epubDirectory}");
@@ -115,20 +126,62 @@ final class EpubDocumentLoader
         $opfXml = $this->xmlParser->parse($opfFile);
 
         $metadata = new Metadata($opfXml, $opfFile);
-        $spine = new Spine($opfXml, new Manifest($opfXml, $opfPath));
+        $manifest = new Manifest($opfXml, $opfPath);
+        $spine = new Spine($opfXml, $manifest);
+
+        // Book-relative path => chapter index, for links between chapters.
+        $chapterIndexes = [];
+        foreach ($spine->getItems() as $spineItem) {
+            $item = $spineItem->item;
+            if ($item instanceof ManifestItem && $item->path !== '' && in_array($item->mediaType, self::XHTML_MEDIA_TYPES, true)) {
+                $chapterIndexes[$item->path] ??= count($chapterIndexes);
+            }
+        }
 
         $chapters = [];
         $chapterTitles = [];
         $styles = [];
-        foreach ($spine->getItems() as $spineItem) {
-            $item = $spineItem->item;
-            if ($item instanceof ManifestItem && $item->path !== '' && in_array($item->mediaType, self::XHTML_MEDIA_TYPES, true)) {
-                $chapters[] = $this->prepareChapter($root, $item->path, $styles, $chapterTitle);
-                $chapterTitles[] = $chapterTitle;
+        foreach (array_keys($chapterIndexes) as $path) {
+            $chapters[] = $this->prepareChapter($root, (string) $path, $styles, $chapterTitle, $chapterIndexes);
+            $chapterTitles[] = $chapterTitle;
+        }
+
+        return new EpubDocument(
+            $metadata->getTitle(),
+            array_values($metadata->getAuthors()),
+            $chapters,
+            array_values($styles),
+            $chapterTitles,
+            $root,
+            $this->coverImage($root, $manifest, $metadata, $chapters[0] ?? '')
+        );
+    }
+
+    /**
+     * The cover image (absolute path) when the first chapter does not show it, as in many EPUB 3
+     * books: the "cover-image" item, else the item named by the EPUB 2 <meta name="cover">. Only
+     * JPEG, PNG and GIF, which both renderers can draw as a page; "" otherwise.
+     */
+    private function coverImage(string $root, Manifest $manifest, Metadata $metadata, string $firstChapter): string
+    {
+        $cover = null;
+        foreach ($manifest->getItems() as $item) {
+            if (in_array('cover-image', explode(' ', $item->properties), true)) {
+                $cover = $item;
+                break;
             }
         }
 
-        return new EpubDocument($metadata->getTitle(), array_values($metadata->getAuthors()), $chapters, array_values($styles), $chapterTitles);
+        $meta = $metadata->getMeta('cover');
+        $cover ??= $meta === null ? null : ($manifest->get($meta) ?? $manifest->findByHref($meta));
+        if (! $cover instanceof ManifestItem || $cover->path === '' || ! in_array($cover->mediaType, ['image/jpeg', 'image/png', 'image/gif'], true)) {
+            return '';
+        }
+
+        // The manifest path is already decoded; keep resolveSource() from decoding it again.
+        $file = $this->resolveSource($root, '', str_replace('%', '%25', $cover->path));
+
+        return $file === '' || str_contains($firstChapter, htmlspecialchars($file)) ? '' : $file;
     }
 
     /**
@@ -140,10 +193,11 @@ final class EpubDocumentLoader
      *
      * @param array<string, string> $styles Sanitised CSS keyed by its source, so shared stylesheets appear once.
      * @param string|null $title Set to the chapter title (see EpubDocument::$chapterTitles).
+     * @param array<string, int> $chapterIndexes Book-relative path => index of every chapter (see linkChapters()).
      *
      * @param-out string $title
      */
-    private function prepareChapter(string $root, string $path, array &$styles, ?string &$title = null): string
+    private function prepareChapter(string $root, string $path, array &$styles, ?string &$title, array $chapterIndexes): string
     {
         $title = '';
 
@@ -173,6 +227,8 @@ final class EpubDocumentLoader
         foreach (iterator_to_array($body->getElementsByTagName('*')) as $element) {
             $this->sanitizeElement($element, $root, $directory);
         }
+
+        $this->linkChapters($document, $body, $directory, $chapterIndexes[$path] ?? 0, $chapterIndexes);
 
         $html = '';
         foreach ($body->childNodes as $child) {
@@ -210,6 +266,96 @@ final class EpubDocumentLoader
                 $element->setAttribute($attribute->nodeName, $this->resolveSource($root, $directory, $attribute->value));
             }
         }
+    }
+
+    /**
+     * Makes links between the book's documents work inside the single PDF: every chapter, and every
+     * element with an id (or <a name>), gets an anchor whose id is unique across the book (see anchorId()),
+     * and links to chapters of the book (and fragment-only links) are rewritten to those anchors.
+     * Other links are kept. The book's own ids stay, so its CSS still applies.
+     *
+     * @param array<string, int> $chapterIndexes
+     */
+    private function linkChapters(DOMDocument $document, DOMElement $body, string $directory, int $index, array $chapterIndexes): void
+    {
+        foreach (iterator_to_array($body->getElementsByTagName('*')) as $element) {
+            $tag = strtolower($element->localName ?? '');
+            $id = $element->getAttribute('id') !== '' ? $element->getAttribute('id') : ($tag === 'a' ? $element->getAttribute('name') : '');
+
+            if ($id !== '' && ! in_array($tag, self::UNANCHORED_ELEMENTS, true)) {
+                $anchor = $this->anchor($document, self::anchorId($index, $id));
+                if (in_array($tag, self::ANCHORED_BEFORE_ELEMENTS, true)) {
+                    $element->parentNode?->insertBefore($anchor, $element);
+                } else {
+                    $element->insertBefore($anchor, $element->firstChild);
+                }
+            }
+
+            if (in_array($tag, ['a', 'area'], true) && $element->hasAttribute('href')) {
+                $target = $this->internalTarget($element->getAttribute('href'), $directory, $index, $chapterIndexes);
+                if ($target !== null) {
+                    $element->setAttribute('href', $target);
+                }
+            }
+        }
+
+        $body->insertBefore($this->anchor($document, self::anchorId($index)), $body->firstChild);
+    }
+
+    /**
+     * An empty-looking link target: a zero-width space, since Dompdf ignores empty anchors.
+     */
+    private function anchor(DOMDocument $document, string $id): DOMElement
+    {
+        $anchor = $document->createElement('a');
+        $anchor->setAttribute('id', $id);
+        $anchor->appendChild($document->createTextNode("\u{200B}"));
+
+        return $anchor;
+    }
+
+    /**
+     * "#<anchor id>" for a link to a chapter of the book (or to an element of one), or null for any
+     * other link (remote, absolute, outside the book, or to a file that is not a chapter).
+     *
+     * @param array<string, int> $chapterIndexes
+     */
+    private function internalTarget(string $href, string $directory, int $index, array $chapterIndexes): ?string
+    {
+        $href = trim($href);
+        if (str_starts_with($href, '#')) {
+            return '#' . self::anchorId($index, rawurldecode(substr($href, 1)));
+        }
+
+        if (preg_match('#^[a-z][a-z0-9+.-]*:#i', $href) === 1) {
+            return null;
+        }
+
+        [$file, $fragment] = array_pad(explode('#', $href, 2), 2, '');
+        try {
+            $path = $this->paths->normalize($directory . rawurldecode(explode('?', $file, 2)[0]));
+        } catch (InvalidEpubException) {
+            return null;
+        }
+
+        $target = $chapterIndexes[$path] ?? null;
+
+        return $target === null ? null : '#' . self::anchorId($target, $fragment === '' ? null : rawurldecode($fragment));
+    }
+
+    /**
+     * "epub-c<chapter>" for a chapter, "epub-c<chapter>-<id>" for an element, with characters other
+     * than letters, digits, "." and "-" written as "_<hex byte>", so ids are unique across chapters.
+     */
+    private static function anchorId(int $chapter, ?string $id = null): string
+    {
+        $encoded = $id === null ? '' : '-' . preg_replace_callback(
+            '/[^A-Za-z0-9.-]/',
+            static fn (array $match): string => sprintf('_%02x', ord($match[0])),
+            $id
+        );
+
+        return "epub-c{$chapter}{$encoded}";
     }
 
     /**

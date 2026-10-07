@@ -17,13 +17,18 @@ final readonly class EpubDocument
      *                             resources confined to the book.
      * @param list<string> $chapterTitles A title per chapter (its first h1-h3 heading, else its <title>; "" when
      *                                    it has neither), in the same order as $chapters.
+     * @param string $directory The book's directory (real path); renderers may read files only inside it.
+     * @param string $coverImage The cover image (absolute path, inside the book) to show as the first page,
+     *                           because no chapter shows it; "" when there is none.
      */
     public function __construct(
         public string $title,
         public array $authors,
         public array $chapters,
         public array $styles = [],
-        public array $chapterTitles = []
+        public array $chapterTitles = [],
+        public string $directory = '',
+        public string $coverImage = ''
     ) {
     }
 
