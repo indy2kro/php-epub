@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PhpEpub;
 
+use PhpEpub\Util\FileSystemHelper;
 use PhpEpub\Util\PathResolver;
 use SimpleXMLElement;
 
@@ -53,9 +54,9 @@ class Parser
             throw new InvalidEpubException('Missing mimetype file: ' . $mimetypePath);
         }
 
-        $mimetype = file_get_contents($mimetypePath);
+        $mimetype = FileSystemHelper::readFile($mimetypePath);
 
-        if ($mimetype === false || trim($mimetype) !== 'application/epub+zip') {
+        if ($mimetype === null || trim($mimetype) !== 'application/epub+zip') {
             throw new InvalidEpubException('Invalid mimetype content: ' . $mimetypePath);
         }
     }

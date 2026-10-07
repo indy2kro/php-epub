@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PhpEpub\Test;
 
 use PhpEpub\Exception;
+use PhpEpub\Test\Support\UnreadableFile;
 use PhpEpub\XmlException;
 use PhpEpub\XmlParser;
 use PHPUnit\Framework\TestCase;
@@ -78,6 +79,24 @@ final class XmlParserTest extends TestCase
         file_put_contents($this->xmlFilePath, "\xFF\xFE" . mb_convert_encoding($xml, 'UTF-16LE', 'UTF-8'));
 
         $this->assertSame('Value', (string) (new XmlParser())->parse($this->xmlFilePath)->element);
+    }
+
+    public function testParseReportsAnUnreadableFile(): void
+    {
+        $file = UnreadableFile::make($this->xmlFilePath);
+
+        try {
+            if (! $file->isUnreadable()) {
+                $this->markTestSkipped('Unreadable files are readable here (e.g. running as root).');
+            }
+
+            $this->expectException(XmlException::class);
+            $this->expectExceptionMessage('Failed to read XML file');
+
+            (new XmlParser())->parse($this->xmlFilePath);
+        } finally {
+            $file->restore();
+        }
     }
 
     public function testParseAcceptsPublicDoctypeWithoutEntities(): void

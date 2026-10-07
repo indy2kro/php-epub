@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PhpEpub;
 
+use PhpEpub\Util\FileSystemHelper;
 use PhpEpub\Util\PathResolver;
 
 class ContentManager
@@ -174,14 +175,7 @@ class ContentManager
             throw new Exception("Content file does not exist: {$fullPath}");
         }
 
-        // A failed read can return "" rather than false (e.g. a file locked on Windows), so check the error too.
-        error_clear_last();
-        $content = @file_get_contents($fullPath);
-        if ($content === false || error_get_last() !== null) {
-            throw new Exception("Failed to read content from: {$fullPath}");
-        }
-
-        return $content;
+        return FileSystemHelper::readFile($fullPath) ?? throw new Exception("Failed to read content from: {$fullPath}");
     }
 
     /**

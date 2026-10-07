@@ -7,6 +7,7 @@ namespace PhpEpub\Test\Converters;
 use PhpEpub\ConversionException;
 use PhpEpub\Converters\EpubDocumentLoader;
 use PhpEpub\Test\Support\EpubBuilder;
+use PhpEpub\Test\Support\UnreadableFile;
 use PhpEpub\Util\FileSystemHelper;
 use PHPUnit\Framework\TestCase;
 
@@ -223,6 +224,44 @@ final class EpubDocumentLoaderTest extends TestCase
         $this->expectExceptionMessage('Failed to read content from: EPUB/chapter.xhtml');
 
         (new EpubDocumentLoader())->load($directory);
+    }
+
+    public function testUnreadableChapterThrowsInsteadOfRenderingNothing(): void
+    {
+        $directory = EpubBuilder::minimal()->writeTo($this->tmpDir . '/book');
+        $chapter = UnreadableFile::make($directory . '/EPUB/chapter.xhtml');
+
+        try {
+            if (! $chapter->isUnreadable()) {
+                $this->markTestSkipped('Unreadable files are readable here (e.g. running as root).');
+            }
+
+            $this->expectException(ConversionException::class);
+            $this->expectExceptionMessage('Failed to read content from: EPUB/chapter.xhtml');
+
+            (new EpubDocumentLoader())->load($directory);
+        } finally {
+            $chapter->restore();
+        }
+    }
+
+    public function testUnreadableStylesheetIsLeftOut(): void
+    {
+        $directory = EpubBuilder::minimal()
+            ->withFile('EPUB/chapter.xhtml', '<html><head><link rel="stylesheet" href="style.css"/></head><body><p>Text</p></body></html>')
+            ->withFile('EPUB/style.css', 'p { color: red; }')
+            ->writeTo($this->tmpDir . '/book');
+        $stylesheet = UnreadableFile::make($directory . '/EPUB/style.css');
+
+        try {
+            if (! $stylesheet->isUnreadable()) {
+                $this->markTestSkipped('Unreadable files are readable here (e.g. running as root).');
+            }
+
+            $this->assertSame([], (new EpubDocumentLoader())->load($directory)->styles);
+        } finally {
+            $stylesheet->restore();
+        }
     }
 
     public function testMissingDirectoryThrows(): void

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PhpEpub\Test\Util;
 
 use PhpEpub\Exception;
+use PhpEpub\Test\Support\UnreadableFile;
 use PhpEpub\Util\FileSystemHelper;
 use PHPUnit\Framework\TestCase;
 
@@ -18,6 +19,33 @@ final class FileSystemHelperTest extends TestCase
         parent::setUp();
         $this->helper = new FileSystemHelper();
         $this->fixturesDir = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'fixtures';
+    }
+
+    public function testReadFile(): void
+    {
+        $directory = $this->fixturesDir . DIRECTORY_SEPARATOR . 'tmp' . DIRECTORY_SEPARATOR . 'read';
+        mkdir($directory, 0777, true);
+        file_put_contents($directory . DIRECTORY_SEPARATOR . 'text.txt', 'content');
+        file_put_contents($directory . DIRECTORY_SEPARATOR . 'empty.txt', '');
+        file_put_contents($directory . DIRECTORY_SEPARATOR . 'locked.txt', 'secret');
+        $locked = UnreadableFile::make($directory . DIRECTORY_SEPARATOR . 'locked.txt');
+
+        try {
+            $this->assertSame('content', FileSystemHelper::readFile($directory . DIRECTORY_SEPARATOR . 'text.txt'));
+            $this->assertSame('', FileSystemHelper::readFile($directory . DIRECTORY_SEPARATOR . 'empty.txt'));
+            $this->assertNull(FileSystemHelper::readFile($directory . DIRECTORY_SEPARATOR . 'missing.txt'));
+            $this->assertNull(FileSystemHelper::readFile($directory));
+
+            if (! $locked->isUnreadable()) {
+                $this->markTestSkipped('Unreadable files are readable here (e.g. running as root).');
+            }
+
+            // On Windows a locked file reads as "" with a notice; it must not look like an empty file.
+            $this->assertNull(FileSystemHelper::readFile($directory . DIRECTORY_SEPARATOR . 'locked.txt'));
+        } finally {
+            $locked->restore();
+            $this->helper->deleteDirectory($directory);
+        }
     }
 
     public function testFileExists(): void
