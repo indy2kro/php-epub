@@ -11,7 +11,8 @@ A PHP library for reading and editing EPUB 2 and EPUB 3 books: metadata, cover, 
 - **Open and save**: `EpubFile::open()` extracts a book safely; `save()` writes an OCF-valid archive (checked with EPUBCheck in CI).
 - **Metadata**: title(s), authors, creators and contributors with roles, description, publisher, dates, language, subjects, identifiers, and any other `<meta>` element.
 - **Cover**: read and replace the cover image (EPUB 3 `cover-image` and EPUB 2 conventions).
-- **Package editing**: manifest items and reading order (spine); adding or deleting content keeps both in sync.
+- **Package editing**: manifest items, reading order (spine) and table of contents (EPUB 3 nav and EPUB 2 NCX); adding or deleting content keeps them in sync.
+- **New books**: `EpubFile::create()` and `addChapter()` build a valid EPUB 3 from scratch.
 - **Structure checks on load**: a missing or wrong `mimetype`, `container.xml`, package document or NCX is reported with an exception. This is not a full validator like EPUBCheck.
 - **Conversion**: PDF with TCPDF or Dompdf, and any format Calibre's `ebook-convert` supports.
 - **Hostile books**: paths are confined to the book, extraction is limited (zip bombs), XML entity declarations are refused, and PDF renderers cannot load anything outside the book. See [Handling Untrusted EPUBs](https://indy2kro.github.io/php-epub/advanced-usage/#handling-untrusted-epubs).
@@ -48,6 +49,16 @@ $metadata->addContributor('Ed Editor', 'edt');
 $epubFile->save('/path/to/edited.epub');
 ```
 
+### Create a new book
+
+```php
+$epubFile = EpubFile::create('/path/to/new.epub', 'My Book', 'en');
+$epubFile->getMetadata()->setAuthors(['Jane Doe']);
+// Each chapter is added to the manifest, the reading order and the table of contents.
+$epubFile->addChapter('Chapter One', '<h1>Chapter One</h1><p>It begins.</p>');
+$epubFile->save();
+```
+
 ### Cover, content and reading order
 
 ```php
@@ -58,6 +69,8 @@ $content = $epubFile->getContentManager();
 $content->addContent('EPUB/text/epilogue.xhtml', $xhtml);   // added to the manifest
 $item = $epubFile->getManifest()->findByPath('EPUB/text/epilogue.xhtml');
 $epubFile->getSpine()->add($item->id);                       // and to the reading order
+$epubFile->getTableOfContents()->addEntry(new \PhpEpub\TocEntry('Epilogue', 'EPUB/text/epilogue.xhtml'));
+// (addChapter() does all three in one call)
 
 $epubFile->save();
 ```
