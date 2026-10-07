@@ -18,6 +18,9 @@ class TCPDFAdapter implements ConverterInterface
         'margin_bottom' => 25,
         'header' => true,
         'footer' => true,
+        'paper_size' => 'A4',
+        'orientation' => 'portrait',
+        'bookmarks' => true,
     ];
 
     /**
@@ -29,8 +32,10 @@ class TCPDFAdapter implements ConverterInterface
      * TCPDFAdapter constructor.
      *
      * @param array<string, mixed> $styles Optional styling parameters: font, font_size, margin_left,
-     *                                     margin_top, margin_right, margin_bottom (int), header, footer (bool).
-     *                                     Values of the wrong type fall back to the defaults.
+     *                                     margin_top, margin_right, margin_bottom (int, mm), header, footer (bool),
+     *                                     paper_size (e.g. "A4", "letter") and orientation ("portrait" or
+     *                                     "landscape"), as in DompdfAdapter, and bookmarks (bool, default true:
+     *                                     a PDF outline entry per chapter). Values of the wrong type fall back to the defaults.
      */
     public function __construct(array $styles = [], private readonly EpubDocumentLoader $loader = new EpubDocumentLoader())
     {
@@ -66,7 +71,8 @@ class TCPDFAdapter implements ConverterInterface
     {
         $author = implode(', ', $document->authors);
 
-        $pdf = new TCPDF();
+        $orientation = strtolower($this->stringStyle('orientation')) === 'landscape' ? 'L' : 'P';
+        $pdf = $this->newPdf($orientation, strtoupper($this->stringStyle('paper_size')));
         $pdf->SetCreator(PDF_CREATOR);
         $pdf->SetTitle($document->title);
         $pdf->SetAuthor($author);
@@ -89,9 +95,14 @@ class TCPDFAdapter implements ConverterInterface
         $pdf->SetAutoPageBreak(true, $this->intStyle('margin_bottom'));
         $pdf->SetFont($this->stringStyle('font'), '', $this->intStyle('font_size'));
 
-        foreach ($document->chapters as $chapter) {
+        foreach ($document->chapters as $index => $chapter) {
             $pdf->AddPage();
-            $pdf->writeHTML($chapter, true, false, true, false, '');
+            if ($this->boolStyle('bookmarks')) {
+                $title = $document->chapterTitles[$index] ?? '';
+                $pdf->Bookmark($title !== '' ? $title : 'Chapter ' . ($index + 1), 0, 0);
+            }
+
+            $pdf->writeHTML($this->chapterHtml($document, $chapter), true, false, true, false, '');
         }
 
         if ($document->chapters === []) {
@@ -99,6 +110,26 @@ class TCPDFAdapter implements ConverterInterface
         }
 
         return $pdf;
+    }
+
+    /**
+     * Creates the TCPDF instance (in mm) that createPdf() fills.
+     *
+     * @param string $orientation "P" or "L".
+     * @param string $format A TCPDF page format, e.g. "A4" or "LETTER".
+     */
+    protected function newPdf(string $orientation, string $format): TCPDF
+    {
+        return new TCPDF($orientation, 'mm', $format);
+    }
+
+    /**
+     * A chapter as passed to writeHTML(): TCPDF takes CSS from <style> elements in that HTML,
+     * so the book's styles are prepended to every chapter.
+     */
+    protected function chapterHtml(EpubDocument $document, string $chapter): string
+    {
+        return ($document->styles === [] ? '' : '<style>' . EpubDocument::styleSheet($document->styles) . '</style>') . $chapter;
     }
 
     private function stringStyle(string $name): string

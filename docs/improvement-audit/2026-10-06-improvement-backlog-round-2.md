@@ -92,11 +92,11 @@ Effort: S = one file, under 30 min · M = one class plus tests · L = cross-cutt
 
 ### Converters
 
-- [ ] **CONV-01** Run `ebook-convert` with a timeout (`proc_open`) and kill it on expiry — `src/Converters/CalibreAdapter.php:79-99`, `src/Util/FileSystemHelper.php:21-24` — S · med
+- [x] **CONV-01** Run `ebook-convert` with a timeout (`proc_open`) and kill it on expiry — `src/Converters/CalibreAdapter.php:79-99`, `src/Util/FileSystemHelper.php:21-24` — S · med
   `exec()` waits forever, so a hostile or simply huge book hangs the worker.
-- [ ] **CONV-02** Carry the book's own CSS into the HTML renderers (sanitised, `url()` confined) — `src/Converters/EpubDocumentLoader.php:81-100`, `src/Converters/DompdfAdapter.php:97-107` — M · med
+- [x] **CONV-02** Carry the book's own CSS into the HTML renderers (sanitised, `url()` confined) — `src/Converters/EpubDocumentLoader.php:81-100`, `src/Converters/DompdfAdapter.php:97-107` — M · med
   Only `<body>` is kept, so stylesheets are dropped and every PDF loses the book's layout. Do after SEC-02.
-- [ ] **CONV-03** Find `ebook-convert` on `PATH` (and the usual Windows/macOS locations) when `calibre_path` is not given — `src/Converters/CalibreAdapter.php:31-34` — S · low
+- [x] **CONV-03** Find `ebook-convert` on `PATH` (and the usual Windows/macOS locations) when `calibre_path` is not given — `src/Converters/CalibreAdapter.php:31-34` — S · low
   The `/usr/bin/ebook-convert` default fails on Windows, macOS and `/usr/local` installs.
 - [ ] **CONV-04** Accept the same options in both PDF adapters (`paper_size`/`orientation` in TCPDF, margins in Dompdf) — `src/Converters/TCPDFAdapter.php:12-21`, `src/Converters/DompdfAdapter.php:13-18` — S · low
   Switching adapters silently ignores half of the caller's options.
@@ -124,7 +124,7 @@ Effort: S = one file, under 30 min · M = one class plus tests · L = cross-cutt
   The library can only edit existing books, and the test suite already holds most of the code.
 - [ ] **FEAT-05** Deterministic archives on save (sorted entries, fixed timestamps) — `src/ZipHandler.php:199-223` — S · low
   The same book saved twice differs byte for byte.
-- [ ] **FEAT-06** PDF bookmarks/outline from the spine or TOC — `src/Converters/TCPDFAdapter.php:92-95`, `src/Converters/DompdfAdapter.php:97-107` — M · low
+- [x] **FEAT-06** PDF bookmarks/outline from the spine or TOC — `src/Converters/TCPDFAdapter.php:92-95`, `src/Converters/DompdfAdapter.php:97-107` — M · low
   Generated PDFs have no navigation.
 
 ### Documentation

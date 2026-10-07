@@ -102,6 +102,70 @@ final class TCPDFAdapterTest extends TestCase
         $this->assertEqualsWithDelta(20.0, $margins['left'], 0.001);
     }
 
+    public function testEveryChapterGetsABookmark(): void
+    {
+        $directory = EpubBuilder::minimal()
+            ->withFile('EPUB/package.opf', str_replace(
+                '<itemref idref="chapter"/>',
+                '<itemref idref="chapter"/><itemref idref="titled"/><itemref idref="bare"/>',
+                EpubBuilder::opf(
+                    '<item id="titled" href="titled.xhtml" media-type="application/xhtml+xml"/>'
+                    . '<item id="bare" href="bare.xhtml" media-type="application/xhtml+xml"/>'
+                )
+            ))
+            ->withFile('EPUB/chapter.xhtml', '<html><head><title>Book</title></head><body><h2>  The   First  Chapter </h2><h1>Later</h1></body></html>')
+            ->withFile('EPUB/titled.xhtml', '<html><head><title>Second Title</title></head><body><p>No heading</p></body></html>')
+            ->withFile('EPUB/bare.xhtml', '<html><body><p>Nothing</p></body></html>')
+            ->writeTo($this->epubDirectory . '-toc');
+        $adapter = $this->exposedAdapter();
+
+        try {
+            $adapter->createPdfFor($this->epubDirectory . '-toc');
+            $this->assertSame([['The First Chapter', 0], ['Second Title', 0], ['Chapter 3', 0]], $adapter->bookmarks);
+
+            $withoutBookmarks = $this->exposedAdapter(['bookmarks' => false]);
+            $withoutBookmarks->createPdfFor($this->epubDirectory . '-toc');
+            $this->assertSame([], $withoutBookmarks->bookmarks);
+        } finally {
+            $this->fileSystemHelper->deleteDirectory($this->epubDirectory . '-toc');
+        }
+    }
+
+    public function testEveryChapterCarriesTheBookCss(): void
+    {
+        $directory = EpubBuilder::minimal()
+            ->withFile('EPUB/chapter.xhtml', '<html><head><style>p { color: #336699; }</style></head><body><p>Text</p></body></html>')
+            ->writeTo($this->epubDirectory . '-css');
+
+        try {
+            $chapters = $this->exposedAdapter()->chapterHtmlFor($this->epubDirectory . '-css');
+        } finally {
+            $this->fileSystemHelper->deleteDirectory($this->epubDirectory . '-css');
+        }
+
+        $this->assertSame(['<style>p { color: #336699; }</style><p>Text</p>'], $chapters);
+    }
+
+    public function testHeaderAndFooterCanBeSwitchedOff(): void
+    {
+        $withThem = $this->exposedAdapter()->createPdfFor($this->epubDirectory);
+        $withoutThem = $this->exposedAdapter(['header' => false, 'footer' => false])->createPdfFor($this->epubDirectory);
+
+        // Without a header and footer, the same content needs fewer bytes of page drawing.
+        $this->assertLessThan(strlen($withThem->Output('', 'S')), strlen($withoutThem->Output('', 'S')));
+    }
+
+    public function testPaperSizeAndOrientationLikeDompdf(): void
+    {
+        $default = $this->exposedAdapter()->createPdfFor($this->epubDirectory);
+        $this->assertEqualsWithDelta(210.0, $default->getPageWidth(), 0.1);
+        $this->assertEqualsWithDelta(297.0, $default->getPageHeight(), 0.1);
+
+        $letter = $this->exposedAdapter(['paper_size' => 'letter', 'orientation' => 'landscape'])->createPdfFor($this->epubDirectory);
+        $this->assertEqualsWithDelta(279.4, $letter->getPageWidth(), 0.1);
+        $this->assertEqualsWithDelta(215.9, $letter->getPageHeight(), 0.1);
+    }
+
     public function testConvertReportsUnwritableOutput(): void
     {
         $this->expectException(ConversionException::class);

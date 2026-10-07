@@ -25,7 +25,9 @@ class DompdfAdapter implements ConverterInterface
     /**
      * DompdfAdapter constructor.
      *
-     * @param array<string, mixed> $styles Optional styling parameters: font, font_size (pt), paper_size, orientation.
+     * @param array<string, mixed> $styles Optional styling parameters: font, font_size (pt), paper_size,
+     *                                     orientation, and margin_top/right/bottom/left (int, mm, as in TCPDFAdapter;
+     *                                     without any, Dompdf keeps its own margins).
      */
     public function __construct(array $styles = [], private readonly EpubDocumentLoader $loader = new EpubDocumentLoader())
     {
@@ -97,13 +99,33 @@ class DompdfAdapter implements ConverterInterface
     private function renderHtml(EpubDocument $document): string
     {
         $font = str_replace(['"', '<', '>', ';', '}'], '', $this->stringStyle('font'));
-        $css = sprintf('body { font-family: "%s"; font-size: %dpt; }', $font, $this->intStyle('font_size'));
+        $css = sprintf('body { font-family: "%s"; font-size: %dpt; }', $font, $this->intStyle('font_size')) . $this->pageMarginCss();
 
         return '<!DOCTYPE html><html><head><meta charset="utf-8">'
             . '<title>' . htmlspecialchars($document->title, ENT_QUOTES | ENT_HTML5) . '</title>'
-            . '<style>' . $css . '</style></head><body>'
+            . '<style>' . $css . '</style>'
+            // The book's own CSS comes after the defaults, so the book's styling wins.
+            . ($document->styles === [] ? '' : '<style>' . EpubDocument::styleSheet($document->styles) . '</style>')
+            . '</head><body>'
             . implode('<div style="page-break-before: always"></div>', $document->chapters)
             . '</body></html>';
+    }
+
+    /**
+     * A CSS @page margin rule from margin_top/right/bottom/left (mm, as in TCPDFAdapter);
+     * empty when none is given, so Dompdf keeps its own default margins.
+     */
+    private function pageMarginCss(): string
+    {
+        $sides = ['margin_top', 'margin_right', 'margin_bottom', 'margin_left'];
+        $given = array_filter($sides, fn (string $side): bool => is_int($this->styles[$side] ?? null));
+        if ($given === []) {
+            return '';
+        }
+
+        $margins = array_map(fn (string $side): string => (is_int($this->styles[$side] ?? null) ? $this->styles[$side] : 0) . 'mm', $sides);
+
+        return ' @page { margin: ' . implode(' ', $margins) . '; }';
     }
 
     private function stringStyle(string $name): string

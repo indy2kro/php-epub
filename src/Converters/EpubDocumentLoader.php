@@ -69,7 +69,10 @@ final readonly class EpubDocumentLoader
 
         // Legacy layout: a single content.xhtml without an OPF package.
         if (is_file($root . DIRECTORY_SEPARATOR . 'content.xhtml')) {
-            return new EpubDocument('', [], [$this->prepareChapter($root, 'content.xhtml')]);
+            $styles = [];
+            $chapter = $this->prepareChapter($root, 'content.xhtml', $styles, $chapterTitle);
+
+            return new EpubDocument('', [], [$chapter], array_values($styles), [$chapterTitle]);
         }
 
         throw new ConversionException("No EPUB package found in: {$epubDirectory}");
@@ -85,25 +88,35 @@ final readonly class EpubDocumentLoader
         $spine = new Spine($opfXml, new Manifest($opfXml, $opfPath));
 
         $chapters = [];
+        $chapterTitles = [];
+        $styles = [];
         foreach ($spine->getItems() as $spineItem) {
             $item = $spineItem->item;
             if ($item instanceof ManifestItem && $item->path !== '' && in_array($item->mediaType, self::XHTML_MEDIA_TYPES, true)) {
-                $chapters[] = $this->prepareChapter($root, $item->path);
+                $chapters[] = $this->prepareChapter($root, $item->path, $styles, $chapterTitle);
+                $chapterTitles[] = $chapterTitle;
             }
         }
 
-        return new EpubDocument($metadata->getTitle(), array_values($metadata->getAuthors()), $chapters);
+        return new EpubDocument($metadata->getTitle(), array_values($metadata->getAuthors()), $chapters, array_values($styles), $chapterTitles);
     }
 
     /**
      * Returns the <body> HTML of a document, with active content removed and every
-     * resource reference confined to the book.
+     * resource reference confined to the book, and adds its stylesheets to $styles.
      *
      * The chapter is parsed with libxml's HTML parser rather than matched with regular
      * expressions, so unquoted or unusually spelled attributes cannot slip through.
+     *
+     * @param array<string, string> $styles Sanitised CSS keyed by its source, so shared stylesheets appear once.
+     * @param string|null $title Set to the chapter title (see EpubDocument::$chapterTitles).
+     *
+     * @param-out string $title
      */
-    private function prepareChapter(string $root, string $path): string
+    private function prepareChapter(string $root, string $path, array &$styles, ?string &$title = null): string
     {
+        $title = '';
+
         $file = $this->paths->resolve($root, $path);
         $content = is_file($file) ? @file_get_contents($file) : false;
         if ($content === false) {
@@ -121,12 +134,14 @@ final readonly class EpubDocumentLoader
             libxml_use_internal_errors($useInternalErrors);
         }
 
+        $directory = dirname($path) === '.' ? '' : dirname($path) . '/';
+        $this->collectStyles($document, $root, $directory, $styles);
+        $title = $this->chapterTitle($document);
+
         $body = $document->getElementsByTagName('body')->item(0);
         if (! $body instanceof DOMElement) {
             return '';
         }
-
-        $directory = dirname($path) === '.' ? '' : dirname($path) . '/';
 
         foreach (iterator_to_array($body->getElementsByTagName('*')) as $element) {
             $this->sanitizeElement($element, $root, $directory);
@@ -147,21 +162,23 @@ final readonly class EpubDocumentLoader
     {
         $tag = strtolower($element->localName ?? $element->nodeName);
 
-        if (in_array($tag, self::REMOVED_ELEMENTS, true) || ($tag === 'style' && $this->isUnsafeCss($element->textContent))) {
+        if (in_array($tag, self::REMOVED_ELEMENTS, true)) {
             $element->parentNode?->removeChild($element);
 
             return;
         }
 
+        if ($tag === 'style') {
+            $element->textContent = $this->sanitizeCss($element->textContent, $root, $directory);
+        }
+
         foreach (iterator_to_array($element->attributes ?? []) as $attribute) {
             $name = strtolower($attribute->nodeName);
 
-            if (
-                str_starts_with($name, 'on')
-                || in_array($name, self::REMOVED_ATTRIBUTES, true)
-                || ($name === 'style' && $this->isUnsafeCss($attribute->value))
-            ) {
+            if (str_starts_with($name, 'on') || in_array($name, self::REMOVED_ATTRIBUTES, true)) {
                 $element->removeAttributeNode($attribute);
+            } elseif ($name === 'style') {
+                $element->setAttribute($attribute->nodeName, $this->sanitizeCss($attribute->value, $root, $directory));
             } elseif (in_array($name, self::SOURCE_ATTRIBUTES, true) || ($name === 'href' && ! in_array($tag, ['a', 'area'], true))) {
                 $element->setAttribute($attribute->nodeName, $this->resolveSource($root, $directory, $attribute->value));
             }
@@ -169,11 +186,91 @@ final readonly class EpubDocumentLoader
     }
 
     /**
-     * CSS that can make a renderer load a resource (url(), @import, image-set()) or hide one behind escapes.
+     * The first h1-h3 heading of the body, else the <title>, with whitespace collapsed; "" when there is neither.
+     * Headings come first because many books repeat the book title in every <title>.
      */
-    private function isUnsafeCss(string $css): bool
+    private function chapterTitle(DOMDocument $document): string
     {
-        return preg_match('/url\s*\(|@import|image-set\s*\(|expression\s*\(|\\\\/i', $css) === 1;
+        $body = $document->getElementsByTagName('body')->item(0);
+        if ($body instanceof DOMElement) {
+            foreach ($body->getElementsByTagName('*') as $element) {
+                if (in_array(strtolower($element->localName ?? ''), ['h1', 'h2', 'h3'], true)) {
+                    $heading = $this->collapseWhitespace($element->textContent);
+                    if ($heading !== '') {
+                        return $heading;
+                    }
+                }
+            }
+        }
+
+        return $this->collapseWhitespace((string) $document->getElementsByTagName('title')->item(0)?->textContent);
+    }
+
+    private function collapseWhitespace(string $text): string
+    {
+        return trim((string) preg_replace('/\s+/u', ' ', $text));
+    }
+
+    /**
+     * Adds the document's linked stylesheets (rel="stylesheet", files inside the book) and
+     * <head> <style> blocks to $styles, sanitised. <style> blocks in the body stay in place.
+     *
+     * @param array<string, string> $styles
+     */
+    private function collectStyles(DOMDocument $document, string $root, string $directory, array &$styles): void
+    {
+        foreach ($document->getElementsByTagName('link') as $link) {
+            $relations = preg_split('/\s+/', strtolower(trim($link->getAttribute('rel')))) ?: [];
+            if (! in_array('stylesheet', $relations, true) || in_array('alternate', $relations, true)) {
+                continue;
+            }
+
+            $file = $this->resolveSource($root, $directory, $link->getAttribute('href'));
+            if ($file === '' || str_starts_with($file, 'data:') || isset($styles[$file])) {
+                continue;
+            }
+
+            // url() in a stylesheet is relative to the stylesheet, not to the chapter.
+            $relative = substr($file, strlen(str_replace('\\', '/', $root)) + 1);
+            $cssDirectory = dirname($relative) === '.' ? '' : dirname($relative) . '/';
+            $styles[$file] = $this->sanitizeCss((string) @file_get_contents($file), $root, $cssDirectory);
+        }
+
+        $head = $document->getElementsByTagName('head')->item(0);
+        if ($head instanceof DOMElement) {
+            foreach ($head->getElementsByTagName('style') as $style) {
+                $css = $this->sanitizeCss($style->textContent, $root, $directory);
+                $styles['style:' . md5($css)] = $css;
+            }
+        }
+    }
+
+    /**
+     * Makes book CSS safe to render: escapes are decoded (and stray backslashes dropped, so the
+     * renderer cannot decode anything again), comments, @import and image-set() are removed, and
+     * every url() is rewritten to a file inside the book (or blanked).
+     */
+    private function sanitizeCss(string $css, string $root, string $directory): string
+    {
+        $css = (string) preg_replace_callback(
+            '/\\\\(?:([0-9a-fA-F]{1,6})\s?|(.))/su',
+            static fn (array $match): string => $match[1] !== ''
+                ? html_entity_decode('&#x' . $match[1] . ';', ENT_QUOTES | ENT_HTML5, 'UTF-8')
+                : $match[2],
+            $css
+        );
+        $css = str_replace('\\', '', $css);
+        $css = (string) preg_replace('#/\*.*?\*/#s', '', $css);
+
+        $css = (string) preg_replace_callback(
+            '/url\s*\(\s*(["\']?)(.*?)\1\s*\)/is',
+            fn (array $match): string => 'url("' . str_replace('"', '%22', $this->resolveSource($root, $directory, $match[2])) . '")',
+            $css
+        );
+
+        $css = (string) preg_replace('/(?:-webkit-)?image-set\s*\((?:[^()]|\([^()]*\))*\)/i', 'none', $css);
+
+        return trim((string) preg_replace('/@import\b[^;]*;?/i', '', $css));
     }
 
     private function resolveSource(string $root, string $directory, string $source): string
