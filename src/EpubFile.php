@@ -8,6 +8,7 @@ use DOMDocument;
 use PhpEpub\Converters\ConverterInterface;
 use PhpEpub\Util\FileSystemHelper;
 use PhpEpub\Util\PathResolver;
+use PhpEpub\Util\TextEncoding;
 use PhpEpub\Util\XhtmlFragment;
 use PhpEpub\Util\XmlText;
 use SimpleXMLElement;
@@ -586,7 +587,7 @@ class EpubFile
         $useInternalErrors = libxml_use_internal_errors(true);
 
         try {
-            $document->loadHTML('<?xml encoding="UTF-8">' . $this->getContentManager()->getContent($page->path), LIBXML_NONET);
+            $document->loadHTML('<?xml encoding="UTF-8">' . TextEncoding::toUtf8($this->getContentManager()->getContent($page->path)), LIBXML_NONET);
         } catch (Exception) {
             return null;
         } finally {
