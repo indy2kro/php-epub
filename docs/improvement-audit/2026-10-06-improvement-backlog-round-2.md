@@ -118,7 +118,7 @@ Effort: S = one file, under 30 min · M = one class plus tests · L = cross-cutt
   `getAuthors()` returns illustrators and editors too, and `dc:contributor` is unreachable.
 - [x] **FEAT-02** Table-of-contents API: read and edit the EPUB 3 nav document and the EPUB 2 NCX — new, `src/Parser.php:134-149` — L · med
   Callers cannot list chapters or add a new one to the TOC after `addContent()`.
-- [ ] **FEAT-03** Validation API that returns a list of problems (structure, manifest/spine references, required metadata) — `src/Parser.php` — L · med
+- [x] **FEAT-03** Validation API that returns a list of problems (structure, manifest/spine references, required metadata) — `src/Parser.php` — L · med
   `Parser` only throws on the first fatal problem, so callers cannot check a book or their own edits before publishing.
 - [x] **FEAT-04** Create a new EPUB from scratch (promote `tests/Support/EpubBuilder` to a public builder) — `tests/Support/EpubBuilder.php`, `src/EpubFile.php` — M · med
   The library can only edit existing books, and the test suite already holds most of the code.

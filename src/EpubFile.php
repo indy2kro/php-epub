@@ -450,6 +450,23 @@ class EpubFile
     }
 
     /**
+     * Checks the book for common structural problems (required metadata, manifest and spine
+     * consistency, navigation), including unsaved changes. A quick check, not a replacement for EPUBCheck.
+     *
+     * @return list<ValidationIssue> Empty when no problem was found.
+     *
+     * @throws Exception If the book is not loaded or its navigation cannot be parsed.
+     */
+    public function validate(): array
+    {
+        if ($this->tempDir === null || $this->opfXml === null || $this->metadata === null || $this->manifest === null || $this->spine === null) {
+            throw new Exception('EPUB file must be loaded before validating.');
+        }
+
+        return (new Validator($this->tempDir, $this->opfXml, $this->metadata, $this->manifest, $this->spine, $this->getTableOfContents()))->validate();
+    }
+
+    /**
      * The table of contents (EPUB 3 navigation document and EPUB 2 NCX). Changes are written
      * to those files immediately and saved with the book.
      */

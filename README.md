@@ -13,7 +13,7 @@ A PHP library for reading and editing EPUB 2 and EPUB 3 books: metadata, cover, 
 - **Cover**: read and replace the cover image (EPUB 3 `cover-image` and EPUB 2 conventions).
 - **Package editing**: manifest items, reading order (spine) and table of contents (EPUB 3 nav and EPUB 2 NCX); adding or deleting content keeps them in sync.
 - **New books**: `EpubFile::create()` and `addChapter()` build a valid EPUB 3 from scratch.
-- **Structure checks on load**: a missing or wrong `mimetype`, `container.xml`, package document or NCX is reported with an exception. This is not a full validator like EPUBCheck.
+- **Checks**: loading rejects a missing or wrong `mimetype`, `container.xml`, package document or NCX, and `validate()` reports common problems (missing metadata, manifest and spine inconsistencies, missing navigation). This is not a full validator like EPUBCheck.
 - **Conversion**: PDF with TCPDF or Dompdf, and any format Calibre's `ebook-convert` supports.
 - **Hostile books**: paths are confined to the book, extraction is limited (zip bombs), XML entity declarations are refused, and PDF renderers cannot load anything outside the book. See [Handling Untrusted EPUBs](https://indy2kro.github.io/php-epub/advanced-usage/#handling-untrusted-epubs).
 
