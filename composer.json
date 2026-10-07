@@ -10,7 +10,10 @@
     "license" : "GPL-2.0-or-later",
     "require": {
         "php": ">=8.3",
+        "ext-ctype": "*",
         "ext-dom": "*",
+        "ext-libxml": "*",
+        "ext-simplexml": "*",
         "ext-xml": "*",
         "ext-zip": "*"
     },
