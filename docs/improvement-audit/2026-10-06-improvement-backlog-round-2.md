@@ -139,7 +139,7 @@ Effort: S = one file, under 30 min · M = one class plus tests · L = cross-cutt
 
 ### CI and packaging
 
-- [ ] **CI-01** Test the lowest supported dependencies (`composer update --prefer-lowest`, TCPDF 6.8) — `.github/workflows/tests.yml`, `composer.json` — S · med
+- [x] **CI-01** Test the lowest supported dependencies (`composer update --prefer-lowest`, TCPDF 6.8) — `.github/workflows/tests.yml`, `composer.json` — S · med
   `tecnickcom/tcpdf: ^6.8 || ^7.0` is allowed but CI always resolves 7.x, so the TCPDF 6 path is never run.
 - [x] **CI-02** Install Calibre in one CI job so the skipped real-conversion tests run — `tests/Converters/CalibreAdapterRealTest.php:26`, `.github/workflows/tests.yml` — S · low
   The adapter is only ever tested against a mocked `exec()`.
