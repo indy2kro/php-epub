@@ -64,7 +64,7 @@ were re-checked against the round-3 hardening.
 
 - [x] **SWEEP-01** Reject malformed XHTML in `addChapter()`, `addContent()` and `updateContent()`, or convert HTML fragments (`&nbsp;`, `<br>`) to XHTML — `src/EpubFile.php:170-191`, `src/BookTemplate.php:59-66`, `src/ContentManager.php:91-134`, `src/Util/ContentDocumentProperties.php:40-50` — M · high
   Probe: `addChapter('C', '<p>a&nbsp;b</p>')`, a `<br>` or an unclosed tag is accepted, and the chapter it writes cannot be parsed by any XHTML reader. Only a later `validate()` reports `CONTENT_NOT_WELL_FORMED`.
-- [ ] **SWEEP-02** Throw `ConversionException` for renderer failures, and say how to fix missing TCPDF core fonts (`scripts/generate-core-fonts.php`) — `src/Converters/TCPDFAdapter.php:57-66,88-115`, `src/Converters/DompdfAdapter.php:48-70`, `scripts/generate-core-fonts.php:1-30` — S · med
+- [x] **SWEEP-02** Throw `ConversionException` for renderer failures, and say how to fix missing TCPDF core fonts (`scripts/generate-core-fonts.php`) — `src/Converters/TCPDFAdapter.php:57-66,88-115`, `src/Converters/DompdfAdapter.php:48-70`, `scripts/generate-core-fonts.php:1-30` — S · med
   Probe: without the generated fonts, which is the case for every project that installs php-epub as a dependency and skips the manual step, `convert()` throws `Com\Tecnick\Pdf\Font\Exception: unable to read file: helvetica.json`. Neither adapter catches Dompdf or tc-lib exceptions, although both document `ConversionException`.
 
 ### Bugs
@@ -82,13 +82,13 @@ were re-checked against the round-3 hardening.
 
 ### Converters
 
-- [ ] **CONV-01** Render non-Latin books: default to a Unicode font (both renderers ship DejaVu) or choose one from `dc:language`, and switch TCPDF to RTL for right-to-left books — `src/Converters/DompdfAdapter.php:17-22,85-95`, `src/Converters/TCPDFAdapter.php:14-25,88-115` — M · med
+- [x] **CONV-01** Render non-Latin books: default to a Unicode font (both renderers ship DejaVu) or choose one from `dc:language`, and switch TCPDF to RTL for right-to-left books — `src/Converters/DompdfAdapter.php:17-22,85-95`, `src/Converters/TCPDFAdapter.php:14-25,88-115` — M · med
   The defaults (Dompdf `Arial`, TCPDF `helvetica`) map to the PDF core fonts, which cover Latin-1 only. Cyrillic, Greek, CJK and Arabic books without embedded fonts lose their glyphs, and nothing in either adapter sets right-to-left layout.
 - [ ] **CONV-02** De-obfuscate IDPF/Adobe obfuscated fonts before the PDF renderers load them — `src/Converters/EpubDocumentLoader.php:393-456,465-499`, `src/FontObfuscation.php` — S · low
   `@font-face` `url()`s point the renderers at the obfuscated files, because nothing in `src/Converters` reads `encryption.xml`, so the book's embedded fonts cannot be used in the PDF.
-- [ ] **CONV-03** Decode content documents in their declared encoding (EPUB allows UTF-16) instead of always forcing UTF-8 for the HTML parser — `src/Converters/EpubDocumentLoader.php:207-216`, `src/EpubFile.php:445-455` — S · low
+- [x] **CONV-03** Decode content documents in their declared encoding (EPUB allows UTF-16) instead of always forcing UTF-8 for the HTML parser — `src/Converters/EpubDocumentLoader.php:207-216`, `src/EpubFile.php:445-455` — S · low
   The `<?xml encoding="UTF-8">` prefix makes libxml read UTF-16 chapters as UTF-8. Their text is garbled in the PDF, and `getCoverImage()` cannot find the image in a UTF-16 cover page.
-- [ ] **CONV-04** Pass paths to `ebook-convert` so that a leading `-` is never read as an option, and document that Calibre receives the book unsanitised (keep Calibre up to date) — `src/Converters/CalibreAdapter.php:96-112`, `docs/converters/calibre-adapter.md` — S · low
+- [x] **CONV-04** Pass paths to `ebook-convert` so that a leading `-` is never read as an option, and document that Calibre receives the book unsanitised (keep Calibre up to date) — `src/Converters/CalibreAdapter.php:96-112`, `docs/converters/calibre-adapter.md` — S · low
   Unlike the TCPDF and Dompdf path, `CalibreAdapter` hands the book to Calibre unchanged, so keeping resources inside the book depends on the Calibre version. Calibre also parses an output name such as `-x.pdf` as an option.
 
 ### Features
@@ -122,7 +122,7 @@ were re-checked against the round-3 hardening.
 
 - [ ] **UX-01** Check language tags (BCP 47) and dates (W3CDTF) when they are set, and report invalid ones in `validate()` — `src/Traits/InteractsWithLanguage.php:20-45`, `src/Traits/InteractsWithDate.php:25-30` — S · low
   `setLanguage('English')` and `setDate('July 2020')` are accepted. EPUBCheck then reports OPF-092 (invalid language tag, an error) and OPF-053 (date syntax).
-- [ ] **UX-02** Reject invalid converter styles (wrong types, unknown keys, unknown paper sizes) instead of silently using the defaults — `src/Converters/TCPDFAdapter.php:35-44,189-208`, `src/Converters/DompdfAdapter.php:25-35,149-162` — S · low
+- [x] **UX-02** Reject invalid converter styles (wrong types, unknown keys, unknown paper sizes) instead of silently using the defaults — `src/Converters/TCPDFAdapter.php:35-44,189-208`, `src/Converters/DompdfAdapter.php:25-35,149-162` — S · low
   `'margin_left' => 12.5`, a typo such as `fontsize`, or a paper size of `A44` is ignored without a word, so callers cannot tell why the PDF looks wrong.
 - [ ] **UX-03** Add `setCreators()`/`setContributors()` that take `Contributor` objects (name, role, file-as), the inverse of `getCreators()` — `src/Traits/InteractsWithAuthors.php:30-60`, `src/Traits/InteractsWithContributors.php:16-42` — S · low
   `getCreators()` returns roles and sort keys, but changing one author's file-as or role means removing every creator and adding them all back with `addCreator()`.

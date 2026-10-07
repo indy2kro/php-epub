@@ -7,9 +7,23 @@ Requires `tecnickcom/tcpdf` and its core fonts; see [Installation](../installati
 
 ## Key Methods
 
-- **`__construct(array $styles = [])`**: Optional styling parameters: `font` (default `helvetica`), `font_size` (default `12`), `margin_left`/`margin_top`/`margin_right`/`margin_bottom` in mm (defaults `15`/`27`/`15`/`25`), `header`/`footer` booleans (default `true`; the header shows the book title and authors), and `paper_size` (e.g. `A4`, `letter`; default `A4`) and `orientation` (`portrait` or `landscape`; default `portrait`), as in `DompdfAdapter`, and `bookmarks` (default `true`): a PDF outline entry per chapter, titled with the chapter's first `h1`–`h3` heading, else its `<title>`, else "Chapter N". Values of the wrong type fall back to the defaults.
+- **`__construct(array $styles = [])`**: Optional styling parameters:
 
-- **`convert(string $epubDirectory, string $outputPath): void`**: Renders every spine document in reading order, each on a new page, sets the PDF title and author from the EPUB metadata, and writes the PDF. Image sources are limited to files inside the book; see [Converter](../converter.md#how-the-pdf-adapters-read-a-book). Throws a `ConversionException` if the book cannot be read or the PDF cannot be written.
+    | Style | Type | Default | |
+    | --- | --- | --- | --- |
+    | `font` | string | `dejavusans` | A TCPDF font name. |
+    | `font_size` | int or float | `12` | In points; greater than zero. |
+    | `margin_left`, `margin_top`, `margin_right`, `margin_bottom` | int or float | `15`, `27`, `15`, `25` | In mm (`12.5` is fine); not negative. |
+    | `header`, `footer` | bool | `true` | The header shows the book title and authors. |
+    | `paper_size` | string | `A4` | A format TCPDF knows, such as `A4` or `letter` (any case), as in `DompdfAdapter`. |
+    | `orientation` | string | `portrait` | `portrait` or `landscape`, as in `DompdfAdapter`. |
+    | `bookmarks` | bool | `true` | A PDF outline entry per chapter, titled with the chapter's first `h1`–`h3` heading, else its `<title>`, else "Chapter N". |
+
+    The constructor throws an `Exception` for a style it does not know (the message lists the valid ones), a value of the wrong type (a numeric string is not a number), an unusable value (a negative margin, an empty font, an unknown orientation) and a paper size TCPDF does not know. With TCPDF 6 the paper size is not checked, because TCPDF 6 has no list to check it against.
+
+    **Fonts and languages:** the default font is DejaVu Sans, which covers Latin, Greek, Cyrillic, Hebrew and Arabic, not only Latin-1 like the PDF core fonts (`helvetica`, `times`, `courier`). It is generated, with its bold and italic variants, by `scripts/generate-core-fonts.php` (see [Installation](../installation.md#tcpdf-core-fonts)); when that has not been run since DejaVu Sans was added, the default falls back to `helvetica`, which renders only Latin-1 text. Chinese, Japanese and Korean need a font of your own: pass its name as `font`. A `font` you pass always wins and never falls back. Books with `page-progression-direction="rtl"` in the spine, or (when the spine says nothing) with a primary language of `ar`, `he`, `fa`, `ur`, `yi`, `ps`, `sd`, `ug` or `dv`, are rendered right to left.
+
+- **`convert(string $epubDirectory, string $outputPath): void`**: Renders every spine document in reading order, each on a new page, sets the PDF title and author from the EPUB metadata, and writes the PDF. Image sources are limited to files inside the book; see [Converter](../converter.md#how-the-pdf-adapters-read-a-book). Throws a `ConversionException` if the book cannot be read, TCPDF fails (its exception, or any other error, is kept as the previous exception) or the PDF cannot be written. A missing font definition, TCPDF's "unable to read file: helvetica.json", is reported with the command that generates the fonts: `php vendor/indy2kro/php-epub/scripts/generate-core-fonts.php`.
 
 ## Usage Example
 

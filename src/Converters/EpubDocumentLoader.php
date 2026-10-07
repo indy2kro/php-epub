@@ -19,6 +19,7 @@ use PhpEpub\Parser;
 use PhpEpub\Spine;
 use PhpEpub\Util\FileSystemHelper;
 use PhpEpub\Util\PathResolver;
+use PhpEpub\Util\TextEncoding;
 use PhpEpub\XmlException;
 use PhpEpub\XmlParser;
 
@@ -146,6 +147,9 @@ final class EpubDocumentLoader
             $chapterTitles[] = $chapterTitle;
         }
 
+        $language = $metadata->getLanguage();
+        $direction = $spine->getPageProgressionDirection();
+
         return new EpubDocument(
             $metadata->getTitle(),
             array_values($metadata->getAuthors()),
@@ -153,7 +157,10 @@ final class EpubDocumentLoader
             array_values($styles),
             $chapterTitles,
             $root,
-            $this->coverImage($root, $manifest, $metadata, $chapters[0] ?? '')
+            $this->coverImage($root, $manifest, $metadata, $chapters[0] ?? ''),
+            $language,
+            // A spine that says "ltr" or "rtl" wins over the language.
+            $direction === null || $direction === 'default' ? EpubDocument::isRightToLeftLanguage($language) : $direction === 'rtl'
         );
     }
 
@@ -209,7 +216,7 @@ final class EpubDocumentLoader
 
         try {
             // The leading declaration makes the HTML parser read the bytes as UTF-8.
-            $document->loadHTML('<?xml encoding="UTF-8">' . $content, LIBXML_NONET);
+            $document->loadHTML('<?xml encoding="UTF-8">' . TextEncoding::toUtf8($content), LIBXML_NONET);
         } finally {
             libxml_clear_errors();
             libxml_use_internal_errors($useInternalErrors);

@@ -42,6 +42,10 @@ try {
 - **Links between chapters** work inside the PDF: a link such as `chapter2.xhtml#note1` (or `#note1` within a chapter) jumps to that place, and a link to a chapter jumps to its first page. Each chapter and each element with an `id` get an extra, invisible anchor with an id unique across the book (`epub-c<chapter>-<id>`); the book's own ids are kept, so its CSS still applies. Links to remote sites are kept, and links to files that are not chapters are left as written.
 The book's own CSS is kept: linked stylesheets (`<link rel="stylesheet">`, not alternate ones) and `<style>` blocks are collected once per book and applied after the adapter's defaults, so the book's styling wins. TCPDF and Dompdf each support only part of CSS, so complex layouts still render more simply than in a reader.
 
+- **Encoding:** content documents are read in their own encoding: UTF-8, or UTF-16 and other encodings as given by the byte order mark or the XML declaration, and converted to UTF-8 before parsing (this needs the `mbstring` or `iconv` extension; without either, documents are read as UTF-8). `EpubFile::getCoverImage()` reads cover pages the same way.
+- **Fonts and direction:** both adapters default to DejaVu Sans, which covers Latin, Greek, Cyrillic, Hebrew and Arabic; a `font` style always wins. Books that read right to left (`page-progression-direction="rtl"`, or a primary `dc:language` of `ar`, `he`, `fa`, `ur`, `yi`, `ps`, `sd`, `ug` or `dv`) are rendered right to left. See [TCPDFAdapter](converters/tcpdf-adapter.md) and [DompdfAdapter](converters/dompdf-adapter.md).
+- **Errors:** an exception thrown by the renderer (Dompdf, TCPDF and its libraries) becomes a `ConversionException` with the original as its previous exception. Invalid styles are rejected by the adapters' constructors with an `Exception`.
+
 Book content is treated as untrusted:
 
 - Each document is parsed with an HTML parser (not pattern-matched), so unquoted or unusually written attributes are handled too.

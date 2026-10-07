@@ -20,6 +20,10 @@ final readonly class EpubDocument
      * @param string $directory The book's directory (real path); renderers may read files only inside it.
      * @param string $coverImage The cover image (absolute path, inside the book) to show as the first page,
      *                           because no chapter shows it; "" when there is none.
+     * @param string $language The main language of the book (its first dc:language; "" when unknown).
+     * @param bool $rightToLeft Whether the book reads right to left: its spine says so
+     *                          (page-progression-direction="rtl"), or, when the spine does not say,
+     *                          its main language is written right to left.
      */
     public function __construct(
         public string $title,
@@ -28,8 +32,21 @@ final readonly class EpubDocument
         public array $styles = [],
         public array $chapterTitles = [],
         public string $directory = '',
-        public string $coverImage = ''
+        public string $coverImage = '',
+        public string $language = '',
+        public bool $rightToLeft = false
     ) {
+    }
+
+    /**
+     * Whether text in this language runs right to left (Arabic, Hebrew, Persian, Urdu, Yiddish,
+     * Pashto, Sindhi, Uyghur and Divehi), judged by the primary language subtag.
+     */
+    public static function isRightToLeftLanguage(string $language): bool
+    {
+        $primary = strtolower((string) strtok(str_replace('_', '-', trim($language)), '-'));
+
+        return in_array($primary, ['ar', 'he', 'fa', 'ur', 'yi', 'ps', 'sd', 'ug', 'dv'], true);
     }
 
     /**

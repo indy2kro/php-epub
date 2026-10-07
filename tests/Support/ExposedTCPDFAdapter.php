@@ -12,7 +12,7 @@ use TCPDF;
 /**
  * Exposes the configured TCPDF instance so tests can inspect pages, fonts and margins.
  */
-final class ExposedTCPDFAdapter extends TCPDFAdapter
+class ExposedTCPDFAdapter extends TCPDFAdapter
 {
     public function createPdfFor(string $epubDirectory): TCPDF
     {
