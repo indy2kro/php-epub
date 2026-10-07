@@ -25,24 +25,13 @@ final class ObfuscatedFontConversionTest extends TestCase
     private string $font;
 
     /**
-     * A family name no earlier run has registered: Dompdf remembers the fonts it loads by family.
+     * A family name of this run only, so nothing but the book can supply the font.
      */
     private string $family;
 
-    /**
-     * Dompdf's font directory before the test, so the fonts it registered can be removed again.
-     *
-     * @var list<string>
-     */
-    private array $fontFiles;
-
-    private string $installedFonts;
 
     protected function setUp(): void
     {
-        $fontDirectory = (new Options())->getFontDir();
-        $this->fontFiles = glob($fontDirectory . '/*') ?: [];
-        $this->installedFonts = (string) file_get_contents($fontDirectory . '/installed-fonts.json');
         $this->family = 'EpubFace' . bin2hex(random_bytes(4));
 
         $this->tmpDir = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'tmp' . DIRECTORY_SEPARATOR . 'obfuscated-fonts';
@@ -57,13 +46,6 @@ final class ObfuscatedFontConversionTest extends TestCase
     protected function tearDown(): void
     {
         (new FileSystemHelper())->deleteDirectory($this->tmpDir);
-
-        $fontDirectory = (new Options())->getFontDir();
-        foreach (array_diff(glob($fontDirectory . '/*') ?: [], $this->fontFiles) as $file) {
-            @unlink($file);
-        }
-
-        file_put_contents($fontDirectory . '/installed-fonts.json', $this->installedFonts);
     }
 
     public function testIdpfObfuscatedFontsAreInlinedPlain(): void
@@ -125,11 +107,14 @@ final class ObfuscatedFontConversionTest extends TestCase
     {
         $directory = $this->book(FontObfuscation::IDPF)->writeTo($this->tmpDir . '/book');
         $pdf = $this->tmpDir . '/out.pdf';
+        $dompdfFonts = glob((new Options())->getFontDir() . '/*') ?: [];
 
         (new DompdfAdapter())->convert($directory, $pdf);
 
         $this->assertStringContainsString('DejaVuSerif', (string) file_get_contents($pdf));
         $this->assertSame([], glob($directory . '/*.pdf') ?: [], 'Nothing is written next to the book');
+        // The book's font is registered in a private font directory, never in Dompdf's own.
+        $this->assertSame($dompdfFonts, glob((new Options())->getFontDir() . '/*') ?: []);
     }
 
     public function testDompdfCannotUseAnObfuscatedFontItDoesNotUnlock(): void
