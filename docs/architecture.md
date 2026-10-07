@@ -50,7 +50,7 @@ File operations on the extracted book (add, update, delete, move, read), keeping
 Reads and edits the EPUB 3 navigation document's `toc` nav and the EPUB 2 NCX as `TocEntry` trees, writing both when a book has both.
 
 ### Validator
-`EpubFile::validate()` runs it to report common structural problems as `ValidationIssue`s: required metadata, duplicate ids, manifest and spine consistency, navigation.
+`EpubFile::validate()` runs it to report common structural problems as `ValidationIssue`s: required metadata, duplicate ids, manifest and spine consistency, media types and manifest properties, navigation, accessibility metadata.
 
 ### Parser and XmlParser
 `Parser` reads `META-INF/container.xml` and locates and checks the OPF; problems reading systems tolerate (a wrong `mimetype`, a broken NCX) are left to `Validator`. `XmlParser` loads XML without network access and rejects entity declarations.

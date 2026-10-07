@@ -137,6 +137,8 @@ Checks the book, including unsaved changes, and returns a list of `PhpEpub\Valid
 | `METADATA_TITLE_MISSING`, `METADATA_LANGUAGE_MISSING`, `METADATA_IDENTIFIER_MISSING` | error | A required Dublin Core element is missing or empty |
 | `METADATA_UNIQUE_IDENTIFIER` | error | `package@unique-identifier` does not name a `dc:identifier` |
 | `METADATA_MODIFIED_MISSING` | error | An EPUB 3 package has no `dcterms:modified` |
+| `METADATA_LANGUAGE_INVALID` | error | A `dc:language` is not a well-formed BCP 47 tag (e.g. `English`) |
+| `METADATA_DATE_INVALID` | warning | A `dc:date` is not W3CDTF (e.g. `July 2020`) |
 | `DUPLICATE_ID` | error | An `id` is used more than once in the package document |
 | `MANIFEST_HREF_OUTSIDE`, `MANIFEST_FILE_MISSING` | error | A manifest item points outside the book, or its file is missing |
 | `FILE_NAME_INVALID` | warning | A file name contains a character OCF forbids (`" * : < > ? \`, DEL, C0 control characters) or ends with a dot; such files cannot be created on every system |
@@ -144,11 +146,16 @@ Checks the book, including unsaved changes, and returns a list of `PhpEpub\Valid
 | `SPINE_EMPTY`, `SPINE_UNKNOWN_IDREF`, `SPINE_DUPLICATE_IDREF` | error | The reading order is empty, or refers to an unknown or repeated item |
 | `SPINE_NOT_CONTENT` | warning | A spine item is not a content document and has no fallback |
 | `CONTENT_NOT_WELL_FORMED` | error | An XHTML content document is not well-formed XML |
+| `MEDIA_TYPE_MISMATCH` | error | A manifest item declared as a JPEG, PNG, GIF or WebP image holds another image type, or one declared as XHTML does not look like XML at all. Only the first 512 KiB of a file are read, and content that is not recognised is not judged |
+| `MANIFEST_PROPERTY_MISSING` | error | An EPUB 3 XHTML document needs a manifest property it lacks: `svg`, `mathml`, `scripted` or `remote-resources` (documents above 8 MiB are not examined) |
+| `MANIFEST_PROPERTY_UNNEEDED` | warning | An EPUB 3 XHTML document declares one of those properties, but its content does not need it |
+| `COVER_NOT_IMAGE` | error | A manifest item with the `cover-image` property is not an image |
 | `CONTENT_REFERENCE_MISSING`, `CONTENT_REFERENCE_NOT_IN_MANIFEST` | error | A content document refers (`src`, `href`, `data`, `poster`) to a local file that is missing or outside the book, or that is not in the manifest; remote URLs, `data:` URIs and links within the document are not checked |
 | `NAV_MISSING` / `NCX_MISSING` | error | An EPUB 3 book has no navigation document / an EPUB 2 book has no NCX |
 | `NAV_INVALID` / `NCX_INVALID` | error | The navigation document is not well-formed / the NCX is not well-formed or has no NCX namespace or `navMap` |
 | `NAV_EMPTY` / `NCX_EMPTY` | error | The `toc` nav of the navigation document has no list item / the NCX `navMap` has no `navPoint` (a table of contents needs an entry; deleting the last linked file leaves it empty) |
 | `TOC_LINK_NOT_IN_MANIFEST` | error | The table of contents links to a file that is not in the manifest |
+| `ACCESSIBILITY_ACCESS_MODE_MISSING`, `ACCESSIBILITY_FEATURE_MISSING`, `ACCESSIBILITY_HAZARD_MISSING`, `ACCESSIBILITY_SUMMARY_MISSING` | warning | An EPUB 3 book has no `schema:accessMode`, `schema:accessibilityFeature`, `schema:accessibilityHazard` or `schema:accessibilitySummary` metadata (see [accessibility metadata](metadata.md#accessibility)); a new book from `create()` starts without them |
 
 ```php
 foreach ($epubFile->validate() as $issue) {

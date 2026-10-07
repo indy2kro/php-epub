@@ -34,12 +34,20 @@ final class ValidatorTest extends TestCase
         $this->assertSame([], $this->open(EpubBuilder::epub3())->validate());
     }
 
-    public function testABookCreatedFromScratchIsValidOnceItHasAChapter(): void
+    public function testABookCreatedFromScratchIsValidOnceItHasAChapterAndAccessibilityMetadata(): void
     {
         $epubFile = EpubFile::create($this->tmpDir . '/new.epub', 'New');
-        $this->assertSame(['SPINE_EMPTY', 'NAV_EMPTY'], $this->codes($epubFile->validate()));
+        $accessibility = ['ACCESSIBILITY_ACCESS_MODE_MISSING', 'ACCESSIBILITY_FEATURE_MISSING', 'ACCESSIBILITY_HAZARD_MISSING', 'ACCESSIBILITY_SUMMARY_MISSING'];
+        $this->assertSame(['SPINE_EMPTY', 'NAV_EMPTY', ...$accessibility], $this->codes($epubFile->validate()));
 
         $epubFile->addChapter('One', '<p>One</p>');
+        $this->assertSame($accessibility, $this->codes($epubFile->validate()));
+
+        $metadata = $epubFile->getMetadata();
+        $metadata->setAccessModes(['textual']);
+        $metadata->setAccessibilityFeatures(['none']);
+        $metadata->setAccessibilityHazards(['none']);
+        $metadata->setAccessibilitySummary('Plain text.');
 
         $this->assertSame([], $epubFile->validate());
     }
@@ -139,6 +147,198 @@ final class ValidatorTest extends TestCase
             )),
             ['TOC_LINK_NOT_IN_MANIFEST'],
         ];
+    }
+
+    /**
+     * @param list<string> $expectedCodes
+     */
+    #[DataProvider('mediaTypeBooks')]
+    public function testChecksDeclaredMediaTypesAgainstContent(string $mediaType, string $content, array $expectedCodes): void
+    {
+        $opf = str_replace('</manifest>', "<item id=\"asset\" href=\"images/asset.bin\" media-type=\"{$mediaType}\"/></manifest>", (string) EpubBuilder::epub3()->getFile('EPUB/package.opf'));
+        $book = EpubBuilder::epub3()->withFile('EPUB/package.opf', $opf)->withFile('EPUB/images/asset.bin', $content);
+
+        $issues = $this->open($book)->validate();
+
+        $this->assertSame($expectedCodes, $this->codes($issues));
+        if ($expectedCodes !== []) {
+            $this->assertSame(ValidationIssue::ERROR, $issues[0]->severity);
+            $this->assertSame('EPUB/images/asset.bin', $issues[0]->location);
+        }
+    }
+
+    /**
+     * @return iterable<string, array{string, string, list<string>}>
+     */
+    public static function mediaTypeBooks(): iterable
+    {
+        $png = (string) base64_decode(EpubBuilder::PNG, true);
+        $jpeg = (string) base64_decode(EpubBuilder::JPEG, true);
+        $gif = (string) base64_decode(EpubBuilder::GIF, true);
+        $webp = (string) base64_decode(EpubBuilder::WEBP, true);
+
+        yield 'png as png' => ['image/png', $png, []];
+        yield 'jpeg as jpeg' => ['image/jpeg', $jpeg, []];
+        yield 'gif as gif' => ['image/gif', $gif, []];
+        yield 'webp as webp' => ['image/webp', $webp, []];
+        yield 'jpeg declared as png' => ['image/png', $jpeg, ['MEDIA_TYPE_MISMATCH']];
+        yield 'png declared as jpeg' => ['image/jpeg', $png, ['MEDIA_TYPE_MISMATCH']];
+        yield 'png declared as gif' => ['image/gif', $png, ['MEDIA_TYPE_MISMATCH']];
+        yield 'gif declared as webp' => ['image/webp', $gif, ['MEDIA_TYPE_MISMATCH']];
+        yield 'webp declared as png' => ['image/png', $webp, ['MEDIA_TYPE_MISMATCH']];
+        yield 'bytes that are no image are not judged' => ['image/png', 'not an image', []];
+        yield 'an empty image file is not judged' => ['image/jpeg', '', []];
+        yield 'other types are not judged' => ['application/octet-stream', $png, []];
+        yield 'a huge file is only read in part' => ['image/png', $png . random_bytes(2 * 1024 * 1024), []];
+        yield 'image declared as XHTML' => ['application/xhtml+xml', $png, ['CONTENT_NOT_WELL_FORMED', 'MEDIA_TYPE_MISMATCH']];
+        yield 'plain text declared as XHTML' => ['application/xhtml+xml', "  \n plain words", ['CONTENT_NOT_WELL_FORMED', 'MEDIA_TYPE_MISMATCH']];
+        yield 'XHTML after a byte order mark' => ['application/xhtml+xml', "\xEF\xBB\xBF\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><title>T</title></head><body/></html>", []];
+        yield 'broken XML is not a media type problem' => ['application/xhtml+xml', '<html><body><p>Open', ['CONTENT_NOT_WELL_FORMED']];
+    }
+
+    /**
+     * @param list<string> $expectedCodes
+     */
+    #[DataProvider('propertyBooks')]
+    public function testChecksManifestPropertiesOfContentDocuments(string $body, string $properties, array $expectedCodes): void
+    {
+        $opf = str_replace('<item id="chapter" href="text/chapter.xhtml" media-type="application/xhtml+xml"/>', '<item id="chapter" href="text/chapter.xhtml" media-type="application/xhtml+xml"' . $properties . '/>', (string) EpubBuilder::epub3()->getFile('EPUB/package.opf'));
+        $book = EpubBuilder::epub3()
+            ->withFile('EPUB/package.opf', $opf)
+            ->withFile('EPUB/text/chapter.xhtml', EpubBuilder::xhtml('Chapter', $body, '../css/style.css'));
+
+        $issues = $this->open($book)->validate();
+
+        $this->assertSame($expectedCodes, $this->codes($issues));
+        foreach ($issues as $issue) {
+            $this->assertSame('EPUB/text/chapter.xhtml', $issue->location);
+            $this->assertSame($issue->code === 'MANIFEST_PROPERTY_UNNEEDED' ? ValidationIssue::WARNING : ValidationIssue::ERROR, $issue->severity);
+        }
+    }
+
+    /**
+     * @return iterable<string, array{string, string, list<string>}>
+     */
+    public static function propertyBooks(): iterable
+    {
+        $svg = '<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"><rect width="1" height="1"/></svg>';
+        $math = '<math xmlns="http://www.w3.org/1998/Math/MathML"><mi>x</mi></math>';
+
+        yield 'plain document, no properties' => ['<p>Text</p>', '', []];
+        yield 'svg without its property' => [$svg, '', ['MANIFEST_PROPERTY_MISSING']];
+        yield 'svg with its property' => [$svg, ' properties="svg"', []];
+        yield 'mathml without its property' => [$math, '', ['MANIFEST_PROPERTY_MISSING']];
+        yield 'script without its property' => ['<script>var a = 1;</script>', '', ['MANIFEST_PROPERTY_MISSING']];
+        yield 'script with its property' => ['<script>var a = 1;</script>', ' properties="scripted"', []];
+        yield 'remote image without its property' => ['<img src="https://example.com/a.png" alt=""/>', '', ['MANIFEST_PROPERTY_MISSING']];
+        yield 'remote link is only followed' => ['<a href="https://example.com/">Web</a>', '', []];
+        yield 'every property missing' => [$svg . $math . '<script/><img src="https://example.com/b.png" alt=""/>', '', ['MANIFEST_PROPERTY_MISSING', 'MANIFEST_PROPERTY_MISSING', 'MANIFEST_PROPERTY_MISSING', 'MANIFEST_PROPERTY_MISSING']];
+        yield 'one of two missing' => [$svg . $math, ' properties="svg"', ['MANIFEST_PROPERTY_MISSING']];
+        yield 'property not needed' => ['<p>Text</p>', ' properties="svg"', ['MANIFEST_PROPERTY_UNNEEDED']];
+        yield 'properties of other kinds are left alone' => ['<p>Text</p>', ' properties="cover-image"', ['COVER_NOT_IMAGE']];
+        yield 'not well-formed content is reported once' => ['<p>Open', '', ['CONTENT_NOT_WELL_FORMED']];
+    }
+
+    public function testHugeDocumentsAreNotExaminedForManifestProperties(): void
+    {
+        $padding = '<!--' . chunk_split(base64_encode(random_bytes(7 * 1024 * 1024)), 76, ' ') . '-->';
+        $book = EpubBuilder::epub3()->withFile(
+            'EPUB/text/chapter.xhtml',
+            EpubBuilder::xhtml('Chapter', '<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"/>' . $padding, '../css/style.css')
+        );
+
+        $this->assertSame([], $this->open($book)->validate());
+    }
+
+    public function testManifestPropertiesAreAnEpub3Matter(): void
+    {
+        $book = EpubBuilder::epub2()->withFile('OEBPS/text/chapter.xhtml', EpubBuilder::xhtml('Chapter', '<script/>'));
+
+        $this->assertSame([], $this->open($book)->validate());
+    }
+
+    public function testACoverImagePropertyNeedsAnImage(): void
+    {
+        $opf = str_replace('media-type="text/css"/>', 'media-type="text/css" properties="cover-image"/><item id="cover" href="cover.png" media-type="image/png" properties="cover-image"/>', (string) EpubBuilder::epub3()->getFile('EPUB/package.opf'));
+        $book = EpubBuilder::epub3()
+            ->withFile('EPUB/package.opf', $opf)
+            ->withFile('EPUB/cover.png', (string) base64_decode(EpubBuilder::PNG, true));
+
+        $issues = $this->open($book)->validate();
+
+        $this->assertSame(['COVER_NOT_IMAGE'], $this->codes($issues));
+        $this->assertSame(ValidationIssue::ERROR, $issues[0]->severity);
+        $this->assertSame('EPUB/css/style.css', $issues[0]->location);
+    }
+
+    public function testInvalidLanguagesAndDatesAreReported(): void
+    {
+        $opf = str_replace(
+            ['<dc:language>en</dc:language>', '</metadata>'],
+            ['<dc:language>en</dc:language><dc:language>English</dc:language><dc:language>fr</dc:language><dc:date>July 2020</dc:date><dc:date>2020-07-31</dc:date><dc:date> </dc:date>', '</metadata>'],
+            (string) EpubBuilder::epub3()->getFile('EPUB/package.opf')
+        );
+
+        $issues = $this->open(EpubBuilder::epub3()->withFile('EPUB/package.opf', $opf))->validate();
+
+        $this->assertSame(['METADATA_LANGUAGE_INVALID', 'METADATA_DATE_INVALID', 'METADATA_DATE_INVALID'], $this->codes($issues));
+        $this->assertSame([ValidationIssue::ERROR, ValidationIssue::WARNING, ValidationIssue::WARNING], array_map(static fn (ValidationIssue $issue): string => $issue->severity, $issues));
+        $this->assertSame(['English', 'July 2020', ''], array_map(static fn (ValidationIssue $issue): ?string => $issue->location, $issues));
+    }
+
+    public function testEmptyLanguageIsReportedAsMissingNotAsInvalid(): void
+    {
+        $opf = str_replace('<dc:language>en</dc:language>', '<dc:language> </dc:language>', (string) EpubBuilder::epub3()->getFile('EPUB/package.opf'));
+
+        $this->assertSame(['METADATA_LANGUAGE_MISSING'], $this->codes($this->open(EpubBuilder::epub3()->withFile('EPUB/package.opf', $opf))->validate()));
+    }
+
+    /**
+     * @param list<string> $removed
+     * @param list<string> $expectedCodes
+     */
+    #[DataProvider('accessibilityGaps')]
+    public function testWarnsAboutMissingAccessibilityMetadataInEpub3(array $removed, array $expectedCodes): void
+    {
+        $opf = (string) EpubBuilder::epub3()->getFile('EPUB/package.opf');
+        foreach ($removed as $property) {
+            $opf = (string) preg_replace('#<meta property="schema:' . $property . '">[^<]*</meta>#', '', $opf);
+        }
+
+        $issues = $this->open(EpubBuilder::epub3()->withFile('EPUB/package.opf', $opf))->validate();
+
+        $this->assertSame($expectedCodes, $this->codes($issues));
+        foreach ($issues as $issue) {
+            $this->assertSame(ValidationIssue::WARNING, $issue->severity);
+        }
+    }
+
+    /**
+     * @return iterable<string, array{list<string>, list<string>}>
+     */
+    public static function accessibilityGaps(): iterable
+    {
+        yield 'complete' => [[], []];
+        yield 'no access mode' => [['accessMode'], ['ACCESSIBILITY_ACCESS_MODE_MISSING']];
+        yield 'no feature' => [['accessibilityFeature'], ['ACCESSIBILITY_FEATURE_MISSING']];
+        yield 'no hazard' => [['accessibilityHazard'], ['ACCESSIBILITY_HAZARD_MISSING']];
+        yield 'no summary' => [['accessibilitySummary'], ['ACCESSIBILITY_SUMMARY_MISSING']];
+        yield 'none at all' => [
+            ['accessMode', 'accessibilityFeature', 'accessibilityHazard', 'accessibilitySummary'],
+            ['ACCESSIBILITY_ACCESS_MODE_MISSING', 'ACCESSIBILITY_FEATURE_MISSING', 'ACCESSIBILITY_HAZARD_MISSING', 'ACCESSIBILITY_SUMMARY_MISSING'],
+        ];
+    }
+
+    public function testEmptyAccessibilityValuesCountAsMissing(): void
+    {
+        $opf = str_replace('>none</meta>', '> </meta>', (string) EpubBuilder::epub3()->getFile('EPUB/package.opf'));
+
+        $this->assertSame(['ACCESSIBILITY_HAZARD_MISSING'], $this->codes($this->open(EpubBuilder::epub3()->withFile('EPUB/package.opf', $opf))->validate()));
+    }
+
+    public function testEpub2BooksNeedNoAccessibilityMetadata(): void
+    {
+        $this->assertSame([], $this->open(EpubBuilder::epub2())->validate());
     }
 
     public function testEpub2BooksNeedAnNcxNotANavigationDocument(): void

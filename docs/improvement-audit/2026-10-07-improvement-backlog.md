@@ -77,7 +77,7 @@ were re-checked against the round-3 hardening.
   Probe: `a.txt.` or `text./a.txt` fails with a misleading "Permission denied" from `fopen()`, and names such as `CON` or `a.xhtml:x` (an alternate data stream) are not rejected up front.
 - [x] **BUG-04** Allow case-only renames in `moveContent()` on case-insensitive filesystems — `src/ContentManager.php:193-195` — S · low
   Probe on Windows: `moveContent('EPUB/text/ch.xhtml', 'EPUB/text/Ch.xhtml')` throws "already exists" because `file_exists()` finds the source file itself.
-- [ ] **BUG-05** Update `dcterms:modified` only on the book-level meta, never on a refinement with the same property — `src/Metadata.php:562-576` — S · low
+- [x] **BUG-05** Update `dcterms:modified` only on the book-level meta, never on a refinement with the same property — `src/Metadata.php:562-576` — S · low
   `updateModifiedDate()` takes the first meta with that property, including one with `refines="#…"`, so the book-level date stays stale and the refinement is overwritten.
 
 ### Converters
@@ -95,9 +95,9 @@ were re-checked against the round-3 hardening.
 
 - [ ] **FEAT-01** Detect DRM-protected books (`encryption.xml` algorithms other than font obfuscation, `rights.xml`, an LCP license): add `isEncrypted()`, report them in `validate()`, refuse PDF conversion — `src/FontObfuscation.php:86-110`, `src/Validator.php`, `src/EpubFile.php:278-287` — M · med
   An Adobe ADEPT or Readium LCP book loads without any warning. `getContent()` then returns ciphertext, `validate()` reports every chapter as not well-formed, and the converters produce garbage PDFs.
-- [ ] **FEAT-02** Extend `validate()` with frequent EPUBCheck package errors: declared media type vs. file content, missing EPUB 3 manifest properties (`svg`, `mathml`, `scripted`, `remote-resources`) in loaded books, `cover-image` on a non-image — `src/Validator.php:150-300`, `src/Util/ContentDocumentProperties.php` — M · med
+- [x] **FEAT-02** Extend `validate()` with frequent EPUBCheck package errors: declared media type vs. file content, missing EPUB 3 manifest properties (`svg`, `mathml`, `scripted`, `remote-resources`) in loaded books, `cover-image` on a non-image — `src/Validator.php:150-300`, `src/Util/ContentDocumentProperties.php` — M · med
   Round 3 sets these properties for content the library writes. Loaded books with wrong media types or missing properties still pass `validate()` and fail EPUBCheck (OPF-014, OPF-029).
-- [ ] **FEAT-03** Accessibility metadata API (`schema:accessMode`, `accessibilityFeature`, `accessibilityHazard`, `accessibilitySummary`, `dcterms:conformsTo`) with `validate()` hints — `src/Metadata.php:166-222`, `src/Validator.php` — M · med
+- [x] **FEAT-03** Accessibility metadata API (`schema:accessMode`, `accessibilityFeature`, `accessibilityHazard`, `accessibilitySummary`, `dcterms:conformsTo`) with `validate()` hints — `src/Metadata.php:166-222`, `src/Validator.php` — M · med
   Since June 2025 the European Accessibility Act requires accessibility metadata for e-books sold in the EU. Today callers have to know the property names and write them through the generic `setPropertyValues()`.
 - [x] **FEAT-04** Rewrite references in content documents when `moveContent()` moves a file (links, images, stylesheets, and the relative links of the moved document itself) — `src/ContentManager.php:168-225` — M · med
   `moveContent()` keeps the manifest, spine, TOC and `encryption.xml` consistent, but every `<a>`, `<img>` and `<link>` that pointed at the file breaks, so reorganising a book still needs a hand-written rewrite pass.
@@ -120,11 +120,11 @@ were re-checked against the round-3 hardening.
 
 ### Public API
 
-- [ ] **UX-01** Check language tags (BCP 47) and dates (W3CDTF) when they are set, and report invalid ones in `validate()` — `src/Traits/InteractsWithLanguage.php:20-45`, `src/Traits/InteractsWithDate.php:25-30` — S · low
+- [x] **UX-01** Check language tags (BCP 47) and dates (W3CDTF) when they are set, and report invalid ones in `validate()` — `src/Traits/InteractsWithLanguage.php:20-45`, `src/Traits/InteractsWithDate.php:25-30` — S · low
   `setLanguage('English')` and `setDate('July 2020')` are accepted. EPUBCheck then reports OPF-092 (invalid language tag, an error) and OPF-053 (date syntax).
 - [x] **UX-02** Reject invalid converter styles (wrong types, unknown keys, unknown paper sizes) instead of silently using the defaults — `src/Converters/TCPDFAdapter.php:35-44,189-208`, `src/Converters/DompdfAdapter.php:25-35,149-162` — S · low
   `'margin_left' => 12.5`, a typo such as `fontsize`, or a paper size of `A44` is ignored without a word, so callers cannot tell why the PDF looks wrong.
-- [ ] **UX-03** Add `setCreators()`/`setContributors()` that take `Contributor` objects (name, role, file-as), the inverse of `getCreators()` — `src/Traits/InteractsWithAuthors.php:30-60`, `src/Traits/InteractsWithContributors.php:16-42` — S · low
+- [x] **UX-03** Add `setCreators()`/`setContributors()` that take `Contributor` objects (name, role, file-as), the inverse of `getCreators()` — `src/Traits/InteractsWithAuthors.php:30-60`, `src/Traits/InteractsWithContributors.php:16-42` — S · low
   `getCreators()` returns roles and sort keys, but changing one author's file-as or role means removing every creator and adding them all back with `addCreator()`.
 - [x] **UX-04** Check the result of `ZipArchive::addFile()` in `compress()` and include the libzip status in the error — `src/ZipHandler.php:213-235` — S · low
   `addFile()` failures are ignored, and `close()` then fails with a bare "Failed to finalize ZIP file" that names neither the file (for example, one locked on Windows) nor the reason.

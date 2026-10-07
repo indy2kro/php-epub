@@ -9,11 +9,11 @@ A PHP library for reading and editing EPUB 2 and EPUB 3 books: metadata, cover, 
 ## Features
 
 - **Open and save**: `EpubFile::open()` extracts a book safely; `save()` writes an OCF-valid archive (checked with EPUBCheck in CI); books can also be opened from and saved to strings and streams.
-- **Metadata**: title(s), authors, creators and contributors with roles, description, publisher, dates, language, subjects, identifiers, and any other `<meta>` element.
+- **Metadata**: title(s), authors, creators and contributors with roles, description, publisher, dates and language (checked when set), accessibility metadata, subjects, identifiers, and any other `<meta>` element.
 - **Cover**: read and replace the cover image (EPUB 3 `cover-image` and EPUB 2 conventions).
 - **Package editing**: manifest items, reading order (spine) and table of contents (EPUB 3 nav and EPUB 2 NCX); adding or deleting content keeps them in sync, moving a file rewrites the references to it, and the table of contents can be generated from the chapters' headings.
 - **New books**: `EpubFile::create()` and `addChapter()` build a valid EPUB 3 from scratch.
-- **Checks**: loading rejects a book without a readable `container.xml` or package document but, like reading systems, accepts a wrong `mimetype` or a broken NCX; `validate()` reports common problems (a wrong `mimetype`, missing metadata, manifest and spine inconsistencies, missing or broken navigation). This is not a full validator like EPUBCheck.
+- **Checks**: loading rejects a book without a readable `container.xml` or package document but, like reading systems, accepts a wrong `mimetype` or a broken NCX; `validate()` reports common problems (a wrong `mimetype`, missing metadata, invalid language tags and dates, manifest and spine inconsistencies, media types that contradict the content, missing manifest properties, missing or broken navigation, missing accessibility metadata). This is not a full validator like EPUBCheck.
 - **Conversion**: PDF with TCPDF or Dompdf, and any format Calibre's `ebook-convert` supports.
 - **Hostile books**: paths are confined to the book, extraction is limited (zip bombs), XML entity declarations are refused, and PDF renderers cannot load anything outside the book. See [Handling Untrusted EPUBs](https://indy2kro.github.io/php-epub/advanced-usage/#handling-untrusted-epubs).
 

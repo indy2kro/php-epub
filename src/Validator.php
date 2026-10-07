@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace PhpEpub;
 
+use PhpEpub\Util\ContentDocumentProperties;
 use PhpEpub\Util\FileSystemHelper;
+use PhpEpub\Util\MetadataSyntax;
 use PhpEpub\Util\PathResolver;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
@@ -34,6 +36,21 @@ final readonly class Validator
     ];
 
     /**
+     * Image media types whose declaration is compared with the file content.
+     */
+    private const array CHECKED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+
+    /**
+     * How much of a file is read to recognise its type; larger files are not loaded for that.
+     */
+    private const int SNIFF_BYTES = 524288;
+
+    /**
+     * XHTML documents above this size are not parsed for the manifest properties they need.
+     */
+    private const int MAX_DOCUMENT_BYTES = 8388608;
+
+    /**
      * @param string $rootDirectory The directory holding the extracted book.
      */
     public function __construct(
@@ -58,11 +75,15 @@ final readonly class Validator
             ...$this->checkMimetype(),
             ...$this->checkFileNames(),
             ...$this->checkMetadata(),
+            ...$this->checkMetadataSyntax(),
             ...$this->checkIds(),
             ...$this->checkManifest(),
             ...$this->checkSpine(),
             ...$this->checkContent(),
             ...$this->checkNavigation(),
+            ...$this->checkMediaTypes(),
+            ...$this->checkManifestProperties(),
+            ...$this->checkAccessibility(),
         ];
     }
 
@@ -106,6 +127,32 @@ final readonly class Validator
 
         if ($this->isEpub3() && trim((string) $this->metadata->getProperty('dcterms:modified')) === '') {
             $issues[] = $this->error('METADATA_MODIFIED_MISSING', 'EPUB 3 packages need a dcterms:modified date.');
+        }
+
+        return $issues;
+    }
+
+    /**
+     * Languages must be well-formed BCP 47 tags (an error: EPUBCheck rejects them) and dates W3CDTF
+     * (a warning: reading systems cope). Empty languages are reported by checkMetadata().
+     *
+     * @return list<ValidationIssue>
+     */
+    private function checkMetadataSyntax(): array
+    {
+        $issues = [];
+        foreach ($this->metadata->getLanguages() as $language) {
+            $language = trim($language);
+            if ($language !== '' && ! MetadataSyntax::isLanguageTag($language)) {
+                $issues[] = $this->error('METADATA_LANGUAGE_INVALID', "\"{$language}\" is not a well-formed BCP 47 language tag.", $language);
+            }
+        }
+
+        foreach ($this->metadata->getDublinCoreValues('date') as $date) {
+            $date = trim($date);
+            if (! MetadataSyntax::isW3cdtf($date)) {
+                $issues[] = $this->warning('METADATA_DATE_INVALID', "\"{$date}\" is not a W3CDTF date (YYYY, YYYY-MM, YYYY-MM-DD or a date-time with a time zone).", $date);
+            }
         }
 
         return $issues;
@@ -258,6 +305,136 @@ final readonly class Validator
         return $this->manifest->findByPath($target) instanceof ManifestItem
             ? []
             : [$this->error('CONTENT_REFERENCE_NOT_IN_MANIFEST', "The content document refers to {$target}, which is not in the manifest.", $document)];
+    }
+
+    /**
+     * The media type of an image (JPEG, PNG, GIF, WebP) must match its content, and an XHTML document
+     * must not obviously be something else (EPUBCheck OPF-029 and friends). Only the first bytes of a
+     * file are read; content that cannot be recognised is not judged.
+     *
+     * @return list<ValidationIssue>
+     */
+    private function checkMediaTypes(): array
+    {
+        $issues = [];
+        foreach ($this->manifest->getItems() as $item) {
+            $isImage = in_array($item->mediaType, self::CHECKED_IMAGE_TYPES, true);
+            if ($item->path === '' || ! ($isImage || $item->mediaType === 'application/xhtml+xml')) {
+                continue;
+            }
+
+            $file = $this->paths->resolve($this->rootDirectory, $item->path);
+            if (! is_file($file)) {
+                continue;
+            }
+
+            $prefix = (string) @file_get_contents($file, false, null, 0, self::SNIFF_BYTES);
+            if ($isImage) {
+                $size = @getimagesizefromstring($prefix);
+                $detected = $size === false ? $item->mediaType : $size['mime'];
+                $message = "Manifest item \"{$item->id}\" is declared {$item->mediaType}, but its content is {$detected}.";
+                $mismatch = $detected !== $item->mediaType;
+            } else {
+                $message = "Manifest item \"{$item->id}\" is declared application/xhtml+xml, but its content does not look like XML.";
+                $mismatch = $this->isObviouslyNotXml($prefix);
+            }
+
+            if ($mismatch) {
+                $issues[] = $this->error('MEDIA_TYPE_MISMATCH', $message, $item->path);
+            }
+        }
+
+        return $issues;
+    }
+
+    /**
+     * Whether the first bytes of a document cannot start an XML document: the first character after an
+     * optional UTF-8 byte order mark and white space is not "<". Empty files and UTF-16 documents are not judged.
+     */
+    private function isObviouslyNotXml(string $prefix): bool
+    {
+        $start = ltrim(str_starts_with($prefix, "\xEF\xBB\xBF") ? substr($prefix, 3) : $prefix);
+
+        return $start !== '' && ! in_array(substr($start, 0, 2), ["\xFE\xFF", "\xFF\xFE"], true) && $start[0] !== '<';
+    }
+
+    /**
+     * EPUB 3 XHTML documents must declare the properties their content needs (svg, mathml, scripted,
+     * remote-resources): an error when one is missing (EPUBCheck OPF-014), a warning when one is not needed.
+     * A cover-image property belongs to an image only (OPF-012). Documents above a size limit, and
+     * documents that are not well-formed (reported by checkContent()), are not examined.
+     *
+     * @return list<ValidationIssue>
+     */
+    private function checkManifestProperties(): array
+    {
+        $issues = [];
+        foreach ($this->manifest->getItems() as $item) {
+            $declared = preg_split('/\s+/', trim($item->properties), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+            if (in_array('cover-image', $declared, true) && ! str_starts_with($item->mediaType, 'image/')) {
+                $issues[] = $this->error('COVER_NOT_IMAGE', "Manifest item \"{$item->id}\" has the cover-image property but is {$item->mediaType}, not an image.", $item->path);
+            }
+
+            $needed = $this->isEpub3() ? $this->neededProperties($item) : null;
+            if ($needed === null) {
+                continue;
+            }
+
+            foreach (ContentDocumentProperties::PROPERTIES as $property) {
+                if (in_array($property, $needed, true) && ! in_array($property, $declared, true)) {
+                    $issues[] = $this->error('MANIFEST_PROPERTY_MISSING', "Manifest item \"{$item->id}\" needs the \"{$property}\" property.", $item->path);
+                } elseif (! in_array($property, $needed, true) && in_array($property, $declared, true)) {
+                    $issues[] = $this->warning('MANIFEST_PROPERTY_UNNEEDED', "Manifest item \"{$item->id}\" has the \"{$property}\" property, but its content does not need it.", $item->path);
+                }
+            }
+        }
+
+        return $issues;
+    }
+
+    /**
+     * The properties an XHTML manifest item needs; null for another kind of item, or when its file is
+     * missing, too large or not well-formed.
+     *
+     * @return list<string>|null
+     */
+    private function neededProperties(ManifestItem $item): ?array
+    {
+        $file = $item->path === '' ? '' : $this->paths->resolve($this->rootDirectory, $item->path);
+        $isReadable = $item->mediaType === 'application/xhtml+xml' && is_file($file)
+            && (int) @filesize($file) <= self::MAX_DOCUMENT_BYTES;
+        $content = $isReadable ? FileSystemHelper::readFile($file) : null;
+
+        return $content === null ? null : ContentDocumentProperties::detect($content);
+    }
+
+    /**
+     * EPUB 3 books should describe their accessibility (EPUB Accessibility 1.1; the European Accessibility
+     * Act asks for it): access modes, features, hazards and a summary. Missing metadata is a warning.
+     *
+     * @return list<ValidationIssue>
+     */
+    private function checkAccessibility(): array
+    {
+        if (! $this->isEpub3()) {
+            return [];
+        }
+
+        $metadata = [
+            'ACCESSIBILITY_ACCESS_MODE_MISSING' => ['schema:accessMode', $this->metadata->getAccessModes()],
+            'ACCESSIBILITY_FEATURE_MISSING' => ['schema:accessibilityFeature', $this->metadata->getAccessibilityFeatures()],
+            'ACCESSIBILITY_HAZARD_MISSING' => ['schema:accessibilityHazard', $this->metadata->getAccessibilityHazards()],
+            'ACCESSIBILITY_SUMMARY_MISSING' => ['schema:accessibilitySummary', [(string) $this->metadata->getAccessibilitySummary()]],
+        ];
+
+        $issues = [];
+        foreach ($metadata as $code => [$property, $values]) {
+            if (! $this->hasValue($values)) {
+                $issues[] = $this->warning($code, "The package has no {$property} accessibility metadata.");
+            }
+        }
+
+        return $issues;
     }
 
     /**
