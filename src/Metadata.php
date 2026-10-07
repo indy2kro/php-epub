@@ -20,6 +20,7 @@ class Metadata
     use Traits\InteractsWithIdentifier;
     use Traits\InteractsWithSeries;
     use Traits\InteractsWithAccessibility;
+    use Traits\InteractsWithRendition;
     use Traits\UpgradesToEpub3;
 
     public const string OPF_NAMESPACE = 'http://www.idpf.org/2007/opf';
