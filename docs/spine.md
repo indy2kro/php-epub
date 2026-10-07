@@ -22,6 +22,12 @@ The `Spine` class manages the reading order of the content within an EPUB file: 
 
 - **`getPageProgressionDirection(): ?string`** and **`setPageProgressionDirection(?string $direction): void`**: The EPUB 3 `page-progression-direction` of the spine: `ltr`, `rtl` (right-to-left books such as manga) or `default`; `null` when not set, and passing `null` removes it. Setting throws for any other value and for EPUB 2 packages, which do not have the attribute.
 
+- **`getItemProperties(string $idref): array`** and **`setItemProperties(string $idref, array $properties): void`**: The EPUB 3 `properties` of a spine entry (e.g. `page-spread-left`, `rendition:layout-pre-paginated`) as a list of tokens; setting replaces them and `[]` removes them. Throws if the item is not in the spine, a token is empty or has white space, or the package is EPUB 2.
+
+- **`getPageSpread(string $idref): ?string`** and **`setPageSpread(string $idref, ?string $side): void`**: The side of a fixed-layout spread a page belongs on: `left` (`page-spread-left`), `right` (`page-spread-right`) or `center` (`rendition:page-spread-center`); `null` removes it. Other properties are kept.
+
+- **`getItemRendition(string $idref, string $aspect): ?string`** and **`setItemRendition(string $idref, string $aspect, ?string $value): void`**: The per-item rendition override of an aspect (`layout`, `orientation`, `spread` or `flow`), e.g. `pre-paginated` for `rendition:layout-pre-paginated`; `null` removes it. The values are those of the book-level `Metadata::setRenditionLayout()` and its siblings. Writing a `rendition:` property declares the `rendition` prefix in the package. See [EPUB 3 Features](epub3-features.md#fixed-layout-and-rendition).
+
 - **`isModified(): bool`**: Whether the reading order changed since loading or the last save.
 
 Changes are made to the OPF in memory; `EpubFile::save()` writes them (and refreshes the EPUB 3 modified date). Other `<itemref>` attributes, such as `id` and `properties`, are kept.

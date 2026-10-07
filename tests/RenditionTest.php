@@ -201,7 +201,7 @@ final class RenditionTest extends TestCase
     }
 
     /**
-     * @param \Closure(\PhpEpub\Spine): void $call
+     * @param \Closure(\PhpEpub\Spine): mixed $call
      */
     #[DataProvider('invalidSpineCalls')]
     public function testRejectsInvalidSpineProperties(\Closure $call): void
@@ -213,7 +213,7 @@ final class RenditionTest extends TestCase
     }
 
     /**
-     * @return iterable<string, array{\Closure(\PhpEpub\Spine): void}>
+     * @return iterable<string, array{\Closure(\PhpEpub\Spine): mixed}>
      */
     public static function invalidSpineCalls(): iterable
     {

@@ -88,6 +88,18 @@ public function getContent(string $filePath): string
 
 Returns the content of a file. Throws an exception if the file doesn't exist or cannot be read.
 
+```php
+public function getText(string $filePath): string
+```
+
+Returns the plain text of an XHTML or HTML document: one line per paragraph, heading, list item, table row and line break, with white space collapsed and entities decoded. Scripts, styles and the document head are left out. The document is read in its declared encoding (UTF-8 or UTF-16) and does not have to be well-formed. Throws an exception if the file doesn't exist or cannot be read. `EpubFile::getText()` does this for every document of the reading order; see [EPUB 3 Features](epub3-features.md#plain-text).
+
+```php
+public function updateManifestProperties(): void
+```
+
+Sets the EPUB 3 manifest properties (`svg`, `mathml`, `scripted`, `remote-resources`) that every XHTML document needs because of its content and removes those it no longer needs; other properties are kept. `addContent()` and `updateContent()` do this for the file they write; use this for books whose documents were written by something else (`EpubFile::upgradeToEpub3()` does). Nothing happens for an EPUB 2 package, and documents that are missing, not well-formed or larger than 8 MiB are left alone.
+
 ### Fonts
 
 ```php

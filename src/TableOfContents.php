@@ -160,7 +160,7 @@ final readonly class TableOfContents
         $landmarks = $this->getLandmarks();
         $directory = dirname($this->manifest->getOpfPath());
         $base = $directory === '.' ? '' : $directory . '/';
-        for ($number = 1; ; $number++) {
+        for ($number = 1;; $number++) {
             $path = $base . ($number === 1 ? 'nav' : 'nav-' . $number) . '.xhtml';
             if (! $this->manifest->findByPath($path) instanceof ManifestItem && ! file_exists($this->paths->resolve($this->rootDirectory, $path))) {
                 break;
@@ -667,14 +667,12 @@ final readonly class TableOfContents
 
         $landmarks = [];
         foreach ($xpath->query('.//x:a[@epub:type][@href]', $nav) ?: [] as $link) {
-            if (! $link instanceof DOMElement) {
-                continue;
-            }
-
-            [$path, $fragment] = $this->resolveHref($navPath, $link->getAttribute('href'));
-            $type = trim($link->getAttributeNS(self::OPS_NAMESPACE, 'type'));
-            if ($path !== '' && $type !== '') {
-                $landmarks[] = new Landmark($type, $this->collapse($link->textContent), $path, $fragment);
+            if ($link instanceof DOMElement) {
+                [$path, $fragment] = $this->resolveHref($navPath, $link->getAttribute('href'));
+                $type = trim($link->getAttributeNS(self::OPS_NAMESPACE, 'type'));
+                if ($path !== '' && $type !== '') {
+                    $landmarks[] = new Landmark($type, $this->collapse($link->textContent), $path, $fragment);
+                }
             }
         }
 
@@ -698,7 +696,10 @@ final readonly class TableOfContents
         $nav = $this->first($xpath, self::LANDMARKS_NAV);
 
         if ($landmarks === []) {
-            $nav?->parentNode?->removeChild($nav);
+            if ($nav instanceof DOMElement) {
+                $nav->parentNode?->removeChild($nav);
+            }
+
             $this->save($root, $navPath);
 
             return;

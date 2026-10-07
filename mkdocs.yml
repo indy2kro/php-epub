@@ -24,6 +24,7 @@ nav:
   - Usage:
     - Basic Usage: basic-usage.md
     - Advanced Features: advanced-usage.md
+    - EPUB 3 Features: epub3-features.md
   - Architecture: architecture.md
   - Classes:
     - EpubFile: epub-file.md

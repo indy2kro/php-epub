@@ -50,7 +50,7 @@ final class UpgradeToEpub3Test extends TestCase
         $this->assertSame('3.0', $reopened->getMetadata()->getVersion());
         $this->assertNotNull($reopened->getMetadata()->getProperty('dcterms:modified'));
         $this->assertEquals($entries, $reopened->getTableOfContents()->getEntries());
-        $this->assertNotNull(array_values(array_filter($reopened->getManifest()->getItems(), static fn ($item): bool => $item->mediaType === 'application/x-dtbncx+xml'))[0] ?? null, 'The NCX stays.');
+        $this->assertInstanceOf(\PhpEpub\ManifestItem::class, array_values(array_filter($reopened->getManifest()->getItems(), static fn ($item): bool => $item->mediaType === 'application/x-dtbncx+xml'))[0] ?? null, 'The NCX stays.');
     }
 
     /**
@@ -105,10 +105,10 @@ final class UpgradeToEpub3Test extends TestCase
 
         $reopened = EpubFile::open($this->tmpDir . '/upgraded.epub');
         $nav = $reopened->getManifest()->findByPath('OEBPS/nav.xhtml');
-        $this->assertNotNull($nav);
+        $this->assertInstanceOf(\PhpEpub\ManifestItem::class, $nav);
         $this->assertSame('nav', $nav->properties);
         $this->assertSame('application/xhtml+xml', $nav->mediaType);
-        $this->assertNotNull($reopened->getManifest()->findByPath('OEBPS/toc.ncx'));
+        $this->assertInstanceOf(\PhpEpub\ManifestItem::class, $reopened->getManifest()->findByPath('OEBPS/toc.ncx'));
 
         $toc = $reopened->getTableOfContents();
         $this->assertEquals(
@@ -206,7 +206,7 @@ final class UpgradeToEpub3Test extends TestCase
         $book = $this->epub2Book()->withFile('OEBPS/nav.xhtml', 'taken');
         $epubFile = $this->open($book);
         $epubFile->upgradeToEpub3();
-        $this->assertNotNull($epubFile->getManifest()->findByPath('OEBPS/nav-2.xhtml'));
+        $this->assertInstanceOf(\PhpEpub\ManifestItem::class, $epubFile->getManifest()->findByPath('OEBPS/nav-2.xhtml'));
         $this->assertSame('taken', $epubFile->getContentManager()->getContent('OEBPS/nav.xhtml'));
 
         $opf = str_replace('<item id="ncx"', '<item id="old-nav" href="text/chapter.xhtml" media-type="application/xhtml+xml" properties="nav"/><item id="ncx"', (string) $this->epub2Book()->getFile('OEBPS/content.opf'));

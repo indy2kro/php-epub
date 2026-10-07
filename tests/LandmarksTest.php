@@ -149,6 +149,17 @@ final class LandmarksTest extends TestCase
         $this->assertStringContainsString('href="text/chapter.xhtml#top"', $opf);
     }
 
+    public function testTheGuideOfAPackageWithoutASpineGoesAtTheEnd(): void
+    {
+        $book = $this->epub2WithGuide('');
+        $opf = (string) preg_replace('#<spine.*</spine>#s', '', (string) $book->getFile('OEBPS/content.opf'));
+        $epubFile = $this->open($book->withFile('OEBPS/content.opf', $opf));
+
+        $epubFile->getTableOfContents()->setLandmarks([new Landmark('cover', 'Cover', 'OEBPS/text/chapter.xhtml')]);
+
+        $this->assertEquals([new Landmark('cover', 'Cover', 'OEBPS/text/chapter.xhtml')], $epubFile->getManifest()->getGuideReferences());
+    }
+
     public function testSetLandmarksUpdatesTheGuideAnEpub3BookKeeps(): void
     {
         $opf = str_replace('</package>', '<guide><reference type="cover" title="Old" href="text/chapter.xhtml"/></guide></package>', (string) EpubBuilder::epub3()->getFile('EPUB/package.opf'));

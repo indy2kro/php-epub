@@ -27,6 +27,10 @@ Each entry is a `PhpEpub\TocEntry`:
 
 - **`generateFromHeadings(int $maxLevel = 3): array`**: Builds the table of contents from the headings `h1` to `h$maxLevel` of the spine documents, in reading order, sets it with `setEntries()` and returns the entries. Headings nest by level (an `h2` after an `h1` is its child, also across documents). A heading without an `id` gets one (`toc-1`, `toc-2`, ..., unique in its document), which rewrites that document. Documents that are not well-formed XML, non-linear spine items, the navigation document and headings without text are skipped. Throws an `Exception` when `$maxLevel` is not 1 to 6, when the object has no spine (use `EpubFile::getTableOfContents()`), when the book has no navigation document or NCX, or when no heading is found (a table of contents needs an entry; nothing is changed then).
 
+- **`getLandmarks(): array`** and **`setLandmarks(array $landmarks): void`**: Read and replace the book's landmarks (`PhpEpub\Landmark`: `type`, `title`, `path`, `fragment`) in the navigation document's `landmarks` nav and the EPUB 2 `<guide>`. See [EPUB 3 Features](epub3-features.md#landmarks-and-the-page-list).
+
+- **`getPageList(): array`**: The print page numbers of the navigation document's `page-list` nav or the NCX `pageList`, as `TocEntry` objects; `[]` when the book has none. Read-only.
+
 - **`isAvailable(): bool`**: Whether the book has a navigation document or an NCX that can hold a table of contents, i.e. whether `setEntries()` can work.
 
 - **`getBook(): ?EpubFile`**: The book this table of contents belongs to, when it came from `EpubFile::getTableOfContents()`. Holding the object keeps the book's extracted files alive, so `EpubFile::open($path)->getTableOfContents()` is safe to use on its own.

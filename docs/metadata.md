@@ -184,6 +184,39 @@ $metadata->setAccessibilitySummary('All images have text alternatives.');
 $metadata->setConformsTo('EPUB Accessibility 1.1 - WCAG 2.1 Level AA');
 ```
 
+### Rendition (fixed layout)
+
+```php
+public function getRenditionLayout(): ?string
+public function setRenditionLayout(?string $layout): void
+public function getRenditionOrientation(): ?string
+public function setRenditionOrientation(?string $orientation): void
+public function getRenditionSpread(): ?string
+public function setRenditionSpread(?string $spread): void
+public function getRenditionFlow(): ?string
+public function setRenditionFlow(?string $flow): void
+```
+
+The EPUB Rendition properties `rendition:layout` (`reflowable`, `pre-paginated`), `rendition:orientation` (`auto`, `landscape`, `portrait`), `rendition:spread` (`none`, `auto`, `landscape`, `portrait`, `both`) and `rendition:flow` (`auto`, `paginated`, `scrolled-continuous`, `scrolled-doc`). The getters return `null` when the property is not set; `null` removes it. The setters throw an `Exception` for another value and for an EPUB 2 package, and declare the `rendition` prefix in the package's `prefix` attribute. Individual pages override them with `Spine::setItemRendition()`. See [EPUB 3 Features](epub3-features.md#fixed-layout-and-rendition).
+
+### Media Overlays
+
+```php
+public function getMediaDuration(): ?string
+public function setMediaDuration(?string $duration): void
+public function getMediaDurationOf(string $overlayId): ?string
+public function setMediaDurationOf(string $overlayId, ?string $duration): void
+public function getMediaDurations(): array
+public function getMediaActiveClass(): ?string
+public function setMediaActiveClass(?string $class): void
+public function getMediaPlaybackActiveClass(): ?string
+public function setMediaPlaybackActiveClass(?string $class): void
+public function getMediaNarrators(): array
+public function setMediaNarrators(array $narrators): void
+```
+
+The `media:duration` of the whole book and, as a refinement of each SMIL manifest item, of each overlay; the `media:active-class` and `media:playback-active-class` CSS classes; and the `media:narrator` names. Durations must be SMIL clock values (`0:32:29.5`, `32:29`, `1949.5s`, `1500ms`, `45min`, `3h`); the setters throw an `Exception` for an invalid value and for an EPUB 2 package, and `setMediaDurationOf()` also for an id that is not an `application/smil+xml` item. Attach an overlay to a content document with `Manifest::setMediaOverlay()`. See [EPUB 3 Features](epub3-features.md#media-overlays).
+
 ### Subject
 
 ```php

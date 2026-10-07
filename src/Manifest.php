@@ -322,8 +322,12 @@ class Manifest
     private function moveAfterSpine(SimpleXMLElement $guide): void
     {
         $spine = $this->query('/opf:package/opf:spine')[0] ?? null;
-        $spineNode = $spine instanceof SimpleXMLElement ? dom_import_simplexml($spine) : null;
-        $spineNode?->parentNode?->insertBefore(dom_import_simplexml($guide), $spineNode->nextSibling);
+        if (! $spine instanceof SimpleXMLElement) {
+            return;
+        }
+
+        $spineNode = dom_import_simplexml($spine);
+        $spineNode->parentNode?->insertBefore(dom_import_simplexml($guide), $spineNode->nextSibling);
     }
 
     /**

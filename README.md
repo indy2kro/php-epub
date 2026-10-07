@@ -12,6 +12,7 @@ A PHP library for reading and editing EPUB 2 and EPUB 3 books: metadata, cover, 
 - **Metadata**: title(s), authors, creators and contributors with roles, description, publisher, dates and language (checked when set), accessibility metadata, subjects, identifiers, and any other `<meta>` element.
 - **Cover**: read and replace the cover image (EPUB 3 `cover-image` and EPUB 2 conventions).
 - **Package editing**: manifest items, reading order (spine) and table of contents (EPUB 3 nav and EPUB 2 NCX); adding or deleting content keeps them in sync, moving a file rewrites the references to it, and the table of contents can be generated from the chapters' headings.
+- **EPUB 3 features**: `upgradeToEpub3()` converts an EPUB 2 book (navigation document, refinements, cover and manifest properties); landmarks (nav and guide) and the page list; fixed-layout rendition metadata and spine properties; media overlays and `media:*` metadata; plain-text extraction per document and per book.
 - **New books**: `EpubFile::create()` and `addChapter()` build a valid EPUB 3 from scratch.
 - **Checks**: loading rejects a book without a readable `container.xml` or package document but, like reading systems, accepts a wrong `mimetype` or a broken NCX; `validate()` reports common problems (a wrong `mimetype`, missing metadata, invalid language tags and dates, manifest and spine inconsistencies, media types that contradict the content, missing manifest properties, missing or broken navigation, missing accessibility metadata). This is not a full validator like EPUBCheck.
 - **Conversion**: PDF with TCPDF or Dompdf, and any format Calibre's `ebook-convert` supports.
@@ -87,6 +88,25 @@ $epubFile->getTableOfContents()->addEntry(new \PhpEpub\TocEntry('Epilogue', 'EPU
 
 $epubFile->save();
 ```
+
+### EPUB 3 features
+
+```php
+// Convert an EPUB 2 book in place (false when it already is EPUB 3), then save it.
+if ($epubFile->upgradeToEpub3()) {
+    $epubFile->save('/path/to/epub3.epub');
+}
+
+// Landmarks, fixed layout and plain text.
+$epubFile->getTableOfContents()->setLandmarks([
+    new \PhpEpub\Landmark('bodymatter', 'Start', 'EPUB/text/chapter-1.xhtml'),
+]);
+$epubFile->getMetadata()->setRenditionLayout('pre-paginated');
+$epubFile->getSpine()->setPageSpread('page-1', 'right');
+$words = array_sum(array_map(str_word_count(...), $epubFile->getText()));
+```
+
+See [EPUB 3 Features](https://indy2kro.github.io/php-epub/epub3-features/) for the details.
 
 ### Converting
 

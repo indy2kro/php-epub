@@ -78,18 +78,22 @@ final class TextExtractionTest extends TestCase
         $this->assertSame("Chapter\nText.", $epubFile->getContentManager()->getText('EPUB/text/chapter.xhtml'));
     }
 
-    public function testContentManagerRefusesAMissingDocumentAndPathsOutsideTheBook(): void
+    #[DataProvider('unreadablePaths')]
+    public function testContentManagerRefusesAMissingDocumentAndPathsOutsideTheBook(string $path): void
     {
         $contentManager = $this->open($this->book())->getContentManager();
 
-        foreach (['EPUB/text/missing.xhtml', '../outside.xhtml'] as $path) {
-            try {
-                $contentManager->getText($path);
-                $this->fail("{$path} was read.");
-            } catch (Exception) {
-                $this->addToAssertionCount(1);
-            }
-        }
+        $this->expectException(Exception::class);
+        $contentManager->getText($path);
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function unreadablePaths(): iterable
+    {
+        yield 'missing' => ['EPUB/text/missing.xhtml'];
+        yield 'outside the book' => ['../outside.xhtml'];
     }
 
     public function testReadsTheWholeBookInReadingOrder(): void

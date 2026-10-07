@@ -47,7 +47,7 @@ The reading order: `SpineItem`s with their manifest item and `linear` flag, and 
 File operations on the extracted book (add, update, delete, move, read), keeping the manifest and spine in sync and refusing XHTML that is not well-formed; moving a file rewrites the references to it. Paths are relative to the book root; the package document itself is managed only through `Metadata`, `Manifest` and `Spine`.
 
 ### TableOfContents
-Reads and edits the EPUB 3 navigation document's `toc` nav and the EPUB 2 NCX as `TocEntry` trees, writing both when a book has both.
+Reads and edits the EPUB 3 navigation document's `toc` nav and the EPUB 2 NCX as `TocEntry` trees, writing both when a book has both. It also reads and writes the landmarks (`Landmark` objects: the nav `landmarks` and the EPUB 2 `<guide>`) and reads the page list.
 
 ### Validator
 `EpubFile::validate()` runs it to report common structural problems as `ValidationIssue`s: required metadata, duplicate ids, manifest and spine consistency, media types and manifest properties, navigation, accessibility metadata.

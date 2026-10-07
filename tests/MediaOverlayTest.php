@@ -221,12 +221,13 @@ final class MediaOverlayTest extends TestCase
 
         $this->assertNull($metadata->getMediaDuration());
         $this->assertSame([], $metadata->getMediaNarrators());
-        foreach ([
+        $calls = [
             static fn () => $metadata->setMediaDuration('0:01:00'),
             static fn () => $metadata->setMediaDurationOf('chapter', '0:01:00'),
             static fn () => $metadata->setMediaActiveClass('active'),
             static fn () => $metadata->setMediaNarrators(['Ann']),
-        ] as $call) {
+        ];
+        foreach ($calls as $call) {
             try {
                 $call();
                 $this->fail('EPUB 2 packages have no media overlay metadata.');

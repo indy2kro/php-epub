@@ -213,6 +213,22 @@ public function removeCoverImage(bool $deleteFile = false): void
 
 Unmarks the cover: removes the `cover-image` property, `<meta name="cover">` and `<guide>` cover references, so `getCoverImage()` returns `null` afterwards. With `$deleteFile`, the image is also deleted from the book (with its manifest item). A cover page in the reading order stays.
 
+### Upgrading to EPUB 3
+
+```php
+public function upgradeToEpub3(): bool
+```
+
+Converts a loaded EPUB 2 book to EPUB 3 in place: package version `3.0` with `dcterms:modified`, a navigation document generated from the NCX (the NCX and the `<guide>` stay, and the guide becomes the landmarks), refinements instead of `opf:role`, `opf:file-as` and the other `opf:*` attributes, the `cover-image` property and the manifest properties the content needs. Returns `true` when the book was converted and `false`, with nothing changed, when it already is EPUB 3. Save the book afterwards. See [EPUB 3 Features](epub3-features.md#upgrading-an-epub-2-book) for the details and the limits (content documents are not rewritten).
+
+### Plain Text
+
+```php
+public function getText(bool $linearOnly = true): array
+```
+
+Returns `path => text` for the XHTML and HTML documents of the reading order, in order, as `ContentManager::getText()` reads them. Auxiliary content (`linear="no"`) is skipped unless `$linearOnly` is `false`; spine items that are not XHTML or HTML, or whose file is missing, are skipped.
+
 ### Converting
 
 ```php

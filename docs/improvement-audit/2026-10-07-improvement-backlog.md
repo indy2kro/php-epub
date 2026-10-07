@@ -103,19 +103,19 @@ were re-checked against the round-3 hardening.
   `moveContent()` keeps the manifest, spine, TOC and `encryption.xml` consistent, but every `<a>`, `<img>` and `<link>` that pointed at the file breaks, so reorganising a book still needs a hand-written rewrite pass.
 - [x] **FEAT-05** Open a book from a string or stream, and save it to one (uploads, HTTP downloads) — `src/EpubFile.php:57-63,251-271` — M · med
   Web apps receive uploads and send downloads, but the API only reads and writes file paths, so callers write their own temp-file plumbing.
-- [ ] **FEAT-06** Upgrade an EPUB 2 book to EPUB 3: package version, a nav document generated from the NCX, `dcterms:modified`, EPUB 3 refinements for `opf:role`/`opf:file-as`, the `cover-image` property — `src/Metadata.php`, `src/TableOfContents.php`, `src/Manifest.php` — L · med
+- [x] **FEAT-06** Upgrade an EPUB 2 book to EPUB 3: package version, a nav document generated from the NCX, `dcterms:modified`, EPUB 3 refinements for `opf:role`/`opf:file-as`, the `cover-image` property — `src/Metadata.php`, `src/TableOfContents.php`, `src/Manifest.php` — L · med
   Stores and validators increasingly require EPUB 3. The library already has every piece of the migration, but callers must assemble them by hand.
 - [x] **FEAT-07** Generate the table of contents from the headings (`h1`–`h3`) of the spine documents — `src/TableOfContents.php:93-130`, `src/EpubFile.php:170-191` — M · low
   Books assembled from existing XHTML need a TOC built from their headings, and callers have to write it themselves with DOM parsing and `setEntries()`.
-- [ ] **FEAT-08** Plain-text extraction per spine document (search indexing, word counts, previews) — `src/ContentManager.php`, `src/Converters/EpubDocumentLoader.php:200-239` — S · low
+- [x] **FEAT-08** Plain-text extraction per spine document (search indexing, word counts, previews) — `src/ContentManager.php`, `src/Converters/EpubDocumentLoader.php:200-239` — S · low
   Getting a book's text is one of the most common reasons to open an EPUB, and today it takes a hand-written spine walk plus HTML parsing.
 - [x] **FEAT-09** Add obfuscated fonts and read fonts de-obfuscated (expose `FontObfuscation` through `ContentManager`) — `src/FontObfuscation.php:31-80`, `src/ContentManager.php:91-110` — S · low
   The library re-keys obfuscated fonts but cannot add one or return a usable font file, so publishers who obfuscate embedded fonts must implement the IDPF algorithm themselves.
-- [ ] **FEAT-10** Landmarks API (EPUB 3 nav `landmarks` and the EPUB 2 `guide`) and page-list access — `src/TableOfContents.php:60-90`, `src/Manifest.php:246-275` — M · low
+- [x] **FEAT-10** Landmarks API (EPUB 3 nav `landmarks` and the EPUB 2 `guide`) and page-list access — `src/TableOfContents.php:60-90`, `src/Manifest.php:246-275` — M · low
   Landmarks (cover, start of text, TOC) drive a reader's "go to beginning", and today they can only be changed by editing the nav XHTML and the guide by hand.
-- [ ] **FEAT-11** Fixed-layout and rendition API: `rendition:layout`, `orientation`, `spread`, and the `page-spread-*` properties of spine itemrefs — `src/Spine.php:73-170`, `src/Metadata.php` — M · low
+- [x] **FEAT-11** Fixed-layout and rendition API: `rendition:layout`, `orientation`, `spread`, and the `page-spread-*` properties of spine itemrefs — `src/Spine.php:73-170`, `src/Metadata.php` — M · low
   Comics and children's books use fixed layout and need these properties, but no accessor reads or writes them.
-- [ ] **FEAT-12** Media overlays: read and set an item's `media-overlay` SMIL, plus the `media:duration` and `media:active-class` metadata — `src/Manifest.php:355-370`, `src/Metadata.php:166-222` — M · low
+- [x] **FEAT-12** Media overlays: read and set an item's `media-overlay` SMIL, plus the `media:duration` and `media:active-class` metadata — `src/Manifest.php:355-370`, `src/Metadata.php:166-222` — M · low
   Read-aloud books need these. The library keeps existing `media-overlay` references consistent but has no API to create them.
 
 ### Public API
