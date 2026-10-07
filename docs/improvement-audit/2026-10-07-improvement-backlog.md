@@ -84,7 +84,7 @@ were re-checked against the round-3 hardening.
 
 - [x] **CONV-01** Render non-Latin books: default to a Unicode font (both renderers ship DejaVu) or choose one from `dc:language`, and switch TCPDF to RTL for right-to-left books — `src/Converters/DompdfAdapter.php:17-22,85-95`, `src/Converters/TCPDFAdapter.php:14-25,88-115` — M · med
   The defaults (Dompdf `Arial`, TCPDF `helvetica`) map to the PDF core fonts, which cover Latin-1 only. Cyrillic, Greek, CJK and Arabic books without embedded fonts lose their glyphs, and nothing in either adapter sets right-to-left layout.
-- [ ] **CONV-02** De-obfuscate IDPF/Adobe obfuscated fonts before the PDF renderers load them — `src/Converters/EpubDocumentLoader.php:393-456,465-499`, `src/FontObfuscation.php` — S · low
+- [x] **CONV-02** De-obfuscate IDPF/Adobe obfuscated fonts before the PDF renderers load them — `src/Converters/EpubDocumentLoader.php:393-456,465-499`, `src/FontObfuscation.php` — S · low
   `@font-face` `url()`s point the renderers at the obfuscated files, because nothing in `src/Converters` reads `encryption.xml`, so the book's embedded fonts cannot be used in the PDF.
 - [x] **CONV-03** Decode content documents in their declared encoding (EPUB allows UTF-16) instead of always forcing UTF-8 for the HTML parser — `src/Converters/EpubDocumentLoader.php:207-216`, `src/EpubFile.php:445-455` — S · low
   The `<?xml encoding="UTF-8">` prefix makes libxml read UTF-16 chapters as UTF-8. Their text is garbled in the PDF, and `getCoverImage()` cannot find the image in a UTF-16 cover page.
@@ -93,7 +93,7 @@ were re-checked against the round-3 hardening.
 
 ### Features
 
-- [ ] **FEAT-01** Detect DRM-protected books (`encryption.xml` algorithms other than font obfuscation, `rights.xml`, an LCP license): add `isEncrypted()`, report them in `validate()`, refuse PDF conversion — `src/FontObfuscation.php:86-110`, `src/Validator.php`, `src/EpubFile.php:278-287` — M · med
+- [x] **FEAT-01** Detect DRM-protected books (`encryption.xml` algorithms other than font obfuscation, `rights.xml`, an LCP license): add `isEncrypted()`, report them in `validate()`, refuse PDF conversion — `src/FontObfuscation.php:86-110`, `src/Validator.php`, `src/EpubFile.php:278-287` — M · med
   An Adobe ADEPT or Readium LCP book loads without any warning. `getContent()` then returns ciphertext, `validate()` reports every chapter as not well-formed, and the converters produce garbage PDFs.
 - [x] **FEAT-02** Extend `validate()` with frequent EPUBCheck package errors: declared media type vs. file content, missing EPUB 3 manifest properties (`svg`, `mathml`, `scripted`, `remote-resources`) in loaded books, `cover-image` on a non-image — `src/Validator.php:150-300`, `src/Util/ContentDocumentProperties.php` — M · med
   Round 3 sets these properties for content the library writes. Loaded books with wrong media types or missing properties still pass `validate()` and fail EPUBCheck (OPF-014, OPF-029).
@@ -109,7 +109,7 @@ were re-checked against the round-3 hardening.
   Books assembled from existing XHTML need a TOC built from their headings, and callers have to write it themselves with DOM parsing and `setEntries()`.
 - [ ] **FEAT-08** Plain-text extraction per spine document (search indexing, word counts, previews) — `src/ContentManager.php`, `src/Converters/EpubDocumentLoader.php:200-239` — S · low
   Getting a book's text is one of the most common reasons to open an EPUB, and today it takes a hand-written spine walk plus HTML parsing.
-- [ ] **FEAT-09** Add obfuscated fonts and read fonts de-obfuscated (expose `FontObfuscation` through `ContentManager`) — `src/FontObfuscation.php:31-80`, `src/ContentManager.php:91-110` — S · low
+- [x] **FEAT-09** Add obfuscated fonts and read fonts de-obfuscated (expose `FontObfuscation` through `ContentManager`) — `src/FontObfuscation.php:31-80`, `src/ContentManager.php:91-110` — S · low
   The library re-keys obfuscated fonts but cannot add one or return a usable font file, so publishers who obfuscate embedded fonts must implement the IDPF algorithm themselves.
 - [ ] **FEAT-10** Landmarks API (EPUB 3 nav `landmarks` and the EPUB 2 `guide`) and page-list access — `src/TableOfContents.php:60-90`, `src/Manifest.php:246-275` — M · low
   Landmarks (cover, start of text, TOC) drive a reader's "go to beginning", and today they can only be changed by editing the nav XHTML and the guide by hand.

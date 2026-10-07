@@ -18,6 +18,10 @@ The `DompdfAdapter` class converts EPUB content into PDF using the Dompdf librar
 
     **Fonts and languages:** the default font is DejaVu Sans, which Dompdf ships and which covers Latin, Greek, Cyrillic, Hebrew and Arabic, not only Latin-1 like the PDF core fonts (`Arial` is mapped to Helvetica). Chinese, Japanese and Korean need a font installed in Dompdf: pass its family as `font`, which always wins. Books with `page-progression-direction="rtl"` in the spine, or (when the spine says nothing) with a primary language of `ar`, `he`, `fa`, `ur`, `yi`, `ps`, `sd`, `ug` or `dv`, get `dir="rtl"` on the generated `<html>` and `<body>`; the book's language is set as `lang`. Dompdf does not shape Arabic script, so Arabic letters are not joined.
 
+    **Embedded fonts:** the fonts a book loads with `@font-face` are used. Obfuscated fonts (IDPF or Adobe, listed in `META-INF/encryption.xml`) are de-obfuscated in memory and handed to Dompdf as `data:` URIs, so nothing is written into the book; a font that cannot be de-obfuscated (an Adobe font in a book without a `urn:uuid:` identifier) is dropped. Dompdf loads only TrueType fonts (a `src` without `format()`, or `format("truetype")`).
+
+    A DRM-protected book is refused with a `ConversionException`.
+
     Dompdf cannot write a PDF outline, so use `TCPDFAdapter` when you need chapter bookmarks.
 
 - **`convert(string $epubDirectory, string $outputPath): void`**: Renders every spine document in reading order, each on a new page, sets the PDF title and author from the EPUB metadata, and writes the PDF. Throws a `ConversionException` if the book cannot be read, Dompdf fails (its exception is kept as the previous exception) or the PDF cannot be written.

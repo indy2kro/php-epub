@@ -15,6 +15,7 @@ A PHP library for reading and editing EPUB 2 and EPUB 3 books: metadata, cover, 
 - **New books**: `EpubFile::create()` and `addChapter()` build a valid EPUB 3 from scratch.
 - **Checks**: loading rejects a book without a readable `container.xml` or package document but, like reading systems, accepts a wrong `mimetype` or a broken NCX; `validate()` reports common problems (a wrong `mimetype`, missing metadata, invalid language tags and dates, manifest and spine inconsistencies, media types that contradict the content, missing manifest properties, missing or broken navigation, missing accessibility metadata). This is not a full validator like EPUBCheck.
 - **Conversion**: PDF with TCPDF or Dompdf, and any format Calibre's `ebook-convert` supports.
+- **Fonts and DRM**: embedded fonts can be added obfuscated (IDPF) and read back de-obfuscated, Dompdf uses a book's obfuscated fonts, and DRM-protected books (encrypted resources, Adobe ADEPT, Readium LCP) are detected, reported by `validate()` and never converted; nothing is ever decrypted.
 - **Hostile books**: paths are confined to the book, extraction is limited (zip bombs), XML entity declarations are refused, and PDF renderers cannot load anything outside the book. See [Handling Untrusted EPUBs](https://indy2kro.github.io/php-epub/advanced-usage/#handling-untrusted-epubs).
 
 ## Installation

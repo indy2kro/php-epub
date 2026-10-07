@@ -342,7 +342,8 @@ class EpubFile
             $this->fontKeyIdentifier = $this->metadata->getUniqueIdentifier();
             $this->manifest = new Manifest($this->opfXml, $opfFilePath);
             $this->spine = new Spine($this->opfXml, $this->manifest);
-            $this->contentManager = new ContentManager($directory, $this->manifest, $this->spine);
+            // Fonts are keyed with the identifier of the last load or save, which rekeyObfuscatedFonts() keeps current.
+            $this->contentManager = new ContentManager($directory, $this->manifest, $this->spine, new PathResolver(), fn (): ?string => $this->fontKeyIdentifier);
         } catch (Throwable $throwable) {
             // Do not leave a half-loaded book (or its extracted files) behind,
             // and report why loading failed rather than a cleanup problem.
@@ -414,6 +415,7 @@ class EpubFile
     /**
      * Converts the book with the given adapter, including changes that have not been saved yet.
      *
+     * @throws ConversionException If the book is DRM-protected (see isDrmProtected()): its content cannot be read.
      * @throws Exception If the book is not loaded or the conversion fails.
      */
     public function convert(ConverterInterface $converter, string $outputPath): void
@@ -422,6 +424,8 @@ class EpubFile
         if ($tempDir === null) {
             throw new Exception('EPUB file must be loaded before converting.');
         }
+
+        (new Encryption($tempDir, $this->xmlParser))->assertNotDrmProtected();
 
         $this->writePackage();
         $converter->convert($tempDir, $outputPath);
@@ -702,6 +706,39 @@ class EpubFile
         }
 
         return $this->manifest;
+    }
+
+    /**
+     * Whether the book is DRM-protected (Adobe ADEPT, Readium LCP and similar): META-INF/encryption.xml
+     * lists a resource encrypted with an algorithm that is not a font obfuscation, or the book has
+     * META-INF/rights.xml or META-INF/license.lcpl. Such a book can be read as a package, but its
+     * encrypted content cannot (the library never decrypts it), validate() reports it and
+     * convert() refuses it. A damaged encryption.xml is ignored here.
+     *
+     * @throws Exception If the book is not loaded.
+     */
+    public function isDrmProtected(): bool
+    {
+        return $this->encryption()->isDrmProtected();
+    }
+
+    /**
+     * The book-relative paths (sorted) of the resources encrypted with an algorithm that is not a
+     * font obfuscation. Empty when the book is not DRM-protected, or only by rights.xml or license.lcpl
+     * without listing resources.
+     *
+     * @return list<string>
+     *
+     * @throws Exception If the book is not loaded.
+     */
+    public function getEncryptedPaths(): array
+    {
+        return $this->encryption()->encryptedPaths();
+    }
+
+    private function encryption(): Encryption
+    {
+        return new Encryption($this->tempDir ?? throw new Exception('EPUB file must be loaded before checking its encryption.'), $this->xmlParser);
     }
 
     /**

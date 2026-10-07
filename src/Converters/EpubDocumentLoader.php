@@ -11,6 +11,8 @@ use DOMElement;
 use DOMProcessingInstruction;
 use DOMXPath;
 use PhpEpub\ConversionException;
+use PhpEpub\Encryption;
+use PhpEpub\FontObfuscation;
 use PhpEpub\InvalidEpubException;
 use PhpEpub\Manifest;
 use PhpEpub\ManifestItem;
@@ -37,6 +39,9 @@ use PhpEpub\XmlParser;
  * is inlined as a sanitised data: URI whose references are confined the same way, and
  * every other data: URI is re-encoded as base64 (renderers read any source containing
  * "<svg" as SVG markup, whatever its declared type).
+ *
+ * Obfuscated fonts (IDPF or Adobe) are de-obfuscated in memory and inlined as data: URIs, so
+ * the renderers can use them and nothing is written to the book. A DRM-protected book is refused.
  */
 final class EpubDocumentLoader
 {
@@ -85,7 +90,33 @@ final class EpubDocumentLoader
      */
     private const int SVG_BUDGET = 16 * 1024 * 1024;
 
+    /**
+     * The most font data, in bytes, de-obfuscated and inlined per book; later fonts are blanked.
+     */
+    private const int FONT_BUDGET = 16 * 1024 * 1024;
+
     private int $svgBudget = self::SVG_BUDGET;
+
+    private int $fontBudget = self::FONT_BUDGET;
+
+    /**
+     * The book's obfuscated fonts: real path => algorithm.
+     *
+     * @var array<string, string>
+     */
+    private array $obfuscatedFonts = [];
+
+    /**
+     * The unique identifier the book's fonts are keyed with; null when the book has none.
+     */
+    private ?string $fontIdentifier = null;
+
+    /**
+     * The de-obfuscated fonts inlined so far: real path => data: URI ("" when unusable).
+     *
+     * @var array<string, string>
+     */
+    private array $fontUris = [];
 
     public function __construct(
         private readonly XmlParser $xmlParser = new XmlParser(),
@@ -94,7 +125,7 @@ final class EpubDocumentLoader
     }
 
     /**
-     * @throws ConversionException If the directory holds no readable book.
+     * @throws ConversionException If the directory holds no readable book, or the book is DRM-protected.
      */
     public function load(string $epubDirectory): EpubDocument
     {
@@ -103,7 +134,13 @@ final class EpubDocumentLoader
             throw new ConversionException("EPUB directory does not exist: {$epubDirectory}");
         }
 
+        (new Encryption($root, $this->xmlParser, $this->paths))->assertNotDrmProtected();
+
         $this->svgBudget = self::SVG_BUDGET;
+        $this->fontBudget = self::FONT_BUDGET;
+        $this->obfuscatedFonts = [];
+        $this->fontUris = [];
+        $this->fontIdentifier = null;
 
         if (is_file($root . DIRECTORY_SEPARATOR . 'META-INF' . DIRECTORY_SEPARATOR . 'container.xml')) {
             return $this->loadPackage($root);
@@ -129,6 +166,7 @@ final class EpubDocumentLoader
         $metadata = new Metadata($opfXml, $opfFile);
         $manifest = new Manifest($opfXml, $opfPath);
         $spine = new Spine($opfXml, $manifest);
+        $this->findObfuscatedFonts($root, $metadata->getUniqueIdentifier());
 
         // Book-relative path => chapter index, for links between chapters.
         $chapterIndexes = [];
@@ -162,6 +200,50 @@ final class EpubDocumentLoader
             // A spine that says "ltr" or "rtl" wins over the language.
             $direction === null || $direction === 'default' ? EpubDocument::isRightToLeftLanguage($language) : $direction === 'rtl'
         );
+    }
+
+    /**
+     * Notes the book's obfuscated fonts, so references to them are de-obfuscated (see resolveSource()).
+     * An encryption.xml that cannot be parsed lists none: the fonts are then used as they are.
+     */
+    private function findObfuscatedFonts(string $root, ?string $identifier): void
+    {
+        $this->fontIdentifier = $identifier;
+
+        try {
+            $fonts = (new FontObfuscation($root, $this->xmlParser, $this->paths))->obfuscatedFonts();
+        } catch (XmlException) {
+            return;
+        }
+
+        foreach ($fonts as $path => $algorithm) {
+            $real = realpath($this->paths->resolve($root, $path));
+            if ($real !== false && is_file($real)) {
+                $this->obfuscatedFonts[$real] = $algorithm;
+            }
+        }
+    }
+
+    /**
+     * A de-obfuscated font as a base64 data: URI; "" when the book has no usable identifier for it,
+     * it cannot be read or it is over the font budget. Each font is read once.
+     */
+    private function plainFontUri(string $file): string
+    {
+        if (! isset($this->fontUris[$file])) {
+            $algorithm = $this->obfuscatedFonts[$file] ?? '';
+            $key = $this->fontIdentifier === null ? null : FontObfuscation::key($algorithm, $this->fontIdentifier);
+            $size = filesize($file);
+            $font = $key !== null && $size !== false && $size <= $this->fontBudget ? FileSystemHelper::readFile($file) : null;
+
+            $this->fontUris[$file] = '';
+            if ($key !== null && $font !== null) {
+                $this->fontBudget -= strlen($font);
+                $this->fontUris[$file] = 'data:font/ttf;base64,' . base64_encode(FontObfuscation::apply($font, $algorithm, $key));
+            }
+        }
+
+        return $this->fontUris[$file];
     }
 
     /**
@@ -496,6 +578,10 @@ final class EpubDocumentLoader
         // A path holding "<svg" would be read as SVG markup.
         if ($real === false || ! is_file($real) || ! str_starts_with($real, $root . DIRECTORY_SEPARATOR) || strpbrk($real, '<>') !== false) {
             return '';
+        }
+
+        if ($svgDepth === 0 && isset($this->obfuscatedFonts[$real])) {
+            return $this->plainFontUri($real);
         }
 
         if (strtolower(pathinfo($real, PATHINFO_EXTENSION)) === 'svg') {

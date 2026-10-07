@@ -145,6 +145,7 @@ Checks the book, including unsaved changes, and returns a list of `PhpEpub\Valid
 | `FILE_NOT_IN_MANIFEST` | warning | A file of the publication is not listed in the manifest |
 | `SPINE_EMPTY`, `SPINE_UNKNOWN_IDREF`, `SPINE_DUPLICATE_IDREF` | error | The reading order is empty, or refers to an unknown or repeated item |
 | `SPINE_NOT_CONTENT` | warning | A spine item is not a content document and has no fallback |
+| `CONTENT_ENCRYPTED` | error | The book is DRM-protected (see [DRM-protected books](#drm-protected-books)). This is the only issue reported for its encrypted resources: they are not checked for well-formedness, media type or manifest properties |
 | `CONTENT_NOT_WELL_FORMED` | error | An XHTML content document is not well-formed XML |
 | `MEDIA_TYPE_MISMATCH` | error | A manifest item declared as a JPEG, PNG, GIF or WebP image holds another image type, or one declared as XHTML does not look like XML at all. Only the first 512 KiB of a file are read, and content that is not recognised is not judged |
 | `MANIFEST_PROPERTY_MISSING` | error | An EPUB 3 XHTML document needs a manifest property it lacks: `svg`, `mathml`, `scripted` or `remote-resources` (documents above 8 MiB are not examined) |
@@ -160,6 +161,25 @@ Checks the book, including unsaved changes, and returns a list of `PhpEpub\Valid
 ```php
 foreach ($epubFile->validate() as $issue) {
     echo $issue, "\n"; // e.g. "error MANIFEST_FILE_MISSING (EPUB/images/gone.png): Manifest item "gone" has no file."
+}
+```
+
+### DRM-protected books
+
+```php
+public function isDrmProtected(): bool
+public function getEncryptedPaths(): array
+```
+
+A book is DRM-protected when `META-INF/encryption.xml` lists a resource encrypted with an algorithm that is not a font obfuscation (the IDPF and Adobe font obfuscations are not DRM), or when the book has `META-INF/rights.xml` (Adobe ADEPT) or `META-INF/license.lcpl` (Readium LCP). `getEncryptedPaths()` returns the sorted, book-relative paths of the encrypted resources (empty when only `rights.xml` or `license.lcpl` marks the book). Both methods throw an `Exception` before `load()`.
+
+The library only detects DRM; it never decrypts. Such a book still opens, and its package (metadata, manifest, spine) can be read, but `getContent()` returns ciphertext for the encrypted files. `validate()` reports one `CONTENT_ENCRYPTED` error instead of an error per encrypted document, and `convert()` (and `TCPDFAdapter`, `DompdfAdapter` called on a directory) throws a `ConversionException` saying the book is DRM-protected. A damaged `encryption.xml` never stops a book from loading; it counts as listing nothing.
+
+```php
+$epubFile = EpubFile::open('/path/to/book.epub');
+
+if ($epubFile->isDrmProtected()) {
+    echo 'Encrypted: ', implode(', ', $epubFile->getEncryptedPaths()), PHP_EOL;
 }
 ```
 
@@ -199,7 +219,7 @@ Unmarks the cover: removes the `cover-image` property, `<meta name="cover">` and
 public function convert(ConverterInterface $converter, string $outputPath): void
 ```
 
-Writes pending changes to the extracted book and converts it with the given adapter (`DompdfAdapter`, `TCPDFAdapter`, `CalibreAdapter`, …), so unsaved edits are included. Throws if called before `load()`.
+Writes pending changes to the extracted book and converts it with the given adapter (`DompdfAdapter`, `TCPDFAdapter`, `CalibreAdapter`, …), so unsaved edits are included. Throws if called before `load()`, and a `ConversionException` if the book is [DRM-protected](#drm-protected-books).
 
 ### Cleanup
 

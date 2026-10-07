@@ -20,12 +20,15 @@ class ContentManager
      * When a manifest (and spine) are given, adding and deleting files keeps them in sync.
      *
      * @param string $contentDirectory The directory containing the extracted EPUB.
+     * @param \Closure(): ?string|null $fontKeyIdentifier Gives the unique identifier the book's obfuscated fonts
+     *                                                    are keyed with; without it, fonts can only be handled plain.
      */
     public function __construct(
         string $contentDirectory,
         private readonly ?Manifest $manifest = null,
         private readonly ?Spine $spine = null,
-        private readonly PathResolver $paths = new PathResolver()
+        private readonly PathResolver $paths = new PathResolver(),
+        private readonly ?\Closure $fontKeyIdentifier = null
     ) {
         if (! is_dir($contentDirectory)) {
             throw new Exception("Content directory does not exist: {$contentDirectory}");
@@ -273,6 +276,72 @@ class ContentManager
         }
 
         return FileSystemHelper::readFile($fullPath) ?? throw new Exception("Failed to read content from: {$fullPath}");
+    }
+
+    /**
+     * Adds (or overwrites) an embedded font and, with a manifest, lists it there. By default the font is
+     * obfuscated with the IDPF algorithm (OCF "Font Obfuscation") and listed in META-INF/encryption.xml
+     * (created when missing), which publishers do to keep the font from being reused as a file.
+     * The key is the unique identifier the book's fonts are keyed with (as loaded or last saved);
+     * EpubFile::save() re-keys the fonts when the identifier changes.
+     *
+     * Overwriting an obfuscated font with a plain one removes its encryption.xml entry.
+     *
+     * @param string $path The path relative to the book root, e.g. "EPUB/fonts/body.otf".
+     * @param string $fontData The plain font file.
+     * @param bool $obfuscate Pass false to store the font as it is.
+     *
+     * @throws Exception If the path is a container file, encryption.xml cannot be parsed or written, the book
+     *                   has no unique identifier (or this ContentManager does not know it), or the file cannot be written.
+     */
+    public function addFont(string $path, string $fontData, bool $obfuscate = true): void
+    {
+        if ($this->isContainerFile($this->paths->normalize($path))) {
+            throw new Exception("A font cannot be stored in the container directory: {$path}");
+        }
+
+        $obfuscation = new FontObfuscation($this->contentDirectory);
+        $stored = $fontData;
+        if ($obfuscate) {
+            $stored = FontObfuscation::apply($fontData, FontObfuscation::IDPF, $this->fontKey(FontObfuscation::IDPF));
+        }
+
+        // Fails on an unreadable encryption.xml before anything is written.
+        $obfuscation->obfuscatedFonts();
+        $this->addContent($path, $stored);
+        $obfuscation->setAlgorithm($path, $obfuscate ? FontObfuscation::IDPF : null);
+    }
+
+    /**
+     * Retrieves a font file as the reading system sees it: an obfuscated font (IDPF or Adobe, listed in
+     * META-INF/encryption.xml) is returned de-obfuscated, any other file as it is. A font encrypted with
+     * another algorithm (DRM) is returned as it is, still encrypted.
+     *
+     * @param string $path The path relative to the book root.
+     *
+     * @throws Exception If the file cannot be read, encryption.xml cannot be parsed, or the font is obfuscated
+     *                   and the book's unique identifier is unknown or gives no key (Adobe needs a urn:uuid).
+     */
+    public function getFontData(string $path): string
+    {
+        $font = $this->getContent($path);
+        $algorithm = (new FontObfuscation($this->contentDirectory))->obfuscatedFonts()[$this->paths->normalize($path)] ?? null;
+
+        return $algorithm === null ? $font : FontObfuscation::apply($font, $algorithm, $this->fontKey($algorithm));
+    }
+
+    /**
+     * @throws Exception If the unique identifier is unknown or gives no key for the algorithm.
+     */
+    private function fontKey(string $algorithm): string
+    {
+        $identifier = $this->fontKeyIdentifier instanceof \Closure ? ($this->fontKeyIdentifier)() : null;
+        if ($identifier === null || trim($identifier) === '') {
+            throw new Exception('The unique identifier of the book is needed to obfuscate fonts; use the ContentManager of an EpubFile that has one.');
+        }
+
+        return FontObfuscation::key($algorithm, $identifier)
+            ?? throw new Exception("An obfuscated font needs a urn:uuid unique identifier, not: {$identifier}");
     }
 
     /**
