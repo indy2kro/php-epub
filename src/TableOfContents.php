@@ -137,6 +137,89 @@ final readonly class TableOfContents
     }
 
     /**
+     * Creates the EPUB 3 navigation document of a book that has none, from the NCX entries (from the
+     * reading order when the NCX has none), and carries the EPUB 2 <guide> over as its landmarks.
+     * The document is added to the manifest with the "nav" property, next to the OPF; the NCX and the
+     * guide stay. Nothing happens when the book already has a navigation document.
+     *
+     * @internal Called by EpubFile::upgradeToEpub3().
+     *
+     * @throws Exception If the NCX cannot be parsed or the document cannot be written.
+     */
+    public function createNavigation(string $title, string $language): void
+    {
+        if ($this->navPath() !== null) {
+            return;
+        }
+
+        $entries = $this->linkedEntries($this->getEntries());
+        if ($entries === []) {
+            $entries = $this->readingOrderEntries();
+        }
+
+        $landmarks = $this->getLandmarks();
+        $directory = dirname($this->manifest->getOpfPath());
+        $base = $directory === '.' ? '' : $directory . '/';
+        for ($number = 1; ; $number++) {
+            $path = $base . ($number === 1 ? 'nav' : 'nav-' . $number) . '.xhtml';
+            if (! $this->manifest->findByPath($path) instanceof ManifestItem && ! file_exists($this->paths->resolve($this->rootDirectory, $path))) {
+                break;
+            }
+        }
+
+        if (@file_put_contents($this->paths->resolve($this->rootDirectory, $path), BookTemplate::navigation($title, $language)) === false) {
+            throw new Exception("Failed to write the navigation document: {$path}");
+        }
+
+        $item = $this->manifest->add($path, 'application/xhtml+xml');
+        $this->manifest->addProperty($item->id, 'nav');
+        $this->writeNav($path, $entries);
+        if ($landmarks !== []) {
+            $this->writeNavLandmarks($path, $landmarks);
+        }
+    }
+
+    /**
+     * Entries that lead somewhere: a navigation document has no unlinked leaf entries. Entries without
+     * a title are named after their file.
+     *
+     * @param list<TocEntry> $entries
+     *
+     * @return list<TocEntry>
+     */
+    private function linkedEntries(array $entries): array
+    {
+        $linked = [];
+        foreach ($entries as $entry) {
+            $children = $this->linkedEntries($entry->children);
+            if ($entry->path !== '' || $children !== []) {
+                $title = $entry->title === '' ? pathinfo($entry->path, PATHINFO_FILENAME) : $entry->title;
+                $linked[] = new TocEntry($title, $entry->path, $entry->fragment, $children);
+            }
+        }
+
+        return $linked;
+    }
+
+    /**
+     * One entry per linear XHTML document of the reading order, titled after its file.
+     *
+     * @return list<TocEntry>
+     */
+    private function readingOrderEntries(): array
+    {
+        $entries = [];
+        foreach ($this->spine?->getItems() ?? [] as $spineItem) {
+            $item = $spineItem->item;
+            if ($spineItem->linear && $item instanceof ManifestItem && $item->path !== '' && $item->mediaType === 'application/xhtml+xml') {
+                $entries[] = new TocEntry(pathinfo($item->path, PATHINFO_FILENAME), $item->path);
+            }
+        }
+
+        return $entries;
+    }
+
+    /**
      * The landmarks (cover, table of contents, start of the body, …): those of the navigation
      * document's "landmarks" nav or, when it has none, the EPUB 2 <guide> references that have an
      * EPUB 3 equivalent (their types are translated, e.g. the guide's "text" is "bodymatter").

@@ -20,6 +20,7 @@ class Metadata
     use Traits\InteractsWithIdentifier;
     use Traits\InteractsWithSeries;
     use Traits\InteractsWithAccessibility;
+    use Traits\UpgradesToEpub3;
 
     public const string OPF_NAMESPACE = 'http://www.idpf.org/2007/opf';
 
@@ -506,6 +507,15 @@ class Metadata
             return;
         }
 
+        $this->addRefinement($node, $property, $value, $property === 'role' ? 'marc:relators' : null);
+    }
+
+    /**
+     * Adds an EPUB 3 refinement (<meta refines="#id" property="…" scheme="…">) to an element, which
+     * gets an id when it has none.
+     */
+    protected function addRefinement(SimpleXMLElement $node, string $property, string $value, ?string $scheme = null): void
+    {
         $id = $this->elementId($node);
         if ($id === '') {
             $id = $this->unusedId($node->getName());
@@ -515,8 +525,8 @@ class Metadata
         $meta = $this->metadataNode->addChild('meta', htmlspecialchars($value, ENT_XML1), self::OPF_NAMESPACE);
         $meta->addAttribute('refines', '#' . $id);
         $meta->addAttribute('property', $property);
-        if ($property === 'role') {
-            $meta->addAttribute('scheme', 'marc:relators');
+        if ($scheme !== null) {
+            $meta->addAttribute('scheme', $scheme);
         }
     }
 

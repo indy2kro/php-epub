@@ -231,6 +231,15 @@ final class EpubCheckTest extends TestCase
         yield 'cover image' => [static function (EpubFile $epubFile): void {
             $epubFile->setCoverImage((string) base64_decode(EpubBuilder::PNG, true), 'image/png');
         }];
+
+        yield 'upgraded to EPUB 3' => [static function (EpubFile $epubFile): void {
+            $epubFile->upgradeToEpub3();
+            $metadata = $epubFile->getMetadata();
+            $metadata->setAccessModes(['textual']);
+            $metadata->setAccessibilityFeatures(['tableOfContents']);
+            $metadata->setAccessibilityHazards(['none']);
+            $metadata->setAccessibilitySummary('Plain text with a table of contents.');
+        }];
     }
 
     private function assertPassesEpubCheck(string $epubPath): void

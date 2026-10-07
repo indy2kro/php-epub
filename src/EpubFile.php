@@ -548,6 +548,43 @@ class EpubFile
     }
 
     /**
+     * Converts a loaded EPUB 2 book to EPUB 3 in place; save() writes the result. The package becomes
+     * version 3.0 with a dcterms:modified date, a navigation document is generated from the NCX (the
+     * NCX and the <guide> stay for EPUB 2 reading systems, and the guide also becomes the navigation
+     * document's landmarks), the cover image gets the "cover-image" property, XHTML documents get the
+     * manifest properties their content needs (svg, mathml, scripted, remote-resources), and the
+     * opf:* attributes EPUB 3 does not allow on Dublin Core elements become refinements or are dropped
+     * (see Metadata::upgradeToEpub3()). Content documents themselves are not rewritten: an XHTML 1.1
+     * document with an old DOCTYPE or obsolete elements may still draw EPUBCheck errors.
+     *
+     * @return bool True when the book was converted; false, with nothing changed, when it is already EPUB 3.
+     *
+     * @throws Exception If the book is not loaded or the navigation document cannot be created.
+     */
+    public function upgradeToEpub3(): bool
+    {
+        $metadata = $this->getMetadata();
+        if (str_starts_with($metadata->getVersion(), '3')) {
+            return false;
+        }
+
+        $manifest = $this->getManifest();
+        $metadata->upgradeToEpub3();
+
+        $language = trim($metadata->getLanguage());
+        $this->getTableOfContents()->createNavigation($metadata->getTitle(), $language === '' ? 'en' : $language);
+
+        $cover = $this->getCoverImage();
+        if ($cover instanceof ManifestItem && str_starts_with($cover->mediaType, 'image/')) {
+            $manifest->addProperty($cover->id, self::COVER_PROPERTY);
+        }
+
+        $this->getContentManager()->updateManifestProperties();
+
+        return true;
+    }
+
+    /**
      * Deletes an item's file with its manifest item and the references to it; an item whose
      * file is missing is only removed from the manifest.
      */

@@ -11,6 +11,11 @@ use PhpEpub\Util\ReferenceRewriter;
 
 class ContentManager
 {
+    /**
+     * The largest document updateManifestProperties() parses.
+     */
+    private const int MAX_SCANNED_BYTES = 8388608;
+
     private readonly string $contentDirectory;
 
     /**
@@ -342,6 +347,25 @@ class ContentManager
 
         return FontObfuscation::key($algorithm, $identifier)
             ?? throw new Exception("An obfuscated font needs a urn:uuid unique identifier, not: {$identifier}");
+    }
+
+    /**
+     * Sets the EPUB 3 properties (svg, mathml, scripted, remote-resources) that every XHTML document of the
+     * manifest needs because of its content, and removes those it no longer needs; other properties are kept.
+     * addContent() and updateContent() do this for the one file they write; this is for books whose
+     * documents were not written by this library (EpubFile::upgradeToEpub3() uses it). Nothing happens
+     * for an EPUB 2 package. Documents that are missing, not well-formed or larger than 8 MiB are left alone.
+     */
+    public function updateManifestProperties(): void
+    {
+        foreach ($this->manifest?->getItems() ?? [] as $item) {
+            $file = $item->path === '' ? '' : $this->paths->resolve($this->contentDirectory, $item->path);
+            $isReadable = $item->mediaType === 'application/xhtml+xml' && is_file($file) && (int) @filesize($file) <= self::MAX_SCANNED_BYTES;
+            $content = $isReadable ? FileSystemHelper::readFile($file) : null;
+            if ($content !== null) {
+                $this->updateContentProperties($item->path, $content);
+            }
+        }
     }
 
     /**
