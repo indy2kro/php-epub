@@ -105,6 +105,115 @@ final class EpubDocumentLoaderTest extends TestCase
         $this->assertStringContainsString('href="chapter.xhtml#top"', $html);
     }
 
+    public function testSvgFilesAreInlinedWithEveryReferenceConfinedToTheBook(): void
+    {
+        file_put_contents($this->tmpDir . '/secret.png', 'png');
+        $outside = str_replace('\\', '/', (string) realpath($this->tmpDir . '/secret.png'));
+
+        $svg = '<?xml version="1.0"?><?xml-stylesheet href="' . $outside . '"?>'
+            . '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">'
+            . '<defs><linearGradient id="g"/></defs><rect fill="url(#g)" style="fill: url(#g)" onclick="x()"/>'
+            . '<image xlink:href="ok.png"/><image href="' . $outside . '"/><image href="../../../secret.png"/>'
+            . '<image href="nested.svg"/><use href="#g"/><script>alert(1)</script>'
+            . '<foreignObject><img xmlns="http://www.w3.org/1999/xhtml" src="' . $outside . '"/></foreignObject>'
+            . '<style>@import url(' . $outside . '); rect { fill: url(' . $outside . '); }</style></svg>';
+        $directory = EpubBuilder::minimal()
+            ->withFile('EPUB/chapter.xhtml', '<html><body><img src="images/drawing.svg"/>'
+                . '<p style="background: url(images/drawing.svg)">Styled</p><svg><image href="images/drawing.svg"/></svg></body></html>')
+            ->withFile('EPUB/images/drawing.svg', $svg)
+            ->withFile('EPUB/images/nested.svg', '<svg xmlns="http://www.w3.org/2000/svg"><image href="' . $outside . '"/></svg>')
+            ->withFile('EPUB/images/ok.png', 'png')
+            ->writeTo($this->tmpDir . '/book');
+
+        $html = (new EpubDocumentLoader())->load($directory)->chapters[0];
+
+        $svgs = self::inlineSvgs($html);
+        $this->assertCount(3, $svgs);
+        $this->assertStringNotContainsString('drawing.svg', $html);
+        $okPath = str_replace('\\', '/', (string) realpath($directory . '/EPUB/images/ok.png'));
+        foreach ($svgs as $inlined) {
+            $this->assertStringContainsString($okPath, $inlined);
+            $this->assertStringContainsString('fill="url(#g)"', $inlined);
+            $this->assertStringContainsString('href="#g"', $inlined);
+            $this->assertStringNotContainsString('secret', $inlined);
+            $this->assertStringNotContainsString('nested.svg', $inlined);
+            $this->assertStringNotContainsString('alert', $inlined);
+            $this->assertStringNotContainsString('onclick', $inlined);
+            $this->assertStringNotContainsString('foreignObject', $inlined);
+            $this->assertStringNotContainsString('xml-stylesheet', $inlined);
+            $this->assertStringNotContainsString('@import', $inlined);
+        }
+    }
+
+    public function testDataUrisAreReEncodedAndSvgDataUrisSanitized(): void
+    {
+        file_put_contents($this->tmpDir . '/secret.png', 'png');
+        $outside = str_replace('\\', '/', (string) realpath($this->tmpDir . '/secret.png'));
+        $svg = '<svg xmlns="http://www.w3.org/2000/svg"><image href="' . $outside . '"/><image href="ok.png"/></svg>';
+
+        $body = '<img src="data:image/svg+xml,' . rawurlencode($svg) . '"/>'
+            . '<img src="data:image/svg+xml;charset=utf-8;base64,' . base64_encode($svg) . '"/>'
+            // Renderers treat any source containing "<svg" as inline SVG markup, whatever its type.
+            . '<img src="data:image/png,' . rawurlencode($svg) . '"/>'
+            . '<img src="data:image/png;base64,!!"/><img src="data:no-type"/><img src="data:te&quot;xt/plain,x"/>';
+        $directory = EpubBuilder::minimal()
+            ->withFile('EPUB/chapter.xhtml', "<html><body>{$body}</body></html>")
+            ->withFile('EPUB/ok.png', 'png')
+            ->writeTo($this->tmpDir . '/book');
+
+        $html = (new EpubDocumentLoader())->load($directory)->chapters[0];
+
+        $svgs = self::inlineSvgs($html);
+        $this->assertCount(2, $svgs);
+        $okPath = str_replace('\\', '/', (string) realpath($directory . '/EPUB/ok.png'));
+        foreach ($svgs as $inlined) {
+            $this->assertStringNotContainsString('secret', $inlined);
+            $this->assertStringContainsString($okPath, $inlined);
+        }
+
+        $this->assertStringContainsString('src="data:image/png;base64,' . base64_encode($svg) . '"', $html);
+        $this->assertSame(3, substr_count($html, 'src=""'));
+        $this->assertStringNotContainsString('%3Csvg', $html);
+    }
+
+    public function testUnusableSvgIsBlanked(): void
+    {
+        $directory = EpubBuilder::minimal()
+            ->withFile('EPUB/chapter.xhtml', '<html><body><img src="broken.svg"/><img src="entities.svg"/>'
+                . '<img src="html.svg"/><img src="self.svg"/></body></html>')
+            ->withFile('EPUB/broken.svg', '<svg xmlns="http://www.w3.org/2000/svg"><image')
+            ->withFile('EPUB/entities.svg', '<!DOCTYPE svg [<!ENTITY a "aaaa">]><svg xmlns="http://www.w3.org/2000/svg">&a;</svg>')
+            ->withFile('EPUB/html.svg', '<html><body/></html>')
+            ->withFile('EPUB/self.svg', '<svg xmlns="http://www.w3.org/2000/svg"><image href="self.svg"/>'
+                . '<image href="data:image/svg+xml,' . rawurlencode('<svg xmlns="http://www.w3.org/2000/svg"/>') . '"/></svg>')
+            ->writeTo($this->tmpDir . '/book');
+
+        $html = (new EpubDocumentLoader())->load($directory)->chapters[0];
+
+        $this->assertSame(3, substr_count($html, 'src=""'));
+        $svgs = self::inlineSvgs($html);
+        $this->assertCount(1, $svgs);
+        // An SVG file never inlines another SVG file (that would multiply the output), but data: SVGs are kept.
+        $this->assertStringContainsString('href=""', $svgs[0]);
+        $this->assertCount(1, self::inlineSvgs($svgs[0]));
+    }
+
+    public function testSvgInliningStopsAtTheSizeBudget(): void
+    {
+        $svg = '<svg xmlns="http://www.w3.org/2000/svg"><desc>' . str_repeat('x', 1024 * 1024) . '</desc></svg>';
+        $directory = EpubBuilder::minimal()
+            ->withFile('EPUB/chapter.xhtml', '<html><body>' . str_repeat('<img src="big.svg"/>', 40) . '</body></html>')
+            ->withFile('EPUB/big.svg', $svg)
+            ->writeTo($this->tmpDir . '/book');
+
+        $html = (new EpubDocumentLoader())->load($directory)->chapters[0];
+
+        $inlined = substr_count($html, "data:image/svg+xml;base64,");
+        $this->assertGreaterThan(0, $inlined);
+        $this->assertLessThan(40, $inlined);
+        $this->assertSame(40 - $inlined, substr_count($html, 'src=""'));
+    }
+
     public function testTextAndPathsSurviveParsing(): void
     {
         $directory = EpubBuilder::minimal()
@@ -280,6 +389,18 @@ final class EpubDocumentLoaderTest extends TestCase
         $this->expectExceptionMessage('No EPUB package found');
 
         (new EpubDocumentLoader())->load($this->tmpDir . '/empty');
+    }
+
+    /**
+     * The decoded SVG markup of every base64 data:image/svg+xml URI in $html.
+     *
+     * @return list<string>
+     */
+    private static function inlineSvgs(string $html): array
+    {
+        preg_match_all('#data:image/svg\+xml;base64,([A-Za-z0-9+/=]+)#', $html, $matches);
+
+        return array_map(static fn (string $data): string => (string) base64_decode($data, true), $matches[1]);
     }
 
     public static function twoChapterBook(): EpubBuilder

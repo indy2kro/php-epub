@@ -27,9 +27,21 @@ class XmlParser
 
         $content = FileSystemHelper::readFile($filePath) ?? throw new XmlException("Failed to read XML file: {$filePath}");
 
+        return $this->parseString($content, $filePath);
+    }
+
+    /**
+     * Parses an XML document held in memory, with the same protections as parse().
+     *
+     * @param string $source Where the document comes from, for error messages.
+     *
+     * @throws XmlException If the document is not well-formed or declares entities.
+     */
+    public function parseString(string $content, string $source = 'string'): SimpleXMLElement
+    {
         // Entity declarations enable expansion attacks; EPUB container, package and NCX files never need them.
         if (preg_match('/<!ENTITY/i', $content) === 1) {
-            throw new XmlException("XML entity declarations are not allowed: {$filePath}");
+            throw new XmlException("XML entity declarations are not allowed: {$source}");
         }
 
         $useInternalErrors = libxml_use_internal_errors(true);
@@ -40,12 +52,12 @@ class XmlParser
                 $errors = libxml_get_errors();
                 $detail = $errors === [] ? '' : sprintf(' (%s at line %d)', trim($errors[0]->message), $errors[0]->line);
 
-                throw new XmlException("Failed to load XML file: {$filePath}{$detail}");
+                throw new XmlException("Failed to load XML file: {$source}{$detail}");
             }
 
             // The byte check above misses other encodings (e.g. UTF-16); the parsed DOCTYPE does not.
             if ($this->declaresEntities($xml)) {
-                throw new XmlException("XML entity declarations are not allowed: {$filePath}");
+                throw new XmlException("XML entity declarations are not allowed: {$source}");
             }
 
             return $xml;

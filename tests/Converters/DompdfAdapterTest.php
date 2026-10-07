@@ -86,6 +86,20 @@ final class DompdfAdapterTest extends TestCase
         }
     }
 
+    public function testSvgImagesAreRenderedWithTheImagesTheyReference(): void
+    {
+        $directory = TCPDFAdapterTest::svgBook()->writeTo($this->epubDirectory . '-svg');
+
+        try {
+            (new DompdfAdapter())->convert($directory, $this->outputPdfPath);
+
+            // The PNG drawn by the SVG; Dompdf only reaches it by rendering the SVG.
+            $this->assertMatchesRegularExpression('#/Subtype\s*/Image#', (string) file_get_contents($this->outputPdfPath));
+        } finally {
+            $this->fileSystemHelper->deleteDirectory($directory);
+        }
+    }
+
     public function testRendererCannotReachOutsideTheBook(): void
     {
         $dompdf = (new ExposedDompdfAdapter())->createDompdfFor($this->epubDirectory);

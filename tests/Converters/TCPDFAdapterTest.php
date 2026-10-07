@@ -77,6 +77,33 @@ final class TCPDFAdapterTest extends TestCase
         }
     }
 
+    public function testSvgImagesAreRenderedWithTheImagesTheyReference(): void
+    {
+        $directory = self::svgBook()->writeTo($this->epubDirectory . '-svg');
+        $svgFiles = glob(sys_get_temp_dir() . '/epu*.svg') ?: [];
+
+        try {
+            (new TCPDFAdapter())->convert($directory, $this->outputPdfPath);
+
+            // The PNG drawn by the SVG; TCPDF only reaches it by rendering the SVG.
+            $this->assertMatchesRegularExpression('#/Subtype\s*/Image#', (string) file_get_contents($this->outputPdfPath));
+            $this->assertSame($svgFiles, glob(sys_get_temp_dir() . '/epu*.svg') ?: [], 'Temporary SVG files are deleted.');
+        } finally {
+            $this->fileSystemHelper->deleteDirectory($directory);
+        }
+    }
+
+    public static function svgBook(): EpubBuilder
+    {
+        $svg = '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="100" height="100">'
+            . '<image xlink:href="pixel.png" width="40" height="40"/></svg>';
+
+        return EpubBuilder::minimal()
+            ->withFile('EPUB/chapter.xhtml', '<html><body><p>Drawing</p><img src="images/drawing.svg" width="100" height="100"/></body></html>')
+            ->withFile('EPUB/images/drawing.svg', $svg)
+            ->withFile('EPUB/images/pixel.png', (string) base64_decode(EpubBuilder::PNG, true));
+    }
+
     public function testBookWithoutChaptersStillProducesAPage(): void
     {
         $directory = EpubBuilder::minimal()

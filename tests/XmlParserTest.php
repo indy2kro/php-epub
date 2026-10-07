@@ -73,6 +73,18 @@ final class XmlParserTest extends TestCase
         (new XmlParser())->parse($this->xmlFilePath);
     }
 
+    public function testParseStringAppliesTheSameProtections(): void
+    {
+        $parser = new XmlParser();
+
+        $this->assertSame('Value', (string) $parser->parseString('<root>Value</root>'));
+
+        $this->expectException(XmlException::class);
+        $this->expectExceptionMessage('XML entity declarations are not allowed: inline SVG');
+
+        $parser->parseString('<!DOCTYPE root [<!ENTITY a "b">]><root>&a;</root>', 'inline SVG');
+    }
+
     public function testParseAcceptsUtf16DocumentsWithoutEntities(): void
     {
         $xml = '<?xml version="1.0" encoding="UTF-16"?><root><element>Value</element></root>';
