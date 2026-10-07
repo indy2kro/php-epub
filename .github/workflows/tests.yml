@@ -146,7 +146,7 @@ jobs:
         - name: Install the lowest allowed dependencies
           run: |
             composer update --prefer-lowest --prefer-stable --no-progress
-            composer show tecnickcom/tcpdf dompdf/dompdf phpunit/phpunit
+            composer show --direct
 
         - name: Run tests
           run: vendor/bin/phpunit
