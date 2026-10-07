@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="author" content="indy2kro" /><link rel="canonical" href="https://indy2kro.github.io/php-epub/improvement-audit/2026-10-07-improvement-backlog/" />
+      <link rel="shortcut icon" href="../../img/favicon.ico" />
+    <title>php-epub improvement backlog — 2026-10-07 (round 4) - PHP EPUB</title>
+    <link rel="stylesheet" href="../../css/theme.css" />
+    <link rel="stylesheet" href="../../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "php-epub improvement backlog \u2014 2026-10-07 (round 4)";
+        var mkdocs_page_input_path = "improvement-audit/2026-10-07-improvement-backlog.md";
+        var mkdocs_page_url = "/php-epub/improvement-audit/2026-10-07-improvement-backlog/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="../.." class="icon icon-home"> PHP EPUB
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../..">Index</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../installation/">Installation</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Usage</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../basic-usage/">Basic Usage</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../advanced-usage/">Advanced Features</a>
+                  </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../architecture/">Architecture</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Classes</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../../epub-file/">EpubFile</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../content-manager/">ContentManager</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../metadata/">Metadata</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../manifest/">Manifest</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../spine/">Spine</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../table-of-contents/">TableOfContents</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../parser/">Parser</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../xml-parser/">XmlParser</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../zip-handler/">ZipHandler</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../converter/">Converter</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Converters</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../../converters/calibre-adapter/">Calibre Adapter</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../converters/dompdf-adapter/">Dompdf Adapter</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../../converters/tcpdf-adapter/">TCPDF Adapter</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../..">PHP EPUB</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="../.." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">php-epub improvement backlog — 2026-10-07 (round 4)</li>
+    <li class="wy-breadcrumbs-aside">
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="php-epub-improvement-backlog-2026-10-07-round-4">php-epub improvement backlog — 2026-10-07 (round 4)<a class="headerlink" href="#php-epub-improvement-backlog-2026-10-07-round-4" title="Permanent link">&para;</a></h1>
+<p>Discovery-only audit of <code>src/</code>, <code>scripts/</code>, <code>docs/</code>, <code>tests/</code> and <code>.github/workflows/</code>
+at <code>88a2210</code> (main), after the round-3 backlog was closed (#131-#138).
+No source changes were made while compiling this list.</p>
+<h2 id="gate-results-fresh-dependencies-composer-update">Gate results (fresh dependencies, <code>composer update</code>)<a class="headerlink" href="#gate-results-fresh-dependencies-composer-update" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Gate</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>PHPUnit 12.5 (<code>XDEBUG_MODE=coverage</code>)</td>
+<td>526 tests, 2 skipped; lines 99.6% (1939/1946)</td>
+</tr>
+<tr>
+<td>PHPCS <code>src/ tests/ docs/</code></td>
+<td>clean</td>
+</tr>
+<tr>
+<td>PHPStan 2.3 level max (512M)</td>
+<td>clean</td>
+</tr>
+<tr>
+<td>Rector 2.7 <code>--dry-run</code></td>
+<td>clean</td>
+</tr>
+<tr>
+<td><code>composer audit</code> / <code>validate --strict</code> / <code>outdated --direct</code></td>
+<td>clean / valid / up to date</td>
+</tr>
+<tr>
+<td>gitleaks</td>
+<td>clean</td>
+</tr>
+<tr>
+<td>actionlint</td>
+<td>clean</td>
+</tr>
+</tbody>
+</table>
+<p>The 7 uncovered lines are defensive branches in <code>ZipHandler</code> and <code>FileSystemHelper</code>, so the gates produced
+no mechanical sweep items. The two sweep items below are behaviour fixes that span several classes.</p>
+<h2 id="summary">Summary<a class="headerlink" href="#summary" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Area</th>
+<th style="text-align: right;">Items</th>
+<th style="text-align: right;">High</th>
+<th style="text-align: right;">Med</th>
+<th style="text-align: right;">Low</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>SEC — untrusted input</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr>
+<td>BUG — wrong behaviour</td>
+<td style="text-align: right;">5</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">3</td>
+</tr>
+<tr>
+<td>CONV — converters</td>
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">3</td>
+</tr>
+<tr>
+<td>FEAT — new capability</td>
+<td style="text-align: right;">12</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">6</td>
+<td style="text-align: right;">6</td>
+</tr>
+<tr>
+<td>UX — public API</td>
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">4</td>
+</tr>
+<tr>
+<td>TEST — tests</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">2</td>
+</tr>
+<tr>
+<td>CI — workflows &amp; packaging</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">1</td>
+</tr>
+<tr>
+<td>SWEEP — cross-cutting</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr>
+<td><strong>Total</strong></td>
+<td style="text-align: right;"><strong>30</strong></td>
+<td style="text-align: right;"><strong>1</strong></td>
+<td style="text-align: right;"><strong>10</strong></td>
+<td style="text-align: right;"><strong>19</strong></td>
+</tr>
+</tbody>
+</table>
+<p>Effort: S = one file, under 30 min · M = one class plus tests · L = cross-cutting.</p>
+<p>No security vulnerabilities were found. ZIP extraction, XML parsing and PDF resource confinement
+were re-checked against the round-3 hardening.</p>
+<h2 id="execution-instructions">Execution instructions<a class="headerlink" href="#execution-instructions" title="Permanent link">&para;</a></h2>
+<ul>
+<li>One branch and one PR per theme (see <em>Themes</em> below); stack PRs that touch the same files.</li>
+<li>Write the failing test first. Build hostile EPUBs inside the test (<code>tests/Support/EpubBuilder</code>)
+  rather than committing binary fixtures.</li>
+<li>Before every push run the gates against fresh dependencies, as CI does
+  (<code>composer update</code>, <code>composer quality</code>, then <code>git checkout composer.lock</code>), and check each exit code.</li>
+<li>Tick the box here in the same PR that fixes an item. Delete <code>docs/improvement-audit/</code> once every
+  item is done or explicitly declined (list declined items in that PR's description).</li>
+</ul>
+<h3 id="themes">Themes<a class="headerlink" href="#themes" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Content &amp; table-of-contents integrity</strong>: SWEEP-01, BUG-01, BUG-04, FEAT-04, FEAT-07</li>
+<li><strong>Archives &amp; I/O</strong>: BUG-02, BUG-03, UX-04, FEAT-05</li>
+<li><strong>Converters</strong>: SWEEP-02, CONV-01, CONV-03, CONV-04, UX-02</li>
+<li><strong>Metadata &amp; validation</strong>: FEAT-02, FEAT-03, UX-01, UX-03, BUG-05</li>
+<li><strong>Encryption &amp; fonts</strong>: FEAT-01, FEAT-09, CONV-02</li>
+<li><strong>EPUB 3 features</strong>: FEAT-06, FEAT-10, FEAT-11, FEAT-12, FEAT-08</li>
+<li><strong>Tests &amp; packaging</strong>: TEST-01, TEST-02, CI-01</li>
+</ol>
+<h2 id="items">Items<a class="headerlink" href="#items" title="Permanent link">&para;</a></h2>
+<h3 id="sweeps">Sweeps<a class="headerlink" href="#sweeps" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[ ] <strong>SWEEP-01</strong> Reject malformed XHTML in <code>addChapter()</code>, <code>addContent()</code> and <code>updateContent()</code>, or convert HTML fragments (<code>&amp;nbsp;</code>, <code>&lt;br&gt;</code>) to XHTML — <code>src/EpubFile.php:170-191</code>, <code>src/BookTemplate.php:59-66</code>, <code>src/ContentManager.php:91-134</code>, <code>src/Util/ContentDocumentProperties.php:40-50</code> — M · high
+  Probe: <code>addChapter('C', '&lt;p&gt;a&amp;nbsp;b&lt;/p&gt;')</code>, a <code>&lt;br&gt;</code> or an unclosed tag is accepted, and the chapter it writes cannot be parsed by any XHTML reader. Only a later <code>validate()</code> reports <code>CONTENT_NOT_WELL_FORMED</code>.</li>
+<li>[ ] <strong>SWEEP-02</strong> Throw <code>ConversionException</code> for renderer failures, and say how to fix missing TCPDF core fonts (<code>scripts/generate-core-fonts.php</code>) — <code>src/Converters/TCPDFAdapter.php:57-66,88-115</code>, <code>src/Converters/DompdfAdapter.php:48-70</code>, <code>scripts/generate-core-fonts.php:1-30</code> — S · med
+  Probe: without the generated fonts, which is the case for every project that installs php-epub as a dependency and skips the manual step, <code>convert()</code> throws <code>Com\Tecnick\Pdf\Font\Exception: unable to read file: helvetica.json</code>. Neither adapter catches Dompdf or tc-lib exceptions, although both document <code>ConversionException</code>.</li>
+</ul>
+<h3 id="bugs">Bugs<a class="headerlink" href="#bugs" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[ ] <strong>BUG-01</strong> Keep the NCX and nav valid when the table of contents becomes empty (navMap needs a navPoint, the toc <code>&lt;ol&gt;</code> an <code>&lt;li&gt;</code>), report empty ones in <code>validate()</code>, and update the NCX <code>dtb:depth</code> — <code>src/TableOfContents.php:93-130,365-410</code>, <code>src/ContentManager.php:279-297</code>, <code>src/Validator.php:265-330</code> — S · med
+  Probes: <code>setEntries([])</code> (or deleting every chapter the TOC links to) writes <code>&lt;navMap&gt;&lt;/navMap&gt;</code> in EPUB 2 and <code>&lt;ol/&gt;</code> in EPUB 3. EPUBCheck rejects both (RSC-005), but <code>validate()</code> reports nothing.</li>
+<li>[ ] <strong>BUG-02</strong> Detect ZIP entry names that collide after Unicode case folding or normalization, not only ASCII case — <code>src/ZipHandler.php:114-121</code> — S · med
+  Probe: on Windows, an archive with <code>É.txt</code> and <code>é.txt</code> extracts into one file without an error, and the second entry silently replaces the first, because the duplicate check uses <code>strtolower()</code>. macOS also merges NFC and NFD spellings.</li>
+<li>[ ] <strong>BUG-03</strong> Report entry names that are invalid on Windows (trailing dot or space, reserved device names such as <code>CON</code>, <code>:</code>) with a clear error — <code>src/ZipHandler.php:131-135</code>, <code>src/Util/PathResolver.php:20-55</code> — S · low
+  Probe: <code>a.txt.</code> or <code>text./a.txt</code> fails with a misleading "Permission denied" from <code>fopen()</code>, and names such as <code>CON</code> or <code>a.xhtml:x</code> (an alternate data stream) are not rejected up front.</li>
+<li>[ ] <strong>BUG-04</strong> Allow case-only renames in <code>moveContent()</code> on case-insensitive filesystems — <code>src/ContentManager.php:193-195</code> — S · low
+  Probe on Windows: <code>moveContent('EPUB/text/ch.xhtml', 'EPUB/text/Ch.xhtml')</code> throws "already exists" because <code>file_exists()</code> finds the source file itself.</li>
+<li>[ ] <strong>BUG-05</strong> Update <code>dcterms:modified</code> only on the book-level meta, never on a refinement with the same property — <code>src/Metadata.php:562-576</code> — S · low
+  <code>updateModifiedDate()</code> takes the first meta with that property, including one with <code>refines="#…"</code>, so the book-level date stays stale and the refinement is overwritten.</li>
+</ul>
+<h3 id="converters">Converters<a class="headerlink" href="#converters" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[ ] <strong>CONV-01</strong> Render non-Latin books: default to a Unicode font (both renderers ship DejaVu) or choose one from <code>dc:language</code>, and switch TCPDF to RTL for right-to-left books — <code>src/Converters/DompdfAdapter.php:17-22,85-95</code>, <code>src/Converters/TCPDFAdapter.php:14-25,88-115</code> — M · med
+  The defaults (Dompdf <code>Arial</code>, TCPDF <code>helvetica</code>) map to the PDF core fonts, which cover Latin-1 only. Cyrillic, Greek, CJK and Arabic books without embedded fonts lose their glyphs, and nothing in either adapter sets right-to-left layout.</li>
+<li>[ ] <strong>CONV-02</strong> De-obfuscate IDPF/Adobe obfuscated fonts before the PDF renderers load them — <code>src/Converters/EpubDocumentLoader.php:393-456,465-499</code>, <code>src/FontObfuscation.php</code> — S · low
+  <code>@font-face</code> <code>url()</code>s point the renderers at the obfuscated files, because nothing in <code>src/Converters</code> reads <code>encryption.xml</code>, so the book's embedded fonts cannot be used in the PDF.</li>
+<li>[ ] <strong>CONV-03</strong> Decode content documents in their declared encoding (EPUB allows UTF-16) instead of always forcing UTF-8 for the HTML parser — <code>src/Converters/EpubDocumentLoader.php:207-216</code>, <code>src/EpubFile.php:445-455</code> — S · low
+  The <code>&lt;?xml encoding="UTF-8"&gt;</code> prefix makes libxml read UTF-16 chapters as UTF-8. Their text is garbled in the PDF, and <code>getCoverImage()</code> cannot find the image in a UTF-16 cover page.</li>
+<li>[ ] <strong>CONV-04</strong> Pass paths to <code>ebook-convert</code> so that a leading <code>-</code> is never read as an option, and document that Calibre receives the book unsanitised (keep Calibre up to date) — <code>src/Converters/CalibreAdapter.php:96-112</code>, <code>docs/converters/calibre-adapter.md</code> — S · low
+  Unlike the TCPDF and Dompdf path, <code>CalibreAdapter</code> hands the book to Calibre unchanged, so keeping resources inside the book depends on the Calibre version. Calibre also parses an output name such as <code>-x.pdf</code> as an option.</li>
+</ul>
+<h3 id="features">Features<a class="headerlink" href="#features" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[ ] <strong>FEAT-01</strong> Detect DRM-protected books (<code>encryption.xml</code> algorithms other than font obfuscation, <code>rights.xml</code>, an LCP license): add <code>isEncrypted()</code>, report them in <code>validate()</code>, refuse PDF conversion — <code>src/FontObfuscation.php:86-110</code>, <code>src/Validator.php</code>, <code>src/EpubFile.php:278-287</code> — M · med
+  An Adobe ADEPT or Readium LCP book loads without any warning. <code>getContent()</code> then returns ciphertext, <code>validate()</code> reports every chapter as not well-formed, and the converters produce garbage PDFs.</li>
+<li>[ ] <strong>FEAT-02</strong> Extend <code>validate()</code> with frequent EPUBCheck package errors: declared media type vs. file content, missing EPUB 3 manifest properties (<code>svg</code>, <code>mathml</code>, <code>scripted</code>, <code>remote-resources</code>) in loaded books, <code>cover-image</code> on a non-image — <code>src/Validator.php:150-300</code>, <code>src/Util/ContentDocumentProperties.php</code> — M · med
+  Round 3 sets these properties for content the library writes. Loaded books with wrong media types or missing properties still pass <code>validate()</code> and fail EPUBCheck (OPF-014, OPF-029).</li>
+<li>[ ] <strong>FEAT-03</strong> Accessibility metadata API (<code>schema:accessMode</code>, <code>accessibilityFeature</code>, <code>accessibilityHazard</code>, <code>accessibilitySummary</code>, <code>dcterms:conformsTo</code>) with <code>validate()</code> hints — <code>src/Metadata.php:166-222</code>, <code>src/Validator.php</code> — M · med
+  Since June 2025 the European Accessibility Act requires accessibility metadata for e-books sold in the EU. Today callers have to know the property names and write them through the generic <code>setPropertyValues()</code>.</li>
+<li>[ ] <strong>FEAT-04</strong> Rewrite references in content documents when <code>moveContent()</code> moves a file (links, images, stylesheets, and the relative links of the moved document itself) — <code>src/ContentManager.php:168-225</code> — M · med
+  <code>moveContent()</code> keeps the manifest, spine, TOC and <code>encryption.xml</code> consistent, but every <code>&lt;a&gt;</code>, <code>&lt;img&gt;</code> and <code>&lt;link&gt;</code> that pointed at the file breaks, so reorganising a book still needs a hand-written rewrite pass.</li>
+<li>[ ] <strong>FEAT-05</strong> Open a book from a string or stream, and save it to one (uploads, HTTP downloads) — <code>src/EpubFile.php:57-63,251-271</code> — M · med
+  Web apps receive uploads and send downloads, but the API only reads and writes file paths, so callers write their own temp-file plumbing.</li>
+<li>[ ] <strong>FEAT-06</strong> Upgrade an EPUB 2 book to EPUB 3: package version, a nav document generated from the NCX, <code>dcterms:modified</code>, EPUB 3 refinements for <code>opf:role</code>/<code>opf:file-as</code>, the <code>cover-image</code> property — <code>src/Metadata.php</code>, <code>src/TableOfContents.php</code>, <code>src/Manifest.php</code> — L · med
+  Stores and validators increasingly require EPUB 3. The library already has every piece of the migration, but callers must assemble them by hand.</li>
+<li>[ ] <strong>FEAT-07</strong> Generate the table of contents from the headings (<code>h1</code>–<code>h3</code>) of the spine documents — <code>src/TableOfContents.php:93-130</code>, <code>src/EpubFile.php:170-191</code> — M · low
+  Books assembled from existing XHTML need a TOC built from their headings, and callers have to write it themselves with DOM parsing and <code>setEntries()</code>.</li>
+<li>[ ] <strong>FEAT-08</strong> Plain-text extraction per spine document (search indexing, word counts, previews) — <code>src/ContentManager.php</code>, <code>src/Converters/EpubDocumentLoader.php:200-239</code> — S · low
+  Getting a book's text is one of the most common reasons to open an EPUB, and today it takes a hand-written spine walk plus HTML parsing.</li>
+<li>[ ] <strong>FEAT-09</strong> Add obfuscated fonts and read fonts de-obfuscated (expose <code>FontObfuscation</code> through <code>ContentManager</code>) — <code>src/FontObfuscation.php:31-80</code>, <code>src/ContentManager.php:91-110</code> — S · low
+  The library re-keys obfuscated fonts but cannot add one or return a usable font file, so publishers who obfuscate embedded fonts must implement the IDPF algorithm themselves.</li>
+<li>[ ] <strong>FEAT-10</strong> Landmarks API (EPUB 3 nav <code>landmarks</code> and the EPUB 2 <code>guide</code>) and page-list access — <code>src/TableOfContents.php:60-90</code>, <code>src/Manifest.php:246-275</code> — M · low
+  Landmarks (cover, start of text, TOC) drive a reader's "go to beginning", and today they can only be changed by editing the nav XHTML and the guide by hand.</li>
+<li>[ ] <strong>FEAT-11</strong> Fixed-layout and rendition API: <code>rendition:layout</code>, <code>orientation</code>, <code>spread</code>, and the <code>page-spread-*</code> properties of spine itemrefs — <code>src/Spine.php:73-170</code>, <code>src/Metadata.php</code> — M · low
+  Comics and children's books use fixed layout and need these properties, but no accessor reads or writes them.</li>
+<li>[ ] <strong>FEAT-12</strong> Media overlays: read and set an item's <code>media-overlay</code> SMIL, plus the <code>media:duration</code> and <code>media:active-class</code> metadata — <code>src/Manifest.php:355-370</code>, <code>src/Metadata.php:166-222</code> — M · low
+  Read-aloud books need these. The library keeps existing <code>media-overlay</code> references consistent but has no API to create them.</li>
+</ul>
+<h3 id="public-api">Public API<a class="headerlink" href="#public-api" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[ ] <strong>UX-01</strong> Check language tags (BCP 47) and dates (W3CDTF) when they are set, and report invalid ones in <code>validate()</code> — <code>src/Traits/InteractsWithLanguage.php:20-45</code>, <code>src/Traits/InteractsWithDate.php:25-30</code> — S · low
+  <code>setLanguage('English')</code> and <code>setDate('July 2020')</code> are accepted. EPUBCheck then reports OPF-092 (invalid language tag, an error) and OPF-053 (date syntax).</li>
+<li>[ ] <strong>UX-02</strong> Reject invalid converter styles (wrong types, unknown keys, unknown paper sizes) instead of silently using the defaults — <code>src/Converters/TCPDFAdapter.php:35-44,189-208</code>, <code>src/Converters/DompdfAdapter.php:25-35,149-162</code> — S · low
+  <code>'margin_left' =&gt; 12.5</code>, a typo such as <code>fontsize</code>, or a paper size of <code>A44</code> is ignored without a word, so callers cannot tell why the PDF looks wrong.</li>
+<li>[ ] <strong>UX-03</strong> Add <code>setCreators()</code>/<code>setContributors()</code> that take <code>Contributor</code> objects (name, role, file-as), the inverse of <code>getCreators()</code> — <code>src/Traits/InteractsWithAuthors.php:30-60</code>, <code>src/Traits/InteractsWithContributors.php:16-42</code> — S · low
+  <code>getCreators()</code> returns roles and sort keys, but changing one author's file-as or role means removing every creator and adding them all back with <code>addCreator()</code>.</li>
+<li>[ ] <strong>UX-04</strong> Check the result of <code>ZipArchive::addFile()</code> in <code>compress()</code> and include the libzip status in the error — <code>src/ZipHandler.php:213-235</code> — S · low
+  <code>addFile()</code> failures are ignored, and <code>close()</code> then fails with a bare "Failed to finalize ZIP file" that names neither the file (for example, one locked on Windows) nor the reason.</li>
+</ul>
+<h3 id="tests">Tests<a class="headerlink" href="#tests" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[ ] <strong>TEST-01</strong> Run the PHP examples in <code>README.md</code> and <code>docs/</code> in the test suite (lint every block, execute the self-contained ones against a fixture) — <code>README.md</code>, <code>docs/*.md</code>, <code>tests/</code> — M · low
+  PHPCS on <code>docs/</code> does not look inside Markdown and no test reads <code>docs/</code>, so examples drift silently whenever the API changes. Round 3's DOC-01 and DOC-02 fixed drift of this kind.</li>
+<li>[ ] <strong>TEST-02</strong> Fuzz the untrusted-input parsers (<code>ZipHandler::extract()</code>, <code>XmlParser</code>, <code>Parser</code>, <code>EpubDocumentLoader</code>) with mutated fixtures in a scheduled job — <code>tests/Support/EpubBuilder.php</code>, <code>.github/workflows/tests.yml</code> — M · low
+  Hostile-input tests are hand-written cases. A cheap mutation fuzzer (truncated entries, flipped bytes, random names) would find crashes and non-library exceptions that example-based tests miss.</li>
+</ul>
+<h3 id="ci">CI<a class="headerlink" href="#ci" title="Permanent link">&para;</a></h3>
+<ul>
+<li>[ ] <strong>CI-01</strong> Mark dev-only files <code>export-ignore</code>: <code>docs/</code>, <code>mkdocs.yml</code>, <code>AGENTS.md</code>, <code>phpcs.xml</code>, <code>phpstan.neon</code>, <code>phpunit.xml</code>, <code>rector.php</code>, <code>composer.lock</code>, <code>.gitignore</code> — <code>.gitattributes:10-20</code> — S · low
+  <code>git archive HEAD</code> shows that all of them ship in the Composer dist package, which every dependent downloads.</li>
+</ul>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+    
+    
+  </span>
+</div>
+    <script src="../../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "../..";</script>
+    <script src="../../js/theme_extra.js"></script>
+    <script src="../../js/theme.js"></script>
+      <script src="../../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>
