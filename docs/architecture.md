@@ -44,7 +44,7 @@ Reads and edits the `<manifest>`: items (`ManifestItem`), lookup by id, path or 
 The reading order: `SpineItem`s with their manifest item and `linear` flag, and adding, removing and moving entries.
 
 ### ContentManager
-File operations on the extracted book (add, update, delete, read), keeping the manifest and spine in sync. Paths are relative to the book root; the package document itself is managed only through `Metadata`, `Manifest` and `Spine`.
+File operations on the extracted book (add, update, delete, move, read), keeping the manifest and spine in sync and refusing XHTML that is not well-formed; moving a file rewrites the references to it. Paths are relative to the book root; the package document itself is managed only through `Metadata`, `Manifest` and `Spine`.
 
 ### TableOfContents
 Reads and edits the EPUB 3 navigation document's `toc` nav and the EPUB 2 NCX as `TocEntry` trees, writing both when a book has both.

@@ -326,7 +326,31 @@ final readonly class Validator
             return [$this->error('NCX_INVALID', 'The NCX has no NCX namespace or no navMap.', $item->path)];
         }
 
-        return [];
+        if (! $isNav && $xml->children($namespace)->navMap->children($namespace)->navPoint->count() === 0) {
+            return [$this->error('NCX_EMPTY', 'The NCX navMap has no navPoint.', $item->path)];
+        }
+
+        return $isNav && $this->hasEmptyTocList($xml) ? [$this->error('NAV_EMPTY', 'The navigation document\'s toc has no list item.', $item->path)] : [];
+    }
+
+    /**
+     * Whether the navigation document's toc nav has a list without any item.
+     */
+    private function hasEmptyTocList(SimpleXMLElement $xml): bool
+    {
+        $root = dom_import_simplexml($xml);
+        $xpath = new \DOMXPath($root->ownerDocument ?? new \DOMDocument());
+        $xpath->registerNamespace('x', (string) $root->namespaceURI);
+        $xpath->registerNamespace('epub', 'http://www.idpf.org/2007/ops');
+
+        $lists = $xpath->query("//x:nav[contains(concat(' ', normalize-space(@epub:type), ' '), ' toc ')]/x:ol");
+        foreach ($lists === false ? [] : $lists as $list) {
+            if ($list instanceof \DOMElement && $list->getElementsByTagNameNS('*', 'li')->length === 0) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

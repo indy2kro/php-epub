@@ -8,6 +8,7 @@ use DOMDocument;
 use PhpEpub\Converters\ConverterInterface;
 use PhpEpub\Util\FileSystemHelper;
 use PhpEpub\Util\PathResolver;
+use PhpEpub\Util\XhtmlFragment;
 use PhpEpub\Util\XmlText;
 use SimpleXMLElement;
 use Throwable;
@@ -162,7 +163,8 @@ class EpubFile
      * Adds an XHTML chapter: writes the document, adds it to the manifest and the reading order,
      * and appends it to the table of contents when the book has one.
      *
-     * @param string $body The chapter's body markup (well-formed XHTML), inserted as it is.
+     * @param string $body The chapter's body markup. Well-formed XHTML is inserted as it is; markup that is not
+     *                     (e.g. "&nbsp;", "<br>" or unclosed tags) is parsed as an HTML fragment and written as XHTML.
      * @param string|null $path Path relative to the book root; defaults to "text/chapter-N.xhtml" next to the OPF.
      *
      * @throws Exception If the book is not loaded, the title or body is not valid XML text, or a file cannot be written.
@@ -174,8 +176,15 @@ class EpubFile
         $spine = $this->getSpine();
         $path ??= $this->unusedChapterPath();
         $language = $this->getMetadata()->getLanguage();
+        $language = $language === '' ? 'en' : $language;
 
-        $this->getContentManager()->addContent($path, BookTemplate::chapter($title, $language === '' ? 'en' : $language, $body));
+        try {
+            $this->xmlParser->parseString(BookTemplate::chapter($title, $language, $body));
+        } catch (XmlException) {
+            $body = XhtmlFragment::fromHtml($body);
+        }
+
+        $this->getContentManager()->addContent($path, BookTemplate::chapter($title, $language, $body));
         $item = $manifest->findByPath($path) ?? throw new Exception("The chapter is not in the manifest: {$path}");
 
         if (! $spine->contains($item->id)) {
@@ -590,7 +599,7 @@ class EpubFile
             throw new Exception('EPUB file must be loaded before accessing the table of contents.');
         }
 
-        return new TableOfContents($this->tempDir, $this->manifest, $this->xmlParser, new PathResolver(), $this);
+        return new TableOfContents($this->tempDir, $this->manifest, $this->xmlParser, new PathResolver(), $this, $this->spine);
     }
 
     public function getContentManager(): ContentManager

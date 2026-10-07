@@ -194,15 +194,22 @@ final class ContentManagerPackageTest extends TestCase
         $this->assertSame('nav', $properties());
     }
 
-    public function testPropertiesAreLeftAloneForUnparseableXhtmlAndOtherFiles(): void
+    public function testPropertiesAreLeftAloneForOtherFilesAndRefusedXhtml(): void
     {
         [$contentManager, $manifest] = $this->open();
         $manifest->addProperty('chapter', 'svg');
 
-        $contentManager->updateContent('EPUB/chapter.xhtml', '<html><body><p>Broken');
+        try {
+            $contentManager->updateContent('EPUB/chapter.xhtml', '<html><body><p>Broken');
+            $this->fail('Expected the malformed XHTML to be refused.');
+        } catch (Exception) {
+            // The refused update changes neither the file nor its properties.
+        }
+
         $contentManager->addContent('EPUB/image.svg', '<svg xmlns="http://www.w3.org/2000/svg"><script>x()</script></svg>');
 
         $this->assertSame('svg', $manifest->get('chapter')?->properties);
+        $this->assertStringContainsString('<p>Chapter</p>', $contentManager->getContent('EPUB/chapter.xhtml'));
         $this->assertSame('', $manifest->findByPath('EPUB/image.svg')?->properties);
     }
 

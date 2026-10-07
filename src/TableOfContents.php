@@ -26,13 +26,15 @@ final readonly class TableOfContents
      * @param string $rootDirectory The directory holding the extracted book.
      * @param EpubFile|null $book The book these files belong to: holding it keeps its extracted
      *                            files alive while this object is used (e.g. EpubFile::open($path)->getTableOfContents()).
+     * @param Spine|null $spine The reading order generateFromHeadings() follows.
      */
     public function __construct(
         private string $rootDirectory,
         private Manifest $manifest,
         private XmlParser $xmlParser = new XmlParser(),
         private PathResolver $paths = new PathResolver(),
-        private ?EpubFile $book = null
+        private ?EpubFile $book = null,
+        private ?Spine $spine = null
     ) {
     }
 
@@ -87,10 +89,31 @@ final readonly class TableOfContents
      *
      * @param list<TocEntry> $entries
      *
-     * @throws Exception If the book has no navigation document or NCX, an entry points outside
-     *                   the book or is not valid XML text, or a file cannot be written.
+     * @throws Exception If $entries is empty (a table of contents needs an entry), the book has no
+     *                   navigation document or NCX, an entry points outside the book or is not valid
+     *                   XML text, or a file cannot be written.
      */
     public function setEntries(array $entries): void
+    {
+        if ($entries === []) {
+            throw new Exception('A table of contents needs at least one entry');
+        }
+
+        $this->writeEntries($entries);
+    }
+
+    /**
+     * Like setEntries(), but accepts an empty list. ContentManager uses it to keep an emptied table
+     * of contents (after the last linked file was deleted) in its files; EpubFile::validate()
+     * reports it (NAV_EMPTY / NCX_EMPTY).
+     *
+     * @internal
+     *
+     * @param list<TocEntry> $entries
+     *
+     * @throws Exception See setEntries().
+     */
+    public function writeEntries(array $entries): void
     {
         $navPath = $this->navPath();
         $ncxPath = $this->ncxPath();
@@ -117,6 +140,122 @@ final readonly class TableOfContents
     public function addEntry(TocEntry $entry): void
     {
         $this->setEntries([...$this->getEntries(), $entry]);
+    }
+
+    /**
+     * Builds the table of contents from the headings (h1 to h$maxLevel) of the spine documents, in
+     * reading order, and sets it as the book's entries. Headings nest by level (an h2 after an h1 is
+     * its child). A heading without an id gets one ("toc-N", unique in its document), which rewrites
+     * that document. Documents that are not well-formed XML and non-linear spine items are skipped,
+     * as are the navigation document and headings without text.
+     *
+     * @param int $maxLevel The deepest heading level to include, 1 to 6.
+     *
+     * @return list<TocEntry> The new entries.
+     *
+     * @throws Exception If $maxLevel is out of range, the table of contents has no spine (it did not
+     *                   come from EpubFile), the book has no navigation document or NCX, no heading was
+     *                   found (a table of contents needs an entry), or a file cannot be written.
+     */
+    public function generateFromHeadings(int $maxLevel = 3): array
+    {
+        if ($maxLevel < 1 || $maxLevel > 6) {
+            throw new Exception("The deepest heading level must be 1 to 6, got {$maxLevel}");
+        }
+
+        if (! $this->spine instanceof Spine) {
+            throw new Exception('The spine is needed to read the headings: use EpubFile::getTableOfContents()');
+        }
+
+        if (! $this->isAvailable()) {
+            throw new Exception('The book has no navigation document or NCX to hold a table of contents');
+        }
+
+        $headings = [];
+        foreach ($this->spine->getItems() as $spineItem) {
+            $item = $spineItem->item;
+            $isNav = $item instanceof ManifestItem && in_array('nav', explode(' ', $item->properties), true);
+            if (! $spineItem->linear || ! $item instanceof ManifestItem || $isNav || $item->mediaType !== 'application/xhtml+xml' || $item->path === '') {
+                continue;
+            }
+
+            foreach ($this->headings($item->path, $maxLevel) as [$level, $title, $id]) {
+                $headings[] = [$level, $title, $item->path, $id];
+            }
+        }
+
+        $index = 0;
+        $entries = $this->nestHeadings($headings, $index, 0);
+        $this->setEntries($entries);
+
+        return $entries;
+    }
+
+    /**
+     * The headings of one document as [level, title, id], giving those without an id one (the
+     * document is then rewritten). [] for a document that cannot be read as XML.
+     *
+     * @return list<array{int, string, string}>
+     */
+    private function headings(string $path, int $maxLevel): array
+    {
+        try {
+            $root = $this->load($path);
+        } catch (XmlException) {
+            return [];
+        }
+
+        $ids = [];
+        foreach ($root->getElementsByTagName('*') as $element) {
+            $ids[$element->getAttribute('id')] = true;
+        }
+
+        $headings = [];
+        $added = 0;
+        $changed = false;
+        foreach ($root->getElementsByTagName('*') as $element) {
+            $level = preg_match('/^h([1-6])$/i', $element->localName ?? '', $match) === 1 ? (int) $match[1] : 0;
+            $title = $this->collapse($element->textContent);
+            if ($level === 0 || $level > $maxLevel || $title === '') {
+                continue;
+            }
+
+            if ($element->getAttribute('id') === '') {
+                do {
+                    $id = 'toc-' . ++$added;
+                } while (isset($ids[$id]));
+
+                $element->setAttribute('id', $id);
+                $ids[$id] = true;
+                $changed = true;
+            }
+
+            $headings[] = [$level, $title, $element->getAttribute('id')];
+        }
+
+        if ($changed) {
+            $this->save($root, $path);
+        }
+
+        return $headings;
+    }
+
+    /**
+     * Nests headings (in reading order) by level: a heading's children are the deeper headings after it.
+     *
+     * @param list<array{int, string, string, string}> $headings [level, title, path, id]
+     *
+     * @return list<TocEntry>
+     */
+    private function nestHeadings(array $headings, int &$index, int $parentLevel): array
+    {
+        $entries = [];
+        while (isset($headings[$index]) && $headings[$index][0] > $parentLevel) {
+            [$level, $title, $path, $id] = $headings[$index++];
+            $entries[] = new TocEntry($title, $path, $id, $this->nestHeadings($headings, $index, $level));
+        }
+
+        return $entries;
     }
 
     /**
@@ -177,6 +316,7 @@ final readonly class TableOfContents
         }
 
         if ($changed) {
+            $this->updateDepth($root);
             $this->save($root, $ncxPath);
         }
     }
@@ -379,7 +519,43 @@ final readonly class TableOfContents
         $playOrder = 0;
         $this->appendNavPoints($document, $namespace, $navMap, $entries, $ncxPath, $playOrder);
 
+        $this->updateDepth($root);
         $this->save($root, $ncxPath);
+    }
+
+    /**
+     * Sets the NCX's dtb:depth meta (creating it) to the real nesting depth of the navPoints, 0 for
+     * none. An NCX without a head is left alone.
+     */
+    private function updateDepth(DOMElement $root): void
+    {
+        $head = $this->childElements($root, 'head')[0] ?? null;
+        if (! $head instanceof DOMElement) {
+            return;
+        }
+
+        $depth = $this->navPointDepth($this->childElements($root, 'navMap')[0] ?? $root);
+        $meta = array_values(array_filter(
+            $this->childElements($head, 'meta'),
+            static fn (DOMElement $meta): bool => $meta->getAttribute('name') === 'dtb:depth'
+        ))[0] ?? null;
+        if (! $meta instanceof DOMElement) {
+            $meta = $this->document($root)->createElementNS((string) $root->namespaceURI, 'meta');
+            $meta->setAttribute('name', 'dtb:depth');
+            $head->appendChild($meta);
+        }
+
+        $meta->setAttribute('content', (string) $depth);
+    }
+
+    private function navPointDepth(DOMElement $parent): int
+    {
+        $deepest = 0;
+        foreach ($this->childElements($parent, 'navPoint') as $point) {
+            $deepest = max($deepest, 1 + $this->navPointDepth($point));
+        }
+
+        return $deepest;
     }
 
     /**

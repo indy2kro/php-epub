@@ -88,7 +88,7 @@ public function addChapter(string $title, string $body, ?string $path = null): M
 
 `create()` prepares a new EPUB 3 book (package document with title, language, identifier and `dcterms:modified`, plus a navigation document) and returns it opened, like `open()`. Nothing is written to `$filePath` until `save()`. Without `$identifier`, a random `urn:uuid:…` is used.
 
-`addChapter()` writes an XHTML document with the given title and body markup, adds it to the manifest and the reading order, and appends it to the table of contents when the book has one. It works on any loaded book; by default chapters are stored as `text/chapter-N.xhtml` next to the OPF. The body is inserted as it is, so it must be well-formed XHTML.
+`addChapter()` writes an XHTML document with the given title and body markup, adds it to the manifest and the reading order, and appends it to the table of contents when the book has one. It works on any loaded book; by default chapters are stored as `text/chapter-N.xhtml` next to the OPF. A well-formed XHTML body is inserted as it is; HTML-ish markup that is not (named entities such as `&nbsp;`, void tags such as `<br>`, unclosed tags) is parsed as an HTML fragment with libxml and written as XHTML: entities become characters, void elements self-close and open tags are closed.
 
 A book needs at least one chapter to be valid.
 
@@ -123,6 +123,7 @@ Checks the book, including unsaved changes, and returns a list of `PhpEpub\Valid
 | `CONTENT_REFERENCE_MISSING`, `CONTENT_REFERENCE_NOT_IN_MANIFEST` | error | A content document refers (`src`, `href`, `data`, `poster`) to a local file that is missing or outside the book, or that is not in the manifest; remote URLs, `data:` URIs and links within the document are not checked |
 | `NAV_MISSING` / `NCX_MISSING` | error | An EPUB 3 book has no navigation document / an EPUB 2 book has no NCX |
 | `NAV_INVALID` / `NCX_INVALID` | error | The navigation document is not well-formed / the NCX is not well-formed or has no NCX namespace or `navMap` |
+| `NAV_EMPTY` / `NCX_EMPTY` | error | The `toc` nav of the navigation document has no list item / the NCX `navMap` has no `navPoint` (a table of contents needs an entry; deleting the last linked file leaves it empty) |
 | `TOC_LINK_NOT_IN_MANIFEST` | error | The table of contents links to a file that is not in the manifest |
 
 ```php

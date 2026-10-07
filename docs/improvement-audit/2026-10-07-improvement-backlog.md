@@ -62,20 +62,20 @@ were re-checked against the round-3 hardening.
 
 ### Sweeps
 
-- [ ] **SWEEP-01** Reject malformed XHTML in `addChapter()`, `addContent()` and `updateContent()`, or convert HTML fragments (`&nbsp;`, `<br>`) to XHTML — `src/EpubFile.php:170-191`, `src/BookTemplate.php:59-66`, `src/ContentManager.php:91-134`, `src/Util/ContentDocumentProperties.php:40-50` — M · high
+- [x] **SWEEP-01** Reject malformed XHTML in `addChapter()`, `addContent()` and `updateContent()`, or convert HTML fragments (`&nbsp;`, `<br>`) to XHTML — `src/EpubFile.php:170-191`, `src/BookTemplate.php:59-66`, `src/ContentManager.php:91-134`, `src/Util/ContentDocumentProperties.php:40-50` — M · high
   Probe: `addChapter('C', '<p>a&nbsp;b</p>')`, a `<br>` or an unclosed tag is accepted, and the chapter it writes cannot be parsed by any XHTML reader. Only a later `validate()` reports `CONTENT_NOT_WELL_FORMED`.
 - [ ] **SWEEP-02** Throw `ConversionException` for renderer failures, and say how to fix missing TCPDF core fonts (`scripts/generate-core-fonts.php`) — `src/Converters/TCPDFAdapter.php:57-66,88-115`, `src/Converters/DompdfAdapter.php:48-70`, `scripts/generate-core-fonts.php:1-30` — S · med
   Probe: without the generated fonts, which is the case for every project that installs php-epub as a dependency and skips the manual step, `convert()` throws `Com\Tecnick\Pdf\Font\Exception: unable to read file: helvetica.json`. Neither adapter catches Dompdf or tc-lib exceptions, although both document `ConversionException`.
 
 ### Bugs
 
-- [ ] **BUG-01** Keep the NCX and nav valid when the table of contents becomes empty (navMap needs a navPoint, the toc `<ol>` an `<li>`), report empty ones in `validate()`, and update the NCX `dtb:depth` — `src/TableOfContents.php:93-130,365-410`, `src/ContentManager.php:279-297`, `src/Validator.php:265-330` — S · med
+- [x] **BUG-01** Keep the NCX and nav valid when the table of contents becomes empty (navMap needs a navPoint, the toc `<ol>` an `<li>`), report empty ones in `validate()`, and update the NCX `dtb:depth` — `src/TableOfContents.php:93-130,365-410`, `src/ContentManager.php:279-297`, `src/Validator.php:265-330` — S · med
   Probes: `setEntries([])` (or deleting every chapter the TOC links to) writes `<navMap></navMap>` in EPUB 2 and `<ol/>` in EPUB 3. EPUBCheck rejects both (RSC-005), but `validate()` reports nothing.
 - [ ] **BUG-02** Detect ZIP entry names that collide after Unicode case folding or normalization, not only ASCII case — `src/ZipHandler.php:114-121` — S · med
   Probe: on Windows, an archive with `É.txt` and `é.txt` extracts into one file without an error, and the second entry silently replaces the first, because the duplicate check uses `strtolower()`. macOS also merges NFC and NFD spellings.
 - [ ] **BUG-03** Report entry names that are invalid on Windows (trailing dot or space, reserved device names such as `CON`, `:`) with a clear error — `src/ZipHandler.php:131-135`, `src/Util/PathResolver.php:20-55` — S · low
   Probe: `a.txt.` or `text./a.txt` fails with a misleading "Permission denied" from `fopen()`, and names such as `CON` or `a.xhtml:x` (an alternate data stream) are not rejected up front.
-- [ ] **BUG-04** Allow case-only renames in `moveContent()` on case-insensitive filesystems — `src/ContentManager.php:193-195` — S · low
+- [x] **BUG-04** Allow case-only renames in `moveContent()` on case-insensitive filesystems — `src/ContentManager.php:193-195` — S · low
   Probe on Windows: `moveContent('EPUB/text/ch.xhtml', 'EPUB/text/Ch.xhtml')` throws "already exists" because `file_exists()` finds the source file itself.
 - [ ] **BUG-05** Update `dcterms:modified` only on the book-level meta, never on a refinement with the same property — `src/Metadata.php:562-576` — S · low
   `updateModifiedDate()` takes the first meta with that property, including one with `refines="#…"`, so the book-level date stays stale and the refinement is overwritten.
@@ -99,13 +99,13 @@ were re-checked against the round-3 hardening.
   Round 3 sets these properties for content the library writes. Loaded books with wrong media types or missing properties still pass `validate()` and fail EPUBCheck (OPF-014, OPF-029).
 - [ ] **FEAT-03** Accessibility metadata API (`schema:accessMode`, `accessibilityFeature`, `accessibilityHazard`, `accessibilitySummary`, `dcterms:conformsTo`) with `validate()` hints — `src/Metadata.php:166-222`, `src/Validator.php` — M · med
   Since June 2025 the European Accessibility Act requires accessibility metadata for e-books sold in the EU. Today callers have to know the property names and write them through the generic `setPropertyValues()`.
-- [ ] **FEAT-04** Rewrite references in content documents when `moveContent()` moves a file (links, images, stylesheets, and the relative links of the moved document itself) — `src/ContentManager.php:168-225` — M · med
+- [x] **FEAT-04** Rewrite references in content documents when `moveContent()` moves a file (links, images, stylesheets, and the relative links of the moved document itself) — `src/ContentManager.php:168-225` — M · med
   `moveContent()` keeps the manifest, spine, TOC and `encryption.xml` consistent, but every `<a>`, `<img>` and `<link>` that pointed at the file breaks, so reorganising a book still needs a hand-written rewrite pass.
 - [ ] **FEAT-05** Open a book from a string or stream, and save it to one (uploads, HTTP downloads) — `src/EpubFile.php:57-63,251-271` — M · med
   Web apps receive uploads and send downloads, but the API only reads and writes file paths, so callers write their own temp-file plumbing.
 - [ ] **FEAT-06** Upgrade an EPUB 2 book to EPUB 3: package version, a nav document generated from the NCX, `dcterms:modified`, EPUB 3 refinements for `opf:role`/`opf:file-as`, the `cover-image` property — `src/Metadata.php`, `src/TableOfContents.php`, `src/Manifest.php` — L · med
   Stores and validators increasingly require EPUB 3. The library already has every piece of the migration, but callers must assemble them by hand.
-- [ ] **FEAT-07** Generate the table of contents from the headings (`h1`–`h3`) of the spine documents — `src/TableOfContents.php:93-130`, `src/EpubFile.php:170-191` — M · low
+- [x] **FEAT-07** Generate the table of contents from the headings (`h1`–`h3`) of the spine documents — `src/TableOfContents.php:93-130`, `src/EpubFile.php:170-191` — M · low
   Books assembled from existing XHTML need a TOC built from their headings, and callers have to write it themselves with DOM parsing and `setEntries()`.
 - [ ] **FEAT-08** Plain-text extraction per spine document (search indexing, word counts, previews) — `src/ContentManager.php`, `src/Converters/EpubDocumentLoader.php:200-239` — S · low
   Getting a book's text is one of the most common reasons to open an EPUB, and today it takes a hand-written spine walk plus HTML parsing.

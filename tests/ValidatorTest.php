@@ -37,7 +37,7 @@ final class ValidatorTest extends TestCase
     public function testABookCreatedFromScratchIsValidOnceItHasAChapter(): void
     {
         $epubFile = EpubFile::create($this->tmpDir . '/new.epub', 'New');
-        $this->assertSame(['SPINE_EMPTY'], $this->codes($epubFile->validate()));
+        $this->assertSame(['SPINE_EMPTY', 'NAV_EMPTY'], $this->codes($epubFile->validate()));
 
         $epubFile->addChapter('One', '<p>One</p>');
 
