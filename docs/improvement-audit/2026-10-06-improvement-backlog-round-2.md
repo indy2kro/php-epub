@@ -143,7 +143,7 @@ Effort: S = one file, under 30 min · M = one class plus tests · L = cross-cutt
   `tecnickcom/tcpdf: ^6.8 || ^7.0` is allowed but CI always resolves 7.x, so the TCPDF 6 path is never run.
 - [ ] **CI-02** Install Calibre in one CI job so the skipped real-conversion tests run — `tests/Converters/CalibreAdapterRealTest.php:26`, `.github/workflows/tests.yml` — S · low
   The adapter is only ever tested against a mocked `exec()`.
-- [ ] **CI-03** Build the docs with `mkdocs build --strict` on pull requests — `.github/workflows/deploy-docs.yml:47` — S · low
+- [x] **CI-03** Build the docs with `mkdocs build --strict` on pull requests — `.github/workflows/deploy-docs.yml:47` — S · low
   Broken nav entries and links are only noticed after they reach the published site.
 - [x] **CI-04** Declare the extensions the library uses (`ext-simplexml`, `ext-libxml`, `ext-ctype`) in `require` — `composer.json`, `src/Manifest.php:298`, `src/XmlParser.php:38-41` — S · low
   Minimal builds (e.g. Alpine's split packages) install cleanly and then fail at runtime.
