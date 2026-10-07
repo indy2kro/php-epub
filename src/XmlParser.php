@@ -87,7 +87,7 @@ class XmlParser
      */
     public function save(SimpleXMLElement $xml, string $filePath): void
     {
-        $result = $xml->asXML($filePath);
+        $result = @$xml->asXML($filePath);
         if ($result === false) {
             throw new Exception("Failed to save XML file: {$filePath}");
         }

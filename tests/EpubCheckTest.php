@@ -114,6 +114,16 @@ final class EpubCheckTest extends TestCase
             $content->deleteContent('EPUB/css/extra.css');
         }];
 
+        yield 'chapter with SVG, MathML and a script' => [static function (EpubFile $epubFile): void {
+            $epubFile->addChapter('Rich', '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="5" height="5"/></svg>'
+                . '<math xmlns="http://www.w3.org/1998/Math/MathML"><mi>x</mi></math><script>var x = 1;</script>');
+        }];
+
+        yield 'chapter deleted after being added to the table of contents' => [static function (EpubFile $epubFile): void {
+            $chapter = $epubFile->addChapter('Short-lived', '<p>Gone soon.</p>');
+            $epubFile->getContentManager()->deleteContent($chapter->path);
+        }];
+
         yield 'cover image' => [static function (EpubFile $epubFile): void {
             $epubFile->setCoverImage((string) base64_decode(EpubBuilder::PNG, true), 'image/png');
         }];

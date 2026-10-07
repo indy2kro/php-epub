@@ -62,18 +62,18 @@ The target was 30 items; the audit found 28, and none were added just to reach t
 
 ### Security (untrusted input)
 
-- [ ] **SEC-01** Confine image references inside SVG files and `data:` SVGs before PDF rendering — `src/Converters/EpubDocumentLoader.php:240-300`, `vendor/tecnickcom/tc-lib-pdf/src/SVG.php:7418-7500` — M · med
+- [x] **SEC-01** Confine image references inside SVG files and `data:` SVGs before PDF rendering — `src/Converters/EpubDocumentLoader.php:240-300`, `vendor/tecnickcom/tc-lib-pdf/src/SVG.php:7418-7500` — M · med
   The loader confines references in chapter HTML but passes book SVG files and `data:image/svg+xml` URIs to the renderer unexamined. tc-lib-pdf follows `<image href>` and nested `.svg` references, so with TCPDF a book's SVG can embed images from TCPDF's default read allowlist (the system temp dir holding other books, the working dir). Dompdf is chrooted to the book and is not affected.
 
 ### Bugs
 
-- [ ] **BUG-01** Keep IDPF-obfuscated fonts readable when the unique identifier changes (re-obfuscate, or refuse the change) — `src/Traits/InteractsWithIdentifier.php:35-49`, `src/EpubFile.php:236-247` — M · high
+- [x] **BUG-01** Keep IDPF-obfuscated fonts readable when the unique identifier changes (re-obfuscate, or refuse the change) — `src/Traits/InteractsWithIdentifier.php:35-49`, `src/EpubFile.php:236-247` — M · high
   Font obfuscation XORs fonts with a key derived from the unique identifier, and nothing reads `META-INF/encryption.xml`, so `setIdentifiers()` on such a book silently turns every embedded font into garbage.
 - [ ] **BUG-02** Open books with recoverable structure problems (an EPUB 3 book with a broken or navMap-less NCX, a missing or padded mimetype) and report them through `validate()` — `src/Parser.php:48-60,130-156` — M · med
   `Parser` throws on the first problem, so an EPUB 3 book whose optional legacy NCX is broken cannot be loaded or repaired with the library, although every reader opens it.
-- [ ] **BUG-03** Set the EPUB 3 manifest properties (`svg`, `mathml`, `scripted`, `remote-resources`) for XHTML added or updated through `ContentManager`/`addChapter()` — `src/ContentManager.php:89-130`, `src/EpubFile.php:162-188` — M · med
+- [x] **BUG-03** Set the EPUB 3 manifest properties (`svg`, `mathml`, `scripted`, `remote-resources`) for XHTML added or updated through `ContentManager`/`addChapter()` — `src/ContentManager.php:89-130`, `src/EpubFile.php:162-188` — M · med
   EPUB 3 requires these properties on content that uses those features, so `addChapter()` with an inline `<svg>` or `<math>` body produces a book EPUBCheck rejects (OPF-014).
-- [ ] **BUG-04** Remove table-of-contents entries for files that `deleteContent()`/`Manifest::remove()` drop, and report dangling TOC links as errors — `src/ContentManager.php:135-160`, `src/Validator.php:180-200` — S · med
+- [x] **BUG-04** Remove table-of-contents entries for files that `deleteContent()`/`Manifest::remove()` drop, and report dangling TOC links as errors — `src/ContentManager.php:135-160`, `src/Validator.php:180-200` — S · med
   A probe confirmed that a deleted chapter's nav/NCX entry stays, which EPUBCheck reports as an error (RSC-007), while `validate()` only warns.
 - [ ] **BUG-05** Do not let `load()` discard a book made with `create()` that was never saved — `src/EpubFile.php:104-145` — S · low
   `load()` re-extracts `$filePath`, which does not exist yet for an unsaved new book, so it throws and cleans up the work in progress.
@@ -81,9 +81,9 @@ The target was 30 items; the audit found 28, and none were added just to reach t
   `setCoverImage()` trusts the media type, so PNG bytes declared as `image/jpeg` produce a book that EPUBCheck and some readers reject. `getimagesizefromstring()` can detect the real type.
 - [ ] **BUG-07** Report entries that differ only by case when extracting on case-insensitive filesystems — `src/ZipHandler.php:46-90` — S · low
   On Windows and macOS `Text/a.xhtml` and `text/a.xhtml` extract to the same file, so one silently replaces the other.
-- [ ] **BUG-08** Update the EPUB 2 `opf:event="modification"` date on save, as `dcterms:modified` is for EPUB 3 — `src/Metadata.php:51-64` — S · low
+- [x] **BUG-08** Update the EPUB 2 `opf:event="modification"` date on save, as `dcterms:modified` is for EPUB 3 — `src/Metadata.php:51-64` — S · low
   `getModifiedDate()` reports the EPUB 2 modification event, which `save()` never touches, so the date stays at its original value after edits.
-- [ ] **BUG-09** Update the NCX `docTitle` when the book title changes — `src/TableOfContents.php`, `src/Traits/InteractsWithTitle.php` — S · low
+- [x] **BUG-09** Update the NCX `docTitle` when the book title changes — `src/TableOfContents.php`, `src/Traits/InteractsWithTitle.php` — S · low
   `setTitle()` only changes the OPF, so readers that show the NCX `docTitle` keep the old name.
 
 ### Converters
@@ -140,5 +140,5 @@ The target was 30 items; the audit found 28, and none were added just to reach t
 
 ### Sweeps
 
-- [ ] **SWEEP-01** Report write failures with an exception and no PHP warning in `XmlParser::save()`, `Metadata::save()` and `ContentManager::addContent()` — `src/XmlParser.php:73-85`, `src/Metadata.php:64`, `src/ContentManager.php:99` — S · low
+- [x] **SWEEP-01** Report write failures with an exception and no PHP warning in `XmlParser::save()`, `Metadata::save()` and `ContentManager::addContent()` — `src/XmlParser.php:73-85`, `src/Metadata.php:64`, `src/ContentManager.php:99` — S · low
   `asXML()` and `file_put_contents()` warn before the exception is thrown, which fails strict callers and test suites, while `updateContent()` and the rest of the library already report I/O failures without warnings.

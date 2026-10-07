@@ -119,7 +119,7 @@ Checks the book, including unsaved changes, and returns a list of `PhpEpub\Valid
 | `SPINE_EMPTY`, `SPINE_UNKNOWN_IDREF`, `SPINE_DUPLICATE_IDREF` | error | The reading order is empty, or refers to an unknown or repeated item |
 | `SPINE_NOT_CONTENT` | warning | A spine item is not a content document and has no fallback |
 | `NAV_MISSING` / `NCX_MISSING` | error | An EPUB 3 book has no navigation document / an EPUB 2 book has no NCX |
-| `TOC_LINK_NOT_IN_MANIFEST` | warning | The table of contents links to a file that is not in the manifest |
+| `TOC_LINK_NOT_IN_MANIFEST` | error | The table of contents links to a file that is not in the manifest |
 
 ```php
 foreach ($epubFile->validate() as $issue) {

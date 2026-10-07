@@ -34,6 +34,11 @@ class EpubFile
     private ?SimpleXMLElement $opfXml = null;
     private ?ContentManager $contentManager = null;
 
+    /**
+     * The unique identifier the book's obfuscated fonts are keyed with (as loaded or last saved).
+     */
+    private ?string $fontKeyIdentifier = null;
+
     public function __construct(
         private readonly string $filePath,
         ?ZipHandler $zipHandler = null,
@@ -220,6 +225,7 @@ class EpubFile
             $this->opfXml = $this->xmlParser->parse($opfFileFullPath);
 
             $this->metadata = new Metadata($this->opfXml, $opfFileFullPath);
+            $this->fontKeyIdentifier = $this->metadata->getUniqueIdentifier();
             $this->manifest = new Manifest($this->opfXml, $opfFilePath);
             $this->spine = new Spine($this->opfXml, $this->manifest);
             $this->contentManager = new ContentManager($directory, $this->manifest, $this->spine);
@@ -412,11 +418,37 @@ class EpubFile
             $this->metadata?->markModified();
         }
 
-        if ($this->metadata?->isModified() === true) {
-            $this->metadata->save();
+        $metadata = $this->metadata;
+        if ($metadata?->isModified() === true) {
+            $metadata->save();
             $this->manifest?->markSaved();
             $this->spine?->markSaved();
+
+            $this->rekeyObfuscatedFonts();
+
+            // The NCX repeats the title for EPUB 2 reading systems.
+            $title = $metadata->getTitle();
+            if ($title !== '') {
+                $this->getTableOfContents()->syncNcxTitle($title);
+            }
         }
+    }
+
+    /**
+     * Obfuscated fonts are keyed with the unique identifier: when it changed, re-key them so
+     * reading systems can still decode them.
+     *
+     * @throws Exception See FontObfuscation::rekey().
+     */
+    private function rekeyObfuscatedFonts(): void
+    {
+        $identifier = $this->metadata?->getUniqueIdentifier();
+        if ($this->tempDir === null || $identifier === null || $this->fontKeyIdentifier === null || $identifier === $this->fontKeyIdentifier) {
+            return;
+        }
+
+        (new FontObfuscation($this->tempDir, $this->xmlParser))->rekey($this->fontKeyIdentifier, $identifier);
+        $this->fontKeyIdentifier = $identifier;
     }
 
     public function getMetadata(): Metadata

@@ -60,7 +60,7 @@ final class MetadataTest extends TestCase
         $this->expectException(Exception::class);
         $this->expectExceptionMessage('Failed to save OPF file:');
 
-        @$metadata->save();
+        $metadata->save();
     }
 
     public function testGetTitle(): void

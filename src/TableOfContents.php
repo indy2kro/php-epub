@@ -119,6 +119,47 @@ final readonly class TableOfContents
         $this->setEntries([...$this->getEntries(), $entry]);
     }
 
+    /**
+     * Writes the book title into the NCX docTitle, which EPUB 2 reading systems show, creating it
+     * when missing. EpubFile::save() calls this after metadata changes. Nothing is written without
+     * an NCX, when its docTitle already matches, or when it cannot be parsed (validate() reports that).
+     *
+     * @internal
+     *
+     * @throws Exception If the NCX cannot be written.
+     */
+    public function syncNcxTitle(string $title): void
+    {
+        $ncxPath = $this->ncxPath();
+        if ($ncxPath === null) {
+            return;
+        }
+
+        try {
+            $root = $this->load($ncxPath);
+        } catch (Exception) {
+            return;
+        }
+
+        $document = $this->document($root);
+        $namespace = (string) $root->namespaceURI;
+
+        $docTitle = $this->childElements($root, 'docTitle')[0] ?? null;
+        if (! $docTitle instanceof DOMElement) {
+            // docTitle follows head.
+            $head = $this->childElements($root, 'head')[0] ?? null;
+            $docTitle = $root->insertBefore($document->createElementNS($namespace, 'docTitle'), $head->nextSibling ?? $root->firstChild);
+        }
+
+        $text = $this->childElements($docTitle, 'text')[0] ?? $docTitle->appendChild($document->createElementNS($namespace, 'text'));
+        if ($text->textContent === $title) {
+            return;
+        }
+
+        $text->textContent = $title;
+        $this->save($root, $ncxPath);
+    }
+
     private function navPath(): ?string
     {
         foreach ($this->manifest->getItems() as $item) {

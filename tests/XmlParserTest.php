@@ -193,7 +193,6 @@ final class XmlParserTest extends TestCase
 
         $this->expectException(Exception::class);
         $this->expectExceptionMessage('Failed to save XML file:');
-        // suppress warnings intedended
-        @$parser->save($xml, __DIR__ . DIRECTORY_SEPARATOR . 'nonexistent' . DIRECTORY_SEPARATOR . 'output.xml');
+        $parser->save($xml, __DIR__ . DIRECTORY_SEPARATOR . 'nonexistent' . DIRECTORY_SEPARATOR . 'output.xml');
     }
 }

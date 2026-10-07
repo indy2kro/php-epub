@@ -263,6 +263,35 @@ XML));
         $this->assertSame([], $this->values($this->reloadXml(), "//opf:meta[@property='dcterms:modified']"));
     }
 
+    public function testGetUniqueIdentifierFollowsThePackageReference(): void
+    {
+        $this->assertSame('urn:uuid:2', $this->load($this->epub2Opf('<dc:identifier id="isbn">978</dc:identifier>'))->getUniqueIdentifier());
+        $this->assertNull($this->load(str_replace('unique-identifier="uid"', 'unique-identifier="none"', $this->epub2Opf('')))->getUniqueIdentifier());
+    }
+
+    public function testSaveUpdatesTheEpub2ModificationEventAfterAnEdit(): void
+    {
+        $metadata = $this->load($this->epub2Opf(
+            '<dc:title>Old</dc:title><dc:date opf:event="publication">1999-01-01</dc:date><dc:date opf:event="modification">2020-05-05</dc:date>'
+        ));
+
+        $metadata->setTitle('New');
+        $metadata->save();
+
+        $reloaded = $this->reload();
+        $this->assertSame(gmdate('Y-m-d'), $reloaded->getModifiedDate());
+        $this->assertSame(['publication' => '1999-01-01', 'modification' => gmdate('Y-m-d')], $reloaded->getDateEvents());
+    }
+
+    public function testSaveWithoutEditsKeepsTheEpub2ModificationEvent(): void
+    {
+        $metadata = $this->load($this->epub2Opf('<dc:title>Old</dc:title><dc:date opf:event="modification">2020-05-05</dc:date>'));
+
+        $metadata->save();
+
+        $this->assertSame('2020-05-05', $this->reload()->getModifiedDate());
+    }
+
     public function testPrefixedPackageMetadataAndSpine(): void
     {
         $opf = <<<'XML'

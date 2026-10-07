@@ -267,6 +267,100 @@ final class TableOfContentsTest extends TestCase
         (new EpubFile($this->tmpDir . '/missing.epub'))->getTableOfContents();
     }
 
+    public function testDeletingAFileRemovesItsEntries(): void
+    {
+        $epubFile = $this->open($this->epub2Book());
+
+        $epubFile->getContentManager()->deleteContent('OEBPS/text/one.xhtml');
+
+        $this->assertEquals([new TocEntry('Chapter Two', 'OEBPS/text/two.xhtml')], $epubFile->getTableOfContents()->getEntries());
+        $this->assertSame([], $epubFile->validate());
+    }
+
+    public function testDeletingAFileKeepsTheChildrenOfItsEntries(): void
+    {
+        $epubFile = $this->open($this->epub3BookWithNcx());
+        $toc = $epubFile->getTableOfContents();
+        $toc->setEntries([new TocEntry('Part', 'EPUB/text/one.xhtml', 'detail', [new TocEntry('End', 'EPUB/end.xhtml')])]);
+
+        $epubFile->getContentManager()->deleteContent('EPUB/text/one.xhtml');
+
+        // The navigation document keeps the entry as an unlinked heading; the NCX, which has none, promotes its children.
+        $this->assertEquals([new TocEntry('Part', '', null, [new TocEntry('End', 'EPUB/end.xhtml')])], $toc->getEntries());
+        $ncx = (string) file_get_contents($epubFile->getTempDir() . '/EPUB/toc.ncx');
+        $this->assertStringNotContainsString('one.xhtml', $ncx);
+        $this->assertStringContainsString('end.xhtml', $ncx);
+    }
+
+    public function testDeletingAFileOutsideTheTableOfContentsLeavesItUntouched(): void
+    {
+        $epubFile = $this->open($this->epub3BookWithNcx());
+        $navPath = $epubFile->getTempDir() . '/EPUB/text/nav.xhtml';
+        $nav = (string) file_get_contents($navPath);
+
+        $epubFile->getContentManager()->deleteContent('EPUB/end.xhtml');
+
+        $this->assertSame($nav, file_get_contents($navPath));
+    }
+
+    public function testDeletingAFileWorksWhenTheNavigationDocumentIsBroken(): void
+    {
+        $epubFile = $this->open($this->epub3BookWithNcx());
+        file_put_contents($epubFile->getTempDir() . '/EPUB/text/nav.xhtml', '<html><body><nav');
+
+        $epubFile->getContentManager()->deleteContent('EPUB/text/one.xhtml');
+
+        $this->assertFileDoesNotExist($epubFile->getTempDir() . '/EPUB/text/one.xhtml');
+        $this->assertSame('<html><body><nav', file_get_contents($epubFile->getTempDir() . '/EPUB/text/nav.xhtml'));
+    }
+
+    public function testSavingANewTitleUpdatesTheNcxDocTitle(): void
+    {
+        $epubFile = $this->open($this->epub2Book());
+
+        $epubFile->getMetadata()->setTitle('Renamed & Co');
+        $epubFile->save();
+
+        $ncx = $epubFile->getContentManager()->getContent('OEBPS/toc.ncx');
+        $this->assertStringContainsString('<docTitle><text>Renamed &amp; Co</text></docTitle>', $ncx);
+    }
+
+    public function testSavingANewTitleAddsAMissingNcxDocTitle(): void
+    {
+        $builder = $this->epub2Book();
+        $builder->withFile('OEBPS/toc.ncx', str_replace('<docTitle><text>Two</text></docTitle>', '', (string) $builder->getFile('OEBPS/toc.ncx')));
+        $epubFile = $this->open($builder);
+
+        $epubFile->getMetadata()->setTitle('Renamed');
+        $epubFile->save();
+
+        $ncx = $epubFile->getContentManager()->getContent('OEBPS/toc.ncx');
+        $this->assertStringContainsString('<head/><docTitle><text>Renamed</text></docTitle><navMap>', $ncx);
+    }
+
+    public function testSavingOtherMetadataLeavesTheNcxUntouched(): void
+    {
+        $epubFile = $this->open($this->epub2Book());
+        $ncx = $epubFile->getContentManager()->getContent('OEBPS/toc.ncx');
+
+        $epubFile->getMetadata()->setDescription('About');
+        $epubFile->save();
+
+        $this->assertSame($ncx, $epubFile->getContentManager()->getContent('OEBPS/toc.ncx'));
+    }
+
+    public function testSavingANewTitleSkipsABrokenNcx(): void
+    {
+        $epubFile = $this->open($this->epub2Book());
+        file_put_contents($epubFile->getTempDir() . '/OEBPS/toc.ncx', '<ncx');
+
+        $epubFile->getMetadata()->setTitle('Renamed');
+        $epubFile->save();
+
+        $this->assertSame('<ncx', $epubFile->getContentManager()->getContent('OEBPS/toc.ncx'));
+        $this->assertStringContainsString('<dc:title>Renamed</dc:title>', $epubFile->getContentManager()->getContent('OEBPS/content.opf'));
+    }
+
     private function open(EpubBuilder $builder): EpubFile
     {
         return EpubFile::open($builder->buildEpub($this->tmpDir . '/book-' . bin2hex(random_bytes(4)) . '.epub'));

@@ -51,17 +51,18 @@ class Metadata
     /**
      * Saves the updated OPF file.
      *
-     * For EPUB 3 packages, the dcterms:modified date is updated when metadata was changed.
+     * When metadata was changed, the modification date is updated: dcterms:modified for EPUB 3
+     * packages, and an existing dc:date with opf:event="modification" for EPUB 2 ones.
      *
      * @throws Exception If the OPF file cannot be saved.
      */
     public function save(): void
     {
-        if ($this->modified && $this->isEpub3()) {
-            $this->updateModifiedDate();
+        if ($this->modified) {
+            $this->isEpub3() ? $this->updateModifiedDate() : $this->updateModificationEvent();
         }
 
-        $result = $this->opfXml->asXML($this->opfFilePath);
+        $result = @$this->opfXml->asXML($this->opfFilePath);
 
         if ($result === false) {
             throw new Exception("Failed to save OPF file: {$this->opfFilePath}");
@@ -523,6 +524,20 @@ class Metadata
 
         $meta = $this->metadataNode->addChild('meta', $now, self::OPF_NAMESPACE);
         $meta->addAttribute('property', 'dcterms:modified');
+    }
+
+    /**
+     * Sets the first EPUB 2 dc:date with opf:event="modification" to today (UTC); none is added.
+     */
+    private function updateModificationEvent(): void
+    {
+        foreach ($this->dcElements('date') as $date) {
+            if ($this->dateEvent($date) === 'modification') {
+                $this->setText($date, gmdate('Y-m-d'));
+
+                return;
+            }
+        }
     }
 
     /**

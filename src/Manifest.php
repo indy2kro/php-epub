@@ -204,6 +204,14 @@ class Manifest
     }
 
     /**
+     * Whether the package is EPUB 3 (version 3.x), whose items carry properties.
+     */
+    public function isEpub3(): bool
+    {
+        return str_starts_with(trim((string) $this->opfXml['version']), '3');
+    }
+
+    /**
      * Adds an EPUB 3 property token (e.g. "cover-image", "nav") to an item.
      *
      * @throws Exception If no item has this id.
