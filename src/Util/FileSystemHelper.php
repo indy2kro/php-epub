@@ -152,6 +152,24 @@ class FileSystemHelper
         return DIRECTORY_SEPARATOR === '\\';
     }
 
+    /**
+     * Reads a whole file; null when it is not a file or cannot be read.
+     *
+     * A failed read can return "" rather than false (e.g. a file locked on Windows), so the
+     * last error is checked too: an unreadable file never looks like an empty one.
+     */
+    public static function readFile(string $path): ?string
+    {
+        if (! is_file($path)) {
+            return null;
+        }
+
+        error_clear_last();
+        $content = @file_get_contents($path);
+
+        return $content === false || error_get_last() !== null ? null : $content;
+    }
+
     public function fileSize(string $path): int|false
     {
         return filesize($path);

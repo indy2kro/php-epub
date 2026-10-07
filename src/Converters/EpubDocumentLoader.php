@@ -14,6 +14,7 @@ use PhpEpub\ManifestItem;
 use PhpEpub\Metadata;
 use PhpEpub\Parser;
 use PhpEpub\Spine;
+use PhpEpub\Util\FileSystemHelper;
 use PhpEpub\Util\PathResolver;
 use PhpEpub\XmlParser;
 
@@ -118,10 +119,7 @@ final readonly class EpubDocumentLoader
         $title = '';
 
         $file = $this->paths->resolve($root, $path);
-        $content = is_file($file) ? @file_get_contents($file) : false;
-        if ($content === false) {
-            throw new ConversionException("Failed to read content from: {$path}");
-        }
+        $content = FileSystemHelper::readFile($file) ?? throw new ConversionException("Failed to read content from: {$path}");
 
         $document = new DOMDocument();
         $useInternalErrors = libxml_use_internal_errors(true);
@@ -233,7 +231,10 @@ final readonly class EpubDocumentLoader
             // url() in a stylesheet is relative to the stylesheet, not to the chapter.
             $relative = substr($file, strlen(str_replace('\\', '/', $root)) + 1);
             $cssDirectory = dirname($relative) === '.' ? '' : dirname($relative) . '/';
-            $styles[$file] = $this->sanitizeCss((string) @file_get_contents($file), $root, $cssDirectory);
+            $css = FileSystemHelper::readFile($file);
+            if ($css !== null) {
+                $styles[$file] = $this->sanitizeCss($css, $root, $cssDirectory);
+            }
         }
 
         $head = $document->getElementsByTagName('head')->item(0);

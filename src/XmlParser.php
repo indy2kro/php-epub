@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PhpEpub;
 
+use PhpEpub\Util\FileSystemHelper;
 use SimpleXMLElement;
 
 class XmlParser
@@ -24,11 +25,7 @@ class XmlParser
             throw new XmlException("XML file not found: {$filePath}");
         }
 
-        // is_file(): on Linux, reading a directory yields "" instead of false.
-        $content = is_file($filePath) ? @file_get_contents($filePath) : false;
-        if ($content === false) {
-            throw new XmlException("Failed to read XML file: {$filePath}");
-        }
+        $content = FileSystemHelper::readFile($filePath) ?? throw new XmlException("Failed to read XML file: {$filePath}");
 
         // Entity declarations enable expansion attacks; EPUB container, package and NCX files never need them.
         if (preg_match('/<!ENTITY/i', $content) === 1) {
