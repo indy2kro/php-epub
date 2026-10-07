@@ -375,6 +375,48 @@ class Manifest
     }
 
     /**
+     * The id of the media overlay (SMIL) item that narrates a content document, from its
+     * media-overlay attribute; null when it has none or no item has this id.
+     */
+    public function getMediaOverlay(string $id): ?string
+    {
+        $overlay = (string) ($this->findNode($id)['media-overlay'] ?? '');
+
+        return $overlay === '' ? null : $overlay;
+    }
+
+    /**
+     * Sets the media overlay (SMIL document) that narrates an XHTML or SVG content document, or
+     * removes it with null. Media overlays exist only in EPUB 3; give the overlay its total duration
+     * with Metadata::setMediaDurationOf().
+     *
+     * @throws Exception If an item is unknown, the content item is not XHTML or SVG, the overlay is not an
+     *                   application/smil+xml item, or the package is not EPUB 3.
+     */
+    public function setMediaOverlay(string $id, ?string $overlayId): void
+    {
+        $this->isEpub3() || throw new Exception('Media overlays exist only in EPUB 3 packages');
+
+        $node = $this->requireNode($id);
+        $mediaType = (string) $node['media-type'];
+        if (! in_array($mediaType, ['application/xhtml+xml', 'image/svg+xml'], true)) {
+            throw new Exception("Only XHTML and SVG content documents have a media overlay, but \"{$id}\" is {$mediaType}");
+        }
+
+        if ($overlayId !== null) {
+            $overlayType = (string) $this->requireNode($overlayId)['media-type'];
+            $overlayType === 'application/smil+xml' || throw new Exception("The media overlay \"{$overlayId}\" must be application/smil+xml, got: {$overlayType}");
+        }
+
+        unset($node['media-overlay']);
+        if ($overlayId !== null) {
+            $node->addAttribute('media-overlay', $overlayId);
+        }
+
+        $this->modified = true;
+    }
+
+    /**
      * Converts a path relative to the book root into an href relative to the OPF file.
      */
     public function pathToHref(string $path): string
