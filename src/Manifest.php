@@ -212,6 +212,15 @@ class Manifest
     }
 
     /**
+     * Removes the EPUB 2 <guide> references of a type (e.g. "cover"), compared case-insensitively,
+     * and the guide when none is left.
+     */
+    public function removeGuideReferences(string $type): void
+    {
+        $this->removeGuideReferencesWhere(static fn (SimpleXMLElement $reference): bool => strcasecmp((string) $reference['type'], $type) === 0);
+    }
+
+    /**
      * Adds an EPUB 3 property token (e.g. "cover-image", "nav") to an item.
      *
      * @throws Exception If no item has this id.
@@ -276,7 +285,10 @@ class Manifest
     }
 
     /**
-     * Marks the current state as persisted (called by EpubFile::save()).
+     * Marks the current state as persisted.
+     *
+     * @internal Called by EpubFile::save() after writing the package; calling it before then makes
+     *           save() treat the manifest as unchanged.
      */
     public function markSaved(): void
     {
@@ -314,14 +326,25 @@ class Manifest
             return;
         }
 
+        $this->removeGuideReferencesWhere(fn (SimpleXMLElement $reference): bool => $this->tryHrefToPath((string) $reference['href']) === $path);
+    }
+
+    /**
+     * Removes the matching <guide> references, and the guide when none is left (OPF 2 requires
+     * at least one reference in a guide).
+     *
+     * @param \Closure(SimpleXMLElement): bool $matches
+     */
+    private function removeGuideReferencesWhere(\Closure $matches): void
+    {
         foreach ($this->query('/opf:package/opf:guide') as $guide) {
             foreach ($this->query('/opf:package/opf:guide/opf:reference') as $reference) {
-                if ($this->tryHrefToPath((string) $reference['href']) === $path) {
+                if ($matches($reference)) {
                     unset($reference[0]);
+                    $this->modified = true;
                 }
             }
 
-            // OPF 2 requires at least one reference in a guide.
             if ($guide->children(Metadata::OPF_NAMESPACE)->count() === 0) {
                 unset($guide[0]);
             }

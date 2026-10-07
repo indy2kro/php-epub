@@ -101,6 +101,7 @@ final class EpubCheckTest extends TestCase
             $metadata->setTitles(['Main Title', 'A Subtitle']);
             $metadata->addCreator('Ivan Illustrator', 'ill', 'Illustrator, Ivan');
             $metadata->addContributor('Ed Editor', 'edt', 'Editor, Ed');
+            $metadata->setSeries('A Series', 2);
         }];
 
         yield 'added and removed content' => [static function (EpubFile $epubFile): void {

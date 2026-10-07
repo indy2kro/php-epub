@@ -126,9 +126,11 @@ Date of publication (dc:date). Should be in a valid date format (preferably ISO 
 ```php
 public function getLanguage(): string
 public function setLanguage(string $language): void
+public function getLanguages(): array<int, string>
+public function setLanguages(array<int, string> $languages): void
 ```
 
-The language of the resource (dc:language). Use BCP 47 language codes (e.g., "en", "fr").
+The language of the resource (dc:language). Use BCP 47 language codes (e.g., "en", "fr"). `getLanguage()`/`setLanguage()` work on the main (first) language; `getLanguages()`/`setLanguages()` on all of them, for multilingual books. At least one language is required.
 
 ### Subject
 
@@ -147,6 +149,8 @@ The topics of the resource (dc:subject). `getSubject()`/`setSubject()` work on t
 public function getIdentifiers(): array<int, string>
 public function getUniqueIdentifier(): ?string
 public function setIdentifiers(array<int, string> $identifiers): void
+public function getTypedIdentifiers(): array<int, Identifier>
+public function getIsbn(): ?string
 ```
 
 Unambiguous references to the resource (dc:identifier), such as an ISBN or UUID.
@@ -154,6 +158,45 @@ Unambiguous references to the resource (dc:identifier), such as an ISBN or UUID.
 The first value passed to `setIdentifiers()` is stored in the identifier that `package@unique-identifier` points to, so the package stays valid. At least one identifier is required. An identifier whose value changes loses its type information (`opf:scheme` / `identifier-type` refinement). `getUniqueIdentifier()` returns that identifier, or `null` when `package@unique-identifier` points to none.
 
 Obfuscated fonts (listed in `META-INF/encryption.xml`) are keyed with the unique identifier, so when it changes, `EpubFile::save()` re-keys them: fonts obfuscated with the IDPF algorithm work with any identifier, while Adobe's older algorithm needs a `urn:uuid:` identifier, and saving throws an `Exception` naming the font otherwise.
+
+`getTypedIdentifiers()` returns `PhpEpub\Identifier` objects (`value`, `scheme`). The scheme, in upper case, comes from the EPUB 2 `opf:scheme` attribute, else the EPUB 3 `identifier-type` refinement (ONIX codes `02` and `15` read as `ISBN`, `06` as `DOI`), else a `urn:<scheme>:` or `doi:` prefix, else a valid ISBN check digit; it is `null` when none of these applies. `getIsbn()` returns the first ISBN without prefix, hyphens or spaces (e.g. `9780306406157`), or `null`.
+
+```php
+foreach ($metadata->getTypedIdentifiers() as $identifier) {
+    echo $identifier->scheme ?? 'unknown', ': ', $identifier->value, "\n";
+}
+```
+
+### Other Dublin Core Elements
+
+```php
+public function getDublinCoreValues(string $element): array<int, string>
+public function setDublinCoreValues(string $element, array<int, string> $values): void
+```
+
+Read and write any of the fifteen Dublin Core elements by name, including those without dedicated methods: `rights` (licence text), `source`, `type`, `format`, `relation` and `coverage`. `setDublinCoreValues()` replaces every element with that name (`[]` removes them all), reusing existing elements in order so the ids and refinements of unchanged values survive. Title and language still need at least one non-empty value, and identifiers are set with `setIdentifiers()`. Both throw an `Exception` for a name that is not a Dublin Core element.
+
+```php
+$metadata->setDublinCoreValues('rights', ['CC BY 4.0']);
+print_r($metadata->getDublinCoreValues('source'));
+```
+
+### Series
+
+```php
+public function getSeries(): ?string
+public function getSeriesIndex(): ?string
+public function setSeries(?string $name, int|float|string|null $index = null): void
+```
+
+Books record their series in two ways: EPUB 3 `<meta property="belongs-to-collection">` refined with `collection-type` `series` (and `group-position` for the position), and Calibre's `calibre:series` and `calibre:series_index` metas, which EPUB 2 books and many reading systems use. `getSeries()` and `getSeriesIndex()` read the EPUB 3 series collection, or else the Calibre metas, and return `null` when there is none. The index is returned as written, e.g. `"2"` or `"2.5"`.
+
+`setSeries()` writes the Calibre metas and, for EPUB 3 packages, a series collection that replaces the previous one; other collections are kept. `null` removes the series (and its index); a call without an index removes the old index. It throws an `Exception` for an empty name or an index that is not a number.
+
+```php
+$metadata->setSeries('The Expanse', 2);
+echo $metadata->getSeries(), ' #', $metadata->getSeriesIndex(); // The Expanse #2
+```
 
 ### Other `<meta>` Elements
 
@@ -178,8 +221,7 @@ Access to metadata beyond the Dublin Core fields:
 - `getVersion()` returns the package version, e.g. `2.0` or `3.0`.
 
 ```php
-$metadata->setMeta('calibre:series', 'The Expanse');
-$metadata->setMeta('calibre:series_index', '1');
+$metadata->setMeta('calibre:title_sort', 'Expanse, The');
 $metadata->setProperty('schema:accessMode', 'textual');
 ```
 
@@ -222,6 +264,7 @@ The Metadata class uses PHP traits to organize code:
 - `InteractsWithLanguage` - Language handling
 - `InteractsWithSubject` - Subject handling
 - `InteractsWithIdentifier` - Identifier handling
+- `InteractsWithSeries` - Series handling (EPUB 3 collections and Calibre metas)
 
 Each trait is a thin layer over shared protected helpers in `Metadata` (`getDcValue()`, `getDcValues()`, `setDcValue()`, `setDcValues()`), which look up elements inside `<metadata>` by namespace URI rather than by prefix.
 

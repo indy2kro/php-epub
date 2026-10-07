@@ -65,10 +65,10 @@ class Spine
     /**
      * Adds a manifest item to the reading order.
      *
-     * @param int|null $position Zero-based position; appends when null.
+     * @param int|null $position Zero-based position, from 0 to the spine length; appends when null.
      * @param bool $linear False for auxiliary content (written as linear="no").
      *
-     * @throws Exception If the item is unknown or already in the spine.
+     * @throws Exception If the item is unknown or already in the spine, or the position is out of range.
      */
     public function add(string $idref, ?int $position = null, bool $linear = true): void
     {
@@ -81,8 +81,11 @@ class Spine
         }
 
         $entries = $this->entries();
+        $position ??= count($entries);
+        $this->assertPosition($position, count($entries));
+
         $entry = $linear ? ['idref' => $idref] : ['idref' => $idref, 'linear' => 'no'];
-        array_splice($entries, $position ?? count($entries), 0, [$entry]);
+        array_splice($entries, $position, 0, [$entry]);
 
         $this->write($entries);
     }
@@ -103,19 +106,74 @@ class Spine
     }
 
     /**
-     * Moves an item to a new zero-based position in the reading order.
+     * Moves an item to a new zero-based position in the reading order (0 to the spine length - 1).
      *
-     * @throws Exception If the item is not in the spine.
+     * @throws Exception If the item is not in the spine or the position is out of range.
      */
     public function move(string $idref, int $position): void
     {
         $entries = $this->entries();
         $index = $this->indexOf($idref);
+        $this->assertPosition($position, count($entries) - 1);
 
         $entry = array_splice($entries, $index, 1);
         array_splice($entries, $position, 0, $entry);
 
         $this->write($entries);
+    }
+
+    /**
+     * Marks an entry as part of the main reading order (linear) or as auxiliary content (linear="no").
+     * Its other attributes are kept.
+     *
+     * @throws Exception If the item is not in the spine.
+     */
+    public function setLinear(string $idref, bool $linear): void
+    {
+        $entries = $this->entries();
+        $index = $this->indexOf($idref);
+
+        unset($entries[$index]['linear']);
+        if (! $linear) {
+            $entries[$index]['linear'] = 'no';
+        }
+
+        $this->write($entries);
+    }
+
+    /**
+     * The EPUB 3 page-progression-direction of the book ("ltr", "rtl" or "default"), or null when not set.
+     */
+    public function getPageProgressionDirection(): ?string
+    {
+        $direction = (string) ($this->spineNode()['page-progression-direction'] ?? '');
+
+        return $direction === '' ? null : $direction;
+    }
+
+    /**
+     * Sets the EPUB 3 page-progression-direction, e.g. "rtl" for right-to-left books such as manga;
+     * null removes it.
+     *
+     * @throws Exception If the value is not "ltr", "rtl" or "default", or the package is not EPUB 3.
+     */
+    public function setPageProgressionDirection(?string $direction): void
+    {
+        if ($direction !== null && ! in_array($direction, ['ltr', 'rtl', 'default'], true)) {
+            throw new Exception("page-progression-direction must be \"ltr\", \"rtl\" or \"default\", got: {$direction}");
+        }
+
+        if (! str_starts_with(trim((string) $this->opfXml['version']), '3')) {
+            throw new Exception('page-progression-direction exists only in EPUB 3 packages');
+        }
+
+        $spineNode = $this->spineNode();
+        unset($spineNode['page-progression-direction']);
+        if ($direction !== null) {
+            $spineNode->addAttribute('page-progression-direction', $direction);
+        }
+
+        $this->modified = true;
     }
 
     public function isModified(): bool
@@ -124,7 +182,10 @@ class Spine
     }
 
     /**
-     * Marks the current state as persisted (called by EpubFile::save()).
+     * Marks the current state as persisted.
+     *
+     * @internal Called by EpubFile::save() after writing the package; calling it before then makes
+     *           save() treat the reading order as unchanged.
      */
     public function markSaved(): void
     {
@@ -142,6 +203,24 @@ class Spine
         }
 
         return $index;
+    }
+
+    /**
+     * @throws Exception
+     */
+    private function assertPosition(int $position, int $last): void
+    {
+        if ($position < 0 || $position > $last) {
+            throw new Exception("Position {$position} is outside the spine (0 to {$last})");
+        }
+    }
+
+    /**
+     * The <spine> element, created when the package has none.
+     */
+    private function spineNode(): SimpleXMLElement
+    {
+        return $this->query('/opf:package/opf:spine')[0] ?? $this->opfXml->addChild('spine', null, Metadata::OPF_NAMESPACE);
     }
 
     /**
@@ -171,7 +250,7 @@ class Spine
      */
     private function write(array $entries): void
     {
-        $spineNode = $this->query('/opf:package/opf:spine')[0] ?? $this->opfXml->addChild('spine', null, Metadata::OPF_NAMESPACE);
+        $spineNode = $this->spineNode();
 
         foreach ($this->itemrefNodes() as $itemref) {
             unset($itemref[0]);

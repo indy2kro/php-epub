@@ -296,6 +296,25 @@ final class EpubFeaturesTest extends TestCase
         yield 'reference outside the book' => ['', '../../outside.jpg', []];
     }
 
+    /**
+     * A book whose cover "old" (EPUB/old.jpg) is marked every way: property, meta and guide.
+     */
+    private function bookWithCover(): EpubBuilder
+    {
+        $opf = str_replace(
+            '</package>',
+            '<guide><reference type="cover" href="old.jpg"/><reference type="text" href="text.xhtml"/></guide></package>',
+            EpubBuilder::opf(
+                '<item id="old" href="old.jpg" media-type="image/jpeg" properties="cover-image"/>',
+                '<meta name="cover" content="old"/>'
+            )
+        );
+
+        return EpubBuilder::minimal()
+            ->withFile('EPUB/package.opf', $opf)
+            ->withFile('EPUB/old.jpg', (string) base64_decode(EpubBuilder::JPEG, true));
+    }
+
     public function testBookWithoutCover(): void
     {
         $this->assertNull($this->open(EpubBuilder::minimal())->getCoverImage());
@@ -308,7 +327,8 @@ final class EpubFeaturesTest extends TestCase
             '<meta name="cover" content="old"/>'
         )));
 
-        $cover = $epubFile->setCoverImage('PNGDATA', 'image/png');
+        $png = (string) base64_decode(EpubBuilder::PNG, true);
+        $cover = $epubFile->setCoverImage($png, 'image/png');
 
         $this->assertSame('EPUB/images/cover.png', $cover->path);
         $this->assertSame('cover-image', $cover->properties);
@@ -316,7 +336,7 @@ final class EpubFeaturesTest extends TestCase
 
         $reloaded = EpubFile::open($this->tmpDir . '/out.epub');
         $this->assertSame('EPUB/images/cover.png', $reloaded->getCoverImage()?->path);
-        $this->assertSame('PNGDATA', $reloaded->getContentManager()->getContent('EPUB/images/cover.png'));
+        $this->assertSame($png, $reloaded->getContentManager()->getContent('EPUB/images/cover.png'));
         $this->assertSame($cover->id, $reloaded->getMetadata()->getMeta('cover'));
         // The previous cover is no longer marked as the cover.
         $this->assertSame('', $reloaded->getManifest()->get('old')?->properties);
@@ -327,7 +347,7 @@ final class EpubFeaturesTest extends TestCase
         $opf = str_replace('version="3.0"', 'version="2.0"', EpubBuilder::opf());
         $epubFile = $this->open(EpubBuilder::minimal()->withFile('EPUB/package.opf', $opf));
 
-        $cover = $epubFile->setCoverImage('JPEG', 'image/jpeg', 'EPUB/art/front.jpg');
+        $cover = $epubFile->setCoverImage((string) base64_decode(EpubBuilder::JPEG, true), 'image/jpeg', 'EPUB/art/front.jpg');
 
         $this->assertSame('EPUB/art/front.jpg', $cover->path);
         $this->assertSame('', $cover->properties);
@@ -356,6 +376,106 @@ final class EpubFeaturesTest extends TestCase
         $this->expectExceptionMessage('Cover must be an image');
 
         $epubFile->setCoverImage('<html/>', 'application/xhtml+xml');
+    }
+
+    public function testSetCoverImageRejectsBytesOfAnotherFormat(): void
+    {
+        $epubFile = $this->open(EpubBuilder::minimal());
+
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('The cover data is image/png, not image/jpeg');
+
+        $epubFile->setCoverImage((string) base64_decode(EpubBuilder::PNG, true), 'image/jpeg');
+    }
+
+    public function testSetCoverImageRejectsBytesThatAreNotTheDeclaredImage(): void
+    {
+        $epubFile = $this->open(EpubBuilder::minimal());
+
+        try {
+            $epubFile->setCoverImage('not an image', 'image/png');
+            $this->fail('Expected an exception for bytes that are not a PNG.');
+        } catch (Exception $exception) {
+            $this->assertStringContainsString('is not a valid image/png image', $exception->getMessage());
+        }
+
+        // Nothing is written before the check.
+        $this->assertNull($epubFile->getCoverImage());
+        $this->assertNotContains('EPUB/images/cover.png', $epubFile->getContentManager()->getContentPaths());
+    }
+
+    public function testSetCoverImageTrustsFormatsItCannotDetect(): void
+    {
+        $epubFile = $this->open(EpubBuilder::minimal());
+
+        $cover = $epubFile->setCoverImage('<svg xmlns="http://www.w3.org/2000/svg"/>', 'image/svg+xml');
+
+        $this->assertSame('image/svg+xml', $cover->mediaType);
+    }
+
+    public function testSetCoverImageCanDeleteThePreviousCover(): void
+    {
+        $epubFile = $this->open($this->bookWithCover());
+
+        $cover = $epubFile->setCoverImage((string) base64_decode(EpubBuilder::PNG, true), 'image/png', null, true);
+
+        $this->assertSame($cover->path, $epubFile->getCoverImage()?->path);
+        $this->assertNull($epubFile->getManifest()->get('old'));
+        $this->assertNotContains('EPUB/old.jpg', $epubFile->getContentManager()->getContentPaths());
+    }
+
+    public function testSetCoverImageKeepsThePreviousCoverWhenItIsTheSameFile(): void
+    {
+        $epubFile = $this->open($this->bookWithCover());
+
+        $cover = $epubFile->setCoverImage((string) base64_decode(EpubBuilder::JPEG, true), 'image/jpeg', 'EPUB/old.jpg', true);
+
+        $this->assertSame('old', $cover->id);
+        $this->assertSame('EPUB/old.jpg', $epubFile->getCoverImage()?->path);
+    }
+
+    public function testRemoveCoverImageUnmarksTheCoverAndKeepsTheFile(): void
+    {
+        $epubFile = $this->open($this->bookWithCover());
+
+        $epubFile->removeCoverImage();
+
+        $this->assertNull($epubFile->getCoverImage());
+        $this->assertSame('', $epubFile->getManifest()->get('old')?->properties);
+        $this->assertNull($epubFile->getMetadata()->getMeta('cover'));
+        $this->assertNull($epubFile->getManifest()->getGuidePath('cover'));
+        $this->assertSame('EPUB/text.xhtml', $epubFile->getManifest()->getGuidePath('text'));
+        $this->assertContains('EPUB/old.jpg', $epubFile->getContentManager()->getContentPaths());
+    }
+
+    public function testRemoveCoverImageCanDeleteTheFile(): void
+    {
+        $epubFile = $this->open($this->bookWithCover());
+
+        $epubFile->removeCoverImage(true);
+
+        $this->assertNull($epubFile->getCoverImage());
+        $this->assertNull($epubFile->getManifest()->get('old'));
+        $this->assertNotContains('EPUB/old.jpg', $epubFile->getContentManager()->getContentPaths());
+    }
+
+    public function testRemoveCoverImageDropsTheItemOfAMissingFile(): void
+    {
+        $epubFile = $this->open($this->bookWithCover()->withoutFile('EPUB/old.jpg'));
+
+        $epubFile->removeCoverImage(true);
+
+        $this->assertNull($epubFile->getManifest()->get('old'));
+    }
+
+    public function testRemoveCoverImageWithoutACoverDoesNothing(): void
+    {
+        $epubFile = $this->open(EpubBuilder::minimal());
+
+        $epubFile->removeCoverImage(true);
+
+        $this->assertNull($epubFile->getCoverImage());
+        $this->assertFalse($epubFile->getManifest()->isModified());
     }
 
     public function testOpenLoadsTheBook(): void

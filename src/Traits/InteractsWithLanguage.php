@@ -21,4 +21,26 @@ trait InteractsWithLanguage
     {
         $this->setDcValue('language', $language);
     }
+
+    /**
+     * Gets every language of the EPUB (dc:language), the main one first.
+     *
+     * @return list<string>
+     */
+    public function getLanguages(): array
+    {
+        return $this->getDcValues('language');
+    }
+
+    /**
+     * Replaces the languages of the EPUB; the first is the main one.
+     *
+     * @param list<string> $languages
+     *
+     * @throws \PhpEpub\Exception If the list or a language is empty.
+     */
+    public function setLanguages(array $languages): void
+    {
+        $this->setDcValues('language', $languages);
+    }
 }

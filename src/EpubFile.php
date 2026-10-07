@@ -321,22 +321,29 @@ class EpubFile
 
     /**
      * Stores an image and marks it as the cover (EPUB 3 "cover-image" property and
-     * EPUB 2 <meta name="cover">). The previous cover image file is kept in the book.
+     * EPUB 2 <meta name="cover">).
+     *
+     * JPEG, PNG, GIF and WebP data is checked against the media type; other formats (such as SVG)
+     * are stored as declared.
      *
      * @param string $imageData The image bytes.
      * @param string $mediaType The image media type, e.g. "image/jpeg".
      * @param string|null $path Path relative to the book root; defaults to "images/cover.<ext>" next to the OPF.
+     * @param bool $deletePrevious Delete the previous cover image from the book (by default it is kept).
      *
-     * @throws Exception If the media type is not an image or the file cannot be written.
+     * @throws Exception If the media type is not an image or does not match the data, or a file cannot be written.
      */
-    public function setCoverImage(string $imageData, string $mediaType, ?string $path = null): ManifestItem
+    public function setCoverImage(string $imageData, string $mediaType, ?string $path = null, bool $deletePrevious = false): ManifestItem
     {
         if (! str_starts_with($mediaType, 'image/')) {
             throw new Exception("Cover must be an image, got: {$mediaType}");
         }
 
+        $this->assertImageData($imageData, $mediaType);
+
         $manifest = $this->getManifest();
         $metadata = $this->getMetadata();
+        $previous = $deletePrevious ? $this->getCoverImage() : null;
 
         if ($path === null) {
             $opfDirectory = dirname($manifest->getOpfPath());
@@ -359,7 +366,71 @@ class EpubFile
         // EPUB 2 readers (and many EPUB 3 ones) look for this meta.
         $metadata->setMeta('cover', $cover->id);
 
+        if ($previous instanceof ManifestItem && $previous->id !== $cover->id) {
+            $this->deleteItem($previous);
+        }
+
         return $manifest->get($cover->id) ?? $cover;
+    }
+
+    /**
+     * Unmarks the cover: removes the EPUB 3 "cover-image" property, the EPUB 2 <meta name="cover">
+     * and <guide> cover references. A cover page in the reading order stays.
+     *
+     * @param bool $deleteFile Also delete the cover image from the book (by default it is kept).
+     *
+     * @throws Exception If the book is not loaded or the image cannot be deleted.
+     */
+    public function removeCoverImage(bool $deleteFile = false): void
+    {
+        $manifest = $this->getManifest();
+        $metadata = $this->getMetadata();
+        $cover = $this->getCoverImage();
+
+        foreach ($manifest->getItems() as $item) {
+            $manifest->removeProperty($item->id, self::COVER_PROPERTY);
+        }
+
+        if ($metadata->getMeta('cover') !== null) {
+            $metadata->setMeta('cover', null);
+        }
+
+        $manifest->removeGuideReferences('cover');
+
+        if ($deleteFile && $cover instanceof ManifestItem) {
+            $this->deleteItem($cover);
+        }
+    }
+
+    /**
+     * Deletes an item's file with its manifest item and the references to it; an item whose
+     * file is missing is only removed from the manifest.
+     */
+    private function deleteItem(ManifestItem $item): void
+    {
+        if (in_array($item->path, $this->getContentManager()->getContentPaths(), true)) {
+            $this->getContentManager()->deleteContent($item->path);
+        } else {
+            $this->getManifest()->remove($item->id);
+        }
+    }
+
+    /**
+     * @throws Exception If image data of a detectable format (JPEG, PNG, GIF, WebP) does not match the media type.
+     */
+    private function assertImageData(string $imageData, string $mediaType): void
+    {
+        $size = $imageData === '' ? false : @getimagesizefromstring($imageData);
+        $detected = $size === false ? null : $size['mime'];
+        $detectable = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+
+        if (in_array($detected, $detectable, true) && $detected !== $mediaType) {
+            throw new Exception("The cover data is {$detected}, not {$mediaType}");
+        }
+
+        if (in_array($mediaType, $detectable, true) && $detected !== $mediaType) {
+            throw new Exception("The cover data is not a valid {$mediaType} image");
+        }
     }
 
     /**
