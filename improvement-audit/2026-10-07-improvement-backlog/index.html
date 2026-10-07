@@ -311,9 +311,9 @@ No source changes were made while compiling this list.</p>
   Only eight DC elements have accessors and <code>getDcValues()</code> is protected, so <code>dc:rights</code> (licence text) and multilingual books cannot be handled.</li>
 <li>[x] <strong>FEAT-04</strong> Typed identifier lookup (<code>getIsbn()</code>, schemes from <code>opf:scheme</code>, <code>identifier-type</code> refinements and <code>urn:</code> prefixes) — <code>src/Traits/InteractsWithIdentifier.php:12-49</code> — S · low
   <code>getIdentifiers()</code> returns bare strings, so finding the ISBN means reimplementing the EPUB 2 and EPUB 3 scheme conventions.</li>
-<li>[ ] <strong>FEAT-05</strong> Rename or move content files and update every reference (manifest href, spine, table of contents, guide) — <code>src/ContentManager.php</code> — M · low
+<li>[x] <strong>FEAT-05</strong> Rename or move content files and update every reference (manifest href, spine, table of contents, guide) — <code>src/ContentManager.php</code> — M · low
   Reorganising a book's files today means deleting and re-adding content, which loses the manifest id, spine position and TOC entries.</li>
-<li>[ ] <strong>FEAT-06</strong> Make manifest lookups fast for large books (index items by id and path) — <code>src/Manifest.php:74-110,330-360</code> — M · low
+<li>[x] <strong>FEAT-06</strong> Make manifest lookups fast for large books (index items by id and path) — <code>src/Manifest.php:74-110,330-360</code> — M · low
   A probe showed that adding 1,500 small files with <code>addContent()</code> takes 5.5 s, because every add rescans the manifest and every id check scans the whole package, which makes image-heavy books (comics) slow to build.</li>
 </ul>
 <h3 id="public-api">Public API<a class="headerlink" href="#public-api" title="Permanent link">&para;</a></h3>

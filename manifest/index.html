@@ -158,6 +158,9 @@
 <p><strong><code>setMediaType(string $id, string $mediaType): void</code></strong>: Changes an item's media type, e.g. after its file was replaced with another format.</p>
 </li>
 <li>
+<p><strong><code>moveItem(string $id, string $path): void</code></strong>: Points an item at another file (path relative to the book root), keeping its id, and updates <code>&lt;guide&gt;</code> references to its old file. The file itself is not moved; <code>ContentManager::moveContent()</code> moves both. Throws if no item has the id or another item already has the path.</p>
+</li>
+<li>
 <p><strong><code>findByHref(string $href): ?ManifestItem</code></strong>: Looks up an item by an href relative to the OPF file (fragments ignored); <code>null</code> when nothing matches or the href points outside the book.</p>
 </li>
 <li>
@@ -170,6 +173,7 @@
 <p><strong><code>getOpfPath(): string</code></strong>: The OPF location relative to the book root.</p>
 </li>
 </ul>
+<p>Lookups (<code>get()</code>, <code>findByPath()</code>, <code>getItems()</code>) use an index built on first use, so adding thousands of files to a large book stays fast.</p>
 <h2 id="usage-example">Usage Example<a class="headerlink" href="#usage-example" title="Permanent link">&para;</a></h2>
 <pre class="codehilite"><code class="language-php">use PhpEpub\EpubFile;
 

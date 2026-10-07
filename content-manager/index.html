@@ -177,6 +177,14 @@ $contentManager = $epubFile-&gt;getContentManager();
 </code></pre>
 
 <p>Deletes a file, its manifest item and its spine entry. Throws an exception if the file doesn't exist or cannot be deleted.</p>
+<pre class="codehilite"><code class="language-php">public function moveContent(string $from, string $to): void
+</code></pre>
+
+<p>Moves or renames a file. Its manifest item keeps its id, so its place in the reading order is unchanged, and points at the new path; <code>&lt;guide&gt;</code> references, table-of-contents entries and the <code>META-INF/encryption.xml</code> entry of an obfuscated font follow it. Moving the navigation document rewrites its links for the new location.</p>
+<p>References inside content documents are not rewritten: links and images in other documents that point at the moved file, and relative links inside a document moved to another directory, keep their old targets; <code>EpubFile::validate()</code> reports those that break (<code>CONTENT_REFERENCE_MISSING</code>). Throws an exception if either path is the package document or leaves the book, the file does not exist, the target already exists, or the file cannot be moved.</p>
+<pre class="codehilite"><code class="language-php">$epubFile-&gt;getContentManager()-&gt;moveContent('EPUB/chapter1.xhtml', 'EPUB/text/chapter-01.xhtml');
+</code></pre>
+
 <pre class="codehilite"><code class="language-php">public function getContent(string $filePath): string
 </code></pre>
 
