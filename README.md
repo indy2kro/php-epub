@@ -8,7 +8,7 @@ A PHP library for reading and editing EPUB 2 and EPUB 3 books: metadata, cover, 
 
 ## Features
 
-- **Open and save**: `EpubFile::open()` extracts a book safely; `save()` writes an OCF-valid archive (checked with EPUBCheck in CI).
+- **Open and save**: `EpubFile::open()` extracts a book safely; `save()` writes an OCF-valid archive (checked with EPUBCheck in CI); books can also be opened from and saved to strings and streams.
 - **Metadata**: title(s), authors, creators and contributors with roles, description, publisher, dates, language, subjects, identifiers, and any other `<meta>` element.
 - **Cover**: read and replace the cover image (EPUB 3 `cover-image` and EPUB 2 conventions).
 - **Package editing**: manifest items, reading order (spine) and table of contents (EPUB 3 nav and EPUB 2 NCX); adding or deleting content keeps them in sync, moving a file rewrites the references to it, and the table of contents can be generated from the chapters' headings.
@@ -48,6 +48,18 @@ $metadata->addContributor('Ed Editor', 'edt');
 // Writes pending package changes, then packages the book (to a new file here).
 $epubFile->save('/path/to/edited.epub');
 ```
+
+### Strings and streams
+
+```php
+// Uploads, HTTP downloads: the same ZIP limits apply as for files.
+$epubFile = EpubFile::openString($bytes);       // or EpubFile::openStream($resource)
+$epubFile->getMetadata()->setTitle('New Title');
+
+$bytes = $epubFile->saveToString();             // or $epubFile->saveToStream($resource)
+```
+
+A book opened this way has no file, so `save()` needs a path (or use the two methods above).
 
 ### Create a new book
 

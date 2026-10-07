@@ -44,6 +44,39 @@ final class ValidatorTest extends TestCase
         $this->assertSame([], $epubFile->validate());
     }
 
+    #[DataProvider('invalidFileNames')]
+    public function testWarnsAboutFileNamesOcfForbids(string $name): void
+    {
+        $epubFile = $this->open(EpubBuilder::epub3());
+        // Written straight into the extraction: some systems cannot even create these files.
+        $written = @file_put_contents($epubFile->getTempDir() . '/EPUB/' . $name, 'x') !== false;
+        if (! $written || ! in_array($name, (array) scandir($epubFile->getTempDir() . '/EPUB'), true)) {
+            $this->markTestSkipped('This system cannot create a file named ' . json_encode($name));
+        }
+
+        $issues = array_values(array_filter($epubFile->validate(), static fn (ValidationIssue $issue): bool => $issue->code === 'FILE_NAME_INVALID'));
+
+        $this->assertCount(1, $issues);
+        $this->assertSame(ValidationIssue::WARNING, $issues[0]->severity);
+        $this->assertSame('EPUB/' . $name, $issues[0]->location);
+    }
+
+    /**
+     * @return \Iterator<string, array{string}>
+     */
+    public static function invalidFileNames(): \Iterator
+    {
+        yield 'DEL' => ["a\x7f.txt"];
+        yield 'control character' => ["a\x01.txt"];
+        yield 'quote' => ['a"b.txt'];
+        yield 'asterisk' => ['a*b.txt'];
+        yield 'colon' => ['a:b.txt'];
+        yield 'less-than' => ['a<b.txt'];
+        yield 'question mark' => ['a?b.txt'];
+        yield 'backslash' => ['a\\b.txt'];
+        yield 'trailing dot' => ['a.'];
+    }
+
     /**
      * @param list<string> $expectedCodes
      */

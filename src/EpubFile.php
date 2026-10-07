@@ -26,6 +26,11 @@ class EpubFile
     ];
 
     private ?string $tempDir = null;
+
+    /**
+     * False for a book opened from a string or stream: there is no file to reload or overwrite.
+     */
+    private bool $hasFile = true;
     private readonly ZipHandler $zipHandler;
     private readonly XmlParser $xmlParser;
     private readonly Parser $parser;
@@ -61,6 +66,91 @@ class EpubFile
         $epubFile->load();
 
         return $epubFile;
+    }
+
+    /**
+     * Opens a book held in a string, e.g. an upload or an HTTP download. The ZIP limits apply as for files.
+     * Such a book has no file: save() needs a path, or use saveToString() or saveToStream().
+     *
+     * @throws Exception If the data is not a valid EPUB or a limit is exceeded.
+     */
+    public static function openString(string $data, ?ZipHandler $zipHandler = null, ?XmlParser $xmlParser = null): self
+    {
+        return self::openArchive(
+            static fn (string $archive): bool => @file_put_contents($archive, $data) !== false || throw new Exception('Failed to buffer the EPUB data'),
+            $zipHandler,
+            $xmlParser
+        );
+    }
+
+    /**
+     * Opens a book read from a stream (from its current position to its end), e.g. a PHP input
+     * stream or a download. The stream stays open and is not rewound. The ZIP limits apply as for files.
+     *
+     * @param resource $stream A readable stream.
+     *
+     * @throws Exception If the stream cannot be read, the data is not a valid EPUB or a limit is exceeded.
+     */
+    public static function openStream($stream, ?ZipHandler $zipHandler = null, ?XmlParser $xmlParser = null): self
+    {
+        self::assertStream($stream);
+
+        return self::openArchive(
+            static function (string $archive) use ($stream): void {
+                $output = @fopen($archive, 'wb') ?: throw new Exception('Failed to buffer the EPUB stream');
+                $copied = @stream_copy_to_stream($stream, $output);
+                fclose($output);
+                $copied === false && throw new Exception('Failed to read the EPUB stream');
+            },
+            $zipHandler,
+            $xmlParser
+        );
+    }
+
+    /**
+     * @param \Closure(string): mixed $write Writes the archive to the given path.
+     */
+    private static function openArchive(\Closure $write, ?ZipHandler $zipHandler, ?XmlParser $xmlParser): self
+    {
+        $epubFile = new self('', $zipHandler, $xmlParser);
+        $epubFile->hasFile = false;
+
+        self::withScratchArchive(static function (string $archive) use ($write, $epubFile): void {
+            $write($archive);
+            $epubFile->openWith(fn (string $directory) => $epubFile->zipHandler->extract($archive, $directory));
+        });
+
+        return $epubFile;
+    }
+
+    /**
+     * Runs $use with the path of an archive inside a private (0700, randomly named) directory
+     * that is deleted afterwards, whatever happens: ZipArchive needs a real file.
+     *
+     * @template T
+     *
+     * @param \Closure(string): T $use
+     *
+     * @return T
+     */
+    private static function withScratchArchive(\Closure $use): mixed
+    {
+        $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'epubio_' . bin2hex(random_bytes(16));
+        @mkdir($directory, 0700) || throw new Exception("Failed to create temporary directory: {$directory}");
+
+        try {
+            return $use($directory . DIRECTORY_SEPARATOR . 'book.epub');
+        } finally {
+            (new FileSystemHelper())->deleteDirectory($directory);
+        }
+    }
+
+    /**
+     * @throws Exception If $stream is not a stream resource.
+     */
+    private static function assertStream(mixed $stream): void
+    {
+        is_resource($stream) && get_resource_type($stream) === 'stream' || throw new Exception('A stream resource is required');
     }
 
     public function __destruct()
@@ -116,6 +206,10 @@ class EpubFile
      */
     public function load(): void
     {
+        if (! $this->hasFile) {
+            throw new Exception('This book was opened from a string or stream and has no file to load again; open it again instead.');
+        }
+
         if ($this->tempDir !== null && ! is_file($this->filePath)) {
             throw new Exception("Nothing to load from {$this->filePath}: the file does not exist yet; save() the book first.");
         }
@@ -265,6 +359,7 @@ class EpubFile
         }
 
         if ($filePath === null) {
+            $this->hasFile || throw new Exception('This book was opened from a string or stream and has no file to overwrite: pass a path to save(), or use saveToString() or saveToStream().');
             $filePath = $this->filePath;
         }
 
@@ -277,6 +372,42 @@ class EpubFile
             || throw new Exception("Failed to write the mimetype file: {$mimetype}");
 
         $this->zipHandler->compress($tempDir, $filePath);
+    }
+
+    /**
+     * Packages the book (as save() does) and returns the EPUB file's bytes. Works for any loaded book.
+     *
+     * @throws Exception If the book is not loaded or cannot be packaged.
+     */
+    public function saveToString(): string
+    {
+        return self::withScratchArchive(function (string $archive): string {
+            $this->save($archive);
+
+            return FileSystemHelper::readFile($archive) ?? throw new Exception('Failed to read the saved EPUB');
+        });
+    }
+
+    /**
+     * Packages the book (as save() does) and writes it to a stream at its current position.
+     * The stream stays open.
+     *
+     * @param resource $stream A writable stream.
+     *
+     * @throws Exception If the stream is not writable, the book is not loaded or cannot be packaged.
+     */
+    public function saveToStream($stream): void
+    {
+        self::assertStream($stream);
+
+        self::withScratchArchive(function (string $archive) use ($stream): void {
+            $this->save($archive);
+
+            $input = @fopen($archive, 'rb') ?: throw new Exception('Failed to read the saved EPUB');
+            $copied = @stream_copy_to_stream($input, $stream);
+            fclose($input);
+            $copied === filesize($archive) || throw new Exception('Failed to write the EPUB to the stream');
+        });
     }
 
     /**

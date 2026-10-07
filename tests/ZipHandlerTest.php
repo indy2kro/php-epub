@@ -259,27 +259,25 @@ final class ZipHandlerTest extends TestCase
     }
 
     /**
-     * @return array<string, array{string}>
+     * @return \Iterator<string, array{string}>
      */
-    public static function windowsInvalidNames(): array
+    public static function windowsInvalidNames(): \Iterator
     {
-        return [
-            'trailing dot in a directory' => ['dir./a.txt'],
-            'trailing dot' => ['a.'],
-            'trailing space' => ['dir /a.txt'],
-            'device name' => ['CON'],
-            'device name with extension' => ['EPUB/aux.xhtml'],
-            'device name in any case' => ['Lpt1.tar.gz'],
-            'numbered device' => ['com9'],
-            'colon' => ['dir/a:b.txt'],
-            'less-than' => ['a<b.txt'],
-            'greater-than' => ['a>b.txt'],
-            'quote' => ['a"b.txt'],
-            'pipe' => ['a|b.txt'],
-            'question mark' => ['a?b.txt'],
-            'asterisk' => ['a*b.txt'],
-            'directory entry' => ['nul/'],
-        ];
+        yield 'trailing dot in a directory' => ['dir./a.txt'];
+        yield 'trailing dot' => ['a.'];
+        yield 'trailing space' => ['dir /a.txt'];
+        yield 'device name' => ['CON'];
+        yield 'device name with extension' => ['EPUB/aux.xhtml'];
+        yield 'device name in any case' => ['Lpt1.tar.gz'];
+        yield 'numbered device' => ['com9'];
+        yield 'colon' => ['dir/a:b.txt'];
+        yield 'less-than' => ['a<b.txt'];
+        yield 'greater-than' => ['a>b.txt'];
+        yield 'quote' => ['a"b.txt'];
+        yield 'pipe' => ['a|b.txt'];
+        yield 'question mark' => ['a?b.txt'];
+        yield 'asterisk' => ['a*b.txt'];
+        yield 'directory entry' => ['nul/'];
     }
 
     public function testExtractAcceptsSimilarNamesOnWindowsRules(): void
@@ -290,6 +288,15 @@ final class ZipHandlerTest extends TestCase
 
         $this->assertStringEqualsFile($this->extractDir . '/console.txt', '1');
         $this->assertStringEqualsFile($this->extractDir . '/.x/c.d', '5');
+    }
+
+    public function testExtractAppliesNoWindowsRulesOnOtherSystems(): void
+    {
+        $zipPath = $this->buildZip(['plain.txt' => '1']);
+
+        $this->windowsHandler(false)->extract($zipPath, $this->extractDir);
+
+        $this->assertStringEqualsFile($this->extractDir . '/plain.txt', '1');
     }
 
     public function testExtractKeepsAcceptingNamesThatOnlyWindowsCannotWrite(): void
@@ -433,18 +440,16 @@ final class ZipHandlerTest extends TestCase
     }
 
     /**
-     * @return array<string, array{string, string}>
+     * @return \Iterator<string, array{string, string}>
      */
-    public static function failingOperations(): array
+    public static function failingOperations(): \Iterator
     {
-        return [
-            'add mimetype' => ['addFile', 'Failed to add ZIP entry: mimetype'],
-            'store mimetype' => ['setCompressionName', 'Failed to store ZIP entry: mimetype'],
-            'add directory' => ['addEmptyDir', 'Failed to add ZIP entry: '],
-            'set time' => ['setMtimeName', 'Failed to set the time of ZIP entry: mimetype'],
-            'set permissions' => ['setExternalAttributesName', 'Failed to set the permissions of ZIP entry: mimetype'],
-            'finalize' => ['close', 'Failed to finalize ZIP file: '],
-        ];
+        yield 'add mimetype' => ['addFile', 'Failed to add ZIP entry: mimetype'];
+        yield 'store mimetype' => ['setCompressionName', 'Failed to store ZIP entry: mimetype'];
+        yield 'add directory' => ['addEmptyDir', 'Failed to add ZIP entry: '];
+        yield 'set time' => ['setMtimeName', 'Failed to set the time of ZIP entry: mimetype'];
+        yield 'set permissions' => ['setExternalAttributesName', 'Failed to set the permissions of ZIP entry: mimetype'];
+        yield 'finalize' => ['close', 'Failed to finalize ZIP file: '];
     }
 
     public function testCompressLeavesNoFileWhenAnEntryCannotBeAdded(): void

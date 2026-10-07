@@ -56,6 +56,7 @@ final readonly class Validator
     {
         return [
             ...$this->checkMimetype(),
+            ...$this->checkFileNames(),
             ...$this->checkMetadata(),
             ...$this->checkIds(),
             ...$this->checkManifest(),
@@ -394,6 +395,28 @@ final readonly class Validator
         sort($files, SORT_STRING);
 
         return $files;
+    }
+
+    /**
+     * OCF forbids the characters " * : < > ? \, DEL, C0 controls and a trailing "." in file names;
+     * such files cannot be created on every system.
+     *
+     * @return list<ValidationIssue>
+     */
+    private function checkFileNames(): array
+    {
+        $root = (string) realpath($this->rootDirectory);
+        $issues = [];
+
+        /** @var \SplFileInfo $file */
+        foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root, RecursiveDirectoryIterator::SKIP_DOTS)) as $file) {
+            $path = str_replace(DIRECTORY_SEPARATOR, '/', substr($file->getPathname(), strlen($root) + 1));
+            if (preg_match('#["*:<>?\\\\\x00-\x1f\x7f]|\.(/|$)#', $path) === 1) {
+                $issues[] = $this->warning('FILE_NAME_INVALID', 'The file name contains a character OCF forbids or ends with a dot.', $path);
+            }
+        }
+
+        return $issues;
     }
 
     private function hasFallback(string $id): bool

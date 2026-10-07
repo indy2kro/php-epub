@@ -31,6 +31,15 @@ public static function open(string $filePath, ?ZipHandler $zipHandler = null, ?X
 
 Shortcut for `new EpubFile(...)` followed by `load()`.
 
+```php
+public static function openString(string $data, ?ZipHandler $zipHandler = null, ?XmlParser $xmlParser = null): EpubFile
+public static function openStream($stream, ?ZipHandler $zipHandler = null, ?XmlParser $xmlParser = null): EpubFile
+```
+
+Open a book held in a string (an upload, an HTTP response) or read from a stream (from its current position to the end; the stream is not rewound and stays open). `ZipArchive` needs a real file, so the data is buffered in a private temporary directory (random name, mode `0700`) that is deleted again, also on failure. The same ZIP size, entry and compression-ratio limits apply as for files, and a book that is not a valid EPUB throws as it would from `open()`.
+
+Such a book has no file: `save()` without a path throws an exception (pass a path, or use `saveToString()` / `saveToStream()`), and `load()` throws as well, because there is nothing to reload from; open the data again instead.
+
 ### Loading and Saving
 
 ```php
@@ -51,7 +60,21 @@ Throws an exception if the file cannot be opened or the EPUB structure is invali
 public function save(?string $filePath = null): void
 ```
 
-Saves the modified EPUB back to disk. If `$filePath` is null, overwrites the original file. Pending metadata, manifest and spine changes are written to the OPF first. Throws an exception if called before `load()`.
+Saves the modified EPUB back to disk. If `$filePath` is null, overwrites the original file. Pending metadata, manifest and spine changes are written to the OPF first. Throws an exception if called before `load()`, or, for a book opened with `openString()` / `openStream()`, when `$filePath` is null.
+
+```php
+public function saveToString(): string
+public function saveToStream($stream): void
+```
+
+Package the book exactly as `save()` does and return the EPUB's bytes, or write them to a writable stream at its current position (the stream stays open; it is not rewound). They work for any loaded book and use the same private temporary directory as `openString()`.
+
+```php
+$epubFile = EpubFile::openString($request->getBody()->getContents());
+$epubFile->getMetadata()->setTitle('Edited');
+header('Content-Type: application/epub+zip');
+$epubFile->saveToStream(fopen('php://output', 'wb'));
+```
 
 ### Accessing Components
 
@@ -116,6 +139,7 @@ Checks the book, including unsaved changes, and returns a list of `PhpEpub\Valid
 | `METADATA_MODIFIED_MISSING` | error | An EPUB 3 package has no `dcterms:modified` |
 | `DUPLICATE_ID` | error | An `id` is used more than once in the package document |
 | `MANIFEST_HREF_OUTSIDE`, `MANIFEST_FILE_MISSING` | error | A manifest item points outside the book, or its file is missing |
+| `FILE_NAME_INVALID` | warning | A file name contains a character OCF forbids (`" * : < > ? \`, DEL, C0 control characters) or ends with a dot; such files cannot be created on every system |
 | `FILE_NOT_IN_MANIFEST` | warning | A file of the publication is not listed in the manifest |
 | `SPINE_EMPTY`, `SPINE_UNKNOWN_IDREF`, `SPINE_DUPLICATE_IDREF` | error | The reading order is empty, or refers to an unknown or repeated item |
 | `SPINE_NOT_CONTENT` | warning | A spine item is not a content document and has no fallback |

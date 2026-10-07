@@ -71,9 +71,9 @@ were re-checked against the round-3 hardening.
 
 - [x] **BUG-01** Keep the NCX and nav valid when the table of contents becomes empty (navMap needs a navPoint, the toc `<ol>` an `<li>`), report empty ones in `validate()`, and update the NCX `dtb:depth` — `src/TableOfContents.php:93-130,365-410`, `src/ContentManager.php:279-297`, `src/Validator.php:265-330` — S · med
   Probes: `setEntries([])` (or deleting every chapter the TOC links to) writes `<navMap></navMap>` in EPUB 2 and `<ol/>` in EPUB 3. EPUBCheck rejects both (RSC-005), but `validate()` reports nothing.
-- [ ] **BUG-02** Detect ZIP entry names that collide after Unicode case folding or normalization, not only ASCII case — `src/ZipHandler.php:114-121` — S · med
+- [x] **BUG-02** Detect ZIP entry names that collide after Unicode case folding or normalization, not only ASCII case — `src/ZipHandler.php:114-121` — S · med
   Probe: on Windows, an archive with `É.txt` and `é.txt` extracts into one file without an error, and the second entry silently replaces the first, because the duplicate check uses `strtolower()`. macOS also merges NFC and NFD spellings.
-- [ ] **BUG-03** Report entry names that are invalid on Windows (trailing dot or space, reserved device names such as `CON`, `:`) with a clear error — `src/ZipHandler.php:131-135`, `src/Util/PathResolver.php:20-55` — S · low
+- [x] **BUG-03** Report entry names that are invalid on Windows (trailing dot or space, reserved device names such as `CON`, `:`) with a clear error — `src/ZipHandler.php:131-135`, `src/Util/PathResolver.php:20-55` — S · low
   Probe: `a.txt.` or `text./a.txt` fails with a misleading "Permission denied" from `fopen()`, and names such as `CON` or `a.xhtml:x` (an alternate data stream) are not rejected up front.
 - [x] **BUG-04** Allow case-only renames in `moveContent()` on case-insensitive filesystems — `src/ContentManager.php:193-195` — S · low
   Probe on Windows: `moveContent('EPUB/text/ch.xhtml', 'EPUB/text/Ch.xhtml')` throws "already exists" because `file_exists()` finds the source file itself.
@@ -101,7 +101,7 @@ were re-checked against the round-3 hardening.
   Since June 2025 the European Accessibility Act requires accessibility metadata for e-books sold in the EU. Today callers have to know the property names and write them through the generic `setPropertyValues()`.
 - [x] **FEAT-04** Rewrite references in content documents when `moveContent()` moves a file (links, images, stylesheets, and the relative links of the moved document itself) — `src/ContentManager.php:168-225` — M · med
   `moveContent()` keeps the manifest, spine, TOC and `encryption.xml` consistent, but every `<a>`, `<img>` and `<link>` that pointed at the file breaks, so reorganising a book still needs a hand-written rewrite pass.
-- [ ] **FEAT-05** Open a book from a string or stream, and save it to one (uploads, HTTP downloads) — `src/EpubFile.php:57-63,251-271` — M · med
+- [x] **FEAT-05** Open a book from a string or stream, and save it to one (uploads, HTTP downloads) — `src/EpubFile.php:57-63,251-271` — M · med
   Web apps receive uploads and send downloads, but the API only reads and writes file paths, so callers write their own temp-file plumbing.
 - [ ] **FEAT-06** Upgrade an EPUB 2 book to EPUB 3: package version, a nav document generated from the NCX, `dcterms:modified`, EPUB 3 refinements for `opf:role`/`opf:file-as`, the `cover-image` property — `src/Metadata.php`, `src/TableOfContents.php`, `src/Manifest.php` — L · med
   Stores and validators increasingly require EPUB 3. The library already has every piece of the migration, but callers must assemble them by hand.
@@ -126,7 +126,7 @@ were re-checked against the round-3 hardening.
   `'margin_left' => 12.5`, a typo such as `fontsize`, or a paper size of `A44` is ignored without a word, so callers cannot tell why the PDF looks wrong.
 - [ ] **UX-03** Add `setCreators()`/`setContributors()` that take `Contributor` objects (name, role, file-as), the inverse of `getCreators()` — `src/Traits/InteractsWithAuthors.php:30-60`, `src/Traits/InteractsWithContributors.php:16-42` — S · low
   `getCreators()` returns roles and sort keys, but changing one author's file-as or role means removing every creator and adding them all back with `addCreator()`.
-- [ ] **UX-04** Check the result of `ZipArchive::addFile()` in `compress()` and include the libzip status in the error — `src/ZipHandler.php:213-235` — S · low
+- [x] **UX-04** Check the result of `ZipArchive::addFile()` in `compress()` and include the libzip status in the error — `src/ZipHandler.php:213-235` — S · low
   `addFile()` failures are ignored, and `close()` then fails with a bare "Failed to finalize ZIP file" that names neither the file (for example, one locked on Windows) nor the reason.
 
 ### Tests
