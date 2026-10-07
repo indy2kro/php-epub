@@ -107,8 +107,18 @@ class EpubFile
         $this->tempDir = null;
     }
 
+    /**
+     * Extracts and parses the file, replacing the loaded book (and discarding its unsaved changes).
+     *
+     * @throws Exception If the file cannot be loaded. A loaded book whose file does not exist yet
+     *                   (made with create() and not saved) is kept.
+     */
     public function load(): void
     {
+        if ($this->tempDir !== null && ! is_file($this->filePath)) {
+            throw new Exception("Nothing to load from {$this->filePath}: the file does not exist yet; save() the book first.");
+        }
+
         $this->openWith(fn (string $directory) => $this->zipHandler->extract($this->filePath, $directory));
     }
 
@@ -250,6 +260,13 @@ class EpubFile
         }
 
         $this->writePackage();
+
+        // Books with a missing or padded mimetype load (see Parser::parse()), but the saved one must be exact.
+        $mimetype = $tempDir . DIRECTORY_SEPARATOR . 'mimetype';
+        FileSystemHelper::readFile($mimetype) === 'application/epub+zip'
+            || @file_put_contents($mimetype, 'application/epub+zip') !== false
+            || throw new Exception("Failed to write the mimetype file: {$mimetype}");
+
         $this->zipHandler->compress($tempDir, $filePath);
     }
 

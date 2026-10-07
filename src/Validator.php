@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PhpEpub;
 
+use PhpEpub\Util\FileSystemHelper;
 use PhpEpub\Util\PathResolver;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
@@ -19,6 +20,12 @@ final readonly class Validator
     /**
      * Media types that may appear in the spine without a fallback (EPUB 3 and EPUB 2 content documents).
      */
+    private const string MIMETYPE = 'application/epub+zip';
+
+    private const string NCX_MEDIA_TYPE = 'application/x-dtbncx+xml';
+
+    private const string NCX_NAMESPACE = 'http://www.daisy.org/z3986/2005/ncx/';
+
     private const array CONTENT_MEDIA_TYPES = [
         'application/xhtml+xml',
         'image/svg+xml',
@@ -36,22 +43,41 @@ final readonly class Validator
         private Manifest $manifest,
         private Spine $spine,
         private TableOfContents $tableOfContents,
-        private PathResolver $paths = new PathResolver()
+        private PathResolver $paths = new PathResolver(),
+        private XmlParser $xmlParser = new XmlParser()
     ) {
     }
 
     /**
-     * @return list<ValidationIssue> Errors and warnings, grouped by area (metadata, ids, manifest, spine, navigation).
+     * @return list<ValidationIssue> Errors and warnings, grouped by area (container, metadata, ids, manifest, spine, navigation).
      */
     public function validate(): array
     {
         return [
+            ...$this->checkMimetype(),
             ...$this->checkMetadata(),
             ...$this->checkIds(),
             ...$this->checkManifest(),
             ...$this->checkSpine(),
             ...$this->checkNavigation(),
         ];
+    }
+
+    /**
+     * The mimetype file must hold exactly "application/epub+zip"; reading systems tolerate other
+     * values, and EpubFile::save() writes the right one.
+     *
+     * @return list<ValidationIssue>
+     */
+    private function checkMimetype(): array
+    {
+        $mimetype = FileSystemHelper::readFile($this->rootDirectory . DIRECTORY_SEPARATOR . 'mimetype');
+
+        return $mimetype === self::MIMETYPE ? [] : [$this->warning(
+            'MIMETYPE_INVALID',
+            'The mimetype file is missing or does not contain exactly "' . self::MIMETYPE . '"; save() writes the right one.',
+            'mimetype'
+        )];
     }
 
     /**
@@ -167,17 +193,61 @@ final readonly class Validator
             if (! $hasNav) {
                 $issues[] = $this->error('NAV_MISSING', 'EPUB 3 books need a navigation document (a manifest item with the "nav" property).');
             }
-        } elseif (array_filter($items, static fn (ManifestItem $item): bool => $item->mediaType === 'application/x-dtbncx+xml') === []) {
+        } elseif (array_filter($items, static fn (ManifestItem $item): bool => $item->mediaType === self::NCX_MEDIA_TYPE) === []) {
             $issues[] = $this->error('NCX_MISSING', 'EPUB 2 books need an NCX table of contents.');
         }
 
-        foreach ($this->tocPaths($this->tableOfContents->getEntries()) as $path) {
+        foreach ($items as $item) {
+            if ($item->path !== '' && is_file($this->paths->resolve($this->rootDirectory, $item->path))) {
+                array_push($issues, ...$this->checkNavigationFile($item));
+            }
+        }
+
+        try {
+            $entries = $this->tableOfContents->getEntries();
+        } catch (Exception) {
+            // The navigation document or NCX is broken, which is reported above.
+            $entries = [];
+        }
+
+        foreach ($this->tocPaths($entries) as $path) {
             if (! $this->manifest->findByPath($path) instanceof ManifestItem) {
                 $issues[] = $this->error('TOC_LINK_NOT_IN_MANIFEST', 'The table of contents links to a file that is not in the manifest.', $path);
             }
         }
 
         return $issues;
+    }
+
+    /**
+     * NAV_INVALID for a navigation document that is not well-formed XML; NCX_INVALID for an NCX
+     * that is not, or lacks the NCX namespace (an unexpected default namespace is tolerated, as
+     * when loading) or the navMap.
+     *
+     * @return list<ValidationIssue>
+     */
+    private function checkNavigationFile(ManifestItem $item): array
+    {
+        $isNav = in_array('nav', explode(' ', $item->properties), true);
+        if (! $isNav && $item->mediaType !== self::NCX_MEDIA_TYPE) {
+            return [];
+        }
+
+        try {
+            $xml = $this->xmlParser->parse($this->paths->resolve($this->rootDirectory, $item->path));
+        } catch (XmlException $exception) {
+            return [$isNav
+                ? $this->error('NAV_INVALID', 'The navigation document cannot be read: ' . $exception->getMessage(), $item->path)
+                : $this->error('NCX_INVALID', 'The NCX cannot be read: ' . $exception->getMessage(), $item->path)];
+        }
+
+        $namespaces = $xml->getNamespaces(true);
+        $namespace = in_array(self::NCX_NAMESPACE, $namespaces, true) ? self::NCX_NAMESPACE : ($namespaces[''] ?? null);
+        if (! $isNav && ($namespace === null || $xml->children($namespace)->navMap->count() === 0)) {
+            return [$this->error('NCX_INVALID', 'The NCX has no NCX namespace or no navMap.', $item->path)];
+        }
+
+        return [];
     }
 
     /**

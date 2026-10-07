@@ -196,6 +196,17 @@ final class ZipHandlerTest extends TestCase
         (new ZipHandler())->extract($zipPath, $this->extractDir);
     }
 
+    public function testExtractRejectsEntriesThatDifferOnlyInCase(): void
+    {
+        // OCF requires unique names after case folding; on Windows and macOS one would overwrite the other.
+        $zipPath = $this->buildZip(['EPUB/Text/a.xhtml' => 'one', 'EPUB/text/A.xhtml' => 'two']);
+
+        $this->expectException(ZipException::class);
+        $this->expectExceptionMessage('ZIP entries differ only in case: EPUB/Text/a.xhtml and EPUB/text/A.xhtml');
+
+        (new ZipHandler())->extract($zipPath, $this->extractDir);
+    }
+
     public function testCompressDirectory(): void
     {
         // Create a sample file to compress

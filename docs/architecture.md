@@ -53,7 +53,7 @@ Reads and edits the EPUB 3 navigation document's `toc` nav and the EPUB 2 NCX as
 `EpubFile::validate()` runs it to report common structural problems as `ValidationIssue`s: required metadata, duplicate ids, manifest and spine consistency, navigation.
 
 ### Parser and XmlParser
-`Parser` checks the container (`mimetype`, `META-INF/container.xml`) and locates and validates the OPF and NCX. `XmlParser` loads XML without network access and rejects entity declarations.
+`Parser` reads `META-INF/container.xml` and locates and checks the OPF; problems reading systems tolerate (a wrong `mimetype`, a broken NCX) are left to `Validator`. `XmlParser` loads XML without network access and rejects entity declarations.
 
 ### ZipHandler
 Extracts archives with limits (entry count, total size, compression ratio) and writes OCF-valid archives (`mimetype` first and uncompressed, `/` separators).

@@ -4,15 +4,12 @@ declare(strict_types=1);
 
 namespace PhpEpub;
 
-use PhpEpub\Util\FileSystemHelper;
 use PhpEpub\Util\PathResolver;
 use SimpleXMLElement;
 
 class Parser
 {
     private const string CONTAINER_NAMESPACE = 'urn:oasis:names:tc:opendocument:xmlns:container';
-
-    private const string NCX_NAMESPACE = 'http://www.daisy.org/z3986/2005/ncx/';
 
     private const string PACKAGE_MEDIA_TYPE = 'application/oebps-package+xml';
 
@@ -23,17 +20,20 @@ class Parser
     }
 
     /**
-     * Parse the EPUB file structure.
+     * Locates the package document (OPF) of an extracted book and checks that it can be read.
+     *
+     * Only problems that make the book unreadable throw: no container, no rootfile, an OPF that is
+     * not XML or has no manifest. A missing or wrong mimetype and a broken NCX, which reading
+     * systems tolerate, are reported by EpubFile::validate() instead.
      *
      * @param string $directory The directory containing the extracted EPUB contents.
      *
      * @return string The OPF path relative to $directory, normalized with "/" separators.
+     *
+     * @throws InvalidEpubException If the book has no readable package document.
      */
     public function parse(string $directory): string
     {
-        // Validate mimetype
-        $this->validateMimetype($directory);
-
         $containerPath = $directory . DIRECTORY_SEPARATOR . 'META-INF' . DIRECTORY_SEPARATOR . 'container.xml';
 
         $opfPath = $this->paths->normalize($this->extractOpfPath($containerPath));
@@ -41,24 +41,6 @@ class Parser
         $this->validateOpf($directory, $opfPath);
 
         return $opfPath;
-    }
-
-    /**
-     * Validates the mimetype file.
-     */
-    private function validateMimetype(string $directory): void
-    {
-        $mimetypePath = $directory . DIRECTORY_SEPARATOR . 'mimetype';
-
-        if (! file_exists($mimetypePath)) {
-            throw new InvalidEpubException('Missing mimetype file: ' . $mimetypePath);
-        }
-
-        $mimetype = FileSystemHelper::readFile($mimetypePath);
-
-        if ($mimetype === null || trim($mimetype) !== 'application/epub+zip') {
-            throw new InvalidEpubException('Invalid mimetype content: ' . $mimetypePath);
-        }
     }
 
     /**
@@ -101,7 +83,7 @@ class Parser
     }
 
     /**
-     * Validates the OPF file and checks for the presence of the NCX file.
+     * Checks that the OPF file is a package document with a manifest.
      */
     private function validateOpf(string $directory, string $opfPath): void
     {
@@ -117,42 +99,6 @@ class Parser
 
         if ($manifest === false || $manifest === null || $manifest === []) {
             throw new InvalidEpubException('Missing manifest in OPF file');
-        }
-
-        $items = $xml->xpath('/opf:package/opf:manifest/opf:item') ?: [];
-
-        $ncxItem = null;
-        foreach ($items as $item) {
-            if ((string) $item['media-type'] === 'application/x-dtbncx+xml') {
-                $ncxItem = (string) $item['href'];
-                break;
-            }
-        }
-
-        if ($ncxItem !== null) {
-            // Manifest hrefs are URLs relative to the OPF file.
-            $opfDirectory = dirname($opfPath);
-            $ncxPath = ($opfDirectory === '.' ? '' : $opfDirectory . '/') . rawurldecode($ncxItem);
-            $this->validateNcx($this->paths->resolve($directory, $ncxPath));
-        }
-    }
-
-    /**
-     * Validates the NCX file.
-     */
-    private function validateNcx(string $ncxPath): void
-    {
-        $xml = $this->xmlParser->parse($ncxPath);
-
-        $ncxNamespace = $this->namespaceFor($xml, self::NCX_NAMESPACE);
-        if ($ncxNamespace === null) {
-            throw new InvalidEpubException('No NCX namespace found in NCX file');
-        }
-
-        $navMap = $xml->children($ncxNamespace)->navMap;
-
-        if (! $navMap) {
-            throw new InvalidEpubException('Missing navMap in NCX file');
         }
     }
 

@@ -76,6 +76,13 @@ final class ValidatorTest extends TestCase
             $book(str_replace(' properties="nav"', '', $opf)),
             ['NAV_MISSING'],
         ];
+        yield 'missing mimetype' => [EpubBuilder::epub3()->withoutFile('mimetype'), ['MIMETYPE_INVALID']];
+        yield 'padded mimetype' => [EpubBuilder::epub3()->withFile('mimetype', "application/epub+zip\n"), ['MIMETYPE_INVALID']];
+        $withNcx = $book(str_replace('</manifest>', '<item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/></manifest>', $opf));
+        yield 'NCX not well-formed' => [(clone $withNcx)->withFile('EPUB/toc.ncx', '<ncx'), ['NCX_INVALID']];
+        yield 'NCX without navMap' => [(clone $withNcx)->withFile('EPUB/toc.ncx', '<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1"/>'), ['NCX_INVALID']];
+        yield 'NCX without namespace' => [(clone $withNcx)->withFile('EPUB/toc.ncx', '<ncx version="2005-1"><navMap/></ncx>'), ['NCX_INVALID']];
+        yield 'navigation document not well-formed' => [EpubBuilder::epub3()->withFile('EPUB/nav.xhtml', '<html><body><nav'), ['NAV_INVALID']];
         yield 'file not in the manifest' => [EpubBuilder::epub3()->withFile('EPUB/extra.css', 'p {}'), ['FILE_NOT_IN_MANIFEST']];
         yield 'toc link to an unlisted file' => [
             EpubBuilder::epub3()->withFile('EPUB/nav.xhtml', EpubBuilder::xhtml(

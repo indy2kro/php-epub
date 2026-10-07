@@ -61,6 +61,24 @@ final class CreateEpubTest extends TestCase
         $this->assertStringContainsString('<body><p>Second.</p></body>', $chapter);
     }
 
+    public function testLoadDoesNotDiscardANewBookThatWasNeverSaved(): void
+    {
+        $epubFile = EpubFile::create($this->tmpDir . DIRECTORY_SEPARATOR . 'unsaved.epub', 'Draft');
+        $epubFile->addChapter('One', '<p>Work in progress.</p>');
+
+        try {
+            $epubFile->load();
+            $this->fail('Expected an exception: there is no saved file to load.');
+        } catch (Exception $exception) {
+            $this->assertStringContainsString('save()', $exception->getMessage());
+        }
+
+        $this->assertSame('Draft', $epubFile->getMetadata()->getTitle());
+        $this->assertCount(1, $epubFile->getSpine()->get());
+        $epubFile->save();
+        $this->assertFileExists($this->tmpDir . DIRECTORY_SEPARATOR . 'unsaved.epub');
+    }
+
     public function testCreateWithAGivenIdentifier(): void
     {
         $epubFile = EpubFile::create($this->tmpDir . DIRECTORY_SEPARATOR . 'id.epub', 'Title', 'en', 'urn:isbn:9780000000002');
