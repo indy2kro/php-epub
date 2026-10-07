@@ -27,6 +27,8 @@ Manifest `href`s are URLs relative to the OPF file (for example `text/chapter%20
 
 - **`setMediaType(string $id, string $mediaType): void`**: Changes an item's media type, e.g. after its file was replaced with another format.
 
+- **`moveItem(string $id, string $path): void`**: Points an item at another file (path relative to the book root), keeping its id, and updates `<guide>` references to its old file. The file itself is not moved; `ContentManager::moveContent()` moves both. Throws if no item has the id or another item already has the path.
+
 - **`findByHref(string $href): ?ManifestItem`**: Looks up an item by an href relative to the OPF file (fragments ignored); `null` when nothing matches or the href points outside the book.
 
 - **`getGuidePath(string $type): ?string`**: The book-root path of the EPUB 2 `<guide>` reference of a type such as `cover` or `toc` (matched case-insensitively), or `null`.
@@ -34,6 +36,8 @@ Manifest `href`s are URLs relative to the OPF file (for example `text/chapter%20
 - **`removeGuideReferences(string $type): void`**: Removes the EPUB 2 `<guide>` references of a type (compared case-insensitively), and the guide when none is left.
 
 - **`getOpfPath(): string`**: The OPF location relative to the book root.
+
+Lookups (`get()`, `findByPath()`, `getItems()`) use an index built on first use, so adding thousands of files to a large book stays fast.
 
 ## Usage Example
 

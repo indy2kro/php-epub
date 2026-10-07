@@ -66,6 +66,17 @@ public function deleteContent(string $filePath): void
 Deletes a file, its manifest item and its spine entry. Throws an exception if the file doesn't exist or cannot be deleted.
 
 ```php
+public function moveContent(string $from, string $to): void
+```
+
+Moves or renames a file. Its manifest item keeps its id, so its place in the reading order is unchanged, and points at the new path; `<guide>` references, table-of-contents entries and the `META-INF/encryption.xml` entry of an obfuscated font follow it. Moving the navigation document rewrites its links for the new location.
+
+References inside content documents are not rewritten: links and images in other documents that point at the moved file, and relative links inside a document moved to another directory, keep their old targets; `EpubFile::validate()` reports those that break (`CONTENT_REFERENCE_MISSING`). Throws an exception if either path is the package document or leaves the book, the file does not exist, the target already exists, or the file cannot be moved.
+
+```php
+$epubFile->getContentManager()->moveContent('EPUB/chapter1.xhtml', 'EPUB/text/chapter-01.xhtml');
+```
+```php
 public function getContent(string $filePath): string
 ```
 
