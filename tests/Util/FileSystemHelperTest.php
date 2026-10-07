@@ -94,6 +94,47 @@ final class FileSystemHelperTest extends TestCase
         $this->assertNull($this->helper->findExecutable($this->fixturesDir . DIRECTORY_SEPARATOR . 'no-such-program'));
     }
 
+    public function testFindExecutableUsesPathextOnWindows(): void
+    {
+        $directory = $this->fixturesDir . DIRECTORY_SEPARATOR . 'tmp' . DIRECTORY_SEPARATOR . 'pathext';
+        mkdir($directory, 0777, true);
+        // Not executable: on Windows the extension is what matters.
+        file_put_contents($directory . DIRECTORY_SEPARATOR . 'tool.cmd', '@echo off');
+        $windows = new class () extends FileSystemHelper {
+            protected function isWindows(): bool
+            {
+                return true;
+            }
+        };
+        $path = getenv('PATH');
+        $pathExt = getenv('PATHEXT');
+        putenv('PATH=' . $directory);
+        putenv('PATHEXT=.COM;.CMD');
+
+        try {
+            $this->assertSame($directory . DIRECTORY_SEPARATOR . 'tool.cmd', $windows->findExecutable('tool'));
+        } finally {
+            putenv('PATH=' . $path);
+            putenv($pathExt === false ? 'PATHEXT' : 'PATHEXT=' . $pathExt);
+            $this->helper->deleteDirectory($directory);
+        }
+    }
+
+    public function testRunProcessReportsAProgramThatFailsToStart(): void
+    {
+        $failing = new class () extends FileSystemHelper {
+            protected function startProcess(array $command, $output)
+            {
+                return false;
+            }
+        };
+
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('Failed to start');
+
+        $failing->runProcess([PHP_BINARY, '-v'], 5);
+    }
+
     public function testRunProcessReportsACommandThatCannotStart(): void
     {
         $this->expectException(Exception::class);

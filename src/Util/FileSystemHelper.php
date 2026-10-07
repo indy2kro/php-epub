@@ -52,10 +52,7 @@ class FileSystemHelper
         $output = $outputFile === '' ? false : @fopen($outputFile, 'w');
 
         try {
-            // stdout and stderr share one handle (and so one file offset), like 2>&1.
-            $process = $output === false
-                ? false
-                : @proc_open($command, [0 => ['file', $this->nullDevice(), 'r'], 1 => $output, 2 => $output], $pipes);
+            $process = $output === false ? false : $this->startProcess($command, $output);
             if ($output === false || $process === false) {
                 throw new Exception("Failed to start {$program}: " . (error_get_last()['message'] ?? 'unknown error'));
             }
@@ -85,9 +82,8 @@ class FileSystemHelper
             return is_file($program) ? $program : null;
         }
 
-        $extensions = DIRECTORY_SEPARATOR === '\\'
-            ? ['', ...explode(';', strtolower((string) (getenv('PATHEXT') ?: '.exe;.bat;.cmd')))]
-            : [''];
+        $windows = $this->isWindows();
+        $extensions = $windows ? ['', ...explode(';', strtolower((string) (getenv('PATHEXT') ?: '.exe;.bat;.cmd')))] : [''];
 
         foreach (explode(PATH_SEPARATOR, (string) getenv('PATH')) as $directory) {
             if ($directory === '') {
@@ -96,7 +92,8 @@ class FileSystemHelper
 
             foreach ($extensions as $extension) {
                 $candidate = rtrim($directory, '/\\') . DIRECTORY_SEPARATOR . $program . $extension;
-                if (is_file($candidate) && (DIRECTORY_SEPARATOR === '\\' || is_executable($candidate))) {
+                // Windows has no executable bit; the extension is what makes a file runnable.
+                if (is_file($candidate) && ($windows || is_executable($candidate))) {
                     return $candidate;
                 }
             }
@@ -135,9 +132,24 @@ class FileSystemHelper
         }
     }
 
-    private function nullDevice(): string
+    /**
+     * Starts the program with stdout and stderr on one handle (and so one file offset), like 2>&1.
+     *
+     * @param non-empty-list<string> $command
+     * @param resource $output
+     *
+     * @return resource|false
+     */
+    protected function startProcess(array $command, $output)
     {
-        return DIRECTORY_SEPARATOR === '\\' ? 'NUL' : '/dev/null';
+        $nullDevice = DIRECTORY_SEPARATOR === '\\' ? 'NUL' : '/dev/null';
+
+        return @proc_open($command, [0 => ['file', $nullDevice, 'r'], 1 => $output, 2 => $output], $pipes);
+    }
+
+    protected function isWindows(): bool
+    {
+        return DIRECTORY_SEPARATOR === '\\';
     }
 
     public function fileSize(string $path): int|false
