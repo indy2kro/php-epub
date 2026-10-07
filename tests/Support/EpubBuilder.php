@@ -127,6 +127,13 @@ XML);
         return $this;
     }
 
+    public function withoutFile(string $path): self
+    {
+        unset($this->files[$path]);
+
+        return $this;
+    }
+
     /**
      * Writes the book as an extracted directory and returns that directory.
      */

@@ -11,6 +11,7 @@ use PhpEpub\Parser;
 use PhpEpub\Test\Support\EpubBuilder;
 use PhpEpub\Util\FileSystemHelper;
 use PhpEpub\XmlParser;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class ParserTest extends TestCase
@@ -47,28 +48,28 @@ final class ParserTest extends TestCase
         $this->assertSame('EPUB/package.opf', $opfPath);
     }
 
-    public function testParseMissingMimetypeThrowsException(): void
+    /**
+     * Reading systems open books whose mimetype is missing or not exactly "application/epub+zip";
+     * validate() reports it and save() writes the right one.
+     */
+    #[DataProvider('mimetypes')]
+    public function testParseToleratesAMissingOrWrongMimetype(?string $mimetype): void
     {
         $directory = $this->copyFixtureToTmp('valid_epub');
-        unlink($directory . '/mimetype');
+        $mimetype === null ? unlink($directory . '/mimetype') : file_put_contents($directory . '/mimetype', $mimetype);
 
-        $this->expectException(Exception::class);
-        $this->expectExceptionMessage('Missing mimetype file:');
-
-        $this->parser->parse($directory);
+        $this->assertSame('EPUB/package.opf', $this->parser->parse($directory));
     }
 
-    public function testParseInvalidMimetypeContentThrowsException(): void
+    /**
+     * @return iterable<string, array{string|null}>
+     */
+    public static function mimetypes(): iterable
     {
-        $directory = $this->copyFixtureToTmp('valid_epub');
-        file_put_contents($directory . '/mimetype', 'invalid-mimetype');
-
-        $this->expectException(Exception::class);
-        $this->expectExceptionMessage('Invalid mimetype content:');
-
-        $this->parser->parse($directory);
+        yield 'missing' => [null];
+        yield 'padded' => ["application/epub+zip\n"];
+        yield 'wrong' => ['application/zip'];
     }
-
     public function testExtractOpfPathMissingRootfileThrowsException(): void
     {
         $directory = $this->copyFixtureToTmp('valid_epub');
@@ -112,24 +113,6 @@ final class ParserTest extends TestCase
     {
         $directory = EpubBuilder::minimal()
             ->withContainer('/etc/package.opf')
-            ->writeTo($this->tmpDir . '/book');
-
-        $this->expectException(Exception::class);
-        $this->expectExceptionMessage('outside the EPUB');
-
-        $this->parser->parse($directory);
-    }
-
-    public function testParseRejectsNcxPathOutsideTheBook(): void
-    {
-        file_put_contents(
-            $this->tmpDir . '/outside.ncx',
-            '<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1"><navMap/></ncx>'
-        );
-        $directory = EpubBuilder::minimal()
-            ->withFile('EPUB/package.opf', EpubBuilder::opf(
-                '<item id="ncx" href="../../outside.ncx" media-type="application/x-dtbncx+xml"/>'
-            ))
             ->writeTo($this->tmpDir . '/book');
 
         $this->expectException(Exception::class);
@@ -207,34 +190,48 @@ final class ParserTest extends TestCase
         $this->parser->parse($directory);
     }
 
-    public function testParseNcxWithoutNavMapThrowsException(): void
+    /**
+     * The NCX is optional in EPUB 3 and only a table of contents in EPUB 2, so a broken one does not
+     * stop a book from loading; validate() reports it.
+     */
+    #[DataProvider('brokenNcxFiles')]
+    public function testParseToleratesABrokenNcx(string $href, ?string $ncx): void
     {
-        $directory = EpubBuilder::minimal()
-            ->withFile('EPUB/package.opf', EpubBuilder::opf(
-                '<item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>'
-            ))
-            ->withFile('EPUB/toc.ncx', '<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1"/>')
-            ->writeTo($this->tmpDir . '/book');
+        file_put_contents($this->tmpDir . '/outside.ncx', '<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1"><navMap/></ncx>');
+        $builder = EpubBuilder::minimal()
+            ->withFile('EPUB/package.opf', EpubBuilder::opf("<item id=\"ncx\" href=\"{$href}\" media-type=\"application/x-dtbncx+xml\"/>"));
+        if ($ncx !== null) {
+            $builder->withFile('EPUB/toc.ncx', $ncx);
+        }
 
-        $this->expectException(InvalidEpubException::class);
-        $this->expectExceptionMessage('Missing navMap in NCX file');
-
-        $this->parser->parse($directory);
+        $this->assertSame('EPUB/package.opf', $this->parser->parse($builder->writeTo($this->tmpDir . '/book')));
     }
 
-    public function testParseNcxWithoutNamespaceThrowsException(): void
+    /**
+     * @return iterable<string, array{string, string|null}>
+     */
+    public static function brokenNcxFiles(): iterable
     {
-        $directory = EpubBuilder::minimal()
-            ->withFile('EPUB/package.opf', EpubBuilder::opf(
-                '<item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>'
-            ))
-            ->withFile('EPUB/toc.ncx', '<ncx version="2005-1"><navMap/></ncx>')
-            ->writeTo($this->tmpDir . '/book');
+        yield 'no navMap' => ['toc.ncx', '<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1"/>'];
+        yield 'no namespace' => ['toc.ncx', '<ncx version="2005-1"><navMap/></ncx>'];
+        yield 'not well-formed' => ['toc.ncx', '<ncx'];
+        yield 'missing' => ['toc.ncx', null];
+        yield 'outside the book' => ['../../outside.ncx', null];
+    }
 
-        $this->expectException(Exception::class);
-        $this->expectExceptionMessage('No NCX namespace found');
+    public function testSavingABookWithABrokenMimetypeWritesTheRightOne(): void
+    {
+        $epubPath = EpubBuilder::epub3()->withFile('mimetype', "application/epub+zip\r\n")->buildEpub($this->tmpDir . '/padded.epub');
 
-        $this->parser->parse($directory);
+        $epubFile = EpubFile::open($epubPath);
+        $epubFile->save();
+        $epubFile->cleanup();
+
+        $zip = new \ZipArchive();
+        $zip->open($epubPath);
+        $this->assertSame('mimetype', $zip->getNameIndex(0));
+        $this->assertSame('application/epub+zip', $zip->getFromName('mimetype'));
+        $zip->close();
     }
 
     public function testPrefixedContainerPackageAndNcxLoad(): void

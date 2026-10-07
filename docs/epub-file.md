@@ -43,7 +43,7 @@ Loads the EPUB file:
 - Parses the OPF file to extract metadata, manifest and spine
 - Initializes the ContentManager for file operations
 
-Calling `load()` again discards the previous extraction (and any unsaved changes) and starts from the file on disk.
+Calling `load()` again discards the previous extraction (and any unsaved changes) and starts from the file on disk. A book made with `create()` that was never saved has no file yet: `load()` then throws and keeps the book.
 
 Throws an exception if the file cannot be opened or the EPUB structure is invalid.
 
@@ -110,6 +110,7 @@ Checks the book, including unsaved changes, and returns a list of `PhpEpub\Valid
 
 | Code | Severity | Problem |
 |---|---|---|
+| `MIMETYPE_INVALID` | warning | The `mimetype` file is missing or not exactly `application/epub+zip` (`save()` writes the right one) |
 | `METADATA_TITLE_MISSING`, `METADATA_LANGUAGE_MISSING`, `METADATA_IDENTIFIER_MISSING` | error | A required Dublin Core element is missing or empty |
 | `METADATA_UNIQUE_IDENTIFIER` | error | `package@unique-identifier` does not name a `dc:identifier` |
 | `METADATA_MODIFIED_MISSING` | error | An EPUB 3 package has no `dcterms:modified` |
@@ -119,6 +120,7 @@ Checks the book, including unsaved changes, and returns a list of `PhpEpub\Valid
 | `SPINE_EMPTY`, `SPINE_UNKNOWN_IDREF`, `SPINE_DUPLICATE_IDREF` | error | The reading order is empty, or refers to an unknown or repeated item |
 | `SPINE_NOT_CONTENT` | warning | A spine item is not a content document and has no fallback |
 | `NAV_MISSING` / `NCX_MISSING` | error | An EPUB 3 book has no navigation document / an EPUB 2 book has no NCX |
+| `NAV_INVALID` / `NCX_INVALID` | error | The navigation document is not well-formed / the NCX is not well-formed or has no NCX namespace or `navMap` |
 | `TOC_LINK_NOT_IN_MANIFEST` | error | The table of contents links to a file that is not in the manifest |
 
 ```php

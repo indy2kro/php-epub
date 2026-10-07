@@ -69,13 +69,14 @@ class ZipHandler
             }
 
             $extractedBytes = 0;
+            $files = [];
             for ($index = 0; $index < $zip->numFiles; $index++) {
                 $stat = $zip->statIndex($index);
                 if ($stat === false) {
                     throw new ZipException("Failed to read entry {$index} of ZIP file: {$zipFilePath}");
                 }
 
-                $extractedBytes += $this->extractEntry($zip, $index, $stat['name'], $stat['comp_size'], $destination, $extractedBytes);
+                $extractedBytes += $this->extractEntry($zip, $index, $stat['name'], $stat['comp_size'], $destination, $extractedBytes, $files);
             }
         } finally {
             $zip->close();
@@ -85,6 +86,8 @@ class ZipHandler
     /**
      * Extracts one entry and returns the number of bytes written.
      *
+     * @param array<string, string> $files The file entries extracted so far, keyed by their case-folded target.
+     *
      * @throws ZipException
      */
     private function extractEntry(
@@ -93,7 +96,8 @@ class ZipHandler
         string $name,
         int $compressedSize,
         string $destination,
-        int $extractedBytes
+        int $extractedBytes,
+        array &$files
     ): int {
         try {
             $target = $this->paths->resolve($destination, $name);
@@ -106,6 +110,15 @@ class ZipHandler
 
             return 0;
         }
+
+        // OCF requires names that are unique after case folding: on case-insensitive file systems
+        // (Windows, macOS) one entry would silently replace the other.
+        $folded = strtolower($target);
+        if (isset($files[$folded])) {
+            throw new ZipException("ZIP entries differ only in case: {$files[$folded]} and {$name}");
+        }
+
+        $files[$folded] = $name;
 
         $this->ensureDirectory(dirname($target));
 

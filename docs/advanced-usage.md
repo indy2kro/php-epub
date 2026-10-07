@@ -31,7 +31,7 @@ $contentManager->updateContent($contentFile, $modifiedContent);
 `EpubFile::save()` writes everything that changed since `load()`:
 
 1. Pending metadata, manifest and spine changes are written to the OPF file (the modification date is refreshed, and the NCX `docTitle` follows the title). Calling `Metadata::save()` yourself first is optional.
-2. The extracted directory is packaged as an OCF-valid archive: `mimetype` first and uncompressed, `/` separators on every OS.
+2. The extracted directory is packaged as an OCF-valid archive: `mimetype` first, uncompressed and exactly `application/epub+zip` (a wrong one is corrected), `/` separators on every OS.
 
 Changes are only in the temporary directory until `save()` is called; `load()` again or `cleanup()` discards them.
 
