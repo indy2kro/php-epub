@@ -54,6 +54,42 @@
                   <li class="toctree-l1"><a class="reference internal" href="../advanced-usage/">Advanced Features</a>
                   </li>
               </ul>
+              <ul class="current">
+                <li class="toctree-l1 current"><a class="reference internal current" href="#">Architecture</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#overview">Overview</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#core-components">Core Components</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#epubfile">EpubFile</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#metadata">Metadata</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#manifest">Manifest</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#spine">Spine</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#contentmanager">ContentManager</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#parser-and-xmlparser">Parser and XmlParser</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#ziphandler">ZipHandler</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#converters">Converters</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#untrusted-input">Untrusted input</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#exceptions">Exceptions</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#design-patterns">Design Patterns</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#testing">Testing</a>
+    </li>
+    </ul>
+                </li>
+              </ul>
               <p class="caption"><span class="caption-text">Classes</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" href="../epub-file/">EpubFile</a>
@@ -109,79 +145,72 @@
             <div class="section" itemprop="articleBody">
               
                 <h1 id="architecture">Architecture<a class="headerlink" href="#architecture" title="Permanent link">&para;</a></h1>
-<p>This document provides an overview of the php-epub architecture.</p>
+<p>This page gives an overview of how php-epub is put together.</p>
 <h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
-<p>The library follows a layered architecture with clear separation of concerns:</p>
-<pre class="codehilite"><code>┌─────────────────────────────────────────────┐
-│              EpubFile (Facade)              │
-│         (Main entry point for users)        │
-└─────────────────┬───────────────────────────┘
-                  │
-        ┌─────────┼─────────┐
-        ▼         ▼         ▼
-   ┌─────────┐ ┌───────┐ ┌──────────────┐
-   │Metadata │ │Spine  │ │ContentManager│
-   └─────────┘ └───────┘ └──────────────┘
-        │         │              │
-        └─────────┼──────────────┘
-                  ▼
-         ┌─────────────────┐
-         │ Parser          │
-         │ (EPUB parsing)  │
-         └────────┬────────┘
-                  │
-      ┌───────────┼───────────┐
-      ▼           ▼           ▼
-┌─────────┐ ┌─────────┐ ┌──────────┐
-│ZipHandler│ │XmlParser│ │FileSystem │
-└─────────┘ └─────────┘ └──────────┘
+<p><code>EpubFile</code> is the entry point. It extracts the book into a private temporary directory, parses the package document (OPF) once, and hands the same in-memory document to the objects that read and edit it. <code>save()</code> writes the OPF back and packs the directory into a new archive.</p>
+<pre class="codehilite"><code>                     ┌──────────────────────────────┐
+                     │      EpubFile (facade)       │
+                     │  open/load · save · convert  │
+                     └──────────────┬───────────────┘
+        ┌──────────────┬────────────┼─────────────┬─────────────────┐
+        ▼              ▼            ▼             ▼                 ▼
+   ┌──────────┐  ┌──────────┐  ┌─────────┐  ┌────────────────┐  ┌────────────┐
+   │ Metadata │  │ Manifest │  │  Spine  │  │ ContentManager │  │ Converters │
+   └────┬─────┘  └────┬─────┘  └────┬────┘  └───────┬────────┘  └─────┬──────┘
+        └─────────────┴──────┬──────┘               │                 │
+                     one OPF document               │       EpubDocumentLoader
+                             │                      │                 │
+                     ┌───────┴────────┐     ┌───────┴────────┐        │
+                     │ Parser         │     │ PathResolver   │◄───────┘
+                     │ XmlParser      │     │ (paths stay    │
+                     └───────┬────────┘     │ inside book)   │
+                             │              └────────────────┘
+                     ┌───────┴────────┐
+                     │ ZipHandler     │
+                     └────────────────┘
 </code></pre>
 
 <h2 id="core-components">Core Components<a class="headerlink" href="#core-components" title="Permanent link">&para;</a></h2>
 <h3 id="epubfile">EpubFile<a class="headerlink" href="#epubfile" title="Permanent link">&para;</a></h3>
-<p>The main facade class that coordinates all operations:
-- Loads EPUB files (extracts ZIP, parses XML)
-- Manages metadata, spine, and content
-- Saves modified EPUB files</p>
+<p>The facade. <code>open()</code>/<code>load()</code> extract and parse the book, <code>save()</code> writes pending package edits and creates the archive, <code>convert()</code> runs a converter on the book including unsaved edits. It also handles the cover image (<code>getCoverImage()</code>, <code>setCoverImage()</code>). <code>cleanup()</code> (called by the destructor) deletes the extraction and unloads the book.</p>
 <h3 id="metadata">Metadata<a class="headerlink" href="#metadata" title="Permanent link">&para;</a></h3>
-<p>Handles Dublin Core metadata using traits for each metadata field:
-- Title, Authors, Publisher, Language
-- Date, Description, Subject, Identifier</p>
-<h3 id="contentmanager">ContentManager<a class="headerlink" href="#contentmanager" title="Permanent link">&para;</a></h3>
-<p>Manages content files within the EPUB:
-- Add, update, delete content files
-- List content files</p>
-<h3 id="parser">Parser<a class="headerlink" href="#parser" title="Permanent link">&para;</a></h3>
-<p>Validates and parses EPUB structure:
-- Validates mimetype file
-- Parses container.xml to find OPF file location
-- Validates OPF file structure</p>
+<p>Reads and edits the <code>&lt;metadata&gt;</code> element. Each Dublin Core field has a trait in <code>src/Traits/</code> (title, authors and creators, contributors, description, publisher, date, language, subject, identifier); <code>getMeta()</code>/<code>setMeta()</code> and <code>getProperty()</code>/<code>setProperty()</code> cover other <code>&lt;meta&gt;</code> elements. Values are checked with <code>Util\XmlText</code> before they are written.</p>
+<h3 id="manifest">Manifest<a class="headerlink" href="#manifest" title="Permanent link">&para;</a></h3>
+<p>Reads and edits the <code>&lt;manifest&gt;</code>: items (<code>ManifestItem</code>), lookup by id, path or href, adding and removing items (removal also clears references to the item elsewhere in the package), media types and EPUB 3 properties. It converts between hrefs (relative to the OPF) and paths (relative to the book root).</p>
 <h3 id="spine">Spine<a class="headerlink" href="#spine" title="Permanent link">&para;</a></h3>
-<p>Represents the reading order of EPUB content:
-- Manages spine items and their order</p>
-<h2 id="converters">Converters<a class="headerlink" href="#converters" title="Permanent link">&para;</a></h2>
-<p>The library supports multiple PDF conversion backends:</p>
-<ul>
-<li><strong>TCPDFAdapter</strong>: Uses TCPDF library</li>
-<li><strong>DompdfAdapter</strong>: Uses Dompdf library  </li>
-<li><strong>CalibreAdapter</strong>: Uses Calibre command-line tool</li>
-</ul>
+<p>The reading order: <code>SpineItem</code>s with their manifest item and <code>linear</code> flag, and adding, removing and moving entries.</p>
+<h3 id="contentmanager">ContentManager<a class="headerlink" href="#contentmanager" title="Permanent link">&para;</a></h3>
+<p>File operations on the extracted book (add, update, delete, read), keeping the manifest and spine in sync. Paths are relative to the book root; the package document itself is managed only through <code>Metadata</code>, <code>Manifest</code> and <code>Spine</code>.</p>
+<h3 id="parser-and-xmlparser">Parser and XmlParser<a class="headerlink" href="#parser-and-xmlparser" title="Permanent link">&para;</a></h3>
+<p><code>Parser</code> checks the container (<code>mimetype</code>, <code>META-INF/container.xml</code>) and locates and validates the OPF and NCX. <code>XmlParser</code> loads XML without network access and rejects entity declarations.</p>
+<h3 id="ziphandler">ZipHandler<a class="headerlink" href="#ziphandler" title="Permanent link">&para;</a></h3>
+<p>Extracts archives with limits (entry count, total size, compression ratio) and writes OCF-valid archives (<code>mimetype</code> first and uncompressed, <code>/</code> separators).</p>
+<h3 id="converters">Converters<a class="headerlink" href="#converters" title="Permanent link">&para;</a></h3>
+<p><code>ConverterInterface</code> has three adapters: <code>TCPDFAdapter</code> and <code>DompdfAdapter</code> (PDF, via <code>EpubDocumentLoader</code>, which reads the spine documents and makes their HTML safe to render), and <code>CalibreAdapter</code> (any format Calibre's <code>ebook-convert</code> supports). <code>Converter</code> maps formats to adapters.</p>
+<h2 id="untrusted-input">Untrusted input<a class="headerlink" href="#untrusted-input" title="Permanent link">&para;</a></h2>
+<p>Every byte of a book is treated as hostile: <code>PathResolver</code> keeps every path from the book (and from callers) inside the extraction directory, <code>ZipHandler</code> limits extraction, <code>XmlParser</code> refuses entity declarations, and <code>EpubDocumentLoader</code> confines everything the PDF renderers could load to the book. See <a href="../advanced-usage/#handling-untrusted-epubs">Handling Untrusted EPUBs</a>.</p>
+<h2 id="exceptions">Exceptions<a class="headerlink" href="#exceptions" title="Permanent link">&para;</a></h2>
+<p>All exceptions extend <code>PhpEpub\Exception</code>: <code>ZipException</code> (archive problems and extraction limits), <code>InvalidEpubException</code> (invalid structure or paths outside the book) with its subclass <code>XmlException</code> (unreadable or unsafe XML), and <code>ConversionException</code> (PDF conversion failures).</p>
 <h2 id="design-patterns">Design Patterns<a class="headerlink" href="#design-patterns" title="Permanent link">&para;</a></h2>
 <ol>
-<li><strong>Facade</strong>: EpubFile provides simple interface</li>
-<li><strong>Trait-based composition</strong>: Metadata uses traits for each field</li>
-<li><strong>Adapter</strong>: ConverterInterface for multiple backends</li>
-<li><strong>Dependency Injection</strong>: Core classes accept dependencies in constructors</li>
+<li><strong>Facade</strong>: <code>EpubFile</code> provides a simple interface over the components.</li>
+<li><strong>Shared document</strong>: <code>Metadata</code>, <code>Manifest</code> and <code>Spine</code> edit the same parsed OPF, which <code>EpubFile::save()</code> writes once.</li>
+<li><strong>Trait-based composition</strong>: <code>Metadata</code> uses a trait per field.</li>
+<li><strong>Adapter</strong>: <code>ConverterInterface</code> for multiple conversion backends.</li>
+<li><strong>Dependency injection</strong>: core classes accept their collaborators in the constructor, which the tests use.</li>
 </ol>
 <h2 id="testing">Testing<a class="headerlink" href="#testing" title="Permanent link">&para;</a></h2>
 <ul>
-<li>PHPUnit for unit testing</li>
-<li>Mock objects for external dependencies</li>
-<li>Fixtures in <code>tests/fixtures/</code></li>
+<li>PHPUnit tests in <code>tests/</code>; hostile and edge-case books are generated in the tests with <code>tests/Support/EpubBuilder</code> instead of being committed as binary fixtures.</li>
+<li><code>tests/EpubCheckTest.php</code> validates books saved by the library with EPUBCheck in CI.</li>
 </ul>
               
             </div>
           </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href="../advanced-usage/" class="btn btn-neutral float-left" title="Advanced Features"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../epub-file/" class="btn btn-neutral float-right" title="EpubFile">Next <span class="icon icon-circle-arrow-right"></span></a>
+    </div>
 
   <hr/>
 
@@ -203,6 +232,10 @@
   <span class="rst-current-version" data-toggle="rst-current-version">
     
     
+      <span><a href="../advanced-usage/" style="color: #fcfcfc">&laquo; Previous</a></span>
+    
+    
+      <span><a href="../epub-file/" style="color: #fcfcfc">Next &raquo;</a></span>
     
   </span>
 </div>

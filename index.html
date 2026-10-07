@@ -60,6 +60,10 @@
                   <li class="toctree-l1"><a class="reference internal" href="advanced-usage/">Advanced Features</a>
                   </li>
               </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="architecture/">Architecture</a>
+                </li>
+              </ul>
               <p class="caption"><span class="caption-text">Classes</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" href="epub-file/">EpubFile</a>
@@ -128,7 +132,7 @@
 <p>Before you begin, ensure you have the following installed on your system:</p>
 <ul>
 <li><strong>PHP</strong>: Version 8.3 or higher.</li>
-<li><strong>PHP Extensions</strong>: <code>ext-dom</code>, <code>ext-xml</code>, <code>ext-zip</code>.</li>
+<li><strong>PHP Extensions</strong>: <code>ext-ctype</code>, <code>ext-dom</code>, <code>ext-libxml</code>, <code>ext-simplexml</code>, <code>ext-xml</code>, <code>ext-zip</code> (most PHP builds include all of them; on Alpine, for example, <code>php-ctype</code>, <code>php-dom</code>, <code>php-simplexml</code>, <code>php-xml</code> and <code>php-zip</code> are separate packages).</li>
 <li><strong>Composer</strong>: For managing PHP dependencies.</li>
 <li><strong>Calibre</strong>: If you plan to use the CalibreAdapter for conversions.</li>
 <li><strong>Dompdf</strong>: If you plan to use the DompdfAdapter for PDF conversions.</li>
@@ -182,5 +186,5 @@
 
 <!--
 MkDocs version : 1.6.1
-Build Date UTC : 2026-10-07 04:05:30.602579+00:00
+Build Date UTC : 2026-10-07 04:05:46.293947+00:00
 -->

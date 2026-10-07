@@ -54,6 +54,10 @@
                   <li class="toctree-l1"><a class="reference internal" href="../../advanced-usage/">Advanced Features</a>
                   </li>
               </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../../architecture/">Architecture</a>
+                </li>
+              </ul>
               <p class="caption"><span class="caption-text">Classes</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" href="../../epub-file/">EpubFile</a>
@@ -279,9 +283,9 @@ No source changes were made while compiling this list.</p>
   Multi-rendition containers may list another rootfile first.</li>
 <li>[x] <strong>BUG-06</strong> Make cloned <code>EpubFile</code> instances safe (copy the extraction, or forbid <code>__clone</code>) — <code>src/EpubFile.php:56-68</code> — S · low
   A clone shares the temp dir, so the first destructor deletes the book under the other instance.</li>
-<li>[ ] <strong>BUG-07</strong> Update the manifest media type when <code>setCoverImage()</code> reuses an existing path — <code>src/EpubFile.php:172</code> — S · low
+<li>[x] <strong>BUG-07</strong> Update the manifest media type when <code>setCoverImage()</code> reuses an existing path — <code>src/EpubFile.php:172</code> — S · low
   Replacing <code>images/cover.jpg</code> with PNG bytes keeps <code>media-type="image/jpeg"</code>.</li>
-<li>[ ] <strong>BUG-08</strong> Fall back to <code>&lt;guide&gt;&lt;reference type="cover"&gt;</code> and href-valued <code>&lt;meta name="cover"&gt;</code> in <code>getCoverImage()</code> — <code>src/EpubFile.php:129-142</code> — S · low
+<li>[x] <strong>BUG-08</strong> Fall back to <code>&lt;guide&gt;&lt;reference type="cover"&gt;</code> and href-valued <code>&lt;meta name="cover"&gt;</code> in <code>getCoverImage()</code> — <code>src/EpubFile.php:129-142</code> — S · low
   Many EPUB 2 books name the cover that way, and <code>getCoverImage()</code> returns null for them.</li>
 <li>[x] <strong>BUG-09</strong> Report <code>deleteDirectory()</code> failures instead of emitting warnings from the destructor — <code>src/Util/FileSystemHelper.php:34-65</code> — S · low
   Recursive results are ignored, and a locked Windows file raises warnings from <code>__destruct</code> and leaks the temp dir silently.</li>
@@ -331,7 +335,7 @@ No source changes were made while compiling this list.</p>
 </ul>
 <h3 id="documentation">Documentation<a class="headerlink" href="#documentation" title="Permanent link">&para;</a></h3>
 <ul>
-<li>[ ] <strong>DOC-01</strong> Refresh the README: <code>EpubFile::open()</code>/<code>convert()</code>, cover, manifest/spine editing, exceptions, and an accurate "Validation" claim — <code>README.md:11-60</code> — S · low
+<li>[x] <strong>DOC-01</strong> Refresh the README: <code>EpubFile::open()</code>/<code>convert()</code>, cover, manifest/spine editing, exceptions, and an accurate "Validation" claim — <code>README.md:11-60</code> — S · low
   It still shows <code>load()</code> plus converting an extracted directory and advertises content validation the library does not do.</li>
 </ul>
 <h3 id="tests">Tests<a class="headerlink" href="#tests" title="Permanent link">&para;</a></h3>
@@ -341,20 +345,20 @@ No source changes were made while compiling this list.</p>
 </ul>
 <h3 id="ci-and-packaging">CI and packaging<a class="headerlink" href="#ci-and-packaging" title="Permanent link">&para;</a></h3>
 <ul>
-<li>[ ] <strong>CI-01</strong> Test the lowest supported dependencies (<code>composer update --prefer-lowest</code>, TCPDF 6.8) — <code>.github/workflows/tests.yml</code>, <code>composer.json</code> — S · med
+<li>[x] <strong>CI-01</strong> Test the lowest supported dependencies (<code>composer update --prefer-lowest</code>, TCPDF 6.8) — <code>.github/workflows/tests.yml</code>, <code>composer.json</code> — S · med
   <code>tecnickcom/tcpdf: ^6.8 || ^7.0</code> is allowed but CI always resolves 7.x, so the TCPDF 6 path is never run.</li>
-<li>[ ] <strong>CI-02</strong> Install Calibre in one CI job so the skipped real-conversion tests run — <code>tests/Converters/CalibreAdapterRealTest.php:26</code>, <code>.github/workflows/tests.yml</code> — S · low
+<li>[x] <strong>CI-02</strong> Install Calibre in one CI job so the skipped real-conversion tests run — <code>tests/Converters/CalibreAdapterRealTest.php:26</code>, <code>.github/workflows/tests.yml</code> — S · low
   The adapter is only ever tested against a mocked <code>exec()</code>.</li>
-<li>[ ] <strong>CI-03</strong> Build the docs with <code>mkdocs build --strict</code> on pull requests — <code>.github/workflows/deploy-docs.yml:47</code> — S · low
+<li>[x] <strong>CI-03</strong> Build the docs with <code>mkdocs build --strict</code> on pull requests — <code>.github/workflows/deploy-docs.yml:47</code> — S · low
   Broken nav entries and links are only noticed after they reach the published site.</li>
-<li>[ ] <strong>CI-04</strong> Declare the extensions the library uses (<code>ext-simplexml</code>, <code>ext-libxml</code>, <code>ext-ctype</code>) in <code>require</code> — <code>composer.json</code>, <code>src/Manifest.php:298</code>, <code>src/XmlParser.php:38-41</code> — S · low
+<li>[x] <strong>CI-04</strong> Declare the extensions the library uses (<code>ext-simplexml</code>, <code>ext-libxml</code>, <code>ext-ctype</code>) in <code>require</code> — <code>composer.json</code>, <code>src/Manifest.php:298</code>, <code>src/XmlParser.php:38-41</code> — S · low
   Minimal builds (e.g. Alpine's split packages) install cleanly and then fail at runtime.</li>
 </ul>
 <h3 id="sweeps">Sweeps<a class="headerlink" href="#sweeps" title="Permanent link">&para;</a></h3>
 <ul>
 <li>[x] <strong>SWEEP-01</strong> Validate every string written into the OPF (metadata values, <code>setMeta</code>/<code>setProperty</code>, manifest ids and media types) as UTF-8 with only XML 1.0 characters, and throw otherwise — <code>src/Metadata.php:104-153,253-263</code>, <code>src/Manifest.php:110-129</code> — S · high
   Probe: a Latin-1 title is written as raw bytes into the UTF-8 OPF, which then fails to parse, so the saved book cannot be reopened; control characters are stripped by <code>setText()</code> and make <code>addChild()</code> drop the whole value.</li>
-<li>[ ] <strong>SWEEP-02</strong> Close the remaining coverage holes: <code>ZipHandler</code> (3/6 methods), <code>FileSystemHelper</code> (77.8% lines), <code>ContentManager</code> (6/8 methods), <code>TCPDFAdapter</code> (5/6), <code>EpubFile</code> (14/15) — <code>tests/</code> — M · low
+<li>[x] <strong>SWEEP-02</strong> Close the remaining coverage holes: <code>ZipHandler</code> (3/6 methods), <code>FileSystemHelper</code> (77.8% lines), <code>ContentManager</code> (6/8 methods), <code>TCPDFAdapter</code> (5/6), <code>EpubFile</code> (14/15) — <code>tests/</code> — M · low
   These are the error paths left after round one (failed writes, unreadable entries, cleanup failures).</li>
 </ul>
               
