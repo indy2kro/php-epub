@@ -88,6 +88,38 @@ public function getContent(string $filePath): string
 
 Returns the content of a file. Throws an exception if the file doesn't exist or cannot be read.
 
+```php
+public function getText(string $filePath): string
+```
+
+Returns the plain text of an XHTML or HTML document: one line per paragraph, heading, list item, table row and line break, with white space collapsed and entities decoded. Scripts, styles and the document head are left out. The document is read in its declared encoding (UTF-8 or UTF-16) and does not have to be well-formed. Throws an exception if the file doesn't exist or cannot be read. `EpubFile::getText()` does this for every document of the reading order; see [EPUB 3 Features](epub3-features.md#plain-text).
+
+```php
+public function updateManifestProperties(): void
+```
+
+Sets the EPUB 3 manifest properties (`svg`, `mathml`, `scripted`, `remote-resources`) that every XHTML document needs because of its content and removes those it no longer needs; other properties are kept. `addContent()` and `updateContent()` do this for the file they write; use this for books whose documents were written by something else (`EpubFile::upgradeToEpub3()` does). Nothing happens for an EPUB 2 package, and documents that are missing, not well-formed or larger than 8 MiB are left alone.
+
+### Fonts
+
+```php
+public function addFont(string $path, string $fontData, bool $obfuscate = true): void
+```
+
+Adds (or overwrites) an embedded font and lists it in the manifest. By default the font is obfuscated with the IDPF algorithm (OCF "Font Obfuscation"), keyed by the book's unique identifier, and listed in `META-INF/encryption.xml`, which is created when the book has none (an existing entry for the path is updated, other entries are kept). With `$obfuscate = false` the font is stored as it is, and an existing `encryption.xml` entry for the path is removed. The key is the identifier the book's fonts are keyed with (as loaded or last saved); `EpubFile::save()` re-keys the fonts when the identifier changes, fonts added this way included. Throws an exception if the path is in `META-INF/`, the book has no unique identifier, `encryption.xml` cannot be parsed (nothing is written then) or the file cannot be written. A `ContentManager` built on its own, without an `EpubFile`, does not know the identifier and can only add plain fonts.
+
+```php
+public function getFontData(string $path): string
+```
+
+Returns the font as a reading system sees it: a font obfuscated with the IDPF or Adobe algorithm (listed in `encryption.xml`) is returned de-obfuscated, any other file as it is. A font encrypted with another algorithm (DRM) is returned as it is, still encrypted. Throws an exception if the file cannot be read, or the font is Adobe-obfuscated and the unique identifier is not a `urn:uuid:` one.
+
+```php
+$content = $epubFile->getContentManager();
+$content->addFont('EPUB/fonts/body.otf', (string) file_get_contents('body.otf'));
+$plain = $content->getFontData('EPUB/fonts/body.otf'); // the original bytes
+```
+
 ## Usage Example
 
 ```php

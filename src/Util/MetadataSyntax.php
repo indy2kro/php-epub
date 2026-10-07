@@ -27,6 +27,18 @@ final class MetadataSyntax
     private const string W3CDTF = '/^(?<year>\d{4})(?:-(?<month>0[1-9]|1[0-2])(?:-(?<day>0[1-9]|[12]\d|3[01])'
         . '(?:T(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d))?)?)?$/D';
 
+    /**
+     * A SMIL clock value, the syntax of media:duration: a full clock value (hh:mm:ss, any number of hour
+     * digits), a partial one (mm:ss), or a time count with an optional unit (h, min, s, ms), each with
+     * an optional fraction of the last unit, e.g. "0:32:29.5", "32:29", "1949.5s" or "1500ms".
+     */
+    private const string SMIL_CLOCK_VALUE = '/^(?:\d+:[0-5]\d:[0-5]\d(?:\.\d+)?|[0-5]\d:[0-5]\d(?:\.\d+)?|\d+(?:\.\d+)?(?:h|min|s|ms)?)$/D';
+
+    public static function isSmilClockValue(string $value): bool
+    {
+        return preg_match(self::SMIL_CLOCK_VALUE, $value) === 1;
+    }
+
     public static function isLanguageTag(string $value): bool
     {
         return preg_match(self::LANGUAGE_TAG, $value) === 1;

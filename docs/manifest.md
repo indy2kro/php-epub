@@ -35,6 +35,10 @@ Manifest `href`s are URLs relative to the OPF file (for example `text/chapter%20
 
 - **`removeGuideReferences(string $type): void`**: Removes the EPUB 2 `<guide>` references of a type (compared case-insensitively), and the guide when none is left.
 
+- **`getGuideReferences(): array`** and **`setGuideReferences(array $references): void`**: The EPUB 2 `<guide>` as `Landmark` objects that carry the guide's own types (`cover`, `text`, `title-page`, ...); references that point outside the book are left out. Setting replaces the guide (created after the spine when missing) and `[]` removes it. Use `TableOfContents::getLandmarks()` and `setLandmarks()` to work with EPUB 3 types and the navigation document at the same time.
+
+- **`getMediaOverlay(string $id): ?string`** and **`setMediaOverlay(string $id, ?string $overlayId): void`**: The SMIL item (`application/smil+xml`) that narrates an XHTML or SVG item (its `media-overlay` attribute); `null` removes it. EPUB 3 only. See [EPUB 3 Features](epub3-features.md#media-overlays).
+
 - **`getOpfPath(): string`**: The OPF location relative to the book root.
 
 Lookups (`get()`, `findByPath()`, `getItems()`) use an index built on first use, so adding thousands of files to a large book stays fast.

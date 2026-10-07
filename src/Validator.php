@@ -51,6 +51,15 @@ final readonly class Validator
     private const int MAX_DOCUMENT_BYTES = 8388608;
 
     /**
+     * The encrypted (DRM) resources of the book, as keys: their content cannot be examined.
+     *
+     * @var array<string, int>
+     */
+    private array $encrypted;
+
+    private Encryption $encryption;
+
+    /**
      * @param string $rootDirectory The directory holding the extracted book.
      */
     public function __construct(
@@ -63,6 +72,8 @@ final readonly class Validator
         private PathResolver $paths = new PathResolver(),
         private XmlParser $xmlParser = new XmlParser()
     ) {
+        $this->encryption = new Encryption($rootDirectory, $xmlParser, $paths);
+        $this->encrypted = array_flip($this->encryption->encryptedPaths());
     }
 
     /**
@@ -74,6 +85,7 @@ final readonly class Validator
         return [
             ...$this->checkMimetype(),
             ...$this->checkFileNames(),
+            ...$this->checkEncryption(),
             ...$this->checkMetadata(),
             ...$this->checkMetadataSyntax(),
             ...$this->checkIds(),
@@ -101,6 +113,27 @@ final readonly class Validator
             'MIMETYPE_INVALID',
             'The mimetype file is missing or does not contain exactly "' . self::MIMETYPE . '"; save() writes the right one.',
             'mimetype'
+        )];
+    }
+
+    /**
+     * A DRM-protected book is one error: its encrypted content is not examined by the checks below
+     * (it would be reported as not well-formed, with the wrong media type, and so on).
+     *
+     * @return list<ValidationIssue>
+     */
+    private function checkEncryption(): array
+    {
+        if (! $this->encryption->isDrmProtected()) {
+            return [];
+        }
+
+        $count = count($this->encrypted);
+
+        return [$this->error(
+            'CONTENT_ENCRYPTED',
+            'The book is DRM-protected' . ($count === 0 ? '' : ", and {$count} of its resources are encrypted") . '; they cannot be read or checked.',
+            $count === 0 ? null : 'META-INF/encryption.xml'
         )];
     }
 
@@ -243,7 +276,7 @@ final readonly class Validator
         foreach ($this->manifest->getItems() as $item) {
             // The navigation document is checked by checkNavigation().
             $isNav = in_array('nav', explode(' ', $item->properties), true);
-            if ($isNav || $item->mediaType !== 'application/xhtml+xml' || $item->path === '' || ! is_file($this->paths->resolve($this->rootDirectory, $item->path))) {
+            if ($isNav || $item->mediaType !== 'application/xhtml+xml' || $item->path === '' || isset($this->encrypted[$item->path]) || ! is_file($this->paths->resolve($this->rootDirectory, $item->path))) {
                 continue;
             }
 
@@ -319,7 +352,7 @@ final readonly class Validator
         $issues = [];
         foreach ($this->manifest->getItems() as $item) {
             $isImage = in_array($item->mediaType, self::CHECKED_IMAGE_TYPES, true);
-            if ($item->path === '' || ! ($isImage || $item->mediaType === 'application/xhtml+xml')) {
+            if ($item->path === '' || isset($this->encrypted[$item->path]) || ! ($isImage || $item->mediaType === 'application/xhtml+xml')) {
                 continue;
             }
 
@@ -401,7 +434,7 @@ final readonly class Validator
     private function neededProperties(ManifestItem $item): ?array
     {
         $file = $item->path === '' ? '' : $this->paths->resolve($this->rootDirectory, $item->path);
-        $isReadable = $item->mediaType === 'application/xhtml+xml' && is_file($file)
+        $isReadable = $item->mediaType === 'application/xhtml+xml' && ! isset($this->encrypted[$item->path]) && is_file($file)
             && (int) @filesize($file) <= self::MAX_DOCUMENT_BYTES;
         $content = $isReadable ? FileSystemHelper::readFile($file) : null;
 
@@ -455,7 +488,7 @@ final readonly class Validator
         }
 
         foreach ($items as $item) {
-            if ($item->path !== '' && is_file($this->paths->resolve($this->rootDirectory, $item->path))) {
+            if ($item->path !== '' && ! isset($this->encrypted[$item->path]) && is_file($this->paths->resolve($this->rootDirectory, $item->path))) {
                 array_push($issues, ...$this->checkNavigationFile($item));
             }
         }

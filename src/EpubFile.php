@@ -342,7 +342,8 @@ class EpubFile
             $this->fontKeyIdentifier = $this->metadata->getUniqueIdentifier();
             $this->manifest = new Manifest($this->opfXml, $opfFilePath);
             $this->spine = new Spine($this->opfXml, $this->manifest);
-            $this->contentManager = new ContentManager($directory, $this->manifest, $this->spine);
+            // Fonts are keyed with the identifier of the last load or save, which rekeyObfuscatedFonts() keeps current.
+            $this->contentManager = new ContentManager($directory, $this->manifest, $this->spine, new PathResolver(), fn (): ?string => $this->fontKeyIdentifier);
         } catch (Throwable $throwable) {
             // Do not leave a half-loaded book (or its extracted files) behind,
             // and report why loading failed rather than a cleanup problem.
@@ -414,6 +415,7 @@ class EpubFile
     /**
      * Converts the book with the given adapter, including changes that have not been saved yet.
      *
+     * @throws ConversionException If the book is DRM-protected (see isDrmProtected()): its content cannot be read.
      * @throws Exception If the book is not loaded or the conversion fails.
      */
     public function convert(ConverterInterface $converter, string $outputPath): void
@@ -422,6 +424,8 @@ class EpubFile
         if ($tempDir === null) {
             throw new Exception('EPUB file must be loaded before converting.');
         }
+
+        (new Encryption($tempDir, $this->xmlParser))->assertNotDrmProtected();
 
         $this->writePackage();
         $converter->convert($tempDir, $outputPath);
@@ -541,6 +545,74 @@ class EpubFile
         if ($deleteFile && $cover instanceof ManifestItem) {
             $this->deleteItem($cover);
         }
+    }
+
+    /**
+     * Converts a loaded EPUB 2 book to EPUB 3 in place; save() writes the result. The package becomes
+     * version 3.0 with a dcterms:modified date, a navigation document is generated from the NCX (the
+     * NCX and the <guide> stay for EPUB 2 reading systems, and the guide also becomes the navigation
+     * document's landmarks), the cover image gets the "cover-image" property, XHTML documents get the
+     * manifest properties their content needs (svg, mathml, scripted, remote-resources), and the
+     * opf:* attributes EPUB 3 does not allow on Dublin Core elements become refinements or are dropped
+     * (see Metadata::upgradeToEpub3()). Content documents themselves are not rewritten: an XHTML 1.1
+     * document with an old DOCTYPE or obsolete elements may still draw EPUBCheck errors.
+     *
+     * @return bool True when the book was converted; false, with nothing changed, when it is already EPUB 3.
+     *
+     * @throws Exception If the book is not loaded or the navigation document cannot be created.
+     */
+    public function upgradeToEpub3(): bool
+    {
+        $metadata = $this->getMetadata();
+        if (str_starts_with($metadata->getVersion(), '3')) {
+            return false;
+        }
+
+        $manifest = $this->getManifest();
+        $metadata->upgradeToEpub3();
+
+        $language = trim($metadata->getLanguage());
+        $this->getTableOfContents()->createNavigation($metadata->getTitle(), $language === '' ? 'en' : $language);
+
+        $cover = $this->getCoverImage();
+        if ($cover instanceof ManifestItem && str_starts_with($cover->mediaType, 'image/')) {
+            $manifest->addProperty($cover->id, self::COVER_PROPERTY);
+        }
+
+        $this->getContentManager()->updateManifestProperties();
+
+        return true;
+    }
+
+    /**
+     * The plain text of the book's XHTML and HTML documents in reading order, e.g. for a search index or a
+     * word count: path (relative to the book root) => text, as ContentManager::getText() reads each.
+     * Spine items that are not XHTML or HTML documents, or whose file is missing, are left out.
+     *
+     * @param bool $linearOnly Skip the auxiliary content of the spine (linear="no"), such as notes.
+     *
+     * @return array<string, string>
+     *
+     * @throws Exception If the book is not loaded or a document cannot be read.
+     */
+    public function getText(bool $linearOnly = true): array
+    {
+        $contentManager = $this->getContentManager();
+        $existing = array_flip($contentManager->getContentPaths());
+
+        $texts = [];
+        foreach ($this->getSpine()->getItems() as $spineItem) {
+            $item = $spineItem->item;
+            if (! $item instanceof ManifestItem || ! in_array($item->mediaType, ['application/xhtml+xml', 'text/html'], true)) {
+                continue;
+            }
+
+            if (($spineItem->linear || ! $linearOnly) && isset($existing[$item->path])) {
+                $texts[$item->path] = $contentManager->getText($item->path);
+            }
+        }
+
+        return $texts;
     }
 
     /**
@@ -702,6 +774,39 @@ class EpubFile
         }
 
         return $this->manifest;
+    }
+
+    /**
+     * Whether the book is DRM-protected (Adobe ADEPT, Readium LCP and similar): META-INF/encryption.xml
+     * lists a resource encrypted with an algorithm that is not a font obfuscation, or the book has
+     * META-INF/rights.xml or META-INF/license.lcpl. Such a book can be read as a package, but its
+     * encrypted content cannot (the library never decrypts it), validate() reports it and
+     * convert() refuses it. A damaged encryption.xml is ignored here.
+     *
+     * @throws Exception If the book is not loaded.
+     */
+    public function isDrmProtected(): bool
+    {
+        return $this->encryption()->isDrmProtected();
+    }
+
+    /**
+     * The book-relative paths (sorted) of the resources encrypted with an algorithm that is not a
+     * font obfuscation. Empty when the book is not DRM-protected, or only by rights.xml or license.lcpl
+     * without listing resources.
+     *
+     * @return list<string>
+     *
+     * @throws Exception If the book is not loaded.
+     */
+    public function getEncryptedPaths(): array
+    {
+        return $this->encryption()->encryptedPaths();
+    }
+
+    private function encryption(): Encryption
+    {
+        return new Encryption($this->tempDir ?? throw new Exception('EPUB file must be loaded before checking its encryption.'), $this->xmlParser);
     }
 
     /**

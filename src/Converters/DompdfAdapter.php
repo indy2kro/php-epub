@@ -9,6 +9,7 @@ use Dompdf\Dompdf;
 use Dompdf\Options;
 use PhpEpub\ConversionException;
 use PhpEpub\Exception;
+use PhpEpub\Util\FileSystemHelper;
 use Throwable;
 
 class DompdfAdapter implements ConverterInterface
@@ -39,6 +40,11 @@ class DompdfAdapter implements ConverterInterface
      * @var array<string, mixed>
      */
     private array $styles;
+
+    /**
+     * The private font directory of the conversion in progress (see convert()).
+     */
+    private ?string $fontDirectory = null;
 
     /**
      * DompdfAdapter constructor.
@@ -76,7 +82,14 @@ class DompdfAdapter implements ConverterInterface
     {
         $document = $this->loader->load($epubDirectory);
 
+        // Dompdf stores the fonts it loads (the book's @font-face fonts) and a registry of them in its
+        // font directory, by default inside vendor/: give every conversion its own, deleted afterwards,
+        // so books leave nothing behind and cannot affect each other's fonts.
+        $fontDirectory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'epub_fonts_' . bin2hex(random_bytes(16));
+        @mkdir($fontDirectory, 0700) || throw new ConversionException("Failed to create temporary directory: {$fontDirectory}");
+
         try {
+            $this->fontDirectory = $fontDirectory;
             $dompdf = $this->createDompdf($epubDirectory);
             $dompdf->loadHtml($this->renderHtml($document));
             $dompdf->setPaper($this->stringStyle('paper_size'), $this->stringStyle('orientation'));
@@ -95,6 +108,9 @@ class DompdfAdapter implements ConverterInterface
             throw $exception;
         } catch (Throwable $exception) {
             throw new ConversionException('Dompdf failed to render the book: ' . $exception->getMessage(), 0, $exception);
+        } finally {
+            $this->fontDirectory = null;
+            (new FileSystemHelper())->deleteDirectory($fontDirectory);
         }
 
         if (@file_put_contents($outputPath, $pdf) === false) {
@@ -115,6 +131,7 @@ class DompdfAdapter implements ConverterInterface
     /**
      * Creates a Dompdf instance that cannot reach outside the book: no remote
      * resources, no embedded PHP or JavaScript, and file access limited to the book.
+     * During convert(), fonts Dompdf loads are stored in that conversion's private directory.
      */
     protected function createDompdf(string $epubDirectory): Dompdf
     {
@@ -126,6 +143,10 @@ class DompdfAdapter implements ConverterInterface
         $options->setIsPhpEnabled(false);
         $options->setIsJavascriptEnabled(false);
         $options->setChroot([$root === false ? $epubDirectory : $root]);
+        if ($this->fontDirectory !== null) {
+            $options->setFontDir($this->fontDirectory);
+            $options->setFontCache($this->fontDirectory);
+        }
 
         return new Dompdf($options);
     }

@@ -4,16 +4,18 @@ declare(strict_types=1);
 
 namespace PhpEpub;
 
+use DOMDocument;
+use DOMElement;
+use DOMXPath;
 use PhpEpub\Util\FileSystemHelper;
 use PhpEpub\Util\PathResolver;
-use SimpleXMLElement;
 
 /**
  * Obfuscated fonts (OCF "Font Obfuscation", listed in META-INF/encryption.xml) are XORed with
  * a key derived from the book's unique identifier, so they have to be re-keyed when it changes.
  * Two algorithms are in use: the IDPF one (EPUB 3) and Adobe's older one.
  *
- * @internal Used by EpubFile::save().
+ * @internal Used by EpubFile::save(), ContentManager and the converters.
  */
 final readonly class FontObfuscation
 {
@@ -22,6 +24,9 @@ final readonly class FontObfuscation
     public const string ADOBE = 'http://ns.adobe.com/pdf/enc#RC';
 
     private const string ENCRYPTION_NAMESPACE = 'http://www.w3.org/2001/04/xmlenc#';
+
+    private const string EMPTY_ENCRYPTION = '<?xml version="1.0" encoding="UTF-8"?>'
+        . '<encryption xmlns="urn:oasis:names:tc:opendocument:xmlns:container" xmlns:enc="http://www.w3.org/2001/04/xmlenc#"/>';
 
     /**
      * How many leading bytes each algorithm obfuscates.
@@ -56,9 +61,7 @@ final readonly class FontObfuscation
             $newKey = self::key($algorithm, $newIdentifier)
                 ?? throw new Exception("The obfuscated font {$path} needs a urn:uuid unique identifier, not: {$newIdentifier}");
 
-            $length = min(self::OBFUSCATED_LENGTHS[$algorithm], strlen($font));
-            $header = substr($font, 0, $length) ^ self::keyStream($oldKey, $length) ^ self::keyStream($newKey, $length);
-            @file_put_contents($file, $header . substr($font, $length)) !== false
+            @file_put_contents($file, self::apply(self::apply($font, $algorithm, $oldKey), $algorithm, $newKey)) !== false
                 || throw new Exception("Failed to rewrite the obfuscated font: {$path}");
         }
     }
@@ -79,40 +82,142 @@ final readonly class FontObfuscation
     }
 
     /**
+     * Whether an algorithm is a font obfuscation (IDPF or Adobe), as opposed to real encryption.
+     */
+    public static function isObfuscation(string $algorithm): bool
+    {
+        return isset(self::OBFUSCATED_LENGTHS[$algorithm]);
+    }
+
+    /**
+     * Obfuscates a font or, as XOR is its own inverse, de-obfuscates it: the leading bytes
+     * (1040 for IDPF, 1024 for Adobe) are XORed with the key; the rest is unchanged.
+     *
+     * @param string $key The key from key().
+     */
+    public static function apply(string $font, string $algorithm, string $key): string
+    {
+        $length = min(self::OBFUSCATED_LENGTHS[$algorithm] ?? 0, strlen($font));
+
+        return (substr($font, 0, $length) ^ self::keyStream($key, $length)) . substr($font, $length);
+    }
+
+    /**
      * Book-relative paths of the fonts obfuscated with a known algorithm, inside the book.
      *
      * @return array<string, string> path => algorithm
      *
-     * @throws Exception If encryption.xml cannot be parsed.
+     * @throws XmlException If encryption.xml cannot be parsed.
      */
-    private function obfuscatedFonts(): array
+    public function obfuscatedFonts(): array
     {
-        $file = $this->rootDirectory . DIRECTORY_SEPARATOR . 'META-INF' . DIRECTORY_SEPARATOR . 'encryption.xml';
-        if (! is_file($file)) {
-            return [];
-        }
-
-        $encryption = $this->xmlParser->parse($file);
-        $encryption->registerXPathNamespace('enc', self::ENCRYPTION_NAMESPACE);
-
         $fonts = [];
-        foreach ($encryption->xpath('//enc:EncryptedData') ?: [] as $data) {
-            $data->registerXPathNamespace('enc', self::ENCRYPTION_NAMESPACE);
-            $algorithm = (string) ($this->first($data, 'enc:EncryptionMethod')['Algorithm'] ?? '');
-            // CipherReference URIs are relative to the root of the container.
-            $uri = rawurldecode((string) ($this->first($data, 'enc:CipherData/enc:CipherReference')['URI'] ?? ''));
-
-            if (isset(self::OBFUSCATED_LENGTHS[$algorithm]) && $this->insideBook($uri)) {
-                $fonts[$this->paths->normalize($uri)] = $algorithm;
+        foreach ((new Encryption($this->rootDirectory, $this->xmlParser, $this->paths))->entries() as $entry) {
+            if (self::isObfuscation($entry['algorithm']) && $this->insideBook($entry['uri'])) {
+                $fonts[$this->paths->normalize($entry['uri'])] = $entry['algorithm'];
             }
         }
 
         return $fonts;
     }
 
-    private function first(SimpleXMLElement $context, string $expression): ?SimpleXMLElement
+    /**
+     * Lists a font in encryption.xml (creating the file when the book has none) with an obfuscation
+     * algorithm, or, with null, removes its entry so that the font reads as plain.
+     *
+     * @throws Exception If the path leaves the book, or encryption.xml cannot be parsed or written.
+     */
+    public function setAlgorithm(string $path, ?string $algorithm): void
     {
-        return ($context->xpath($expression) ?: [])[0] ?? null;
+        $path = $this->paths->normalize($path);
+        $file = $this->rootDirectory . DIRECTORY_SEPARATOR . 'META-INF' . DIRECTORY_SEPARATOR . 'encryption.xml';
+        $exists = is_file($file);
+        if (! $exists && $algorithm === null) {
+            return;
+        }
+
+        $xml = $exists ? $this->xmlParser->parse($file) : $this->xmlParser->parseString(self::EMPTY_ENCRYPTION, $file);
+        $root = dom_import_simplexml($xml);
+        $document = $root->ownerDocument ?? throw new Exception("Failed to update: {$file}");
+        $xpath = new DOMXPath($document);
+        $xpath->registerNamespace('enc', self::ENCRYPTION_NAMESPACE);
+
+        $found = false;
+        foreach (iterator_to_array($xpath->query('//enc:EncryptedData') ?: []) as $data) {
+            if (! $data instanceof DOMElement) {
+                continue;
+            }
+
+            $reference = $this->firstElement($xpath, 'enc:CipherData/enc:CipherReference', $data);
+            if (! $reference instanceof DOMElement || ! $this->refersTo($reference->getAttribute('URI'), $path)) {
+                continue;
+            }
+
+            $found = true;
+            if ($algorithm === null) {
+                $data->parentNode?->removeChild($data);
+            } else {
+                $this->methodOf($document, $xpath, $data)->setAttribute('Algorithm', $algorithm);
+            }
+        }
+
+        if (! $found && $algorithm !== null) {
+            $root->appendChild($this->encryptedData($document, $path, $algorithm));
+        }
+
+        $this->xmlParser->save($xml, $file);
+    }
+
+    private function firstElement(DOMXPath $xpath, string $expression, DOMElement $context): ?DOMElement
+    {
+        foreach ($xpath->query($expression, $context) ?: [] as $node) {
+            return $node instanceof DOMElement ? $node : null;
+        }
+
+        return null;
+    }
+
+    private function refersTo(string $uri, string $path): bool
+    {
+        try {
+            return $this->paths->normalize(rawurldecode($uri)) === $path;
+        } catch (InvalidEpubException) {
+            return false;
+        }
+    }
+
+    /**
+     * The EncryptionMethod element of an EncryptedData one, created when it is missing.
+     */
+    private function methodOf(DOMDocument $document, DOMXPath $xpath, DOMElement $data): DOMElement
+    {
+        $method = $this->firstElement($xpath, 'enc:EncryptionMethod', $data);
+        if ($method instanceof DOMElement) {
+            return $method;
+        }
+
+        $method = $document->createElementNS(self::ENCRYPTION_NAMESPACE, 'enc:EncryptionMethod');
+        $data->insertBefore($method, $data->firstChild);
+
+        return $method;
+    }
+
+    private function encryptedData(DOMDocument $document, string $path, string $algorithm): DOMElement
+    {
+        $uri = implode('/', array_map(rawurlencode(...), explode('/', $path)));
+
+        $method = $document->createElementNS(self::ENCRYPTION_NAMESPACE, 'enc:EncryptionMethod');
+        $method->setAttribute('Algorithm', $algorithm);
+        $reference = $document->createElementNS(self::ENCRYPTION_NAMESPACE, 'enc:CipherReference');
+        $reference->setAttribute('URI', $uri);
+        $cipherData = $document->createElementNS(self::ENCRYPTION_NAMESPACE, 'enc:CipherData');
+        $cipherData->appendChild($reference);
+
+        $data = $document->createElementNS(self::ENCRYPTION_NAMESPACE, 'enc:EncryptedData');
+        $data->appendChild($method);
+        $data->appendChild($cipherData);
+
+        return $data;
     }
 
     private function insideBook(string $path): bool

@@ -22,6 +22,10 @@ final readonly class TableOfContents
 
     private const string TOC_NAV = "//x:nav[contains(concat(' ', normalize-space(@epub:type), ' '), ' toc ')]";
 
+    private const string LANDMARKS_NAV = "//x:nav[contains(concat(' ', normalize-space(@epub:type), ' '), ' landmarks ')]";
+
+    private const string PAGE_LIST_NAV = "//x:nav[contains(concat(' ', normalize-space(@epub:type), ' '), ' page-list ')]";
+
     /**
      * @param string $rootDirectory The directory holding the extracted book.
      * @param EpubFile|null $book The book these files belong to: holding it keeps its extracted
@@ -130,6 +134,207 @@ final readonly class TableOfContents
         if ($ncxPath !== null) {
             $this->writeNcx($ncxPath, $entries);
         }
+    }
+
+    /**
+     * Creates the EPUB 3 navigation document of a book that has none, from the NCX entries (from the
+     * reading order when the NCX has none), and carries the EPUB 2 <guide> over as its landmarks.
+     * The document is added to the manifest with the "nav" property, next to the OPF; the NCX and the
+     * guide stay. Nothing happens when the book already has a navigation document.
+     *
+     * @internal Called by EpubFile::upgradeToEpub3().
+     *
+     * @throws Exception If the NCX cannot be parsed or the document cannot be written.
+     */
+    public function createNavigation(string $title, string $language): void
+    {
+        if ($this->navPath() !== null) {
+            return;
+        }
+
+        $entries = $this->linkedEntries($this->getEntries());
+        if ($entries === []) {
+            $entries = $this->readingOrderEntries();
+        }
+
+        $landmarks = $this->getLandmarks();
+        $directory = dirname($this->manifest->getOpfPath());
+        $base = $directory === '.' ? '' : $directory . '/';
+        for ($number = 1;; $number++) {
+            $path = $base . ($number === 1 ? 'nav' : 'nav-' . $number) . '.xhtml';
+            if (! $this->manifest->findByPath($path) instanceof ManifestItem && ! file_exists($this->paths->resolve($this->rootDirectory, $path))) {
+                break;
+            }
+        }
+
+        if (@file_put_contents($this->paths->resolve($this->rootDirectory, $path), BookTemplate::navigation($title, $language)) === false) {
+            throw new Exception("Failed to write the navigation document: {$path}");
+        }
+
+        $item = $this->manifest->add($path, 'application/xhtml+xml');
+        $this->manifest->addProperty($item->id, 'nav');
+        $this->writeNav($path, $entries);
+        if ($landmarks !== []) {
+            $this->writeNavLandmarks($path, $landmarks);
+        }
+    }
+
+    /**
+     * Entries that lead somewhere: a navigation document has no unlinked leaf entries. Entries without
+     * a title are named after their file.
+     *
+     * @param list<TocEntry> $entries
+     *
+     * @return list<TocEntry>
+     */
+    private function linkedEntries(array $entries): array
+    {
+        $linked = [];
+        foreach ($entries as $entry) {
+            $children = $this->linkedEntries($entry->children);
+            if ($entry->path !== '' || $children !== []) {
+                $title = $entry->title === '' ? pathinfo($entry->path, PATHINFO_FILENAME) : $entry->title;
+                $linked[] = new TocEntry($title, $entry->path, $entry->fragment, $children);
+            }
+        }
+
+        return $linked;
+    }
+
+    /**
+     * One entry per linear XHTML document of the reading order, titled after its file.
+     *
+     * @return list<TocEntry>
+     */
+    private function readingOrderEntries(): array
+    {
+        $entries = [];
+        foreach ($this->spine?->getItems() ?? [] as $spineItem) {
+            $item = $spineItem->item;
+            if ($spineItem->linear && $item instanceof ManifestItem && $item->path !== '' && $item->mediaType === 'application/xhtml+xml') {
+                $entries[] = new TocEntry(pathinfo($item->path, PATHINFO_FILENAME), $item->path);
+            }
+        }
+
+        return $entries;
+    }
+
+    /**
+     * The landmarks (cover, table of contents, start of the body, …): those of the navigation
+     * document's "landmarks" nav or, when it has none, the EPUB 2 <guide> references that have an
+     * EPUB 3 equivalent (their types are translated, e.g. the guide's "text" is "bodymatter").
+     * Landmarks that point outside the book are left out.
+     *
+     * @return list<Landmark>
+     *
+     * @throws Exception If the navigation document cannot be parsed.
+     */
+    public function getLandmarks(): array
+    {
+        $navPath = $this->navPath();
+        $landmarks = $navPath === null ? null : $this->readNavLandmarks($navPath);
+        if ($landmarks !== null) {
+            return $landmarks;
+        }
+
+        $landmarks = [];
+        foreach ($this->manifest->getGuideReferences() as $reference) {
+            $type = Landmark::fromGuideType($reference->type);
+            if ($type !== null) {
+                $landmarks[] = new Landmark($type, $reference->title, $reference->path, $reference->fragment);
+            }
+        }
+
+        return $landmarks;
+    }
+
+    /**
+     * Replaces the landmarks. They are written to the navigation document's "landmarks" nav (created
+     * when missing) and, in an EPUB 2 book or an EPUB 3 book that keeps a <guide>, to the guide
+     * (landmarks whose type the guide cannot express, such as "chapter", are left out of it: see
+     * Landmark::toGuideType()). [] removes the landmarks nav and the guide.
+     *
+     * @param list<Landmark> $landmarks
+     *
+     * @throws Exception If a landmark has an empty type, title or path, a value is not valid XML text, a path
+     *                   leaves the book, the book has neither a navigation document nor a guide to hold
+     *                   landmarks, or a file cannot be written.
+     */
+    public function setLandmarks(array $landmarks): void
+    {
+        foreach ($landmarks as $landmark) {
+            if (trim($landmark->type) === '' || trim($landmark->title) === '' || $landmark->path === '') {
+                throw new Exception('A landmark needs a type, a title and a path');
+            }
+
+            XmlText::assertValid($landmark->type, $landmark->title, $landmark->fragment ?? '');
+            $this->paths->normalize($landmark->path);
+        }
+
+        $navPath = $this->navPath();
+        $keepsGuide = ! $this->manifest->isEpub3() || $this->manifest->getGuideReferences() !== [];
+        if ($navPath === null && ! $keepsGuide) {
+            throw new Exception('The book has no navigation document or guide to hold landmarks');
+        }
+
+        if ($navPath !== null) {
+            $this->writeNavLandmarks($navPath, $landmarks);
+        }
+
+        if ($keepsGuide) {
+            $references = [];
+            foreach ($landmarks as $landmark) {
+                $guideType = Landmark::toGuideType($landmark->type);
+                if ($guideType !== null) {
+                    $references[] = new Landmark($guideType, $landmark->title, $landmark->path, $landmark->fragment);
+                }
+            }
+
+            $this->manifest->setGuideReferences($references);
+        }
+    }
+
+    /**
+     * The page list: the print page numbers of the navigation document's "page-list" nav or, when it
+     * has none, of the NCX pageList; [] when the book has neither.
+     *
+     * @return list<TocEntry>
+     *
+     * @throws Exception If the navigation document or NCX cannot be parsed.
+     */
+    public function getPageList(): array
+    {
+        $navPath = $this->navPath();
+        if ($navPath !== null) {
+            $list = $this->first($this->navXPath($this->load($navPath)), self::PAGE_LIST_NAV . '/x:ol');
+            if ($list instanceof DOMElement) {
+                return $this->readNavList($list, $navPath);
+            }
+        }
+
+        $ncxPath = $this->ncxPath();
+        $pageList = $ncxPath === null ? null : ($this->childElements($this->load($ncxPath), 'pageList')[0] ?? null);
+        if ($ncxPath === null || ! $pageList instanceof DOMElement) {
+            return [];
+        }
+
+        $entries = [];
+        foreach ($this->childElements($pageList, 'pageTarget') as $target) {
+            $title = '';
+            $path = '';
+            $fragment = null;
+            foreach ($this->childElements($target) as $child) {
+                if ($child->localName === 'navLabel') {
+                    $title = $this->collapse($child->textContent);
+                } elseif ($child->localName === 'content' && $child->hasAttribute('src')) {
+                    [$path, $fragment] = $this->resolveHref($ncxPath, $child->getAttribute('src'));
+                }
+            }
+
+            $entries[] = new TocEntry($title, $path, $fragment);
+        }
+
+        return $entries;
     }
 
     /**
@@ -442,6 +647,82 @@ final readonly class TableOfContents
             $nav->replaceChild($newList, $oldList);
         } else {
             $nav->appendChild($newList);
+        }
+
+        $this->save($root, $navPath);
+    }
+
+    /**
+     * The landmarks of the navigation document's landmarks nav; null when it has none.
+     *
+     * @return list<Landmark>|null
+     */
+    private function readNavLandmarks(string $navPath): ?array
+    {
+        $xpath = $this->navXPath($this->load($navPath));
+        $nav = $this->first($xpath, self::LANDMARKS_NAV);
+        if (! $nav instanceof DOMElement) {
+            return null;
+        }
+
+        $landmarks = [];
+        foreach ($xpath->query('.//x:a[@epub:type][@href]', $nav) ?: [] as $link) {
+            if ($link instanceof DOMElement) {
+                [$path, $fragment] = $this->resolveHref($navPath, $link->getAttribute('href'));
+                $type = trim($link->getAttributeNS(self::OPS_NAMESPACE, 'type'));
+                if ($path !== '' && $type !== '') {
+                    $landmarks[] = new Landmark($type, $this->collapse($link->textContent), $path, $fragment);
+                }
+            }
+        }
+
+        return $landmarks;
+    }
+
+    /**
+     * Replaces the landmarks nav's list, creating the nav when missing (after the other navs);
+     * no landmarks remove it.
+     *
+     * @param list<Landmark> $landmarks
+     *
+     * @throws Exception
+     */
+    private function writeNavLandmarks(string $navPath, array $landmarks): void
+    {
+        $root = $this->load($navPath);
+        $document = $this->document($root);
+        $namespace = (string) $root->namespaceURI;
+        $xpath = $this->navXPath($root);
+        $nav = $this->first($xpath, self::LANDMARKS_NAV);
+
+        if ($landmarks === []) {
+            if ($nav instanceof DOMElement) {
+                $nav->parentNode?->removeChild($nav);
+            }
+
+            $this->save($root, $navPath);
+
+            return;
+        }
+
+        if (! $nav instanceof DOMElement) {
+            $nav = $document->createElementNS($namespace, 'nav');
+            $nav->setAttributeNS(self::OPS_NAMESPACE, 'epub:type', 'landmarks');
+            $nav->setAttribute('hidden', '');
+            $nav->appendChild($document->createElementNS($namespace, 'h2'))->appendChild($document->createTextNode('Landmarks'));
+            ($this->first($xpath, '//x:body') ?? $root)->appendChild($nav);
+        }
+
+        // The list joins the document first, so its links reuse the epub namespace declaration.
+        $list = $document->createElementNS($namespace, 'ol');
+        $oldList = $this->first($xpath, 'x:ol', $nav);
+        $oldList instanceof DOMElement ? $nav->replaceChild($list, $oldList) : $nav->appendChild($list);
+
+        foreach ($landmarks as $landmark) {
+            $link = $list->appendChild($document->createElementNS($namespace, 'li'))->appendChild($document->createElementNS($namespace, 'a'));
+            $link->setAttributeNS(self::OPS_NAMESPACE, 'epub:type', $landmark->type);
+            $link->setAttribute('href', $this->href($navPath, new TocEntry($landmark->title, $landmark->path, $landmark->fragment)));
+            $link->appendChild($document->createTextNode($landmark->title));
         }
 
         $this->save($root, $navPath);
