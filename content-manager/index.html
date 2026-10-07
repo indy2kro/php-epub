@@ -53,6 +53,8 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../advanced-usage/">Advanced Features</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../epub3-features/">EPUB 3 Features</a>
+                  </li>
               </ul>
               <ul>
                 <li class="toctree-l1"><a class="reference internal" href="../architecture/">Architecture</a>
@@ -71,6 +73,8 @@
     <li class="toctree-l3"><a class="reference internal" href="#constructor">Constructor</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#file-operations">File Operations</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#fonts">Fonts</a>
     </li>
         </ul>
     </li>
@@ -195,6 +199,28 @@ $contentManager = $epubFile-&gt;getContentManager();
 </code></pre>
 
 <p>Returns the content of a file. Throws an exception if the file doesn't exist or cannot be read.</p>
+<pre class="codehilite"><code class="language-php">public function getText(string $filePath): string
+</code></pre>
+
+<p>Returns the plain text of an XHTML or HTML document: one line per paragraph, heading, list item, table row and line break, with white space collapsed and entities decoded. Scripts, styles and the document head are left out. The document is read in its declared encoding (UTF-8 or UTF-16) and does not have to be well-formed. Throws an exception if the file doesn't exist or cannot be read. <code>EpubFile::getText()</code> does this for every document of the reading order; see <a href="../epub3-features/#plain-text">EPUB 3 Features</a>.</p>
+<pre class="codehilite"><code class="language-php">public function updateManifestProperties(): void
+</code></pre>
+
+<p>Sets the EPUB 3 manifest properties (<code>svg</code>, <code>mathml</code>, <code>scripted</code>, <code>remote-resources</code>) that every XHTML document needs because of its content and removes those it no longer needs; other properties are kept. <code>addContent()</code> and <code>updateContent()</code> do this for the file they write; use this for books whose documents were written by something else (<code>EpubFile::upgradeToEpub3()</code> does). Nothing happens for an EPUB 2 package, and documents that are missing, not well-formed or larger than 8 MiB are left alone.</p>
+<h3 id="fonts">Fonts<a class="headerlink" href="#fonts" title="Permanent link">&para;</a></h3>
+<pre class="codehilite"><code class="language-php">public function addFont(string $path, string $fontData, bool $obfuscate = true): void
+</code></pre>
+
+<p>Adds (or overwrites) an embedded font and lists it in the manifest. By default the font is obfuscated with the IDPF algorithm (OCF "Font Obfuscation"), keyed by the book's unique identifier, and listed in <code>META-INF/encryption.xml</code>, which is created when the book has none (an existing entry for the path is updated, other entries are kept). With <code>$obfuscate = false</code> the font is stored as it is, and an existing <code>encryption.xml</code> entry for the path is removed. The key is the identifier the book's fonts are keyed with (as loaded or last saved); <code>EpubFile::save()</code> re-keys the fonts when the identifier changes, fonts added this way included. Throws an exception if the path is in <code>META-INF/</code>, the book has no unique identifier, <code>encryption.xml</code> cannot be parsed (nothing is written then) or the file cannot be written. A <code>ContentManager</code> built on its own, without an <code>EpubFile</code>, does not know the identifier and can only add plain fonts.</p>
+<pre class="codehilite"><code class="language-php">public function getFontData(string $path): string
+</code></pre>
+
+<p>Returns the font as a reading system sees it: a font obfuscated with the IDPF or Adobe algorithm (listed in <code>encryption.xml</code>) is returned de-obfuscated, any other file as it is. A font encrypted with another algorithm (DRM) is returned as it is, still encrypted. Throws an exception if the file cannot be read, or the font is Adobe-obfuscated and the unique identifier is not a <code>urn:uuid:</code> one.</p>
+<pre class="codehilite"><code class="language-php">$content = $epubFile-&gt;getContentManager();
+$content-&gt;addFont('EPUB/fonts/body.otf', (string) file_get_contents('body.otf'));
+$plain = $content-&gt;getFontData('EPUB/fonts/body.otf'); // the original bytes
+</code></pre>
+
 <h2 id="usage-example">Usage Example<a class="headerlink" href="#usage-example" title="Permanent link">&para;</a></h2>
 <pre class="codehilite"><code class="language-php">use PhpEpub\EpubFile;
 

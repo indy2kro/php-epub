@@ -53,6 +53,8 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../advanced-usage/">Advanced Features</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../epub3-features/">EPUB 3 Features</a>
+                  </li>
               </ul>
               <ul class="current">
                 <li class="toctree-l1 current"><a class="reference internal current" href="#">Architecture</a>
@@ -188,7 +190,7 @@
 <h3 id="contentmanager">ContentManager<a class="headerlink" href="#contentmanager" title="Permanent link">&para;</a></h3>
 <p>File operations on the extracted book (add, update, delete, move, read), keeping the manifest and spine in sync and refusing XHTML that is not well-formed; moving a file rewrites the references to it. Paths are relative to the book root; the package document itself is managed only through <code>Metadata</code>, <code>Manifest</code> and <code>Spine</code>.</p>
 <h3 id="tableofcontents">TableOfContents<a class="headerlink" href="#tableofcontents" title="Permanent link">&para;</a></h3>
-<p>Reads and edits the EPUB 3 navigation document's <code>toc</code> nav and the EPUB 2 NCX as <code>TocEntry</code> trees, writing both when a book has both.</p>
+<p>Reads and edits the EPUB 3 navigation document's <code>toc</code> nav and the EPUB 2 NCX as <code>TocEntry</code> trees, writing both when a book has both. It also reads and writes the landmarks (<code>Landmark</code> objects: the nav <code>landmarks</code> and the EPUB 2 <code>&lt;guide&gt;</code>) and reads the page list.</p>
 <h3 id="validator">Validator<a class="headerlink" href="#validator" title="Permanent link">&para;</a></h3>
 <p><code>EpubFile::validate()</code> runs it to report common structural problems as <code>ValidationIssue</code>s: required metadata, duplicate ids, manifest and spine consistency, media types and manifest properties, navigation, accessibility metadata.</p>
 <h3 id="parser-and-xmlparser">Parser and XmlParser<a class="headerlink" href="#parser-and-xmlparser" title="Permanent link">&para;</a></h3>
@@ -218,7 +220,7 @@
             </div>
           </div><footer>
     <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
-        <a href="../advanced-usage/" class="btn btn-neutral float-left" title="Advanced Features"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../epub3-features/" class="btn btn-neutral float-left" title="EPUB 3 Features"><span class="icon icon-circle-arrow-left"></span> Previous</a>
         <a href="../epub-file/" class="btn btn-neutral float-right" title="EpubFile">Next <span class="icon icon-circle-arrow-right"></span></a>
     </div>
 
@@ -242,7 +244,7 @@
   <span class="rst-current-version" data-toggle="rst-current-version">
     
     
-      <span><a href="../advanced-usage/" style="color: #fcfcfc">&laquo; Previous</a></span>
+      <span><a href="../epub3-features/" style="color: #fcfcfc">&laquo; Previous</a></span>
     
     
       <span><a href="../epub-file/" style="color: #fcfcfc">Next &raquo;</a></span>

@@ -53,6 +53,8 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../../advanced-usage/">Advanced Features</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../epub3-features/">EPUB 3 Features</a>
+                  </li>
               </ul>
               <ul>
                 <li class="toctree-l1"><a class="reference internal" href="../../architecture/">Architecture</a>
@@ -284,7 +286,7 @@ were re-checked against the round-3 hardening.</p>
 <ul>
 <li>[x] <strong>CONV-01</strong> Render non-Latin books: default to a Unicode font (both renderers ship DejaVu) or choose one from <code>dc:language</code>, and switch TCPDF to RTL for right-to-left books — <code>src/Converters/DompdfAdapter.php:17-22,85-95</code>, <code>src/Converters/TCPDFAdapter.php:14-25,88-115</code> — M · med
   The defaults (Dompdf <code>Arial</code>, TCPDF <code>helvetica</code>) map to the PDF core fonts, which cover Latin-1 only. Cyrillic, Greek, CJK and Arabic books without embedded fonts lose their glyphs, and nothing in either adapter sets right-to-left layout.</li>
-<li>[ ] <strong>CONV-02</strong> De-obfuscate IDPF/Adobe obfuscated fonts before the PDF renderers load them — <code>src/Converters/EpubDocumentLoader.php:393-456,465-499</code>, <code>src/FontObfuscation.php</code> — S · low
+<li>[x] <strong>CONV-02</strong> De-obfuscate IDPF/Adobe obfuscated fonts before the PDF renderers load them — <code>src/Converters/EpubDocumentLoader.php:393-456,465-499</code>, <code>src/FontObfuscation.php</code> — S · low
   <code>@font-face</code> <code>url()</code>s point the renderers at the obfuscated files, because nothing in <code>src/Converters</code> reads <code>encryption.xml</code>, so the book's embedded fonts cannot be used in the PDF.</li>
 <li>[x] <strong>CONV-03</strong> Decode content documents in their declared encoding (EPUB allows UTF-16) instead of always forcing UTF-8 for the HTML parser — <code>src/Converters/EpubDocumentLoader.php:207-216</code>, <code>src/EpubFile.php:445-455</code> — S · low
   The <code>&lt;?xml encoding="UTF-8"&gt;</code> prefix makes libxml read UTF-16 chapters as UTF-8. Their text is garbled in the PDF, and <code>getCoverImage()</code> cannot find the image in a UTF-16 cover page.</li>
@@ -293,7 +295,7 @@ were re-checked against the round-3 hardening.</p>
 </ul>
 <h3 id="features">Features<a class="headerlink" href="#features" title="Permanent link">&para;</a></h3>
 <ul>
-<li>[ ] <strong>FEAT-01</strong> Detect DRM-protected books (<code>encryption.xml</code> algorithms other than font obfuscation, <code>rights.xml</code>, an LCP license): add <code>isEncrypted()</code>, report them in <code>validate()</code>, refuse PDF conversion — <code>src/FontObfuscation.php:86-110</code>, <code>src/Validator.php</code>, <code>src/EpubFile.php:278-287</code> — M · med
+<li>[x] <strong>FEAT-01</strong> Detect DRM-protected books (<code>encryption.xml</code> algorithms other than font obfuscation, <code>rights.xml</code>, an LCP license): add <code>isEncrypted()</code>, report them in <code>validate()</code>, refuse PDF conversion — <code>src/FontObfuscation.php:86-110</code>, <code>src/Validator.php</code>, <code>src/EpubFile.php:278-287</code> — M · med
   An Adobe ADEPT or Readium LCP book loads without any warning. <code>getContent()</code> then returns ciphertext, <code>validate()</code> reports every chapter as not well-formed, and the converters produce garbage PDFs.</li>
 <li>[x] <strong>FEAT-02</strong> Extend <code>validate()</code> with frequent EPUBCheck package errors: declared media type vs. file content, missing EPUB 3 manifest properties (<code>svg</code>, <code>mathml</code>, <code>scripted</code>, <code>remote-resources</code>) in loaded books, <code>cover-image</code> on a non-image — <code>src/Validator.php:150-300</code>, <code>src/Util/ContentDocumentProperties.php</code> — M · med
   Round 3 sets these properties for content the library writes. Loaded books with wrong media types or missing properties still pass <code>validate()</code> and fail EPUBCheck (OPF-014, OPF-029).</li>
@@ -303,19 +305,19 @@ were re-checked against the round-3 hardening.</p>
   <code>moveContent()</code> keeps the manifest, spine, TOC and <code>encryption.xml</code> consistent, but every <code>&lt;a&gt;</code>, <code>&lt;img&gt;</code> and <code>&lt;link&gt;</code> that pointed at the file breaks, so reorganising a book still needs a hand-written rewrite pass.</li>
 <li>[x] <strong>FEAT-05</strong> Open a book from a string or stream, and save it to one (uploads, HTTP downloads) — <code>src/EpubFile.php:57-63,251-271</code> — M · med
   Web apps receive uploads and send downloads, but the API only reads and writes file paths, so callers write their own temp-file plumbing.</li>
-<li>[ ] <strong>FEAT-06</strong> Upgrade an EPUB 2 book to EPUB 3: package version, a nav document generated from the NCX, <code>dcterms:modified</code>, EPUB 3 refinements for <code>opf:role</code>/<code>opf:file-as</code>, the <code>cover-image</code> property — <code>src/Metadata.php</code>, <code>src/TableOfContents.php</code>, <code>src/Manifest.php</code> — L · med
+<li>[x] <strong>FEAT-06</strong> Upgrade an EPUB 2 book to EPUB 3: package version, a nav document generated from the NCX, <code>dcterms:modified</code>, EPUB 3 refinements for <code>opf:role</code>/<code>opf:file-as</code>, the <code>cover-image</code> property — <code>src/Metadata.php</code>, <code>src/TableOfContents.php</code>, <code>src/Manifest.php</code> — L · med
   Stores and validators increasingly require EPUB 3. The library already has every piece of the migration, but callers must assemble them by hand.</li>
 <li>[x] <strong>FEAT-07</strong> Generate the table of contents from the headings (<code>h1</code>–<code>h3</code>) of the spine documents — <code>src/TableOfContents.php:93-130</code>, <code>src/EpubFile.php:170-191</code> — M · low
   Books assembled from existing XHTML need a TOC built from their headings, and callers have to write it themselves with DOM parsing and <code>setEntries()</code>.</li>
-<li>[ ] <strong>FEAT-08</strong> Plain-text extraction per spine document (search indexing, word counts, previews) — <code>src/ContentManager.php</code>, <code>src/Converters/EpubDocumentLoader.php:200-239</code> — S · low
+<li>[x] <strong>FEAT-08</strong> Plain-text extraction per spine document (search indexing, word counts, previews) — <code>src/ContentManager.php</code>, <code>src/Converters/EpubDocumentLoader.php:200-239</code> — S · low
   Getting a book's text is one of the most common reasons to open an EPUB, and today it takes a hand-written spine walk plus HTML parsing.</li>
-<li>[ ] <strong>FEAT-09</strong> Add obfuscated fonts and read fonts de-obfuscated (expose <code>FontObfuscation</code> through <code>ContentManager</code>) — <code>src/FontObfuscation.php:31-80</code>, <code>src/ContentManager.php:91-110</code> — S · low
+<li>[x] <strong>FEAT-09</strong> Add obfuscated fonts and read fonts de-obfuscated (expose <code>FontObfuscation</code> through <code>ContentManager</code>) — <code>src/FontObfuscation.php:31-80</code>, <code>src/ContentManager.php:91-110</code> — S · low
   The library re-keys obfuscated fonts but cannot add one or return a usable font file, so publishers who obfuscate embedded fonts must implement the IDPF algorithm themselves.</li>
-<li>[ ] <strong>FEAT-10</strong> Landmarks API (EPUB 3 nav <code>landmarks</code> and the EPUB 2 <code>guide</code>) and page-list access — <code>src/TableOfContents.php:60-90</code>, <code>src/Manifest.php:246-275</code> — M · low
+<li>[x] <strong>FEAT-10</strong> Landmarks API (EPUB 3 nav <code>landmarks</code> and the EPUB 2 <code>guide</code>) and page-list access — <code>src/TableOfContents.php:60-90</code>, <code>src/Manifest.php:246-275</code> — M · low
   Landmarks (cover, start of text, TOC) drive a reader's "go to beginning", and today they can only be changed by editing the nav XHTML and the guide by hand.</li>
-<li>[ ] <strong>FEAT-11</strong> Fixed-layout and rendition API: <code>rendition:layout</code>, <code>orientation</code>, <code>spread</code>, and the <code>page-spread-*</code> properties of spine itemrefs — <code>src/Spine.php:73-170</code>, <code>src/Metadata.php</code> — M · low
+<li>[x] <strong>FEAT-11</strong> Fixed-layout and rendition API: <code>rendition:layout</code>, <code>orientation</code>, <code>spread</code>, and the <code>page-spread-*</code> properties of spine itemrefs — <code>src/Spine.php:73-170</code>, <code>src/Metadata.php</code> — M · low
   Comics and children's books use fixed layout and need these properties, but no accessor reads or writes them.</li>
-<li>[ ] <strong>FEAT-12</strong> Media overlays: read and set an item's <code>media-overlay</code> SMIL, plus the <code>media:duration</code> and <code>media:active-class</code> metadata — <code>src/Manifest.php:355-370</code>, <code>src/Metadata.php:166-222</code> — M · low
+<li>[x] <strong>FEAT-12</strong> Media overlays: read and set an item's <code>media-overlay</code> SMIL, plus the <code>media:duration</code> and <code>media:active-class</code> metadata — <code>src/Manifest.php:355-370</code>, <code>src/Metadata.php:166-222</code> — M · low
   Read-aloud books need these. The library keeps existing <code>media-overlay</code> references consistent but has no API to create them.</li>
 </ul>
 <h3 id="public-api">Public API<a class="headerlink" href="#public-api" title="Permanent link">&para;</a></h3>

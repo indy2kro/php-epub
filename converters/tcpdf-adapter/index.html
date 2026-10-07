@@ -53,6 +53,8 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../../advanced-usage/">Advanced Features</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../epub3-features/">EPUB 3 Features</a>
+                  </li>
               </ul>
               <ul>
                 <li class="toctree-l1"><a class="reference internal" href="../../architecture/">Architecture</a>
@@ -186,6 +188,7 @@ It provides a flexible interface to customize the PDF output through various sty
 </table>
 <p>The constructor throws an <code>Exception</code> for a style it does not know (the message lists the valid ones), a value of the wrong type (a numeric string is not a number), an unusable value (a negative margin, an empty font, an unknown orientation) and a paper size TCPDF does not know. With TCPDF 6 the paper size is not checked, because TCPDF 6 has no list to check it against.</p>
 <p><strong>Fonts and languages:</strong> the default font is DejaVu Sans, which covers Latin, Greek, Cyrillic, Hebrew and Arabic, not only Latin-1 like the PDF core fonts (<code>helvetica</code>, <code>times</code>, <code>courier</code>). It is generated, with its bold and italic variants, by <code>scripts/generate-core-fonts.php</code> (see <a href="../../installation/#tcpdf-core-fonts">Installation</a>); when that has not been run since DejaVu Sans was added, the default falls back to <code>helvetica</code>, which renders only Latin-1 text. Chinese, Japanese and Korean need a font of your own: pass its name as <code>font</code>. A <code>font</code> you pass always wins and never falls back. Books with <code>page-progression-direction="rtl"</code> in the spine, or (when the spine says nothing) with a primary language of <code>ar</code>, <code>he</code>, <code>fa</code>, <code>ur</code>, <code>yi</code>, <code>ps</code>, <code>sd</code>, <code>ug</code> or <code>dv</code>, are rendered right to left.</p>
+<p><strong>Embedded fonts:</strong> TCPDF does not support CSS <code>@font-face</code>, so the fonts a book embeds are not used (use <code>DompdfAdapter</code>, which loads them). A DRM-protected book is refused with a <code>ConversionException</code>.</p>
 </li>
 <li>
 <p><strong><code>convert(string $epubDirectory, string $outputPath): void</code></strong>: Renders every spine document in reading order, each on a new page, sets the PDF title and author from the EPUB metadata, and writes the PDF. Image sources are limited to files inside the book; see <a href="../../converter/#how-the-pdf-adapters-read-a-book">Converter</a>. Throws a <code>ConversionException</code> if the book cannot be read, TCPDF fails (its exception, or any other error, is kept as the previous exception) or the PDF cannot be written. A missing font definition, TCPDF's "unable to read file: helvetica.json", is reported with the command that generates the fonts: <code>php vendor/indy2kro/php-epub/scripts/generate-core-fonts.php</code>.</p>

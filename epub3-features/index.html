@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="author" content="indy2kro" /><link rel="canonical" href="https://indy2kro.github.io/php-epub/epub3-features/" />
+      <link rel="shortcut icon" href="../img/favicon.ico" />
+    <title>EPUB 3 Features - PHP EPUB</title>
+    <link rel="stylesheet" href="../css/theme.css" />
+    <link rel="stylesheet" href="../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "EPUB 3 Features";
+        var mkdocs_page_input_path = "epub3-features.md";
+        var mkdocs_page_url = "/php-epub/epub3-features/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href=".." class="icon icon-home"> PHP EPUB
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="..">Index</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../installation/">Installation</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Usage</span></p>
+              <ul class="current">
+                  <li class="toctree-l1"><a class="reference internal" href="../basic-usage/">Basic Usage</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../advanced-usage/">Advanced Features</a>
+                  </li>
+                  <li class="toctree-l1 current"><a class="reference internal current" href="#">EPUB 3 Features</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#upgrading-an-epub-2-book">Upgrading an EPUB 2 book</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#landmarks-and-the-page-list">Landmarks and the page list</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#fixed-layout-and-rendition">Fixed layout and rendition</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#media-overlays">Media overlays</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#plain-text">Plain text</a>
+    </li>
+    </ul>
+                  </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../architecture/">Architecture</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Classes</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../epub-file/">EpubFile</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../content-manager/">ContentManager</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../metadata/">Metadata</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../manifest/">Manifest</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../spine/">Spine</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../table-of-contents/">TableOfContents</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../parser/">Parser</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../xml-parser/">XmlParser</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../zip-handler/">ZipHandler</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../converter/">Converter</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Converters</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../converters/calibre-adapter/">Calibre Adapter</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../converters/dompdf-adapter/">Dompdf Adapter</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../converters/tcpdf-adapter/">TCPDF Adapter</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="..">PHP EPUB</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
+          <li class="breadcrumb-item">Usage</li>
+      <li class="breadcrumb-item active">EPUB 3 Features</li>
+    <li class="wy-breadcrumbs-aside">
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="epub-3-features">EPUB 3 Features<a class="headerlink" href="#epub-3-features" title="Permanent link">&para;</a></h1>
+<p>Upgrading a book to EPUB 3, landmarks and the page list, fixed layout, media overlays and plain-text extraction.</p>
+<h2 id="upgrading-an-epub-2-book">Upgrading an EPUB 2 book<a class="headerlink" href="#upgrading-an-epub-2-book" title="Permanent link">&para;</a></h2>
+<pre class="codehilite"><code class="language-php">use PhpEpub\EpubFile;
+
+$epubFile = EpubFile::open('/path/to/old.epub');
+
+if ($epubFile-&gt;upgradeToEpub3()) {
+    $epubFile-&gt;save('/path/to/new.epub');
+}
+</code></pre>
+
+<p><code>EpubFile::upgradeToEpub3(): bool</code> converts a loaded EPUB 2 book in place; <code>save()</code> writes the result. It returns <code>true</code> when the book was converted and <code>false</code>, changing nothing, when it already is EPUB 3. It throws an <code>Exception</code> when the book is not loaded or the navigation document cannot be written; the book may be partly converted then, so open it again. The conversion:</p>
+<ul>
+<li>sets the package <code>version</code> to <code>3.0</code> and adds <code>dcterms:modified</code>;</li>
+<li>generates a navigation document (<code>nav.xhtml</code> next to the OPF, or <code>nav-2.xhtml</code>, ... when that name is taken) from the NCX entries, with the <code>nav</code> manifest property. A book without NCX entries gets one entry per linear XHTML document of the reading order, named after its file. The NCX stays (and <code>spine@toc</code> with it) for EPUB 2 reading systems;</li>
+<li>turns the <code>&lt;guide&gt;</code> into the navigation document's landmarks (see below) and keeps the guide too. Guide types without an EPUB 3 equivalent, such as <code>other.custom</code>, are not carried over to the landmarks;</li>
+<li>converts the <code>opf:*</code> attributes, which EPUB 3 does not allow on Dublin Core elements: <code>opf:role</code> and <code>opf:file-as</code> become <code>role</code> (scheme <code>marc:relators</code>) and <code>file-as</code> refinements; the <code>opf:scheme</code> of an ISBN or DOI identifier becomes an <code>identifier-type</code> refinement (ONIX code list 5: <code>15</code> ISBN-13, <code>02</code> ISBN-10, <code>06</code> DOI; other schemes are dropped); every other <code>opf:*</code> attribute is removed;</li>
+<li>keeps one <code>dc:date</code>: the publication date (the one with the <code>publication</code> event, or else the first without an event). Dates with the <code>creation</code>, <code>issued</code> and <code>copyright</code> events become <code>dcterms:created</code>, <code>dcterms:issued</code> and <code>dcterms:dateCopyrighted</code> properties; the <code>modification</code> date is replaced by <code>dcterms:modified</code>, and any other date is dropped;</li>
+<li>gives the cover image the <code>cover-image</code> property (the <code>&lt;meta name="cover"&gt;</code> stays for older readers);</li>
+<li>adds the manifest properties XHTML documents need for their content (<code>svg</code>, <code>mathml</code>, <code>scripted</code>, <code>remote-resources</code>), as <code>ContentManager::updateManifestProperties()</code> does.</li>
+</ul>
+<p>Content documents are not rewritten. An XHTML 1.1 document with an old <code>DOCTYPE</code> or obsolete elements may still draw EPUBCheck errors in EPUB 3 even though the package is valid; <code>validate()</code> does not report those. A book whose metadata declares <code>xmlns:opf</code> gets the new refinements as <code>&lt;opf:meta …&gt;</code>, which is the same XML in the same namespace.</p>
+<h2 id="landmarks-and-the-page-list">Landmarks and the page list<a class="headerlink" href="#landmarks-and-the-page-list" title="Permanent link">&para;</a></h2>
+<p>Landmarks are the places a reading system offers as "go to cover", "go to the table of contents" or "go to the beginning": the EPUB 3 navigation document's <code>landmarks</code> nav and the EPUB 2 <code>&lt;guide&gt;</code>. They are read and written through <a href="../table-of-contents/">TableOfContents</a> as <code>PhpEpub\Landmark</code> objects (<code>type</code>, <code>title</code>, <code>path</code>, <code>fragment</code>), with the EPUB 3 <code>epub:type</code> as the type:</p>
+<pre class="codehilite"><code class="language-php">use PhpEpub\Landmark;
+
+$toc = $epubFile-&gt;getTableOfContents();
+
+foreach ($toc-&gt;getLandmarks() as $landmark) {
+    echo $landmark-&gt;type, ': ', $landmark-&gt;title, ' -&gt; ', $landmark-&gt;path, &quot;\n&quot;;
+}
+
+$toc-&gt;setLandmarks([
+    new Landmark('cover', 'Cover', 'EPUB/text/cover.xhtml'),
+    new Landmark('toc', 'Contents', 'EPUB/nav.xhtml'),
+    new Landmark('bodymatter', 'Start of the book', 'EPUB/text/chapter-1.xhtml'),
+]);
+$epubFile-&gt;save();
+</code></pre>
+
+<ul>
+<li><code>getLandmarks()</code> returns the landmarks of the navigation document's <code>landmarks</code> nav or, when it has none, those of the <code>&lt;guide&gt;</code> that have an EPUB 3 equivalent, with the type translated (<code>text</code> becomes <code>bodymatter</code>, <code>title-page</code> becomes <code>titlepage</code>, <code>acknowledgements</code> becomes <code>acknowledgments</code>, <code>notes</code> becomes <code>endnotes</code>; <code>Landmark::fromGuideType()</code> and <code>Landmark::toGuideType()</code> expose the mapping). Landmarks that point outside the book are left out.</li>
+<li><code>setLandmarks()</code> replaces them. They are written to the navigation document's <code>landmarks</code> nav, which is created when missing (hidden, after the other navs), and, for an EPUB 2 book or an EPUB 3 book that keeps a <code>&lt;guide&gt;</code>, to the guide as well, after the spine. Landmarks whose type the guide cannot express (for example <code>chapter</code>) stay out of the guide. <code>[]</code> removes the nav and the guide. It throws an <code>Exception</code> when a landmark has an empty type, title or path, a value is not valid XML text, a path leaves the book, or the book has neither a navigation document nor a guide.</li>
+<li><code>getPageList()</code> returns the print page numbers of the navigation document's <code>page-list</code> nav or, when it has none, of the NCX <code>pageList</code>, as a list of <code>TocEntry</code> (title = the page label); <code>[]</code> when the book has neither. It is read-only.</li>
+</ul>
+<p>The guide itself is available through <code>Manifest::getGuideReferences()</code> and <code>Manifest::setGuideReferences()</code>, which use the guide's own types.</p>
+<h2 id="fixed-layout-and-rendition">Fixed layout and rendition<a class="headerlink" href="#fixed-layout-and-rendition" title="Permanent link">&para;</a></h2>
+<p>The rendition vocabulary tells a reading system whether a book is reflowable or fixed layout. It is EPUB 3 only: the setters throw an <code>Exception</code> for an EPUB 2 package, and the getters return <code>null</code> there.</p>
+<pre class="codehilite"><code class="language-php">$metadata = $epubFile-&gt;getMetadata();
+$metadata-&gt;setRenditionLayout('pre-paginated');   // or 'reflowable'
+$metadata-&gt;setRenditionOrientation('portrait');   // auto, landscape, portrait
+$metadata-&gt;setRenditionSpread('none');            // none, auto, landscape, portrait, both
+$metadata-&gt;setRenditionFlow('paginated');         // auto, paginated, scrolled-continuous, scrolled-doc
+
+$spine = $epubFile-&gt;getSpine();
+$spine-&gt;setPageSpread('page-1', 'right');         // left, right or center; null removes it
+$spine-&gt;setItemRendition('page-2', 'layout', 'reflowable');   // override one page; null removes it
+$spine-&gt;setItemProperties('page-3', ['page-spread-left', 'rendition:orientation-landscape']);
+</code></pre>
+
+<ul>
+<li><code>Metadata::getRenditionLayout()</code> / <code>setRenditionLayout()</code> and the matching <code>…Orientation()</code>, <code>…Spread()</code> and <code>…Flow()</code> methods read and write the <code>rendition:*</code> metadata. A value outside the vocabulary throws an <code>Exception</code>; <code>null</code> removes the property.</li>
+<li><code>Spine::getItemProperties($idref)</code> / <code>setItemProperties($idref, array $properties)</code> read and replace the raw <code>properties</code> of an itemref (tokens without white space). <code>getPageSpread()</code> / <code>setPageSpread()</code> handle <code>page-spread-left</code>, <code>page-spread-right</code> and <code>rendition:page-spread-center</code>; <code>getItemRendition($idref, $aspect)</code> / <code>setItemRendition($idref, $aspect, $value)</code> handle the per-item overrides (<code>rendition:layout-pre-paginated</code>, <code>rendition:orientation-landscape</code>, ...). Other properties of the entry are kept, and the item must be in the spine.</li>
+<li>Writing any <code>rendition:</code> metadata or property declares the prefix in the package element, <code>prefix="rendition: http://www.idpf.org/vocab/rendition/#"</code>, unless the package declares it already. The prefix is reserved from EPUB 3.1 on, but a package of version <code>3.0</code> (which includes EPUB 3.2 and 3.3 books) and older reading systems expect the declaration, and declaring a reserved prefix with its standard URI is allowed.</li>
+</ul>
+<h2 id="media-overlays">Media overlays<a class="headerlink" href="#media-overlays" title="Permanent link">&para;</a></h2>
+<p>A media overlay is a SMIL document that narrates a content document. Overlays are EPUB 3 only.</p>
+<pre class="codehilite"><code class="language-php">$manifest = $epubFile-&gt;getManifest();
+$manifest-&gt;setMediaOverlay('chapter-1', 'chapter-1-smil');   // content item id, SMIL item id
+echo $manifest-&gt;getMediaOverlay('chapter-1');                // 'chapter-1-smil'
+
+$metadata = $epubFile-&gt;getMetadata();
+$metadata-&gt;setMediaDuration('0:32:29');                      // the whole narration
+$metadata-&gt;setMediaDurationOf('chapter-1-smil', '0:16:00.5'); // one overlay
+$metadata-&gt;setMediaActiveClass('-epub-media-overlay-active');
+$metadata-&gt;setMediaPlaybackActiveClass('-epub-media-overlay-playing');
+$metadata-&gt;setMediaNarrators(['Ann Narrator']);
+</code></pre>
+
+<ul>
+<li><code>Manifest::setMediaOverlay($id, $overlayId)</code> sets the <code>media-overlay</code> attribute of an XHTML or SVG item; <code>null</code> removes it. It throws an <code>Exception</code> when an item is unknown, the content item is not XHTML or SVG, the overlay is not an <code>application/smil+xml</code> item, or the package is EPUB 2. <code>getMediaOverlay($id)</code> returns the overlay id or <code>null</code>. Deleting the SMIL item clears the reference and its duration.</li>
+<li><code>Metadata::getMediaDuration()</code> / <code>setMediaDuration()</code> handle the book's total <code>media:duration</code>; <code>getMediaDurationOf($overlayId)</code> / <code>setMediaDurationOf($overlayId, $duration)</code> the duration of one overlay (a refinement of its SMIL item, which must be in the manifest); <code>getMediaDurations()</code> returns them all, keyed by SMIL item id. Durations must be SMIL clock values: <code>0:32:29.5</code> (hours, minutes, seconds), <code>32:29</code>, or a time count with an optional unit, <code>1949.5s</code>, <code>1500ms</code>, <code>45min</code>, <code>3h</code>; anything else throws an <code>Exception</code>. The library does not check that the total equals the sum of the overlays.</li>
+<li><code>getMediaActiveClass()</code> / <code>setMediaActiveClass()</code> and <code>getMediaPlaybackActiveClass()</code> / <code>setMediaPlaybackActiveClass()</code> take a CSS class name without white space; <code>getMediaNarrators()</code> / <code>setMediaNarrators()</code> a list of names.</li>
+</ul>
+<h2 id="plain-text">Plain text<a class="headerlink" href="#plain-text" title="Permanent link">&para;</a></h2>
+<pre class="codehilite"><code class="language-php">$text = $epubFile-&gt;getContentManager()-&gt;getText('EPUB/text/chapter-1.xhtml');   // one document
+
+foreach ($epubFile-&gt;getText() as $path =&gt; $text) {   // the whole book, in reading order
+    echo $path, ': ', str_word_count($text), &quot; words\n&quot;;
+}
+</code></pre>
+
+<ul>
+<li><code>ContentManager::getText($path)</code> returns the text of one XHTML or HTML document: one line per paragraph, heading, list item, table row and <code>&lt;br&gt;</code>, white space collapsed, entities decoded, with scripts, styles and the document head left out. The document is read in its declared encoding (UTF-8 or UTF-16, as for conversion) and does not have to be well-formed. It throws an <code>Exception</code> if the file cannot be read.</li>
+<li><code>EpubFile::getText(bool $linearOnly = true)</code> returns <code>path =&gt; text</code> for the XHTML and HTML documents of the spine, in reading order. Auxiliary content (<code>linear="no"</code>, such as notes) is skipped unless <code>$linearOnly</code> is <code>false</code>; spine items that are not XHTML or HTML, or whose file is missing, are skipped.</li>
+</ul>
+              
+            </div>
+          </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href="../advanced-usage/" class="btn btn-neutral float-left" title="Advanced Features"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../architecture/" class="btn btn-neutral float-right" title="Architecture">Next <span class="icon icon-circle-arrow-right"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+    
+      <span><a href="../advanced-usage/" style="color: #fcfcfc">&laquo; Previous</a></span>
+    
+    
+      <span><a href="../architecture/" style="color: #fcfcfc">Next &raquo;</a></span>
+    
+  </span>
+</div>
+    <script src="../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "..";</script>
+    <script src="../js/theme_extra.js"></script>
+    <script src="../js/theme.js"></script>
+      <script src="../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

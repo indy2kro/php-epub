@@ -53,6 +53,8 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../advanced-usage/">Advanced Features</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../epub3-features/">EPUB 3 Features</a>
+                  </li>
               </ul>
               <ul>
                 <li class="toctree-l1"><a class="reference internal" href="../architecture/">Architecture</a>
@@ -76,9 +78,15 @@
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#validating">Validating</a>
     </li>
+    <li class="toctree-l3"><a class="reference internal" href="#drm-protected-books">DRM-protected books</a>
+    </li>
     <li class="toctree-l3"><a class="reference internal" href="#table-of-contents">Table of Contents</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#cover-image">Cover Image</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#upgrading-to-epub-3">Upgrading to EPUB 3</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#plain-text">Plain Text</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#converting">Converting</a>
     </li>
@@ -312,6 +320,11 @@ $epubFile-&gt;save();
 <td>A spine item is not a content document and has no fallback</td>
 </tr>
 <tr>
+<td><code>CONTENT_ENCRYPTED</code></td>
+<td>error</td>
+<td>The book is DRM-protected (see <a href="#drm-protected-books">DRM-protected books</a>). This is the only issue reported for its encrypted resources: they are not checked for well-formedness, media type or manifest properties</td>
+</tr>
+<tr>
 <td><code>CONTENT_NOT_WELL_FORMED</code></td>
 <td>error</td>
 <td>An XHTML content document is not well-formed XML</td>
@@ -373,6 +386,20 @@ $epubFile-&gt;save();
 }
 </code></pre>
 
+<h3 id="drm-protected-books">DRM-protected books<a class="headerlink" href="#drm-protected-books" title="Permanent link">&para;</a></h3>
+<pre class="codehilite"><code class="language-php">public function isDrmProtected(): bool
+public function getEncryptedPaths(): array
+</code></pre>
+
+<p>A book is DRM-protected when <code>META-INF/encryption.xml</code> lists a resource encrypted with an algorithm that is not a font obfuscation (the IDPF and Adobe font obfuscations are not DRM), or when the book has <code>META-INF/rights.xml</code> (Adobe ADEPT) or <code>META-INF/license.lcpl</code> (Readium LCP). <code>getEncryptedPaths()</code> returns the sorted, book-relative paths of the encrypted resources (empty when only <code>rights.xml</code> or <code>license.lcpl</code> marks the book). Both methods throw an <code>Exception</code> before <code>load()</code>.</p>
+<p>The library only detects DRM; it never decrypts. Such a book still opens, and its package (metadata, manifest, spine) can be read, but <code>getContent()</code> returns ciphertext for the encrypted files. <code>validate()</code> reports one <code>CONTENT_ENCRYPTED</code> error instead of an error per encrypted document, and <code>convert()</code> (and <code>TCPDFAdapter</code>, <code>DompdfAdapter</code> called on a directory) throws a <code>ConversionException</code> saying the book is DRM-protected. A damaged <code>encryption.xml</code> never stops a book from loading; it counts as listing nothing.</p>
+<pre class="codehilite"><code class="language-php">$epubFile = EpubFile::open('/path/to/book.epub');
+
+if ($epubFile-&gt;isDrmProtected()) {
+    echo 'Encrypted: ', implode(', ', $epubFile-&gt;getEncryptedPaths()), PHP_EOL;
+}
+</code></pre>
+
 <h3 id="table-of-contents">Table of Contents<a class="headerlink" href="#table-of-contents" title="Permanent link">&para;</a></h3>
 <pre class="codehilite"><code class="language-php">public function getTableOfContents(): TableOfContents
 </code></pre>
@@ -392,11 +419,21 @@ $epubFile-&gt;save();
 </code></pre>
 
 <p>Unmarks the cover: removes the <code>cover-image</code> property, <code>&lt;meta name="cover"&gt;</code> and <code>&lt;guide&gt;</code> cover references, so <code>getCoverImage()</code> returns <code>null</code> afterwards. With <code>$deleteFile</code>, the image is also deleted from the book (with its manifest item). A cover page in the reading order stays.</p>
+<h3 id="upgrading-to-epub-3">Upgrading to EPUB 3<a class="headerlink" href="#upgrading-to-epub-3" title="Permanent link">&para;</a></h3>
+<pre class="codehilite"><code class="language-php">public function upgradeToEpub3(): bool
+</code></pre>
+
+<p>Converts a loaded EPUB 2 book to EPUB 3 in place: package version <code>3.0</code> with <code>dcterms:modified</code>, a navigation document generated from the NCX (the NCX and the <code>&lt;guide&gt;</code> stay, and the guide becomes the landmarks), refinements instead of <code>opf:role</code>, <code>opf:file-as</code> and the other <code>opf:*</code> attributes, the <code>cover-image</code> property and the manifest properties the content needs. Returns <code>true</code> when the book was converted and <code>false</code>, with nothing changed, when it already is EPUB 3. Save the book afterwards. See <a href="../epub3-features/#upgrading-an-epub-2-book">EPUB 3 Features</a> for the details and the limits (content documents are not rewritten).</p>
+<h3 id="plain-text">Plain Text<a class="headerlink" href="#plain-text" title="Permanent link">&para;</a></h3>
+<pre class="codehilite"><code class="language-php">public function getText(bool $linearOnly = true): array
+</code></pre>
+
+<p>Returns <code>path =&gt; text</code> for the XHTML and HTML documents of the reading order, in order, as <code>ContentManager::getText()</code> reads them. Auxiliary content (<code>linear="no"</code>) is skipped unless <code>$linearOnly</code> is <code>false</code>; spine items that are not XHTML or HTML, or whose file is missing, are skipped.</p>
 <h3 id="converting">Converting<a class="headerlink" href="#converting" title="Permanent link">&para;</a></h3>
 <pre class="codehilite"><code class="language-php">public function convert(ConverterInterface $converter, string $outputPath): void
 </code></pre>
 
-<p>Writes pending changes to the extracted book and converts it with the given adapter (<code>DompdfAdapter</code>, <code>TCPDFAdapter</code>, <code>CalibreAdapter</code>, …), so unsaved edits are included. Throws if called before <code>load()</code>.</p>
+<p>Writes pending changes to the extracted book and converts it with the given adapter (<code>DompdfAdapter</code>, <code>TCPDFAdapter</code>, <code>CalibreAdapter</code>, …), so unsaved edits are included. Throws if called before <code>load()</code>, and a <code>ConversionException</code> if the book is <a href="#drm-protected-books">DRM-protected</a>.</p>
 <h3 id="cleanup">Cleanup<a class="headerlink" href="#cleanup" title="Permanent link">&para;</a></h3>
 <pre class="codehilite"><code class="language-php">public function cleanup(): void
 </code></pre>

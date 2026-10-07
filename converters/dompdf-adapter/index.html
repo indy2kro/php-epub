@@ -53,6 +53,8 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../../advanced-usage/">Advanced Features</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../epub3-features/">EPUB 3 Features</a>
+                  </li>
               </ul>
               <ul>
                 <li class="toctree-l1"><a class="reference internal" href="../../architecture/">Architecture</a>
@@ -172,6 +174,8 @@
 </table>
 <p>The constructor throws an <code>Exception</code> for a style it does not know (the message lists the valid ones), a value of the wrong type (a numeric string is not a number), an unusable value (a negative margin, an unknown orientation) and a paper size Dompdf does not know (Dompdf itself would fall back to <code>letter</code> without a word).</p>
 <p><strong>Fonts and languages:</strong> the default font is DejaVu Sans, which Dompdf ships and which covers Latin, Greek, Cyrillic, Hebrew and Arabic, not only Latin-1 like the PDF core fonts (<code>Arial</code> is mapped to Helvetica). Chinese, Japanese and Korean need a font installed in Dompdf: pass its family as <code>font</code>, which always wins. Books with <code>page-progression-direction="rtl"</code> in the spine, or (when the spine says nothing) with a primary language of <code>ar</code>, <code>he</code>, <code>fa</code>, <code>ur</code>, <code>yi</code>, <code>ps</code>, <code>sd</code>, <code>ug</code> or <code>dv</code>, get <code>dir="rtl"</code> on the generated <code>&lt;html&gt;</code> and <code>&lt;body&gt;</code>; the book's language is set as <code>lang</code>. Dompdf does not shape Arabic script, so Arabic letters are not joined.</p>
+<p><strong>Embedded fonts:</strong> the fonts a book loads with <code>@font-face</code> are used. Obfuscated fonts (IDPF or Adobe, listed in <code>META-INF/encryption.xml</code>) are de-obfuscated in memory and handed to Dompdf as <code>data:</code> URIs, so nothing is written into the book; a font that cannot be de-obfuscated (an Adobe font in a book without a <code>urn:uuid:</code> identifier) is dropped. Dompdf loads only TrueType fonts (a <code>src</code> without <code>format()</code>, or <code>format("truetype")</code>). Dompdf keeps the fonts it loads in a font directory; each conversion gets a private temporary one, deleted afterwards, so books leave nothing in Dompdf's own <code>lib/fonts</code> and cannot change the fonts of later conversions.</p>
+<p>A DRM-protected book is refused with a <code>ConversionException</code>.</p>
 <p>Dompdf cannot write a PDF outline, so use <code>TCPDFAdapter</code> when you need chapter bookmarks.</p>
 </li>
 <li>

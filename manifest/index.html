@@ -53,6 +53,8 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../advanced-usage/">Advanced Features</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../epub3-features/">EPUB 3 Features</a>
+                  </li>
               </ul>
               <ul>
                 <li class="toctree-l1"><a class="reference internal" href="../architecture/">Architecture</a>
@@ -168,6 +170,12 @@
 </li>
 <li>
 <p><strong><code>removeGuideReferences(string $type): void</code></strong>: Removes the EPUB 2 <code>&lt;guide&gt;</code> references of a type (compared case-insensitively), and the guide when none is left.</p>
+</li>
+<li>
+<p><strong><code>getGuideReferences(): array</code></strong> and <strong><code>setGuideReferences(array $references): void</code></strong>: The EPUB 2 <code>&lt;guide&gt;</code> as <code>Landmark</code> objects that carry the guide's own types (<code>cover</code>, <code>text</code>, <code>title-page</code>, ...); references that point outside the book are left out. Setting replaces the guide (created after the spine when missing) and <code>[]</code> removes it. Use <code>TableOfContents::getLandmarks()</code> and <code>setLandmarks()</code> to work with EPUB 3 types and the navigation document at the same time.</p>
+</li>
+<li>
+<p><strong><code>getMediaOverlay(string $id): ?string</code></strong> and <strong><code>setMediaOverlay(string $id, ?string $overlayId): void</code></strong>: The SMIL item (<code>application/smil+xml</code>) that narrates an XHTML or SVG item (its <code>media-overlay</code> attribute); <code>null</code> removes it. EPUB 3 only. See <a href="../epub3-features/#media-overlays">EPUB 3 Features</a>.</p>
 </li>
 <li>
 <p><strong><code>getOpfPath(): string</code></strong>: The OPF location relative to the book root.</p>

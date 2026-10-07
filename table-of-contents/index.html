@@ -53,6 +53,8 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../advanced-usage/">Advanced Features</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../epub3-features/">EPUB 3 Features</a>
+                  </li>
               </ul>
               <ul>
                 <li class="toctree-l1"><a class="reference internal" href="../architecture/">Architecture</a>
@@ -150,6 +152,12 @@
 </li>
 <li>
 <p><strong><code>generateFromHeadings(int $maxLevel = 3): array</code></strong>: Builds the table of contents from the headings <code>h1</code> to <code>h$maxLevel</code> of the spine documents, in reading order, sets it with <code>setEntries()</code> and returns the entries. Headings nest by level (an <code>h2</code> after an <code>h1</code> is its child, also across documents). A heading without an <code>id</code> gets one (<code>toc-1</code>, <code>toc-2</code>, ..., unique in its document), which rewrites that document. Documents that are not well-formed XML, non-linear spine items, the navigation document and headings without text are skipped. Throws an <code>Exception</code> when <code>$maxLevel</code> is not 1 to 6, when the object has no spine (use <code>EpubFile::getTableOfContents()</code>), when the book has no navigation document or NCX, or when no heading is found (a table of contents needs an entry; nothing is changed then).</p>
+</li>
+<li>
+<p><strong><code>getLandmarks(): array</code></strong> and <strong><code>setLandmarks(array $landmarks): void</code></strong>: Read and replace the book's landmarks (<code>PhpEpub\Landmark</code>: <code>type</code>, <code>title</code>, <code>path</code>, <code>fragment</code>) in the navigation document's <code>landmarks</code> nav and the EPUB 2 <code>&lt;guide&gt;</code>. See <a href="../epub3-features/#landmarks-and-the-page-list">EPUB 3 Features</a>.</p>
+</li>
+<li>
+<p><strong><code>getPageList(): array</code></strong>: The print page numbers of the navigation document's <code>page-list</code> nav or the NCX <code>pageList</code>, as <code>TocEntry</code> objects; <code>[]</code> when the book has none. Read-only.</p>
 </li>
 <li>
 <p><strong><code>isAvailable(): bool</code></strong>: Whether the book has a navigation document or an NCX that can hold a table of contents, i.e. whether <code>setEntries()</code> can work.</p>

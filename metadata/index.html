@@ -53,6 +53,8 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../advanced-usage/">Advanced Features</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../epub3-features/">EPUB 3 Features</a>
+                  </li>
               </ul>
               <ul>
                 <li class="toctree-l1"><a class="reference internal" href="../architecture/">Architecture</a>
@@ -93,6 +95,10 @@
     <li class="toctree-l3"><a class="reference internal" href="#language">Language</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#accessibility">Accessibility</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#rendition-fixed-layout">Rendition (fixed layout)</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#media-overlays">Media Overlays</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#subject">Subject</a>
     </li>
@@ -339,6 +345,33 @@ $metadata-&gt;setAccessibilitySummary('All images have text alternatives.');
 $metadata-&gt;setConformsTo('EPUB Accessibility 1.1 - WCAG 2.1 Level AA');
 </code></pre>
 
+<h3 id="rendition-fixed-layout">Rendition (fixed layout)<a class="headerlink" href="#rendition-fixed-layout" title="Permanent link">&para;</a></h3>
+<pre class="codehilite"><code class="language-php">public function getRenditionLayout(): ?string
+public function setRenditionLayout(?string $layout): void
+public function getRenditionOrientation(): ?string
+public function setRenditionOrientation(?string $orientation): void
+public function getRenditionSpread(): ?string
+public function setRenditionSpread(?string $spread): void
+public function getRenditionFlow(): ?string
+public function setRenditionFlow(?string $flow): void
+</code></pre>
+
+<p>The EPUB Rendition properties <code>rendition:layout</code> (<code>reflowable</code>, <code>pre-paginated</code>), <code>rendition:orientation</code> (<code>auto</code>, <code>landscape</code>, <code>portrait</code>), <code>rendition:spread</code> (<code>none</code>, <code>auto</code>, <code>landscape</code>, <code>portrait</code>, <code>both</code>) and <code>rendition:flow</code> (<code>auto</code>, <code>paginated</code>, <code>scrolled-continuous</code>, <code>scrolled-doc</code>). The getters return <code>null</code> when the property is not set; <code>null</code> removes it. The setters throw an <code>Exception</code> for another value and for an EPUB 2 package, and declare the <code>rendition</code> prefix in the package's <code>prefix</code> attribute. Individual pages override them with <code>Spine::setItemRendition()</code>. See <a href="../epub3-features/#fixed-layout-and-rendition">EPUB 3 Features</a>.</p>
+<h3 id="media-overlays">Media Overlays<a class="headerlink" href="#media-overlays" title="Permanent link">&para;</a></h3>
+<pre class="codehilite"><code class="language-php">public function getMediaDuration(): ?string
+public function setMediaDuration(?string $duration): void
+public function getMediaDurationOf(string $overlayId): ?string
+public function setMediaDurationOf(string $overlayId, ?string $duration): void
+public function getMediaDurations(): array
+public function getMediaActiveClass(): ?string
+public function setMediaActiveClass(?string $class): void
+public function getMediaPlaybackActiveClass(): ?string
+public function setMediaPlaybackActiveClass(?string $class): void
+public function getMediaNarrators(): array
+public function setMediaNarrators(array $narrators): void
+</code></pre>
+
+<p>The <code>media:duration</code> of the whole book and, as a refinement of each SMIL manifest item, of each overlay; the <code>media:active-class</code> and <code>media:playback-active-class</code> CSS classes; and the <code>media:narrator</code> names. Durations must be SMIL clock values (<code>0:32:29.5</code>, <code>32:29</code>, <code>1949.5s</code>, <code>1500ms</code>, <code>45min</code>, <code>3h</code>); the setters throw an <code>Exception</code> for an invalid value and for an EPUB 2 package, and <code>setMediaDurationOf()</code> also for an id that is not an <code>application/smil+xml</code> item. Attach an overlay to a content document with <code>Manifest::setMediaOverlay()</code>. See <a href="../epub3-features/#media-overlays">EPUB 3 Features</a>.</p>
 <h3 id="subject">Subject<a class="headerlink" href="#subject" title="Permanent link">&para;</a></h3>
 <pre class="codehilite"><code class="language-php">public function getSubject(): string
 public function setSubject(string $subject): void

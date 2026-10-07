@@ -53,6 +53,8 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../advanced-usage/">Advanced Features</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../epub3-features/">EPUB 3 Features</a>
+                  </li>
               </ul>
               <ul>
                 <li class="toctree-l1"><a class="reference internal" href="../architecture/">Architecture</a>
@@ -151,6 +153,15 @@
 </li>
 <li>
 <p><strong><code>getPageProgressionDirection(): ?string</code></strong> and <strong><code>setPageProgressionDirection(?string $direction): void</code></strong>: The EPUB 3 <code>page-progression-direction</code> of the spine: <code>ltr</code>, <code>rtl</code> (right-to-left books such as manga) or <code>default</code>; <code>null</code> when not set, and passing <code>null</code> removes it. Setting throws for any other value and for EPUB 2 packages, which do not have the attribute.</p>
+</li>
+<li>
+<p><strong><code>getItemProperties(string $idref): array</code></strong> and <strong><code>setItemProperties(string $idref, array $properties): void</code></strong>: The EPUB 3 <code>properties</code> of a spine entry (e.g. <code>page-spread-left</code>, <code>rendition:layout-pre-paginated</code>) as a list of tokens; setting replaces them and <code>[]</code> removes them. Throws if the item is not in the spine, a token is empty or has white space, or the package is EPUB 2.</p>
+</li>
+<li>
+<p><strong><code>getPageSpread(string $idref): ?string</code></strong> and <strong><code>setPageSpread(string $idref, ?string $side): void</code></strong>: The side of a fixed-layout spread a page belongs on: <code>left</code> (<code>page-spread-left</code>), <code>right</code> (<code>page-spread-right</code>) or <code>center</code> (<code>rendition:page-spread-center</code>); <code>null</code> removes it. Other properties are kept.</p>
+</li>
+<li>
+<p><strong><code>getItemRendition(string $idref, string $aspect): ?string</code></strong> and <strong><code>setItemRendition(string $idref, string $aspect, ?string $value): void</code></strong>: The per-item rendition override of an aspect (<code>layout</code>, <code>orientation</code>, <code>spread</code> or <code>flow</code>), e.g. <code>pre-paginated</code> for <code>rendition:layout-pre-paginated</code>; <code>null</code> removes it. The values are those of the book-level <code>Metadata::setRenditionLayout()</code> and its siblings. Writing a <code>rendition:</code> property declares the <code>rendition</code> prefix in the package. See <a href="../epub3-features/#fixed-layout-and-rendition">EPUB 3 Features</a>.</p>
 </li>
 <li>
 <p><strong><code>isModified(): bool</code></strong>: Whether the reading order changed since loading or the last save.</p>
