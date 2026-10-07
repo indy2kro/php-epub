@@ -8,3 +8,13 @@
 tests/                  export-ignore
 site/                   export-ignore
 codecov.yml             export-ignore
+docs/                   export-ignore
+mkdocs.yml              export-ignore
+AGENTS.md               export-ignore
+phpcs.xml               export-ignore
+phpstan.neon            export-ignore
+phpunit.xml             export-ignore
+rector.php              export-ignore
+composer.lock           export-ignore
+.gitignore              export-ignore
+.gitattributes          export-ignore
