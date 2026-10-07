@@ -3,6 +3,7 @@ name: Tests
 on:
   push:
     branches: [ main ]
+  workflow_dispatch:
   schedule:
     - cron: "0 6 * * *"
   pull_request:
@@ -231,3 +232,39 @@ jobs:
 
         - name: Check saved books with EPUBCheck
           run: vendor/bin/phpunit --group epubcheck
+
+  fuzz:
+
+    # Mutated books against the parsers of untrusted input (tests/FuzzTest.php). The regular run does a few dozen
+    # iterations; this job, on the nightly schedule and on demand, does thousands. A failure prints the seed.
+    name: Fuzz
+    if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
+
+    runs-on: ubuntu-latest
+
+    timeout-minutes: 30
+
+    env:
+      EPUB_FUZZ_ITERATIONS: "5000"
+      # A different seed on every run; the failure message names it, so the run can be reproduced.
+      EPUB_FUZZ_SEED: ${{ github.run_id }}
+
+    steps:
+
+        - name: Checkout
+          uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+          with:
+            persist-credentials: false
+
+        - name: Install PHP
+          uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
+          with:
+            php-version: "8.5"
+            extensions: xml, zip, curl, dom, mbstring, gd, json
+            coverage: none
+
+        - name: Update Dependencies with latest stable
+          run: composer update --no-progress
+
+        - name: Fuzz the parsers
+          run: vendor/bin/phpunit --group fuzz
