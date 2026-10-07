@@ -20,6 +20,17 @@ trait InteractsWithIdentifier
     }
 
     /**
+     * Gets the unique identifier: the dc:identifier referenced by package@unique-identifier,
+     * or null when it references none.
+     */
+    public function getUniqueIdentifier(): ?string
+    {
+        $unique = $this->uniqueIdentifierElement();
+
+        return $unique instanceof SimpleXMLElement ? trim((string) $unique) : null;
+    }
+
+    /**
      * Sets the identifiers (dc:identifier) of the EPUB.
      *
      * The first value is stored in the identifier referenced by

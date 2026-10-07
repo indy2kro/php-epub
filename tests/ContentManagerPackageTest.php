@@ -161,6 +161,77 @@ final class ContentManagerPackageTest extends TestCase
         $this->assertDirectoryExists((string) $epubFile->getTempDir());
     }
 
+    public function testAddedXhtmlGetsTheEpub3PropertiesItsContentNeeds(): void
+    {
+        [$contentManager, $manifest] = $this->open();
+
+        $contentManager->addContent('EPUB/drawing.xhtml', self::xhtml(
+            '<svg xmlns="http://www.w3.org/2000/svg"><rect/></svg><math xmlns="http://www.w3.org/1998/Math/MathML"><mi>x</mi></math>'
+        ));
+        $contentManager->addContent('EPUB/active.xhtml', self::xhtml(
+            '<script>run()</script><audio src="https://example.com/a.mp3"/><a href="https://example.com/">Link</a>'
+        ));
+        $contentManager->addContent('EPUB/form.xhtml', self::xhtml('<form><input/></form>'));
+        $contentManager->addContent('EPUB/plain.xhtml', self::xhtml('<p>Text</p><a href="https://example.com/">Link</a>'));
+
+        $this->assertSame('svg mathml', $manifest->findByPath('EPUB/drawing.xhtml')?->properties);
+        $this->assertSame('scripted remote-resources', $manifest->findByPath('EPUB/active.xhtml')?->properties);
+        $this->assertSame('scripted', $manifest->findByPath('EPUB/form.xhtml')?->properties);
+        $this->assertSame('', $manifest->findByPath('EPUB/plain.xhtml')?->properties);
+    }
+
+    public function testUpdatedXhtmlPropertiesFollowItsContentAndKeepOthers(): void
+    {
+        [$contentManager, $manifest] = $this->open();
+        $manifest->addProperty('chapter', 'nav');
+        $properties = static fn (): ?string => $manifest->get('chapter')?->properties;
+
+        $contentManager->updateContent('EPUB/chapter.xhtml', self::xhtml('<svg xmlns="http://www.w3.org/2000/svg"/>'));
+        $this->assertSame('nav svg', $properties());
+
+        $contentManager->updateContent('EPUB/chapter.xhtml', self::xhtml('<p>No drawing</p>'));
+        $this->assertSame('nav', $properties());
+    }
+
+    public function testPropertiesAreLeftAloneForUnparseableXhtmlAndOtherFiles(): void
+    {
+        [$contentManager, $manifest] = $this->open();
+        $manifest->addProperty('chapter', 'svg');
+
+        $contentManager->updateContent('EPUB/chapter.xhtml', '<html><body><p>Broken');
+        $contentManager->addContent('EPUB/image.svg', '<svg xmlns="http://www.w3.org/2000/svg"><script>x()</script></svg>');
+
+        $this->assertSame('svg', $manifest->get('chapter')?->properties);
+        $this->assertSame('', $manifest->findByPath('EPUB/image.svg')?->properties);
+    }
+
+    public function testEpub2PackagesGetNoProperties(): void
+    {
+        $root = EpubBuilder::minimal()
+            ->withFile('EPUB/package.opf', str_replace('version="3.0"', 'version="2.0"', EpubBuilder::opf()))
+            ->writeTo($this->tmpDir . '/book');
+        $manifest = new Manifest((new XmlParser())->parse($root . '/EPUB/package.opf'), 'EPUB/package.opf');
+
+        (new ContentManager($root, $manifest))->addContent('EPUB/drawing.xhtml', self::xhtml('<svg xmlns="http://www.w3.org/2000/svg"/>'));
+
+        $this->assertSame('', $manifest->findByPath('EPUB/drawing.xhtml')?->properties);
+    }
+
+    public function testAddChapterWithInlineSvgSetsTheProperty(): void
+    {
+        $epubFile = EpubFile::open(EpubBuilder::epub3()->buildEpub($this->tmpDir . '/in.epub'));
+
+        $item = $epubFile->addChapter('Drawing', '<svg xmlns="http://www.w3.org/2000/svg"><rect/></svg>');
+
+        $this->assertSame('svg', $item->properties);
+    }
+
+    private static function xhtml(string $body): string
+    {
+        return '<?xml version="1.0" encoding="UTF-8"?><html xmlns="http://www.w3.org/1999/xhtml"><head><title>T</title></head>'
+            . "<body>{$body}</body></html>";
+    }
+
     /**
      * @return array{ContentManager, Manifest, Spine}
      */

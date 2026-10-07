@@ -25,7 +25,7 @@ public function save(): void
 public function isModified(): bool
 ```
 
-`save()` serializes the OPF XML back to disk. For EPUB 3 packages, `dcterms:modified` is set to the current UTC time when metadata was changed since the last save (it is left alone when nothing changed). Throws an exception if the file cannot be written.
+`save()` serializes the OPF XML back to disk. When metadata was changed since the last save, the modification date is updated (it is left alone when nothing changed): for EPUB 3 packages `dcterms:modified` is set to the current UTC time, and for EPUB 2 packages an existing `dc:date` with `opf:event="modification"` is set to the current UTC date (none is added). Throws an exception if the file cannot be written.
 
 `isModified()` tells whether there are unsaved changes. `EpubFile::save()` calls `Metadata::save()` automatically when there are, so calling it yourself is optional.
 
@@ -118,7 +118,7 @@ public function getDateEvents(): array
 Date of publication (dc:date). Should be in a valid date format (preferably ISO 8601).
 
 - `getDate()`/`setDate()` use the publication date: the `dc:date` with the EPUB 2 `opf:event="publication"`, or else one without an event, or else the first. Dates of other events are kept.
-- `getModifiedDate()` returns the EPUB 3 `dcterms:modified` property, or else the EPUB 2 `dc:date` with `opf:event="modification"`, or `null`. `save()` keeps the EPUB 3 value up to date.
+- `getModifiedDate()` returns the EPUB 3 `dcterms:modified` property, or else the EPUB 2 `dc:date` with `opf:event="modification"`, or `null`. `save()` keeps both up to date.
 - `getDateEvents()` returns every `dc:date` keyed by its `opf:event` (`""` for a date without one), e.g. `['publication' => '1999-01-01', 'modification' => '2020-05-05']`.
 
 ### Language
@@ -145,12 +145,15 @@ The topics of the resource (dc:subject). `getSubject()`/`setSubject()` work on t
 
 ```php
 public function getIdentifiers(): array<int, string>
+public function getUniqueIdentifier(): ?string
 public function setIdentifiers(array<int, string> $identifiers): void
 ```
 
 Unambiguous references to the resource (dc:identifier), such as an ISBN or UUID.
 
-The first value passed to `setIdentifiers()` is stored in the identifier that `package@unique-identifier` points to, so the package stays valid. At least one identifier is required. An identifier whose value changes loses its type information (`opf:scheme` / `identifier-type` refinement).
+The first value passed to `setIdentifiers()` is stored in the identifier that `package@unique-identifier` points to, so the package stays valid. At least one identifier is required. An identifier whose value changes loses its type information (`opf:scheme` / `identifier-type` refinement). `getUniqueIdentifier()` returns that identifier, or `null` when `package@unique-identifier` points to none.
+
+Obfuscated fonts (listed in `META-INF/encryption.xml`) are keyed with the unique identifier, so when it changes, `EpubFile::save()` re-keys them: fonts obfuscated with the IDPF algorithm work with any identifier, while Adobe's older algorithm needs a `urn:uuid:` identifier, and saving throws an `Exception` naming the font otherwise.
 
 ### Other `<meta>` Elements
 

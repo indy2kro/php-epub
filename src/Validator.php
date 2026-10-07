@@ -173,7 +173,7 @@ final readonly class Validator
 
         foreach ($this->tocPaths($this->tableOfContents->getEntries()) as $path) {
             if (! $this->manifest->findByPath($path) instanceof ManifestItem) {
-                $issues[] = $this->warning('TOC_LINK_NOT_IN_MANIFEST', 'The table of contents links to a file that is not in the manifest.', $path);
+                $issues[] = $this->error('TOC_LINK_NOT_IN_MANIFEST', 'The table of contents links to a file that is not in the manifest.', $path);
             }
         }
 

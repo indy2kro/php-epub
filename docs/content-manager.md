@@ -9,7 +9,8 @@ ContentManager operates on the extracted EPUB directory (accessible via `EpubFil
 When it is created by `EpubFile` (or given a `Manifest` and `Spine`), it keeps the OPF in sync:
 
 - `addContent()` adds new files to the manifest, with a media type guessed from the extension.
-- `deleteContent()` removes the file's manifest item and its spine entry, plus package references to it (EPUB 2 cover meta, refinements, `spine@toc`, `fallback`/`media-overlay` of other items, `<guide>` references).
+- In EPUB 3 books, `addContent()` and `updateContent()` set the manifest properties an XHTML document needs because of its content, and remove those it no longer needs: `svg` (inline SVG), `mathml`, `scripted` (`<script>` or `<form>`) and `remote-resources` (a resource loaded from `http(s)://`; links do not count). Other properties, such as `nav`, are kept, and a document that is not well-formed XML keeps its properties.
+- `deleteContent()` removes the file's manifest item and its spine entry, plus package references to it (EPUB 2 cover meta, refinements, `spine@toc`, `fallback`/`media-overlay` of other items, `<guide>` references) and its table-of-contents entries (an entry with children stays as an unlinked heading in the navigation document; the NCX promotes the children).
 
 Adding a file does not put it in the reading order; call `Spine::add()` for that.
 

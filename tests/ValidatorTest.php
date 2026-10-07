@@ -100,6 +100,20 @@ final class ValidatorTest extends TestCase
         $this->assertSame(ValidationIssue::ERROR, $issues[0]->severity);
     }
 
+    public function testADanglingTableOfContentsLinkIsAnError(): void
+    {
+        $book = EpubBuilder::epub3()->withFile('EPUB/nav.xhtml', EpubBuilder::xhtml(
+            'Contents',
+            '<nav epub:type="toc"><ol><li><a href="text/chapter.xhtml">Chapter</a></li><li><a href="text/missing.xhtml">Missing</a></li></ol></nav>'
+        ));
+
+        $issues = $this->open($book)->validate();
+
+        $this->assertSame(['TOC_LINK_NOT_IN_MANIFEST'], $this->codes($issues));
+        // EPUBCheck rejects such a book (RSC-007).
+        $this->assertSame(ValidationIssue::ERROR, $issues[0]->severity);
+    }
+
     public function testIssuesDescribeTheProblemAndWhere(): void
     {
         $opf = str_replace('</manifest>', '<item id="gone" href="gone.png" media-type="image/png"/></manifest>', (string) EpubBuilder::epub3()->getFile('EPUB/package.opf'));

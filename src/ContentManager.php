@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PhpEpub;
 
+use PhpEpub\Util\ContentDocumentProperties;
 use PhpEpub\Util\FileSystemHelper;
 use PhpEpub\Util\PathResolver;
 
@@ -96,7 +97,7 @@ class ContentManager
             throw new Exception("Failed to create directory: {$directory}");
         }
 
-        if (file_put_contents($fullPath, $content) === false) {
+        if (@file_put_contents($fullPath, $content) === false) {
             throw new Exception("Failed to add content to: {$fullPath}");
         }
 
@@ -104,6 +105,8 @@ class ContentManager
         if ($this->manifest instanceof Manifest && ! $this->isContainerFile($path) && ! $this->manifest->findByPath($path) instanceof ManifestItem) {
             $this->manifest->add($path);
         }
+
+        $this->updateContentProperties($path, $content);
     }
 
     /**
@@ -126,6 +129,8 @@ class ContentManager
         if (@file_put_contents($fullPath, $newContent) === false) {
             throw new Exception("Failed to update content in: {$fullPath}");
         }
+
+        $this->updateContentProperties($this->paths->normalize($filePath), $newContent);
     }
 
     /**
@@ -156,6 +161,8 @@ class ContentManager
 
             $this->manifest->remove($item->id);
         }
+
+        $this->removeTableOfContentsEntries($this->paths->normalize($filePath));
     }
 
     /**
@@ -176,6 +183,78 @@ class ContentManager
         }
 
         return FileSystemHelper::readFile($fullPath) ?? throw new Exception("Failed to read content from: {$fullPath}");
+    }
+
+    /**
+     * Sets the EPUB 3 properties an XHTML document needs because of its content (svg, mathml,
+     * scripted, remote-resources) and removes those it no longer needs; other properties are kept.
+     * A document that is not well-formed XML keeps its properties.
+     */
+    private function updateContentProperties(string $path, string $content): void
+    {
+        $item = $this->manifest?->findByPath($path);
+        if (! $item instanceof ManifestItem || $item->mediaType !== 'application/xhtml+xml' || ! $this->manifest->isEpub3()) {
+            return;
+        }
+
+        $needed = ContentDocumentProperties::detect($content);
+        if ($needed === null) {
+            return;
+        }
+
+        foreach (ContentDocumentProperties::PROPERTIES as $property) {
+            if (in_array($property, $needed, true)) {
+                $this->manifest->addProperty($item->id, $property);
+            } else {
+                $this->manifest->removeProperty($item->id, $property);
+            }
+        }
+    }
+
+    /**
+     * Drops the table-of-contents entries that link to a deleted file; an entry with children
+     * stays as an unlinked heading (see TableOfContents::setEntries()). A navigation document
+     * or NCX that cannot be parsed is left as is, since the file is already gone; validate()
+     * reports the dangling link.
+     */
+    private function removeTableOfContentsEntries(string $path): void
+    {
+        if (! $this->manifest instanceof Manifest) {
+            return;
+        }
+
+        $toc = new TableOfContents($this->contentDirectory, $this->manifest);
+
+        try {
+            $entries = $toc->getEntries();
+        } catch (Exception) {
+            return;
+        }
+
+        $kept = $this->entriesWithout($entries, $path);
+        if ($kept != $entries) {
+            $toc->setEntries($kept);
+        }
+    }
+
+    /**
+     * @param list<TocEntry> $entries
+     *
+     * @return list<TocEntry>
+     */
+    private function entriesWithout(array $entries, string $path): array
+    {
+        $kept = [];
+        foreach ($entries as $entry) {
+            $children = $this->entriesWithout($entry->children, $path);
+            if ($entry->path !== $path) {
+                $kept[] = new TocEntry($entry->title, $entry->path, $entry->fragment, $children);
+            } elseif ($children !== []) {
+                $kept[] = new TocEntry($entry->title, '', null, $children);
+            }
+        }
+
+        return $kept;
     }
 
     /**

@@ -315,7 +315,7 @@ final class ContentManagerTest extends TestCase
         mkdir($this->contentDir . DIRECTORY_SEPARATOR . 'test');
 
         $contentManager = new ContentManager($this->contentDir);
-        @$contentManager->addContent('test', 'Sample content');
+        $contentManager->addContent('test', 'Sample content');
     }
 
     public function testUpdateContentFailsWithNonexistentFile(): void
