@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace PhpEpub;
 
+use Normalizer;
 use PhpEpub\Util\PathResolver;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
+use Throwable;
 use ZipArchive;
 
 class ZipHandler
@@ -105,6 +107,8 @@ class ZipHandler
             throw new ZipException("ZIP entry resolves outside the EPUB: {$name}", 0, $exception);
         }
 
+        $this->assertWritableName($name);
+
         if (str_ends_with($name, '/') || str_ends_with($name, '\\')) {
             $this->ensureDirectory($target);
 
@@ -113,7 +117,7 @@ class ZipHandler
 
         // OCF requires names that are unique after case folding: on case-insensitive file systems
         // (Windows, macOS) one entry would silently replace the other.
-        $folded = strtolower($target);
+        $folded = $this->fold($target);
         if (isset($files[$folded])) {
             throw new ZipException("ZIP entries differ only in case: {$files[$folded]} and {$name}");
         }
@@ -170,6 +174,54 @@ class ZipHandler
     }
 
     /**
+     * Folds a path the way case-insensitive file systems compare names: Unicode case folding and
+     * NFC normalization when mbstring and intl are available, ASCII lower-casing otherwise
+     * (and for names that are not valid UTF-8).
+     */
+    private function fold(string $path): string
+    {
+        $path = class_exists(Normalizer::class) ? (Normalizer::normalize($path) ?: $path) : $path;
+
+        return function_exists('mb_convert_case') && mb_check_encoding($path, 'UTF-8')
+            ? mb_convert_case($path, MB_CASE_FOLD)
+            : strtolower($path);
+    }
+
+    /**
+     * Refuses entry names the current OS cannot create, so the failure names the entry
+     * instead of surfacing as a misleading "Permission denied". Other systems keep accepting them.
+     *
+     * @throws ZipException
+     */
+    private function assertWritableName(string $name): void
+    {
+        if (! $this->isWindows()) {
+            return;
+        }
+
+        foreach (preg_split('#[/\\\\]#', $name) ?: [] as $segment) {
+            $problem = match (true) {
+                preg_match('/[<>:"|?*\x00-\x1f]/', $segment) === 1 => 'it contains a character Windows does not allow',
+                preg_match('/[. ]$/', $segment) === 1 => 'a name cannot end with a dot or a space on Windows',
+                preg_match('/^(con|prn|aux|nul|com[1-9]|lpt[1-9])(\..*)?$/i', $segment) === 1 => 'it is a reserved device name on Windows',
+                default => null,
+            };
+
+            if ($problem !== null) {
+                throw new ZipException("ZIP entry cannot be written on this system ({$problem}): {$name}");
+            }
+        }
+    }
+
+    /**
+     * Whether extraction runs on Windows (overridable, so tests can cover both rule sets on any OS).
+     */
+    protected function isWindows(): bool
+    {
+        return DIRECTORY_SEPARATOR === '\\';
+    }
+
+    /**
      * @throws ZipException
      */
     private function ensureDirectory(string $directory): void
@@ -199,21 +251,72 @@ class ZipHandler
      */
     public function compress(string $source, string $zipFilePath): void
     {
-        $zip = new ZipArchive();
-        if ($zip->open($zipFilePath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
-            throw new ZipException("Failed to create ZIP file: {$zipFilePath}");
-        }
-
         $realSource = realpath($source);
         if ($realSource === false) {
             throw new ZipException("Invalid source directory: {$source}");
         }
 
+        // Written next to the target and moved into place when complete, so a failed save leaves
+        // neither a partial archive nor damage to the file it would replace.
+        $temporary = $zipFilePath . '.' . bin2hex(random_bytes(6)) . '.tmp';
+        $zip = $this->createArchive();
+        if ($zip->open($temporary, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
+            throw new ZipException("Failed to create ZIP file: {$zipFilePath}");
+        }
+
+        $closed = false;
+
+        try {
+            $this->addEntries($zip, $realSource);
+
+            if (! $zip->close()) {
+                throw new ZipException("Failed to finalize ZIP file: {$zipFilePath} ({$zip->getStatusString()})");
+            }
+
+            $closed = true;
+
+            // libzip writes nothing for an archive without entries.
+            if (! is_file($temporary)) {
+                throw new ZipException("Failed to finalize ZIP file: nothing to compress in {$source}");
+            }
+
+            if (! @rename($temporary, $zipFilePath)) {
+                throw new ZipException("Failed to finalize ZIP file: {$zipFilePath}" . $this->lastError());
+            }
+        } catch (Throwable $throwable) {
+            if (! $closed) {
+                // Discard the pending entries, or the archive is written when the object is destroyed.
+                // A close() that failed may already have released it (it does on Linux and macOS).
+                try {
+                    $zip->unchangeAll();
+                    @$zip->close();
+                } catch (\ValueError) {
+                }
+            }
+            @unlink($temporary);
+
+            throw $throwable;
+        }
+    }
+
+    /**
+     * The archive compress() fills (overridable, so tests can make single operations fail).
+     */
+    protected function createArchive(): ZipArchive
+    {
+        return new ZipArchive();
+    }
+
+    /**
+     * @throws ZipException
+     */
+    private function addEntries(ZipArchive $zip, string $realSource): void
+    {
         // OCF: "mimetype" must be the first entry and must be stored uncompressed.
         $mimetypePath = $realSource . DIRECTORY_SEPARATOR . 'mimetype';
         if (is_file($mimetypePath)) {
-            $zip->addFile($mimetypePath, 'mimetype');
-            $zip->setCompressionName('mimetype', ZipArchive::CM_STORE);
+            $this->assertDone($zip->addFile($mimetypePath, 'mimetype'), $zip, 'add', 'mimetype');
+            $this->assertDone($zip->setCompressionName('mimetype', ZipArchive::CM_STORE), $zip, 'store', 'mimetype');
             $this->normalizeEntry($zip, 'mimetype', false);
         }
 
@@ -221,17 +324,20 @@ class ZipHandler
         // the same book twice (on any OS) produces the same bytes.
         foreach ($this->entries($realSource) as $relativePath => $filePath) {
             $isDirectory = is_dir($filePath);
-            if ($isDirectory) {
-                $zip->addEmptyDir($relativePath);
-            } else {
-                $zip->addFile($filePath, $relativePath);
-            }
+            $added = $isDirectory ? $zip->addEmptyDir($relativePath) : $zip->addFile($filePath, $relativePath);
+            $this->assertDone($added, $zip, 'add', $relativePath);
 
             $this->normalizeEntry($zip, $isDirectory ? $relativePath . '/' : $relativePath, $isDirectory);
         }
+    }
 
-        if (! $zip->close()) {
-            throw new ZipException("Failed to finalize ZIP file: {$zipFilePath}");
+    /**
+     * @throws ZipException If a ZipArchive call failed.
+     */
+    private function assertDone(bool $succeeded, ZipArchive $zip, string $action, string $name): void
+    {
+        if (! $succeeded) {
+            throw new ZipException("Failed to {$action} ZIP entry: {$name} ({$zip->getStatusString()})");
         }
     }
 
@@ -272,8 +378,8 @@ class ZipHandler
      */
     private function normalizeEntry(ZipArchive $zip, string $name, bool $isDirectory): void
     {
-        $zip->setMtimeName($name, self::FIXED_MTIME);
+        $this->assertDone($zip->setMtimeName($name, self::FIXED_MTIME), $zip, 'set the time of', $name);
         $mode = $isDirectory ? 040755 : 0100644;
-        $zip->setExternalAttributesName($name, ZipArchive::OPSYS_UNIX, $mode << 16);
+        $this->assertDone($zip->setExternalAttributesName($name, ZipArchive::OPSYS_UNIX, $mode << 16), $zip, 'set the permissions of', $name);
     }
 }

@@ -4,7 +4,11 @@ declare(strict_types=1);
 
 namespace PhpEpub\Traits;
 
+use DateTimeInterface;
+use PhpEpub\Exception;
 use PhpEpub\Metadata;
+use PhpEpub\Util\MetadataSyntax;
+use PhpEpub\Util\XmlText;
 use SimpleXMLElement;
 
 trait InteractsWithDate
@@ -21,9 +25,21 @@ trait InteractsWithDate
     /**
      * Sets the publication date of the EPUB (see getDate()), creating dc:date when missing.
      * Dates of other events (creation, modification) are kept.
+     *
+     * @param string|DateTimeInterface $date A W3CDTF string (YYYY, YYYY-MM, YYYY-MM-DD, or a date-time with
+     *                                       a time zone such as 2020-07-31T10:20:30Z); a DateTimeInterface
+     *                                       is written as a date-time with its own time zone offset.
+     *
+     * @throws Exception If the date is not valid W3CDTF.
      */
-    public function setDate(string $date): void
+    public function setDate(string|DateTimeInterface $date): void
     {
+        $date = $date instanceof DateTimeInterface ? $date->format('c') : $date;
+        XmlText::assertValid($date);
+        if (! MetadataSyntax::isW3cdtf($date)) {
+            throw new Exception("Not a W3CDTF date (YYYY, YYYY-MM, YYYY-MM-DD or a date-time with a time zone): \"{$date}\"");
+        }
+
         $dates = $this->getDcValues('date');
         $dates[$this->publicationDateIndex()] = $date;
 

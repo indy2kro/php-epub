@@ -11,6 +11,12 @@ The `CalibreAdapter` class converts EPUB files to other formats (MOBI, AZW3, PDF
 
 - **`convert(string $inputFile, string $outputPath): void`**: Converts an `.epub` file, or a directory with an extracted EPUB (packaged into a temporary `.epub` first, which is removed afterwards). The output extension selects the format. Calibre is started directly, without a shell, so no argument is ever interpreted; its output (including stderr) is included in the exception message when the conversion fails. A conversion that runs longer than `timeout` is stopped (the `ebook-convert` process is killed) and reported with an exception. Throws an exception if Calibre or the input is missing, or if the conversion fails.
 
+A relative input or output path that starts with `-` is passed to Calibre as `./-name` (`.\-name` on Windows), so Calibre never reads it as an option.
+
+## Untrusted books
+
+Unlike `TCPDFAdapter` and `DompdfAdapter`, which sanitise the book and confine every resource to it (see [Converter](../converter.md#how-the-pdf-adapters-read-a-book)), `CalibreAdapter` hands the book to Calibre unchanged. Whether Calibre keeps the book's references inside the book depends on its version. When you convert books you do not trust, keep Calibre up to date, or run `ebook-convert` in a sandbox (a container, or an unprivileged user without access to files that matter).
+
 ## Usage Example
 
 ```php

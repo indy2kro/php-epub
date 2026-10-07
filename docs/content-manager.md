@@ -9,7 +9,7 @@ ContentManager operates on the extracted EPUB directory (accessible via `EpubFil
 When it is created by `EpubFile` (or given a `Manifest` and `Spine`), it keeps the OPF in sync:
 
 - `addContent()` adds new files to the manifest, with a media type guessed from the extension.
-- In EPUB 3 books, `addContent()` and `updateContent()` set the manifest properties an XHTML document needs because of its content, and remove those it no longer needs: `svg` (inline SVG), `mathml`, `scripted` (`<script>` or `<form>`) and `remote-resources` (a resource loaded from `http(s)://`; links do not count). Other properties, such as `nav`, are kept, and a document that is not well-formed XML keeps its properties.
+- In EPUB 3 books, `addContent()` and `updateContent()` set the manifest properties an XHTML document needs because of its content, and remove those it no longer needs: `svg` (inline SVG), `mathml`, `scripted` (`<script>` or `<form>`) and `remote-resources` (a resource loaded from `http(s)://`; links do not count). Other properties, such as `nav`, are kept, and the others are untouched.
 - `deleteContent()` removes the file's manifest item and its spine entry, plus package references to it (EPUB 2 cover meta, refinements, `spine@toc`, `fallback`/`media-overlay` of other items, `<guide>` references) and its table-of-contents entries (an entry with children stays as an unlinked heading in the navigation document; the NCX promotes the children).
 
 Adding a file does not put it in the reading order; call `Spine::add()` for that.
@@ -51,27 +51,33 @@ public function getContentList(): array
 public function addContent(string $filePath, string $content): void
 ```
 
-Creates (or overwrites) a file, creating missing directories. New files are added to the manifest, except container files (`mimetype`, `META-INF/…`). Throws an exception if the file cannot be written.
+Creates (or overwrites) a file, creating missing directories. New files are added to the manifest, except container files (`mimetype`, `META-INF/…`). An XHTML document (`.xhtml`, `.html` or `.htm`, or a manifest item with media type `application/xhtml+xml`) must be well-formed XML without entity declarations, or an exception is thrown and nothing is written. Throws an exception if the file cannot be written.
 
 ```php
 public function updateContent(string $filePath, string $newContent): void
 ```
 
-Updates an existing file's content. Throws an exception if the file doesn't exist.
+Updates an existing file's content. XHTML must stay well-formed, as for `addContent()`. Throws an exception if the file doesn't exist or the XHTML is not well-formed.
 
 ```php
 public function deleteContent(string $filePath): void
 ```
 
-Deletes a file, its manifest item and its spine entry. Throws an exception if the file doesn't exist or cannot be deleted.
+Deletes a file, its manifest item and its spine entry. Deleting the last file the table of contents links to leaves the table of contents empty instead of failing; `EpubFile::validate()` reports it (`NAV_EMPTY` / `NCX_EMPTY`). Throws an exception if the file doesn't exist or cannot be deleted.
 
 ```php
-public function moveContent(string $from, string $to): void
+public function moveContent(string $from, string $to, bool $updateReferences = true): void
 ```
 
-Moves or renames a file. Its manifest item keeps its id, so its place in the reading order is unchanged, and points at the new path; `<guide>` references, table-of-contents entries and the `META-INF/encryption.xml` entry of an obfuscated font follow it. Moving the navigation document rewrites its links for the new location.
+Moves or renames a file. Its manifest item keeps its id, so its place in the reading order is unchanged, and points at the new path; `<guide>` references, table-of-contents entries and the `META-INF/encryption.xml` entry of an obfuscated font follow it. Moving the navigation document rewrites its links for the new location. A case-only rename (`ch.xhtml` to `Ch.xhtml`) also works on case-insensitive filesystems.
 
-References inside content documents are not rewritten: links and images in other documents that point at the moved file, and relative links inside a document moved to another directory, keep their old targets; `EpubFile::validate()` reports those that break (`CONTENT_REFERENCE_MISSING`). Throws an exception if either path is the package document or leaves the book, the file does not exist, the target already exists, or the file cannot be moved.
+References inside content documents follow the move (pass `$updateReferences = false` to leave them alone; `EpubFile::validate()` then reports those that break, `CONTENT_REFERENCE_MISSING`):
+
+- In XHTML and SVG documents, the attributes `src`, `poster`, `data`, and `href` (including `xlink:href`) on `a`, `area`, `link`, `image` and `use` that point at the moved file are rewritten.
+- In stylesheets, `<style>` elements and `style` attributes, `url(...)` values and `@import "..."` strings are rewritten.
+- A document that moves to another directory gets its own relative references recomputed, so they still reach the same files.
+
+Query strings and fragments are kept. Only documents that change are written, and they are re-serialized with DOM, so details such as quote style, the XML declaration or whitespace inside tags can differ. Documents that are not well-formed XML are left unchanged. Throws an exception if either path is the package document or leaves the book, the file does not exist, the target already exists, or the file cannot be moved or a document cannot be rewritten.
 
 ```php
 $epubFile->getContentManager()->moveContent('EPUB/chapter1.xhtml', 'EPUB/text/chapter-01.xhtml');

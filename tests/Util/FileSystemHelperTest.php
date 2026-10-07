@@ -48,6 +48,32 @@ final class FileSystemHelperTest extends TestCase
         }
     }
 
+    public function testIsSameFile(): void
+    {
+        $directory = $this->fixturesDir . DIRECTORY_SEPARATOR . 'tmp' . DIRECTORY_SEPARATOR . 'same';
+        mkdir($directory, 0777, true);
+        $file = $directory . DIRECTORY_SEPARATOR . 'a.txt';
+        $other = $directory . DIRECTORY_SEPARATOR . 'b.txt';
+        $link = $directory . DIRECTORY_SEPARATOR . 'link.txt';
+        file_put_contents($file, 'a');
+        file_put_contents($other, 'b');
+
+        try {
+            $this->assertTrue(FileSystemHelper::isSameFile($file, $directory . DIRECTORY_SEPARATOR . '.' . DIRECTORY_SEPARATOR . 'a.txt'));
+            $this->assertFalse(FileSystemHelper::isSameFile($file, $other));
+            $this->assertFalse(FileSystemHelper::isSameFile($file, $directory . DIRECTORY_SEPARATOR . 'missing.txt'));
+
+            // A hard link has its own path but the same inode, like a differently cased name on macOS.
+            if (! @link($file, $link) || (int) (stat($link)['ino'] ?? 0) === 0) {
+                $this->markTestSkipped('Hard links or inode numbers are not available here.');
+            }
+
+            $this->assertTrue(FileSystemHelper::isSameFile($file, $link));
+        } finally {
+            $this->helper->deleteDirectory($directory);
+        }
+    }
+
     public function testFileExists(): void
     {
         $validFile = $this->fixturesDir . DIRECTORY_SEPARATOR . 'valid.epub';

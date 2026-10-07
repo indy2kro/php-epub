@@ -45,6 +45,21 @@ trait InteractsWithAuthors
     }
 
     /**
+     * Replaces every creator (dc:creator) by these, the inverse of getCreators(). Existing creators are
+     * reused in order, so their ids and refinements survive; the role and sort key of each creator are set
+     * exactly as given (null removes them) and written the way the package version expects. Creators
+     * beyond the list are removed with their refinements.
+     *
+     * @param list<Contributor> $creators
+     *
+     * @throws \PhpEpub\Exception If a value is not valid XML text or a name is empty; nothing is changed then.
+     */
+    public function setCreators(array $creators): void
+    {
+        $this->setPeople('creator', $creators);
+    }
+
+    /**
      * Adds a creator, storing the role and sort key the way the package version expects
      * (EPUB 3 refinements, EPUB 2 opf:role / opf:file-as attributes).
      *

@@ -7,6 +7,7 @@ namespace PhpEpub;
 use PhpEpub\Util\ContentDocumentProperties;
 use PhpEpub\Util\FileSystemHelper;
 use PhpEpub\Util\PathResolver;
+use PhpEpub\Util\ReferenceRewriter;
 
 class ContentManager
 {
@@ -83,14 +84,18 @@ class ContentManager
      * except container files (mimetype, META-INF/). The OPF itself is refused. Use Spine::add() to
      * also place a document in the reading order.
      *
+     * An XHTML document (".xhtml", ".html" or ".htm", or a manifest item of that media type) must be
+     * well-formed XML without entity declarations.
+     *
      * @param string $filePath The path relative to the book root.
      * @param string $content The content to add.
      *
-     * @throws Exception If the file cannot be created.
+     * @throws Exception If the file cannot be created or is XHTML that is not well-formed.
      */
     public function addContent(string $filePath, string $content): void
     {
         $this->refusePackageDocument($filePath);
+        $this->assertWellFormed($filePath, $content);
         $fullPath = $this->paths->resolve($this->contentDirectory, $filePath);
         $directory = dirname($fullPath);
         if (! is_dir($directory) && ! @mkdir($directory, 0777, true) && ! is_dir($directory)) {
@@ -112,14 +117,17 @@ class ContentManager
     /**
      * Updates an existing content file in the EPUB.
      *
+     * An XHTML document must stay well-formed XML, as for addContent().
+     *
      * @param string $filePath The path of the content to update.
      * @param string $newContent The new content.
      *
-     * @throws Exception If the file cannot be updated.
+     * @throws Exception If the file cannot be updated or is XHTML that is not well-formed.
      */
     public function updateContent(string $filePath, string $newContent): void
     {
         $this->refusePackageDocument($filePath);
+        $this->assertWellFormed($filePath, $newContent);
         $fullPath = $this->paths->resolve($this->contentDirectory, $filePath);
         // is_file(): a directory is not content (and reading one behaves differently per OS).
         if (! is_file($fullPath)) {
@@ -170,17 +178,26 @@ class ContentManager
      * unchanged) and points at the new path, and the <guide>, the table of contents and
      * META-INF/encryption.xml (obfuscated fonts) follow it.
      *
-     * References inside content documents, such as links and images in other chapters or relative
-     * links in a document moved to another directory, are not rewritten; EpubFile::validate()
-     * reports those that break.
+     * References to the moved file are rewritten too: attributes such as href, src, poster, data and
+     * xlink:href in the XHTML (and SVG) documents of the book, and url() and @import values in
+     * stylesheets, <style> elements and style attributes. The relative references of the moved
+     * document itself are rewritten when it changes directory. Query strings and fragments are kept,
+     * documents that are not well-formed XML are left unchanged, and only documents that change are
+     * written (they are re-serialized by DOM, so formatting details such as quote style or the
+     * XML declaration can differ). The package document and the navigation links of the table of
+     * contents are handled separately, as above.
+     *
+     * A case-only rename ("ch.xhtml" to "Ch.xhtml") works on case-insensitive filesystems too.
      *
      * @param string $from The current path relative to the book root.
      * @param string $to The new path relative to the book root; it must not exist yet.
+     * @param bool $updateReferences Pass false to leave the references inside content documents as they are;
+     *                               EpubFile::validate() then reports those that break.
      *
      * @throws Exception If either path is the package document or leaves the book, the file does not
      *                   exist, the target exists, or the file cannot be moved.
      */
-    public function moveContent(string $from, string $to): void
+    public function moveContent(string $from, string $to, bool $updateReferences = true): void
     {
         $this->refusePackageDocument($from);
         $this->refusePackageDocument($to);
@@ -190,12 +207,17 @@ class ContentManager
             throw new Exception("Content file does not exist: {$source}");
         }
 
-        if (file_exists($target)) {
+        $fromPath = $this->paths->normalize($from);
+        $toPath = $this->paths->normalize($to);
+
+        // On a case-insensitive filesystem the target of a case-only rename "exists": it is the source itself.
+        $caseOnly = file_exists($target) && $fromPath !== $toPath && strcasecmp($fromPath, $toPath) === 0
+            && FileSystemHelper::isSameFile($source, $target);
+        if (file_exists($target) && ! $caseOnly) {
             throw new Exception("Cannot move {$from}: {$to} already exists");
         }
 
-        $fromPath = $this->paths->normalize($from);
-        $toPath = $this->paths->normalize($to);
+        $rewrites = $updateReferences ? $this->referenceRewrites($fromPath, $toPath) : [];
 
         // Read the table of contents first: moving the navigation document changes how its links resolve.
         $toc = $this->manifest instanceof Manifest ? new TableOfContents($this->contentDirectory, $this->manifest) : null;
@@ -206,7 +228,10 @@ class ContentManager
         }
 
         $directory = dirname($target);
-        $moved = (is_dir($directory) || @mkdir($directory, 0777, true)) && @rename($source, $target);
+        // A case-only rename goes through a temporary name, since the target is the source on such filesystems.
+        $temporary = $source . '.' . bin2hex(random_bytes(4)) . '.moving';
+        $moved = (is_dir($directory) || @mkdir($directory, 0777, true))
+            && ($caseOnly ? @rename($source, $temporary) && @rename($temporary, $target) : @rename($source, $target));
         $moved || throw new Exception("Failed to move {$from} to {$to}");
 
         $item = $this->manifest?->findByPath($fromPath);
@@ -214,11 +239,17 @@ class ContentManager
             $this->manifest->moveItem($item->id, $toPath);
         }
 
+        foreach ($rewrites as $path => $content) {
+            if (@file_put_contents($this->paths->resolve($this->contentDirectory, (string) $path), $content) === false) {
+                throw new Exception("Failed to update the references in: {$path}");
+            }
+        }
+
         // A moved navigation document is rewritten too: its links are relative to where it is.
         $movedEntries = $this->entriesMoved($entries, $fromPath, $toPath);
         $isNav = $item instanceof ManifestItem && in_array('nav', explode(' ', $item->properties), true);
         if ($toc instanceof TableOfContents && ($movedEntries != $entries || $isNav)) {
-            $toc->setEntries($movedEntries);
+            $toc->writeEntries($movedEntries);
         }
 
         $this->moveEncryptionReference($fromPath, $toPath);
@@ -247,17 +278,15 @@ class ContentManager
     /**
      * Sets the EPUB 3 properties an XHTML document needs because of its content (svg, mathml,
      * scripted, remote-resources) and removes those it no longer needs; other properties are kept.
-     * A document that is not well-formed XML keeps its properties.
      */
     private function updateContentProperties(string $path, string $content): void
     {
         $item = $this->manifest?->findByPath($path);
-        if (! $item instanceof ManifestItem || $item->mediaType !== 'application/xhtml+xml' || ! $this->manifest->isEpub3()) {
-            return;
-        }
-
-        $needed = ContentDocumentProperties::detect($content);
-        if ($needed === null) {
+        // detect() is null for a document that is not well-formed, which addContent() and updateContent() refuse.
+        $needed = $item instanceof ManifestItem && $item->mediaType === 'application/xhtml+xml' && $this->manifest->isEpub3()
+            ? ContentDocumentProperties::detect($content)
+            : null;
+        if (! $item instanceof ManifestItem || $needed === null) {
             return;
         }
 
@@ -272,7 +301,8 @@ class ContentManager
 
     /**
      * Drops the table-of-contents entries that link to a deleted file; an entry with children
-     * stays as an unlinked heading (see TableOfContents::setEntries()). A navigation document
+     * stays as an unlinked heading (see TableOfContents::setEntries()), and the table of contents
+     * may end up empty (reported by validate()). A navigation document
      * or NCX that cannot be parsed is left as is, since the file is already gone; validate()
      * reports the dangling link.
      */
@@ -292,7 +322,8 @@ class ContentManager
 
         $kept = $this->entriesWithout($entries, $path);
         if ($kept != $entries) {
-            $toc->setEntries($kept);
+            // Deleting the last linked file empties the table of contents; validate() reports that.
+            $toc->writeEntries($kept);
         }
     }
 
@@ -378,6 +409,62 @@ class ContentManager
             throw new Exception(
                 "The package document cannot be changed as content: {$filePath}. Use Metadata, Manifest and Spine instead."
             );
+        }
+    }
+
+    /**
+     * The documents whose references change when $from moves to $to, as [path after the move => new content].
+     * XHTML and SVG documents are rewritten as XML (those that are not well-formed are skipped), stylesheets as text.
+     *
+     * @return array<string, string>
+     */
+    private function referenceRewrites(string $from, string $to): array
+    {
+        $rewriter = new ReferenceRewriter($this->paths);
+        $rewrites = [];
+        foreach ($this->getContentPaths() as $path) {
+            $mediaType = $this->manifest?->findByPath($path)?->mediaType;
+            $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+            $isCss = $mediaType === 'text/css' || $extension === 'css';
+            $isXml = in_array($mediaType, ['application/xhtml+xml', 'image/svg+xml'], true)
+                || in_array($extension, ['xhtml', 'html', 'htm', 'svg'], true);
+            $content = $isCss || $isXml ? FileSystemHelper::readFile($this->paths->resolve($this->contentDirectory, $path)) : null;
+            if ($content === null) {
+                continue;
+            }
+
+            $newPath = $path === $from ? $to : $path;
+            $rewritten = $isCss
+                ? $rewriter->rewriteCss($content, $path, $newPath, $from, $to)
+                : $rewriter->rewriteXml($content, $path, $newPath, $from, $to);
+            if ($rewritten !== null) {
+                $rewrites[$newPath] = $rewritten;
+            }
+        }
+
+        return $rewrites;
+    }
+
+    /**
+     * Refuses XHTML that is not well-formed XML (or declares entities): reading systems reject
+     * such a document. Other files are not checked.
+     *
+     * @throws Exception If the path is an XHTML document and the content is not well-formed.
+     */
+    private function assertWellFormed(string $filePath, string $content): void
+    {
+        $path = $this->paths->normalize($filePath);
+        $mediaType = $this->manifest?->findByPath($path)?->mediaType;
+        $isXhtml = $mediaType === 'application/xhtml+xml'
+            || in_array(strtolower(pathinfo($path, PATHINFO_EXTENSION)), ['xhtml', 'html', 'htm'], true);
+        if (! $isXhtml) {
+            return;
+        }
+
+        try {
+            (new XmlParser())->parseString($content, $path);
+        } catch (XmlException $exception) {
+            throw new Exception("The XHTML document is not well-formed XML: {$exception->getMessage()}", 0, $exception);
         }
     }
 

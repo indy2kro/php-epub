@@ -4,14 +4,32 @@ declare(strict_types=1);
 
 namespace PhpEpub\Converters;
 
+use Dompdf\Adapter\CPDF;
 use Dompdf\Dompdf;
 use Dompdf\Options;
 use PhpEpub\ConversionException;
+use PhpEpub\Exception;
+use Throwable;
 
 class DompdfAdapter implements ConverterInterface
 {
+    private const array STYLE_TYPES = [
+        'font' => 'string',
+        'font_size' => 'number',
+        'paper_size' => 'string',
+        'orientation' => 'string',
+        'margin_top' => 'number',
+        'margin_right' => 'number',
+        'margin_bottom' => 'number',
+        'margin_left' => 'number',
+    ];
+
+    /**
+     * DejaVu Sans ships with Dompdf and covers Latin, Greek, Cyrillic, Hebrew and Arabic, unlike
+     * the PDF core fonts (Arial maps to Helvetica), which are Latin-1 only.
+     */
     private const array DEFAULT_STYLES = [
-        'font' => 'Arial',
+        'font' => 'DejaVu Sans',
         'font_size' => 12,
         'paper_size' => 'A4',
         'orientation' => 'portrait',
@@ -25,12 +43,21 @@ class DompdfAdapter implements ConverterInterface
     /**
      * DompdfAdapter constructor.
      *
-     * @param array<string, mixed> $styles Optional styling parameters: font, font_size (pt), paper_size,
-     *                                     orientation, and margin_top/right/bottom/left (int, mm, as in TCPDFAdapter;
-     *                                     without any, Dompdf keeps its own margins).
+     * @param array<string, mixed> $styles Optional styling parameters: font (default "DejaVu Sans"), font_size (pt),
+     *                                     paper_size, orientation, and margin_top/right/bottom/left (int or float,
+     *                                     mm, as in TCPDFAdapter; without any, Dompdf keeps its own margins).
+     *
+     * @throws Exception If a style is unknown, of the wrong type or has an unusable value (such as a paper size Dompdf does not know).
      */
     public function __construct(array $styles = [], private readonly EpubDocumentLoader $loader = new EpubDocumentLoader())
     {
+        PdfStyles::validate(
+            'DompdfAdapter',
+            self::STYLE_TYPES,
+            $styles,
+            static fn (string $size): bool => isset(CPDF::$PAPER_SIZES[strtolower($size)])
+        );
+
         $this->styles = array_merge(self::DEFAULT_STYLES, $styles);
     }
 
@@ -43,27 +70,34 @@ class DompdfAdapter implements ConverterInterface
      * @param string $epubDirectory The directory containing the extracted EPUB contents.
      * @param string $outputPath The path where the converted PDF should be saved.
      *
-     * @throws ConversionException If the conversion fails.
+     * @throws ConversionException If the book cannot be read, Dompdf fails or the PDF cannot be written.
      */
     public function convert(string $epubDirectory, string $outputPath): void
     {
         $document = $this->loader->load($epubDirectory);
 
-        $dompdf = $this->createDompdf($epubDirectory);
-        $dompdf->loadHtml($this->renderHtml($document));
-        $dompdf->setPaper($this->stringStyle('paper_size'), $this->stringStyle('orientation'));
+        try {
+            $dompdf = $this->createDompdf($epubDirectory);
+            $dompdf->loadHtml($this->renderHtml($document));
+            $dompdf->setPaper($this->stringStyle('paper_size'), $this->stringStyle('orientation'));
 
-        if ($document->title !== '') {
-            $dompdf->addInfo('Title', $document->title);
+            if ($document->title !== '') {
+                $dompdf->addInfo('Title', $document->title);
+            }
+
+            if ($document->authors !== []) {
+                $dompdf->addInfo('Author', implode(', ', $document->authors));
+            }
+
+            $dompdf->render();
+            $pdf = (string) $dompdf->output();
+        } catch (Exception $exception) {
+            throw $exception;
+        } catch (Throwable $exception) {
+            throw new ConversionException('Dompdf failed to render the book: ' . $exception->getMessage(), 0, $exception);
         }
 
-        if ($document->authors !== []) {
-            $dompdf->addInfo('Author', implode(', ', $document->authors));
-        }
-
-        $dompdf->render();
-
-        if (@file_put_contents($outputPath, (string) $dompdf->output()) === false) {
+        if (@file_put_contents($outputPath, $pdf) === false) {
             throw new ConversionException("Failed to write PDF: {$outputPath}");
         }
     }
@@ -99,14 +133,16 @@ class DompdfAdapter implements ConverterInterface
     private function renderHtml(EpubDocument $document): string
     {
         $font = str_replace(['"', '<', '>', ';', '}'], '', $this->stringStyle('font'));
-        $css = sprintf('body { font-family: "%s"; font-size: %dpt; }', $font, $this->intStyle('font_size')) . $this->pageMarginCss();
+        $css = sprintf('body { font-family: "%s"; font-size: %spt; }', $font, $this->numberStyle('font_size')) . $this->pageMarginCss();
+        $direction = $document->rightToLeft ? ' dir="rtl"' : '';
+        $language = $document->language === '' ? '' : ' lang="' . htmlspecialchars($document->language, ENT_QUOTES | ENT_HTML5) . '"';
 
-        return '<!DOCTYPE html><html><head><meta charset="utf-8">'
+        return '<!DOCTYPE html><html' . $direction . $language . '><head><meta charset="utf-8">'
             . '<title>' . htmlspecialchars($document->title, ENT_QUOTES | ENT_HTML5) . '</title>'
             . '<style>' . $css . '</style>'
             // The book's own CSS comes after the defaults, so the book's styling wins.
             . ($document->styles === [] ? '' : '<style>' . EpubDocument::styleSheet($document->styles) . '</style>')
-            . '</head><body>'
+            . '</head><body' . $direction . '>'
             . implode('<div style="page-break-before: always"></div>', $this->pages($document))
             . '</body></html>';
     }
@@ -136,12 +172,12 @@ class DompdfAdapter implements ConverterInterface
     private function pageMarginCss(): string
     {
         $sides = ['margin_top', 'margin_right', 'margin_bottom', 'margin_left'];
-        $given = array_filter($sides, fn (string $side): bool => is_int($this->styles[$side] ?? null));
+        $given = array_filter($sides, fn (string $side): bool => isset($this->styles[$side]));
         if ($given === []) {
             return '';
         }
 
-        $margins = array_map(fn (string $side): string => (is_int($this->styles[$side] ?? null) ? $this->styles[$side] : 0) . 'mm', $sides);
+        $margins = array_map(fn (string $side): string => (is_int($this->styles[$side] ?? null) || is_float($this->styles[$side] ?? null) ? $this->styles[$side] : 0) . 'mm', $sides);
 
         return ' @page { margin: ' . implode(' ', $margins) . '; }';
     }
@@ -153,10 +189,10 @@ class DompdfAdapter implements ConverterInterface
         return is_string($value) ? $value : (string) self::DEFAULT_STYLES[$name];
     }
 
-    private function intStyle(string $name): int
+    private function numberStyle(string $name): int|float
     {
         $value = $this->styles[$name] ?? null;
 
-        return is_int($value) ? $value : (int) self::DEFAULT_STYLES[$name];
+        return is_int($value) || is_float($value) ? $value : (int) self::DEFAULT_STYLES[$name];
     }
 }

@@ -4,9 +4,23 @@ The `DompdfAdapter` class converts EPUB content into PDF using the Dompdf librar
 
 ## Key Methods
 
-- **`__construct(array $styles = [])`**: Optional styling parameters: `font` (default `Arial`), `font_size` in points (default `12`), `paper_size` (default `A4`), `orientation` (default `portrait`) and `margin_top`/`margin_right`/`margin_bottom`/`margin_left` in mm, as in `TCPDFAdapter`. Without any margin option Dompdf keeps its own default margins; once one is given, sides that are not given are `0`. Values of the wrong type fall back to the defaults. Dompdf cannot write a PDF outline, so use `TCPDFAdapter` when you need chapter bookmarks.
+- **`__construct(array $styles = [])`**: Optional styling parameters:
 
-- **`convert(string $epubDirectory, string $outputPath): void`**: Renders every spine document in reading order, each on a new page, sets the PDF title and author from the EPUB metadata, and writes the PDF. Throws a `ConversionException` if the book cannot be read or the PDF cannot be written.
+    | Style | Type | Default | |
+    | --- | --- | --- | --- |
+    | `font` | string | `DejaVu Sans` | A font family Dompdf knows. |
+    | `font_size` | int or float | `12` | In points; greater than zero. |
+    | `paper_size` | string | `A4` | A size Dompdf knows (any case), as in `TCPDFAdapter`. |
+    | `orientation` | string | `portrait` | `portrait` or `landscape`. |
+    | `margin_top`, `margin_right`, `margin_bottom`, `margin_left` | int or float | none | In mm (`12.5` is fine; not negative), as in `TCPDFAdapter`. Without any margin option Dompdf keeps its own default margins; once one is given, sides that are not given are `0`. |
+
+    The constructor throws an `Exception` for a style it does not know (the message lists the valid ones), a value of the wrong type (a numeric string is not a number), an unusable value (a negative margin, an unknown orientation) and a paper size Dompdf does not know (Dompdf itself would fall back to `letter` without a word).
+
+    **Fonts and languages:** the default font is DejaVu Sans, which Dompdf ships and which covers Latin, Greek, Cyrillic, Hebrew and Arabic, not only Latin-1 like the PDF core fonts (`Arial` is mapped to Helvetica). Chinese, Japanese and Korean need a font installed in Dompdf: pass its family as `font`, which always wins. Books with `page-progression-direction="rtl"` in the spine, or (when the spine says nothing) with a primary language of `ar`, `he`, `fa`, `ur`, `yi`, `ps`, `sd`, `ug` or `dv`, get `dir="rtl"` on the generated `<html>` and `<body>`; the book's language is set as `lang`. Dompdf does not shape Arabic script, so Arabic letters are not joined.
+
+    Dompdf cannot write a PDF outline, so use `TCPDFAdapter` when you need chapter bookmarks.
+
+- **`convert(string $epubDirectory, string $outputPath): void`**: Renders every spine document in reading order, each on a new page, sets the PDF title and author from the EPUB metadata, and writes the PDF. Throws a `ConversionException` if the book cannot be read, Dompdf fails (its exception is kept as the previous exception) or the PDF cannot be written.
 
 - **`buildHtml(string $epubDirectory): string`**: Returns the HTML document that `convert()` renders, e.g. for previews or debugging.
 

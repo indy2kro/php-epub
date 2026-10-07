@@ -4,13 +4,18 @@ declare(strict_types=1);
 
 namespace PhpEpub\Test\Converters;
 
+use Iterator;
 use PhpEpub\ConversionException;
+use PhpEpub\Converters\ConfinedTcpdf;
+use PhpEpub\Converters\EpubDocument;
 use PhpEpub\Converters\TCPDFAdapter;
 use PhpEpub\Exception;
 use PhpEpub\Test\Support\EpubBuilder;
 use PhpEpub\Test\Support\ExposedTCPDFAdapter;
 use PhpEpub\Util\FileSystemHelper;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use TCPDF;
 
 final class TCPDFAdapterTest extends TestCase
 {
@@ -199,16 +204,178 @@ final class TCPDFAdapterTest extends TestCase
         }
     }
 
-    public function testInvalidStyleValuesFallBackToTheDeclaredDefaults(): void
+    /**
+     * @param array<string, mixed> $styles
+     */
+    #[DataProvider('invalidStyleProvider')]
+    public function testInvalidStylesAreRejected(array $styles, string $message): void
     {
-        $pdf = $this->exposedAdapter(['font_size' => '14', 'margin_bottom' => 'wide', 'margin_left' => 20])
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage($message);
+
+        new TCPDFAdapter($styles);
+    }
+
+    public static function invalidStyleProvider(): Iterator
+    {
+        yield 'unknown key' => [['fontsize' => 12], 'does not know the style "fontsize"; the styles are: font, font_size, margin_left,'];
+        yield 'wrong type for a number' => [['font_size' => '14'], 'style "font_size" must be a number (int or float), string given'];
+        yield 'wrong type for a boolean' => [['header' => 1], 'style "header" must be a bool, int given'];
+        yield 'wrong type for a string' => [['font' => null], 'style "font" must be a string, null given'];
+        yield 'unknown paper size' => [['paper_size' => 'A44'], 'style "paper_size" is not a paper size the renderer knows, \'A44\' given'];
+        yield 'unknown orientation' => [['orientation' => 'sideways'], 'style "orientation" must be "portrait" or "landscape"'];
+        yield 'negative margin' => [['margin_left' => -1], 'style "margin_left" must not be negative'];
+        yield 'zero font size' => [['font_size' => 0], 'style "font_size" must be greater than zero'];
+        yield 'infinite margin' => [['margin_top' => INF], 'style "margin_top" must be a finite number'];
+        yield 'empty font' => [['font' => ''], 'style "font" must not be empty'];
+    }
+
+    public function testFractionalMillimetresAreAccepted(): void
+    {
+        $pdf = $this->exposedAdapter(['font_size' => 11.5, 'margin_bottom' => 20.5, 'margin_left' => 12.5, 'paper_size' => 'Letter', 'orientation' => 'Landscape'])
             ->createPdfFor($this->epubDirectory);
 
-        $this->assertEqualsWithDelta(12.0, $pdf->getFontSizePt(), 0.001);
-        $this->assertEqualsWithDelta(25.0, $pdf->getBreakMargin(), 0.001);
+        $this->assertEqualsWithDelta(11.5, $pdf->getFontSizePt(), 0.001);
+        $this->assertEqualsWithDelta(20.5, $pdf->getBreakMargin(), 0.001);
         $margins = $pdf->getMargins();
         $this->assertIsArray($margins);
-        $this->assertEqualsWithDelta(20.0, $margins['left'], 0.001);
+        $this->assertEqualsWithDelta(12.5, $margins['left'], 0.001);
+        $this->assertEqualsWithDelta(279.4, $pdf->getPageWidth(), 0.1);
+    }
+
+    public function testTheDefaultFontCoversNonLatinScripts(): void
+    {
+        $directory = EpubDocumentLoaderTest::languageBook('ru', null, 'Привет, мир. Γειά σου κόσμε.')->writeTo($this->epubDirectory . '-ru');
+
+        try {
+            $pdf = $this->exposedAdapter()->createPdfFor($directory);
+            $this->assertSame('dejavusans', $pdf->getFontFamily());
+
+            (new TCPDFAdapter())->convert($directory, $this->outputPdfPath);
+            $this->assertStringContainsString('DejaVuSans', (string) file_get_contents($this->outputPdfPath));
+        } finally {
+            $this->fileSystemHelper->deleteDirectory($directory);
+        }
+    }
+
+    public function testAGivenFontWins(): void
+    {
+        $pdf = $this->exposedAdapter(['font' => 'times'])->createPdfFor($this->epubDirectory);
+
+        $this->assertSame('times', $pdf->getFontFamily());
+    }
+
+    public function testTheDefaultFontFallsBackToHelveticaWithoutItsDefinition(): void
+    {
+        $adapter = new class extends ExposedTCPDFAdapter {
+            protected function newPdf(string $orientation, string $format, array $readableDirectories = []): TCPDF
+            {
+                return new class ($orientation, $format, $readableDirectories) extends ConfinedTcpdf {
+                    /**
+                     * @param string $_family
+                     * @param string $_style
+                     * @param float|null $_size
+                     * @param string $_fontfile
+                     * @param string $_subset
+                     * @param bool $_out
+                     *
+                     * @return mixed
+                     */
+                    public function setFont($_family, $_style = '', $_size = null, $_fontfile = '', $_subset = 'default', $_out = true)
+                    {
+                        if ($_family === 'dejavusans') {
+                            throw new \RuntimeException('unable to read file: dejavusans.json');
+                        }
+
+                        return parent::setFont($_family, $_style, $_size, $_fontfile, $_subset, $_out);
+                    }
+                };
+            }
+        };
+
+        $this->assertSame('helvetica', $adapter->createPdfFor($this->epubDirectory)->getFontFamily());
+    }
+
+    public function testAMissingFontIsReportedWithTheFix(): void
+    {
+        $adapter = new TCPDFAdapter(['font' => 'nosuchfont']);
+
+        try {
+            $adapter->convert($this->epubDirectory, $this->outputPdfPath);
+            $this->fail('A ConversionException was expected.');
+        } catch (ConversionException $exception) {
+            $this->assertStringContainsString('unable to read file: nosuchfont.json', $exception->getMessage());
+            $this->assertStringContainsString('php vendor/indy2kro/php-epub/scripts/generate-core-fonts.php', $exception->getMessage());
+            $this->assertInstanceOf(\Throwable::class, $exception->getPrevious());
+            $this->assertNotInstanceOf(ConversionException::class, $exception->getPrevious());
+        }
+
+        $this->assertFileDoesNotExist($this->outputPdfPath);
+    }
+
+    public function testOtherRendererFailuresBecomeConversionExceptions(): void
+    {
+        $adapter = new class extends TCPDFAdapter {
+            protected function chapterHtml(EpubDocument $document, string $chapter): string
+            {
+                throw new \TypeError('boom');
+            }
+        };
+
+        try {
+            $adapter->convert($this->epubDirectory, $this->outputPdfPath);
+            $this->fail('A ConversionException was expected.');
+        } catch (ConversionException $exception) {
+            $this->assertSame('TCPDF failed to render the book: boom', $exception->getMessage());
+            $this->assertInstanceOf(\TypeError::class, $exception->getPrevious());
+        }
+    }
+
+    public function testTheLibrarysOwnExceptionsAreNotWrapped(): void
+    {
+        $failure = new Exception('library failure');
+        $adapter = new class ($failure) extends TCPDFAdapter {
+            public function __construct(private readonly Exception $failure)
+            {
+                parent::__construct();
+            }
+
+            protected function newPdf(string $orientation, string $format, array $readableDirectories = []): TCPDF
+            {
+                throw $this->failure;
+            }
+        };
+
+        try {
+            $adapter->convert($this->epubDirectory, $this->outputPdfPath);
+            $this->fail('An Exception was expected.');
+        } catch (Exception $exception) {
+            $this->assertSame($failure, $exception);
+        }
+    }
+
+    #[DataProvider('readingDirectionProvider')]
+    public function testRightToLeftBooksAreRenderedRightToLeft(string $language, ?string $direction, bool $expected): void
+    {
+        $directory = EpubDocumentLoaderTest::languageBook($language, $direction, 'مرحبا שלום')->writeTo($this->epubDirectory . '-rtl');
+
+        try {
+            $this->assertSame($expected, $this->exposedAdapter()->createPdfFor($directory)->getRTL());
+
+            (new TCPDFAdapter())->convert($directory, $this->outputPdfPath);
+            $this->assertGreaterThan(0, filesize($this->outputPdfPath));
+        } finally {
+            $this->fileSystemHelper->deleteDirectory($directory);
+        }
+    }
+
+    public static function readingDirectionProvider(): Iterator
+    {
+        yield 'Arabic' => ['ar', null, true];
+        yield 'Hebrew' => ['he', null, true];
+        yield 'English with an rtl spine' => ['en', 'rtl', true];
+        yield 'English' => ['en', null, false];
+        yield 'Arabic with an ltr spine' => ['ar', 'ltr', false];
     }
 
     public function testEveryChapterGetsABookmark(): void

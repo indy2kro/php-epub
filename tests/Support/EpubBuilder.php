@@ -28,8 +28,18 @@ final class EpubBuilder
     public const string JPEG = '/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=';
 
     /**
-     * A small EPUB 3 book that passes EPUBCheck: navigation document, dcterms:modified
-     * and complete XHTML documents.
+     * A 1x1 GIF.
+     */
+    public const string GIF = 'R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
+
+    /**
+     * A 1x1 WebP.
+     */
+    public const string WEBP = 'UklGRhoAAABXRUJQVlA4TA0AAAAvAAAAEAcQERGIiP4HAA==';
+
+    /**
+     * A small EPUB 3 book that passes EPUBCheck: navigation document, dcterms:modified, accessibility
+     * metadata (so validate() reports nothing) and complete XHTML documents.
      */
     public static function epub3(): self
     {
@@ -41,6 +51,10 @@ final class EpubBuilder
     <dc:title>Valid Book</dc:title>
     <dc:language>en</dc:language>
     <meta property="dcterms:modified">2026-01-01T00:00:00Z</meta>
+    <meta property="schema:accessMode">textual</meta>
+    <meta property="schema:accessibilityFeature">tableOfContents</meta>
+    <meta property="schema:accessibilityHazard">none</meta>
+    <meta property="schema:accessibilitySummary">Plain text with a table of contents.</meta>
   </metadata>
   <manifest>
     <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>

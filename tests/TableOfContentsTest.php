@@ -335,7 +335,7 @@ final class TableOfContentsTest extends TestCase
         $epubFile->save();
 
         $ncx = $epubFile->getContentManager()->getContent('OEBPS/toc.ncx');
-        $this->assertStringContainsString('<meta name="dtb:uid" content="urn:x"/></head><docTitle><text>Renamed</text></docTitle><navMap>', $ncx);
+        $this->assertStringContainsString('<meta name="dtb:uid" content="urn:x"/><meta name="dtb:depth" content="2"/></head><docTitle><text>Renamed</text></docTitle><navMap>', $ncx);
     }
 
     public function testSavingANewUniqueIdentifierUpdatesTheNcxUid(): void
@@ -360,7 +360,7 @@ final class TableOfContentsTest extends TestCase
         $epubFile->save();
 
         $this->assertStringContainsString(
-            '<head><meta name="dtb:uid" content="urn:x"/></head>',
+            '<head><meta name="dtb:uid" content="urn:x"/><meta name="dtb:depth" content="2"/></head>',
             $epubFile->getContentManager()->getContent('OEBPS/toc.ncx')
         );
     }

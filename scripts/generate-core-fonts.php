@@ -90,7 +90,23 @@ $afmFiles = [
     'ZapfDingbats.afm' => 'a32565c90afd1b57a7008fc567b78d95cf1c22adff5e086094d666d88b039859',
 ];
 
-$baseUrl = 'https://raw.githubusercontent.com/tecnickcom/tc-font-mirror/main/core/';
+// DejaVu Sans (regular, bold, oblique, bold oblique) is TCPDFAdapter's default font: unlike the core
+// fonts it covers Latin, Greek, Cyrillic, Hebrew and Arabic. Same mirror, same SHA-256 check.
+$ttfFiles = [
+    'DejaVuSans.ttf' => '7da195a74c55bef988d0d48f9508bd5d849425c1770dba5d7bfc6ce9ed848954',
+    'DejaVuSans-Bold.ttf' => 'e6476c1b80502924294eed40894c5b18e06c181444ca953e5334262df9c27724',
+    'DejaVuSans-Oblique.ttf' => '4af75fa16ee6d3ad43e1ecec41862c24954af26a55c6bb1ebb27bd486a50f5f4',
+    'DejaVuSans-BoldOblique.ttf' => 'eb436dca0c2594b73d8b603b892e374fdfd8d885d25ffb4f18df4c4c0b49e50f',
+];
+
+// File name => [SHA-256, URL of its directory in the mirror].
+$fontFiles = [];
+foreach ($afmFiles as $file => $hash) {
+    $fontFiles[$file] = [$hash, 'https://raw.githubusercontent.com/tecnickcom/tc-font-mirror/main/core/'];
+}
+foreach ($ttfFiles as $file => $hash) {
+    $fontFiles[$file] = [$hash, 'https://raw.githubusercontent.com/tecnickcom/tc-font-mirror/main/dejavu/ttf/'];
+}
 
 $tmpDir = sys_get_temp_dir() . '/php-epub-fonts-' . bin2hex(random_bytes(8));
 if (! mkdir($tmpDir, 0700, true)) {
@@ -111,7 +127,7 @@ $context = stream_context_create([
 $success = 0;
 $errors = 0;
 
-foreach ($afmFiles as $afmFile => $expectedHash) {
+foreach ($fontFiles as $afmFile => [$expectedHash, $baseUrl]) {
     $tmpPath = $tmpDir . '/' . $afmFile;
 
     echo "Downloading {$afmFile}... ";
@@ -134,11 +150,13 @@ foreach ($afmFiles as $afmFile => $expectedHash) {
     file_put_contents($tmpPath, $content);
     echo "OK.\n";
 
-    $basename = basename($afmFile, '.afm');
+    $basename = pathinfo($afmFile, PATHINFO_FILENAME);
     $encoding = '';
     $type = '';
 
-    if ($basename === 'Symbol') {
+    if (isset($ttfFiles[$afmFile])) {
+        $type = 'TrueTypeUnicode';
+    } elseif ($basename === 'Symbol') {
         $encoding = 'symbol';
     } elseif ($basename !== 'ZapfDingbats') {
         $encoding = 'cp1252';

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PhpEpub\Test\Converters;
 
+use Iterator;
 use PhpEpub\ConversionException;
 use PhpEpub\Converters\EpubDocumentLoader;
 use PhpEpub\Test\Support\EpubBuilder;
@@ -43,6 +44,76 @@ final class EpubDocumentLoaderTest extends TestCase
         $this->assertStringContainsString('First file, second in the spine', $document->chapters[1]);
         $this->assertStringNotContainsString('<body', $document->chapters[0]);
         $this->assertStringNotContainsString('<title>', $document->chapters[0]);
+    }
+
+    #[DataProvider('directionProvider')]
+    public function testCarriesTheLanguageAndTheReadingDirection(string $language, ?string $spineDirection, bool $expectedRtl): void
+    {
+        $directory = self::languageBook($language, $spineDirection)->writeTo($this->tmpDir . '/book');
+
+        $document = (new EpubDocumentLoader())->load($directory);
+
+        $this->assertSame($language, $document->language);
+        $this->assertSame($expectedRtl, $document->rightToLeft);
+    }
+
+    public static function directionProvider(): Iterator
+    {
+        yield 'English' => ['en', null, false];
+        yield 'Arabic' => ['ar', null, true];
+        yield 'Hebrew with a region' => ['he-IL', null, true];
+        yield 'Persian with an underscore' => ['FA_IR', null, true];
+        yield 'spine says rtl' => ['en', 'rtl', true];
+        yield 'spine says ltr for an rtl language' => ['ar', 'ltr', false];
+        yield 'spine says default for an rtl language' => ['ur', 'default', true];
+        yield 'no language' => ['', null, false];
+    }
+
+    public function testALegacyBookHasNoLanguage(): void
+    {
+        $directory = $this->tmpDir . '/legacy';
+        mkdir($directory);
+        file_put_contents($directory . '/content.xhtml', '<html><body>Text</body></html>');
+
+        $document = (new EpubDocumentLoader())->load($directory);
+
+        $this->assertSame('', $document->language);
+        $this->assertFalse($document->rightToLeft);
+    }
+
+    #[DataProvider('utf16Provider')]
+    public function testReadsChaptersInTheirDeclaredEncoding(string $bytes): void
+    {
+        $directory = EpubBuilder::minimal()->withFile('EPUB/chapter.xhtml', $bytes)->writeTo($this->tmpDir . '/book');
+
+        $document = (new EpubDocumentLoader())->load($directory);
+
+        $this->assertSame(["<a id=\"epub-c0\">\u{200B}</a><p>Привет, мир — café</p>"], $document->chapters);
+        $this->assertSame(['Заголовок'], $document->chapterTitles);
+    }
+
+    public static function utf16Provider(): Iterator
+    {
+        $xhtml = '<?xml version="1.0" encoding="UTF-16"?>' . "\n"
+            . '<html xmlns="http://www.w3.org/1999/xhtml"><head><title>Заголовок</title></head><body><p>Привет, мир — café</p></body></html>';
+
+        yield 'UTF-16LE with a byte order mark' => ["\xFF\xFE" . mb_convert_encoding($xhtml, 'UTF-16LE', 'UTF-8')];
+        yield 'UTF-16BE with a byte order mark' => ["\xFE\xFF" . mb_convert_encoding($xhtml, 'UTF-16BE', 'UTF-8')];
+        yield 'UTF-16LE without a byte order mark' => [mb_convert_encoding($xhtml, 'UTF-16LE', 'UTF-8')];
+        yield 'UTF-8 with a byte order mark' => ["\xEF\xBB\xBF" . str_replace('UTF-16', 'UTF-8', $xhtml)];
+    }
+
+    public function testReadsAnIso88591Chapter(): void
+    {
+        $xhtml = '<?xml version="1.0" encoding="ISO-8859-1"?><html><head><title>Café</title></head><body><p>Crème</p></body></html>';
+        $directory = EpubBuilder::minimal()
+            ->withFile('EPUB/chapter.xhtml', mb_convert_encoding($xhtml, 'ISO-8859-1', 'UTF-8'))
+            ->writeTo($this->tmpDir . '/book');
+
+        $document = (new EpubDocumentLoader())->load($directory);
+
+        $this->assertSame(["<a id=\"epub-c0\">\u{200B}</a><p>Crème</p>"], $document->chapters);
+        $this->assertSame(['Café'], $document->chapterTitles);
     }
 
     public function testSkipsSpineItemsThatAreNotXhtml(): void
@@ -464,6 +535,21 @@ final class EpubDocumentLoaderTest extends TestCase
         preg_match_all('#data:image/svg\+xml;base64,([A-Za-z0-9+/=]+)#', $html, $matches);
 
         return array_map(static fn (string $data): string => (string) base64_decode($data, true), $matches[1]);
+    }
+
+    /**
+     * One chapter in the given language, in a spine with the given page-progression-direction.
+     */
+    public static function languageBook(string $language, ?string $direction = null, string $text = 'Text'): EpubBuilder
+    {
+        $opf = str_replace('<dc:language>en</dc:language>', "<dc:language>{$language}</dc:language>", EpubBuilder::opf());
+        if ($direction !== null) {
+            $opf = str_replace('<spine>', "<spine page-progression-direction=\"{$direction}\">", $opf);
+        }
+
+        return EpubBuilder::minimal()
+            ->withFile('EPUB/package.opf', $opf)
+            ->withFile('EPUB/chapter.xhtml', "<html><body><p>{$text}</p></body></html>");
     }
 
     public static function twoChapterBook(): EpubBuilder

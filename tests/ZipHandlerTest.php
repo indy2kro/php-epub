@@ -8,6 +8,7 @@ use PhpEpub\Exception;
 use PhpEpub\Util\FileSystemHelper;
 use PhpEpub\ZipException;
 use PhpEpub\ZipHandler;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use ZipArchive;
 
@@ -35,6 +36,9 @@ final class ZipHandlerTest extends TestCase
         }
         if (! is_dir($this->compressDir)) {
             mkdir($this->compressDir, 0777, true);
+        }
+        if (! is_dir(dirname($this->outputZipPath))) {
+            mkdir(dirname($this->outputZipPath), 0777, true);
         }
     }
 
@@ -207,6 +211,108 @@ final class ZipHandlerTest extends TestCase
         (new ZipHandler())->extract($zipPath, $this->extractDir);
     }
 
+    public function testExtractRejectsEntriesThatDifferOnlyInUnicodeCase(): void
+    {
+        $this->requireUnicodeFolding();
+        $zipPath = $this->buildZip(["a/\u{00C9}.txt" => 'one', "a/\u{00E9}.txt" => 'two']);
+
+        $this->expectException(ZipException::class);
+        $this->expectExceptionMessage('ZIP entries differ only in case');
+
+        (new ZipHandler())->extract($zipPath, $this->extractDir);
+    }
+
+    public function testExtractRejectsEntriesThatDifferOnlyInUnicodeNormalization(): void
+    {
+        $this->requireUnicodeFolding();
+        // The same name precomposed (NFC) and decomposed (NFD): macOS stores both as one file.
+        $zipPath = $this->buildZip(["caf\u{00E9}.txt" => 'one', "cafe\u{0301}.txt" => 'two']);
+
+        $this->expectException(ZipException::class);
+        $this->expectExceptionMessage('ZIP entries differ only in case');
+
+        (new ZipHandler())->extract($zipPath, $this->extractDir);
+    }
+
+    public function testExtractKeepsDistinctUnicodeNamesAndNamesThatAreNotUtf8(): void
+    {
+        $zipPath = $this->buildZip(["\u{00E9}.txt" => 'one', "e.txt" => 'two', "\xE9a.txt" => 'three', "\xE9b.txt" => 'four']);
+
+        (new ZipHandler())->extract($zipPath, $this->extractDir);
+
+        $this->assertStringEqualsFile($this->extractDir . "/\u{00E9}.txt", 'one');
+        $this->assertStringEqualsFile($this->extractDir . '/e.txt', 'two');
+    }
+
+    #[DataProvider('windowsInvalidNames')]
+    public function testExtractRejectsNamesWindowsCannotWrite(string $name): void
+    {
+        $zipPath = $this->buildZip([$name => 'data']);
+
+        try {
+            $this->windowsHandler(true)->extract($zipPath, $this->extractDir);
+            $this->fail('Expected an exception for an entry name Windows cannot write.');
+        } catch (ZipException $exception) {
+            $this->assertStringContainsString('cannot be written on this system', $exception->getMessage());
+            $this->assertStringContainsString($name, $exception->getMessage());
+        }
+    }
+
+    /**
+     * @return \Iterator<string, array{string}>
+     */
+    public static function windowsInvalidNames(): \Iterator
+    {
+        yield 'trailing dot in a directory' => ['dir./a.txt'];
+        yield 'trailing dot' => ['a.'];
+        yield 'trailing space' => ['dir /a.txt'];
+        yield 'device name' => ['CON'];
+        yield 'device name with extension' => ['EPUB/aux.xhtml'];
+        yield 'device name in any case' => ['Lpt1.tar.gz'];
+        yield 'numbered device' => ['com9'];
+        yield 'colon' => ['dir/a:b.txt'];
+        yield 'less-than' => ['a<b.txt'];
+        yield 'greater-than' => ['a>b.txt'];
+        yield 'quote' => ['a"b.txt'];
+        yield 'pipe' => ['a|b.txt'];
+        yield 'question mark' => ['a?b.txt'];
+        yield 'asterisk' => ['a*b.txt'];
+        yield 'directory entry' => ['nul/'];
+    }
+
+    public function testExtractAcceptsSimilarNamesOnWindowsRules(): void
+    {
+        $zipPath = $this->buildZip(['console.txt' => '1', 'com10.txt' => '2', 'COM0' => '3', 'a.b/.hidden' => '4', '.x/c.d' => '5']);
+
+        $this->windowsHandler(true)->extract($zipPath, $this->extractDir);
+
+        $this->assertStringEqualsFile($this->extractDir . '/console.txt', '1');
+        $this->assertStringEqualsFile($this->extractDir . '/.x/c.d', '5');
+    }
+
+    public function testExtractAppliesNoWindowsRulesOnOtherSystems(): void
+    {
+        $zipPath = $this->buildZip(['plain.txt' => '1']);
+
+        $this->windowsHandler(false)->extract($zipPath, $this->extractDir);
+
+        $this->assertStringEqualsFile($this->extractDir . '/plain.txt', '1');
+    }
+
+    public function testExtractKeepsAcceptingNamesThatOnlyWindowsCannotWrite(): void
+    {
+        if (DIRECTORY_SEPARATOR === '\\') {
+            $this->markTestSkipped('These names cannot be created on Windows.');
+        }
+
+        $zipPath = $this->buildZip(['CON.txt' => '1', 'dir./a.' => '2', 'x/a:b.txt' => '3']);
+
+        $this->windowsHandler(false)->extract($zipPath, $this->extractDir);
+
+        $this->assertStringEqualsFile($this->extractDir . '/CON.txt', '1');
+        $this->assertStringEqualsFile($this->extractDir . '/x/a:b.txt', '3');
+    }
+
     public function testCompressDirectory(): void
     {
         // Create a sample file to compress
@@ -313,6 +419,161 @@ final class ZipHandlerTest extends TestCase
 
         $zipHandler = new ZipHandler();
         @$zipHandler->compress($this->compressDir, __DIR__ . DIRECTORY_SEPARATOR . 'nonexistent' . DIRECTORY_SEPARATOR . 'output.zip');
+    }
+
+    #[DataProvider('failingOperations')]
+    public function testCompressNamesTheEntryAndTheLibzipStatusWhenACallFails(string $method, string $expected): void
+    {
+        $this->createEpubTree();
+        file_put_contents($this->outputZipPath, 'previous book');
+
+        try {
+            $this->failingHandler($method)->compress($this->compressDir, $this->outputZipPath);
+            $this->fail('Expected a ZipException.');
+        } catch (ZipException $exception) {
+            $this->assertStringContainsString($expected, $exception->getMessage());
+            $this->assertStringContainsString('(No error)', $exception->getMessage());
+        }
+
+        // The failed save leaves neither a partial archive nor damage to the file it would replace.
+        $this->assertStringEqualsFile($this->outputZipPath, 'previous book');
+    }
+
+    /**
+     * @return \Iterator<string, array{string, string}>
+     */
+    public static function failingOperations(): \Iterator
+    {
+        yield 'add mimetype' => ['addFile', 'Failed to add ZIP entry: mimetype'];
+        yield 'store mimetype' => ['setCompressionName', 'Failed to store ZIP entry: mimetype'];
+        yield 'add directory' => ['addEmptyDir', 'Failed to add ZIP entry: '];
+        yield 'set time' => ['setMtimeName', 'Failed to set the time of ZIP entry: mimetype'];
+        yield 'set permissions' => ['setExternalAttributesName', 'Failed to set the permissions of ZIP entry: mimetype'];
+        yield 'finalize' => ['close', 'Failed to finalize ZIP file: '];
+    }
+
+    public function testCompressLeavesNoFileWhenAnEntryCannotBeAdded(): void
+    {
+        $this->createEpubTree();
+
+        $this->expectException(ZipException::class);
+
+        try {
+            $this->failingHandler('addEmptyDir')->compress($this->compressDir, $this->outputZipPath);
+        } finally {
+            $this->assertSame([], glob($this->outputZipPath . '*'));
+        }
+    }
+
+    public function testCompressRejectsADirectoryWithoutFiles(): void
+    {
+        $this->expectException(ZipException::class);
+        $this->expectExceptionMessage('nothing to compress');
+
+        try {
+            (new ZipHandler())->compress($this->compressDir, $this->outputZipPath);
+        } finally {
+            $this->assertSame([], glob($this->outputZipPath . '*'));
+        }
+    }
+
+    public function testCompressReportsATargetItCannotReplace(): void
+    {
+        $this->createEpubTree();
+        mkdir($this->outputZipPath);
+
+        try {
+            (new ZipHandler())->compress($this->compressDir, $this->outputZipPath);
+            $this->fail('Expected a ZipException.');
+        } catch (ZipException $exception) {
+            $this->assertStringContainsString('Failed to finalize ZIP file: ' . $this->outputZipPath, $exception->getMessage());
+        } finally {
+            rmdir($this->outputZipPath);
+        }
+
+        $this->assertSame([], glob($this->outputZipPath . '*'));
+    }
+
+    /**
+     * A handler whose archive fails the given ZipArchive method (close() fails once, as when the disk is full).
+     */
+    private function failingHandler(string $method): ZipHandler
+    {
+        return new class ($method) extends ZipHandler {
+            public function __construct(private readonly string $method)
+            {
+                parent::__construct();
+            }
+
+            protected function createArchive(): ZipArchive
+            {
+                return new class ($this->method) extends ZipArchive {
+                    private bool $failed = false;
+
+                    public function __construct(private readonly string $method)
+                    {
+                    }
+
+                    public function addFile(string $filepath, string $entryname = '', int $start = 0, int $length = 0, int $flags = ZipArchive::FL_OVERWRITE): bool
+                    {
+                        return $this->method === 'addFile' ? false : parent::addFile($filepath, $entryname, $start, $length, $flags);
+                    }
+
+                    public function addEmptyDir(string $dirname, int $flags = 0): bool
+                    {
+                        return $this->method === 'addEmptyDir' ? false : parent::addEmptyDir($dirname, $flags);
+                    }
+
+                    public function setCompressionName(string $name, int $method, int $compressionFlags = 0): bool
+                    {
+                        return $this->method === 'setCompressionName' ? false : parent::setCompressionName($name, $method, $compressionFlags);
+                    }
+
+                    public function setMtimeName(string $name, int $timestamp, int $flags = 0): bool
+                    {
+                        return $this->method === 'setMtimeName' ? false : parent::setMtimeName($name, $timestamp, $flags);
+                    }
+
+                    public function setExternalAttributesName(string $name, int $opsys, int $attr, int $flags = 0): bool
+                    {
+                        return $this->method === 'setExternalAttributesName' ? false : parent::setExternalAttributesName($name, $opsys, $attr, $flags);
+                    }
+
+                    public function close(): bool
+                    {
+                        if ($this->method === 'close' && ! $this->failed) {
+                            $this->failed = true;
+
+                            return false;
+                        }
+
+                        return parent::close();
+                    }
+                };
+            }
+        };
+    }
+
+    private function windowsHandler(bool $windows): ZipHandler
+    {
+        return new class ($windows) extends ZipHandler {
+            public function __construct(private readonly bool $windows)
+            {
+                parent::__construct();
+            }
+
+            protected function isWindows(): bool
+            {
+                return $this->windows;
+            }
+        };
+    }
+
+    private function requireUnicodeFolding(): void
+    {
+        if (! class_exists(\Normalizer::class) || ! function_exists('mb_convert_case')) {
+            $this->markTestSkipped('Needs the intl and mbstring extensions.');
+        }
     }
 
     /**

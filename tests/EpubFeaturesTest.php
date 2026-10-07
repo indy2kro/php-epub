@@ -250,6 +250,20 @@ final class EpubFeaturesTest extends TestCase
         $this->assertSame('img', $epubFile->getCoverImage()?->id);
     }
 
+    public function testGetCoverImageFromAUtf16CoverPage(): void
+    {
+        $opf = str_replace('</package>', '<guide><reference type="cover" href="text/cover.xhtml"/></guide></package>', EpubBuilder::opf(
+            '<item id="page" href="text/cover.xhtml" media-type="application/xhtml+xml"/>'
+            . '<item id="img" href="images/front.jpg" media-type="image/jpeg"/>'
+        ));
+        $page = '<?xml version="1.0" encoding="UTF-16"?>' . EpubBuilder::xhtml('Обложка', '<div><img src="../images/front.jpg" alt="Обложка"/></div>');
+        $epubFile = $this->open(EpubBuilder::minimal()
+            ->withFile('EPUB/package.opf', $opf)
+            ->withFile('EPUB/text/cover.xhtml', "\xFF\xFE" . mb_convert_encoding($page, 'UTF-16LE', 'UTF-8')));
+
+        $this->assertSame('img', $epubFile->getCoverImage()?->id);
+    }
+
     public function testGetCoverImageFromAnSvgCoverPageSkipsSourcesOutsideTheBook(): void
     {
         $opf = str_replace('</package>', '<guide><reference type="Cover" href="cover.xhtml"/></guide></package>', EpubBuilder::opf(

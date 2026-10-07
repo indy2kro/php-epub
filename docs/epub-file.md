@@ -31,6 +31,15 @@ public static function open(string $filePath, ?ZipHandler $zipHandler = null, ?X
 
 Shortcut for `new EpubFile(...)` followed by `load()`.
 
+```php
+public static function openString(string $data, ?ZipHandler $zipHandler = null, ?XmlParser $xmlParser = null): EpubFile
+public static function openStream($stream, ?ZipHandler $zipHandler = null, ?XmlParser $xmlParser = null): EpubFile
+```
+
+Open a book held in a string (an upload, an HTTP response) or read from a stream (from its current position to the end; the stream is not rewound and stays open). `ZipArchive` needs a real file, so the data is buffered in a private temporary directory (random name, mode `0700`) that is deleted again, also on failure. The same ZIP size, entry and compression-ratio limits apply as for files, and a book that is not a valid EPUB throws as it would from `open()`.
+
+Such a book has no file: `save()` without a path throws an exception (pass a path, or use `saveToString()` / `saveToStream()`), and `load()` throws as well, because there is nothing to reload from; open the data again instead.
+
 ### Loading and Saving
 
 ```php
@@ -51,7 +60,21 @@ Throws an exception if the file cannot be opened or the EPUB structure is invali
 public function save(?string $filePath = null): void
 ```
 
-Saves the modified EPUB back to disk. If `$filePath` is null, overwrites the original file. Pending metadata, manifest and spine changes are written to the OPF first. Throws an exception if called before `load()`.
+Saves the modified EPUB back to disk. If `$filePath` is null, overwrites the original file. Pending metadata, manifest and spine changes are written to the OPF first. Throws an exception if called before `load()`, or, for a book opened with `openString()` / `openStream()`, when `$filePath` is null.
+
+```php
+public function saveToString(): string
+public function saveToStream($stream): void
+```
+
+Package the book exactly as `save()` does and return the EPUB's bytes, or write them to a writable stream at its current position (the stream stays open; it is not rewound). They work for any loaded book and use the same private temporary directory as `openString()`.
+
+```php
+$epubFile = EpubFile::openString($request->getBody()->getContents());
+$epubFile->getMetadata()->setTitle('Edited');
+header('Content-Type: application/epub+zip');
+$epubFile->saveToStream(fopen('php://output', 'wb'));
+```
 
 ### Accessing Components
 
@@ -88,7 +111,7 @@ public function addChapter(string $title, string $body, ?string $path = null): M
 
 `create()` prepares a new EPUB 3 book (package document with title, language, identifier and `dcterms:modified`, plus a navigation document) and returns it opened, like `open()`. Nothing is written to `$filePath` until `save()`. Without `$identifier`, a random `urn:uuid:…` is used.
 
-`addChapter()` writes an XHTML document with the given title and body markup, adds it to the manifest and the reading order, and appends it to the table of contents when the book has one. It works on any loaded book; by default chapters are stored as `text/chapter-N.xhtml` next to the OPF. The body is inserted as it is, so it must be well-formed XHTML.
+`addChapter()` writes an XHTML document with the given title and body markup, adds it to the manifest and the reading order, and appends it to the table of contents when the book has one. It works on any loaded book; by default chapters are stored as `text/chapter-N.xhtml` next to the OPF. A well-formed XHTML body is inserted as it is; HTML-ish markup that is not (named entities such as `&nbsp;`, void tags such as `<br>`, unclosed tags) is parsed as an HTML fragment with libxml and written as XHTML: entities become characters, void elements self-close and open tags are closed.
 
 A book needs at least one chapter to be valid.
 
@@ -114,16 +137,25 @@ Checks the book, including unsaved changes, and returns a list of `PhpEpub\Valid
 | `METADATA_TITLE_MISSING`, `METADATA_LANGUAGE_MISSING`, `METADATA_IDENTIFIER_MISSING` | error | A required Dublin Core element is missing or empty |
 | `METADATA_UNIQUE_IDENTIFIER` | error | `package@unique-identifier` does not name a `dc:identifier` |
 | `METADATA_MODIFIED_MISSING` | error | An EPUB 3 package has no `dcterms:modified` |
+| `METADATA_LANGUAGE_INVALID` | error | A `dc:language` is not a well-formed BCP 47 tag (e.g. `English`) |
+| `METADATA_DATE_INVALID` | warning | A `dc:date` is not W3CDTF (e.g. `July 2020`) |
 | `DUPLICATE_ID` | error | An `id` is used more than once in the package document |
 | `MANIFEST_HREF_OUTSIDE`, `MANIFEST_FILE_MISSING` | error | A manifest item points outside the book, or its file is missing |
+| `FILE_NAME_INVALID` | warning | A file name contains a character OCF forbids (`" * : < > ? \`, DEL, C0 control characters) or ends with a dot; such files cannot be created on every system |
 | `FILE_NOT_IN_MANIFEST` | warning | A file of the publication is not listed in the manifest |
 | `SPINE_EMPTY`, `SPINE_UNKNOWN_IDREF`, `SPINE_DUPLICATE_IDREF` | error | The reading order is empty, or refers to an unknown or repeated item |
 | `SPINE_NOT_CONTENT` | warning | A spine item is not a content document and has no fallback |
 | `CONTENT_NOT_WELL_FORMED` | error | An XHTML content document is not well-formed XML |
+| `MEDIA_TYPE_MISMATCH` | error | A manifest item declared as a JPEG, PNG, GIF or WebP image holds another image type, or one declared as XHTML does not look like XML at all. Only the first 512 KiB of a file are read, and content that is not recognised is not judged |
+| `MANIFEST_PROPERTY_MISSING` | error | An EPUB 3 XHTML document needs a manifest property it lacks: `svg`, `mathml`, `scripted` or `remote-resources` (documents above 8 MiB are not examined) |
+| `MANIFEST_PROPERTY_UNNEEDED` | warning | An EPUB 3 XHTML document declares one of those properties, but its content does not need it |
+| `COVER_NOT_IMAGE` | error | A manifest item with the `cover-image` property is not an image |
 | `CONTENT_REFERENCE_MISSING`, `CONTENT_REFERENCE_NOT_IN_MANIFEST` | error | A content document refers (`src`, `href`, `data`, `poster`) to a local file that is missing or outside the book, or that is not in the manifest; remote URLs, `data:` URIs and links within the document are not checked |
 | `NAV_MISSING` / `NCX_MISSING` | error | An EPUB 3 book has no navigation document / an EPUB 2 book has no NCX |
 | `NAV_INVALID` / `NCX_INVALID` | error | The navigation document is not well-formed / the NCX is not well-formed or has no NCX namespace or `navMap` |
+| `NAV_EMPTY` / `NCX_EMPTY` | error | The `toc` nav of the navigation document has no list item / the NCX `navMap` has no `navPoint` (a table of contents needs an entry; deleting the last linked file leaves it empty) |
 | `TOC_LINK_NOT_IN_MANIFEST` | error | The table of contents links to a file that is not in the manifest |
+| `ACCESSIBILITY_ACCESS_MODE_MISSING`, `ACCESSIBILITY_FEATURE_MISSING`, `ACCESSIBILITY_HAZARD_MISSING`, `ACCESSIBILITY_SUMMARY_MISSING` | warning | An EPUB 3 book has no `schema:accessMode`, `schema:accessibilityFeature`, `schema:accessibilityHazard` or `schema:accessibilitySummary` metadata (see [accessibility metadata](metadata.md#accessibility)); a new book from `create()` starts without them |
 
 ```php
 foreach ($epubFile->validate() as $issue) {
