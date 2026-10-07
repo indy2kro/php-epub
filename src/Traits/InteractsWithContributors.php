@@ -19,14 +19,18 @@ trait InteractsWithContributors
     }
 
     /**
-     * Replaces the contributors by these names. Existing contributors are reused in order,
-     * so their roles are kept; one whose name changes loses its sort key.
+     * Replaces the contributors by these names or Contributor objects (the inverse of getContributors()).
+     * Existing contributors are reused in order, so their ids and refinements survive. A plain name keeps
+     * the role of the contributor it reuses and drops its sort key when the name changes; a Contributor
+     * sets the role and sort key exactly (null removes them).
      *
-     * @param array<int, string> $names
+     * @param array<int, string|Contributor> $contributors
+     *
+     * @throws \PhpEpub\Exception If a value is not valid XML text or a name is empty; nothing is changed then.
      */
-    public function setContributors(array $names): void
+    public function setContributors(array $contributors): void
     {
-        $this->setDcValues('contributor', array_values($names), null, ['file-as']);
+        $this->setPeople('contributor', array_values($contributors));
     }
 
     /**

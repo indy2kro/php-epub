@@ -19,6 +19,7 @@ class Metadata
     use Traits\InteractsWithSubject;
     use Traits\InteractsWithIdentifier;
     use Traits\InteractsWithSeries;
+    use Traits\InteractsWithAccessibility;
 
     public const string OPF_NAMESPACE = 'http://www.idpf.org/2007/opf';
 
@@ -431,27 +432,117 @@ class Metadata
         }
 
         $node = $this->addDcElement($element, $name);
-        $details = array_filter(['role' => $role, 'file-as' => $fileAs], static fn (?string $value): bool => $value !== null && $value !== '');
 
-        if ($details !== [] && $this->isEpub3()) {
-            $id = $this->unusedId($element);
-            $node->addAttribute('id', $id);
-
-            foreach ($details as $property => $value) {
-                $meta = $this->metadataNode->addChild('meta', htmlspecialchars($value, ENT_XML1), self::OPF_NAMESPACE);
-                $meta->addAttribute('refines', '#' . $id);
-                $meta->addAttribute('property', $property);
-                if ($property === 'role') {
-                    $meta->addAttribute('scheme', 'marc:relators');
-                }
-            }
-        } else {
-            foreach ($details as $property => $value) {
-                $node->addAttribute('opf:' . $property, $value, self::OPF_NAMESPACE);
+        foreach (['role' => $role, 'file-as' => $fileAs] as $property => $value) {
+            if ($value !== null && $value !== '') {
+                $this->writePersonDetail($node, $property, $value);
             }
         }
 
         $this->modified = true;
+    }
+
+    /**
+     * Replaces the dc:creator / dc:contributor elements in $elements (all of them by default) by these
+     * people. Existing elements are reused in order, so their ids and refinements survive.
+     *
+     * A Contributor sets the role and sort key exactly (null removes them). A plain name keeps the role
+     * of the element it reuses, and drops its sort key when the name changes; a new element gets neither.
+     *
+     * @param list<string|Contributor> $people
+     * @param list<SimpleXMLElement>|null $elements
+     *
+     * @throws Exception If a value is not valid XML text or a name is empty; nothing is changed then.
+     */
+    protected function setPeople(string $element, array $people, ?array $elements = null): void
+    {
+        foreach ($people as $person) {
+            XmlText::assertValid(...($person instanceof Contributor ? [$person->name, $person->role ?? '', $person->fileAs ?? ''] : [$person]));
+            if (trim($person instanceof Contributor ? $person->name : $person) === '') {
+                throw new Exception("dc:{$element} cannot be empty");
+            }
+        }
+
+        $elements ??= $this->dcElements($element);
+
+        foreach ($people as $index => $person) {
+            $name = $person instanceof Contributor ? $person->name : $person;
+            $node = $elements[$index] ?? null;
+
+            if (! $node instanceof SimpleXMLElement) {
+                $this->addPerson($element, $name, $person instanceof Contributor ? $person->role : null, $person instanceof Contributor ? $person->fileAs : null);
+                continue;
+            }
+
+            $renamed = (string) $node !== $name;
+            if ($renamed) {
+                $this->setText($node, $name);
+            }
+
+            if ($person instanceof Contributor) {
+                $this->setPersonDetail($node, 'role', $person->role);
+                $this->setPersonDetail($node, 'file-as', $person->fileAs);
+            } elseif ($renamed) {
+                $this->removeProperties($node, ['file-as']);
+            }
+        }
+
+        foreach (array_slice($elements, count($people)) as $node) {
+            $this->removeElement($node);
+        }
+
+        $this->modified = true;
+    }
+
+    /**
+     * Writes a role or file-as of a person the way the package version expects: an EPUB 3 refinement
+     * (the element gets an id when it has none) or an EPUB 2 opf:* attribute.
+     */
+    private function writePersonDetail(SimpleXMLElement $node, string $property, string $value): void
+    {
+        if (! $this->isEpub3()) {
+            $node->addAttribute('opf:' . $property, $value, self::OPF_NAMESPACE);
+
+            return;
+        }
+
+        $id = $this->elementId($node);
+        if ($id === '') {
+            $id = $this->unusedId($node->getName());
+            $node->addAttribute('id', $id);
+        }
+
+        $meta = $this->metadataNode->addChild('meta', htmlspecialchars($value, ENT_XML1), self::OPF_NAMESPACE);
+        $meta->addAttribute('refines', '#' . $id);
+        $meta->addAttribute('property', $property);
+        if ($property === 'role') {
+            $meta->addAttribute('scheme', 'marc:relators');
+        }
+    }
+
+    /**
+     * The id attribute of an element ("" when none). Read through attributes(): SimpleXML cannot read
+     * ['id'] on an element it has just added in a namespace.
+     */
+    private function elementId(SimpleXMLElement $element): string
+    {
+        return (string) ($element->attributes()['id'] ?? '');
+    }
+
+    /**
+     * Changes the role or file-as of a person; null or "" removes it. Unchanged values are left as they are.
+     */
+    private function setPersonDetail(SimpleXMLElement $node, string $property, ?string $value): void
+    {
+        $value = $value === null || $value === '' ? null : $value;
+        if ($this->personDetail($node, $property) === $value) {
+            return;
+        }
+
+        $this->removeProperties($node, [$property]);
+        if ($value !== null) {
+            $this->writePersonDetail($node, $property, $value);
+        }
     }
 
     /**
@@ -521,7 +612,7 @@ class Metadata
      */
     private function refinements(SimpleXMLElement $element): array
     {
-        $id = (string) $element['id'];
+        $id = $this->elementId($element);
         if ($id === '') {
             return [];
         }
@@ -563,12 +654,12 @@ class Metadata
     {
         $now = gmdate('Y-m-d\TH:i:s\Z');
 
-        foreach ($this->query($this->metadataNode, './/opf:meta') as $meta) {
-            if ((string) $meta['property'] === 'dcterms:modified') {
-                $this->setText($meta, $now);
+        // Only the book-level date: a refinement with the same property describes another element.
+        $meta = $this->propertyMetas('dcterms:modified')[0] ?? null;
+        if ($meta instanceof SimpleXMLElement) {
+            $this->setText($meta, $now);
 
-                return;
-            }
+            return;
         }
 
         $meta = $this->metadataNode->addChild('meta', $now, self::OPF_NAMESPACE);

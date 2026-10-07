@@ -60,6 +60,7 @@ The name given to the resource (dc:title). A book can have several titles; in EP
 public function getAuthors(): array<int, string>
 public function setAuthors(array<int, string> $authors): void
 public function getCreators(): array<int, Contributor>
+public function setCreators(array<int, Contributor> $creators): void
 public function addCreator(string $name, ?string $role = 'aut', ?string $fileAs = null): void
 ```
 
@@ -69,15 +70,24 @@ The authors are the creators of the resource (dc:creator) with the role `aut` or
 
 `getCreators()` returns every creator as a `PhpEpub\Contributor` with `name`, `role` (a [MARC relator code](https://www.loc.gov/marc/relators/relaterm.html) such as `aut`, `ill` or `trl`, or `null`) and `fileAs` (the sort key, or `null`). `addCreator()` adds one, writing the role and sort key as EPUB 3 refinements (`scheme="marc:relators"`) or as EPUB 2 `opf:role` / `opf:file-as` attributes, depending on the package version.
 
+`setCreators()` is the inverse of `getCreators()`: it replaces every creator by the given `Contributor` objects. Existing creators are reused in order, so their ids and other refinements survive; the role and sort key of each are set exactly as given (`null` removes them), in the form the package version expects. Creators beyond the list are removed with their refinements. It throws an `Exception` for an empty name or an invalid value, and then changes nothing.
+
+```php
+$metadata->setCreators([
+    new Contributor('Jane Doe', 'aut', 'Doe, Jane'),
+    new Contributor('Ivan Illustrator', 'ill', null),
+]);
+```
+
 ### Contributors
 
 ```php
 public function getContributors(): array<int, Contributor>
-public function setContributors(array<int, string> $names): void
+public function setContributors(array<int, string|Contributor> $contributors): void
 public function addContributor(string $name, ?string $role = null, ?string $fileAs = null): void
 ```
 
-People or organisations who contributed to the resource (dc:contributor), such as editors (`edt`) or translators (`trl`). These work like the creator methods; `setContributors()` reuses existing contributors in order, keeping their roles.
+People or organisations who contributed to the resource (dc:contributor), such as editors (`edt`) or translators (`trl`). These work like the creator methods. `setContributors()` reuses existing contributors in order. A plain name keeps the role of the contributor it reuses (its sort key is dropped when the name changes), while a `Contributor` object sets the role and sort key exactly (`null` removes them), so names and objects can be mixed. Empty names throw an `Exception`.
 
 ```php
 $metadata->addCreator('Ivan Illustrator', 'ill', 'Illustrator, Ivan');
@@ -110,15 +120,15 @@ The entity that made the resource available (dc:publisher).
 
 ```php
 public function getDate(): string
-public function setDate(string $date): void
+public function setDate(string|DateTimeInterface $date): void
 public function getModifiedDate(): ?string
 public function getDateEvents(): array
 ```
 
-Date of publication (dc:date). Should be in a valid date format (preferably ISO 8601).
+Date of publication (dc:date). `setDate()` accepts [W3CDTF](https://www.w3.org/TR/NOTE-datetime), the format EPUB uses, and throws an `Exception` for anything else: `YYYY`, `YYYY-MM`, `YYYY-MM-DD`, or a date-time with a time zone (`2020-07-31T10:20:30Z`, `2020-07-31T10:20+02:00`). A `DateTimeInterface` is written as a date-time with its own offset (`2020-07-31T10:20:30+02:00`).
 
 - `getDate()`/`setDate()` use the publication date: the `dc:date` with the EPUB 2 `opf:event="publication"`, or else one without an event, or else the first. Dates of other events are kept.
-- `getModifiedDate()` returns the EPUB 3 `dcterms:modified` property, or else the EPUB 2 `dc:date` with `opf:event="modification"`, or `null`. `save()` keeps both up to date.
+- `getModifiedDate()` returns the EPUB 3 `dcterms:modified` property, or else the EPUB 2 `dc:date` with `opf:event="modification"`, or `null`. `save()` keeps both up to date: it only touches the book-level `dcterms:modified` (never a refinement of another element with that property), and adds it when the package only has refinements.
 - `getDateEvents()` returns every `dc:date` keyed by its `opf:event` (`""` for a date without one), e.g. `['publication' => '1999-01-01', 'modification' => '2020-05-05']`.
 
 ### Language
@@ -130,7 +140,49 @@ public function getLanguages(): array<int, string>
 public function setLanguages(array<int, string> $languages): void
 ```
 
-The language of the resource (dc:language). Use BCP 47 language codes (e.g., "en", "fr"). `getLanguage()`/`setLanguage()` work on the main (first) language; `getLanguages()`/`setLanguages()` on all of them, for multilingual books. At least one language is required.
+The language of the resource (dc:language). Use BCP 47 language tags (e.g., "en", "pt-BR", "zh-Hant"). `setLanguage()` and `setLanguages()` throw an `Exception` for a value that is not a well-formed tag (`"English"` or `"en_US"`); only the syntax is checked, not whether the language is registered. `getLanguage()`/`setLanguage()` work on the main (first) language; `getLanguages()`/`setLanguages()` on all of them, for multilingual books. At least one language is required.
+
+### Accessibility
+
+```php
+public function getAccessModes(): array<int, string>
+public function setAccessModes(array<int, string> $modes): void
+public function getAccessModesSufficient(): array<int, string>
+public function setAccessModesSufficient(array<int, string> $sets): void
+public function getAccessibilityFeatures(): array<int, string>
+public function setAccessibilityFeatures(array<int, string> $features): void
+public function getAccessibilityHazards(): array<int, string>
+public function setAccessibilityHazards(array<int, string> $hazards): void
+public function getAccessibilitySummary(): ?string
+public function setAccessibilitySummary(?string $summary): void
+public function getConformsTo(): ?string
+public function setConformsTo(?string $conformance): void
+public function getCertifiedBy(): ?string
+public function setCertifiedBy(?string $certifier): void
+```
+
+Accessibility metadata as described by [EPUB Accessibility 1.1](https://www.w3.org/TR/epub-a11y-11/); the European Accessibility Act asks for it for e-books sold in the EU.
+
+| Methods | Property | Example values |
+|---|---|---|
+| `getAccessModes()` / `setAccessModes()` | `schema:accessMode` | `textual`, `visual`, `auditory`, `tactile` |
+| `getAccessModesSufficient()` / `setAccessModesSufficient()` | `schema:accessModeSufficient` | `textual,visual` (each value is a comma-separated set), `textual` |
+| `getAccessibilityFeatures()` / `setAccessibilityFeatures()` | `schema:accessibilityFeature` | `alternativeText`, `tableOfContents`, `structuralNavigation`, `none` |
+| `getAccessibilityHazards()` / `setAccessibilityHazards()` | `schema:accessibilityHazard` | `none`, `unknown`, `noFlashingHazard`, `flashing` |
+| `getAccessibilitySummary()` / `setAccessibilitySummary()` | `schema:accessibilitySummary` | free text |
+| `getConformsTo()` / `setConformsTo()` | `dcterms:conformsTo` | `EPUB Accessibility 1.1 - WCAG 2.1 Level AA` |
+| `getCertifiedBy()` / `setCertifiedBy()` | `a11y:certifiedBy` | the certifier's name |
+
+The list methods read and replace every value in order; the single-value ones return `null` when absent, and `null` or `""` removes the value. EPUB 3 packages store each as a `<meta property="...">` element; EPUB 2 packages as `<meta name="..." content="..."/>`, which the specification allows. The values are not checked against the vocabularies. `EpubFile::validate()` warns when an EPUB 3 book has no access mode, feature, hazard or summary (see [Validating](epub-file.md#validating)).
+
+```php
+$metadata->setAccessModes(['textual', 'visual']);
+$metadata->setAccessModesSufficient(['textual']);
+$metadata->setAccessibilityFeatures(['alternativeText', 'tableOfContents']);
+$metadata->setAccessibilityHazards(['none']);
+$metadata->setAccessibilitySummary('All images have text alternatives.');
+$metadata->setConformsTo('EPUB Accessibility 1.1 - WCAG 2.1 Level AA');
+```
 
 ### Subject
 
@@ -264,6 +316,7 @@ The Metadata class uses PHP traits to organize code:
 - `InteractsWithSubject` - Subject handling
 - `InteractsWithIdentifier` - Identifier handling
 - `InteractsWithSeries` - Series handling (EPUB 3 collections and Calibre metas)
+- `InteractsWithAccessibility` - Accessibility metadata
 
 Each trait is a thin layer over shared protected helpers in `Metadata` (`getDcValue()`, `getDcValues()`, `setDcValue()`, `setDcValues()`), which look up elements inside `<metadata>` by namespace URI rather than by prefix.
 
@@ -271,6 +324,8 @@ Each trait is a thin layer over shared protected helpers in `Metadata` (`getDcVa
 
 - The constructor throws `InvalidEpubException` if the package has no `<metadata>` element.
 - `setIdentifiers([])` throws an `Exception`, because a package needs at least one identifier.
+- `setLanguage()`/`setLanguages()` throw an `Exception` for a malformed BCP 47 tag, and `setDate()` for a date that is not W3CDTF.
+- `setCreators()` and `setContributors()` throw an `Exception` for an empty name.
 - `setTitle()`, `setLanguage()` and `setIdentifiers()` throw an `Exception` for an empty or whitespace-only value, because the OPF specification requires these elements to have content.
 - Every setter (including `setMeta()` and `setProperty()`) throws an `Exception` for a value that is not valid UTF-8 or contains a character XML cannot store (control characters other than tab, newline and carriage return). Convert legacy encodings first, e.g. with `mb_convert_encoding($value, 'UTF-8', 'ISO-8859-1')`. The package is left unchanged when a value is rejected, even if it was one of several in a list.
 - `save()` throws an `Exception` if the OPF file cannot be written.

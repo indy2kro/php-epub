@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace PhpEpub\Traits;
 
+use PhpEpub\Exception;
+use PhpEpub\Util\MetadataSyntax;
+use PhpEpub\Util\XmlText;
+
 trait InteractsWithLanguage
 {
     /**
@@ -16,9 +20,14 @@ trait InteractsWithLanguage
 
     /**
      * Sets the language of the EPUB, creating dc:language when missing.
+     *
+     * @param string $language A well-formed BCP 47 tag, e.g. "en" or "pt-BR".
+     *
+     * @throws Exception If the language is empty or not a well-formed BCP 47 tag.
      */
     public function setLanguage(string $language): void
     {
+        $this->assertLanguageTags([$language]);
         $this->setDcValue('language', $language);
     }
 
@@ -35,12 +44,29 @@ trait InteractsWithLanguage
     /**
      * Replaces the languages of the EPUB; the first is the main one.
      *
-     * @param list<string> $languages
+     * @param list<string> $languages Well-formed BCP 47 tags.
      *
-     * @throws \PhpEpub\Exception If the list or a language is empty.
+     * @throws Exception If the list or a language is empty, or a language is not a well-formed BCP 47 tag.
      */
     public function setLanguages(array $languages): void
     {
+        $this->assertLanguageTags($languages);
         $this->setDcValues('language', $languages);
+    }
+
+    /**
+     * @param list<string> $languages
+     *
+     * @throws Exception If a language is not a well-formed BCP 47 tag; empty ones are left to the caller's own check.
+     */
+    private function assertLanguageTags(array $languages): void
+    {
+        XmlText::assertValid(...$languages);
+
+        foreach ($languages as $language) {
+            if (trim($language) !== '' && ! MetadataSyntax::isLanguageTag($language)) {
+                throw new Exception("Not a well-formed BCP 47 language tag: \"{$language}\"");
+            }
+        }
     }
 }
