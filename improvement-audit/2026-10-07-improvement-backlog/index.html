@@ -333,14 +333,14 @@ were re-checked against the round-3 hardening.</p>
 </ul>
 <h3 id="tests">Tests<a class="headerlink" href="#tests" title="Permanent link">&para;</a></h3>
 <ul>
-<li>[ ] <strong>TEST-01</strong> Run the PHP examples in <code>README.md</code> and <code>docs/</code> in the test suite (lint every block, execute the self-contained ones against a fixture) — <code>README.md</code>, <code>docs/*.md</code>, <code>tests/</code> — M · low
+<li>[x] <strong>TEST-01</strong> Run the PHP examples in <code>README.md</code> and <code>docs/</code> in the test suite (lint every block, execute the self-contained ones against a fixture) — <code>README.md</code>, <code>docs/*.md</code>, <code>tests/</code> — M · low
   PHPCS on <code>docs/</code> does not look inside Markdown and no test reads <code>docs/</code>, so examples drift silently whenever the API changes. Round 3's DOC-01 and DOC-02 fixed drift of this kind.</li>
-<li>[ ] <strong>TEST-02</strong> Fuzz the untrusted-input parsers (<code>ZipHandler::extract()</code>, <code>XmlParser</code>, <code>Parser</code>, <code>EpubDocumentLoader</code>) with mutated fixtures in a scheduled job — <code>tests/Support/EpubBuilder.php</code>, <code>.github/workflows/tests.yml</code> — M · low
+<li>[x] <strong>TEST-02</strong> Fuzz the untrusted-input parsers (<code>ZipHandler::extract()</code>, <code>XmlParser</code>, <code>Parser</code>, <code>EpubDocumentLoader</code>) with mutated fixtures in a scheduled job — <code>tests/Support/EpubBuilder.php</code>, <code>.github/workflows/tests.yml</code> — M · low
   Hostile-input tests are hand-written cases. A cheap mutation fuzzer (truncated entries, flipped bytes, random names) would find crashes and non-library exceptions that example-based tests miss.</li>
 </ul>
 <h3 id="ci">CI<a class="headerlink" href="#ci" title="Permanent link">&para;</a></h3>
 <ul>
-<li>[ ] <strong>CI-01</strong> Mark dev-only files <code>export-ignore</code>: <code>docs/</code>, <code>mkdocs.yml</code>, <code>AGENTS.md</code>, <code>phpcs.xml</code>, <code>phpstan.neon</code>, <code>phpunit.xml</code>, <code>rector.php</code>, <code>composer.lock</code>, <code>.gitignore</code> — <code>.gitattributes:10-20</code> — S · low
+<li>[x] <strong>CI-01</strong> Mark dev-only files <code>export-ignore</code>: <code>docs/</code>, <code>mkdocs.yml</code>, <code>AGENTS.md</code>, <code>phpcs.xml</code>, <code>phpstan.neon</code>, <code>phpunit.xml</code>, <code>rector.php</code>, <code>composer.lock</code>, <code>.gitignore</code> — <code>.gitattributes:10-20</code> — S · low
   <code>git archive HEAD</code> shows that all of them ship in the Composer dist package, which every dependent downloads.</li>
 </ul>
               
