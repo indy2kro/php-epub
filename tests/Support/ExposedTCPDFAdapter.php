@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PhpEpub\Test\Support;
 
+use PhpEpub\Converters\ConfinedTcpdf;
 use PhpEpub\Converters\EpubDocumentLoader;
 use PhpEpub\Converters\TCPDFAdapter;
 use TCPDF;
@@ -25,20 +26,24 @@ final class ExposedTCPDFAdapter extends TCPDFAdapter
      */
     public array $bookmarks = [];
 
-    protected function newPdf(string $orientation, string $format): TCPDF
+    /**
+     * @param list<string> $readableDirectories
+     */
+    protected function newPdf(string $orientation, string $format, array $readableDirectories = []): TCPDF
     {
         $this->bookmarks = [];
         $record = function (string $title, int $level): void {
             $this->bookmarks[] = [$title, $level];
         };
 
-        return new class ($orientation, 'mm', $format, $record) extends TCPDF {
+        return new class ($orientation, $format, $readableDirectories, $record) extends ConfinedTcpdf {
             /**
+             * @param list<string> $readableDirectories
              * @param \Closure(string, int): void $record
              */
-            public function __construct(string $orientation, string $unit, string $format, private readonly \Closure $record)
+            public function __construct(string $orientation, string $format, array $readableDirectories, private readonly \Closure $record)
             {
-                parent::__construct($orientation, $unit, $format);
+                parent::__construct($orientation, $format, $readableDirectories);
             }
 
             /**

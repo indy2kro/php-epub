@@ -9,6 +9,7 @@ use PhpEpub\Converters\EpubDocumentLoader;
 use PhpEpub\Test\Support\EpubBuilder;
 use PhpEpub\Test\Support\UnreadableFile;
 use PhpEpub\Util\FileSystemHelper;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class EpubDocumentLoaderTest extends TestCase
@@ -102,7 +103,8 @@ final class EpubDocumentLoaderTest extends TestCase
         $okPath = str_replace('\\', '/', (string) realpath($directory . '/EPUB/images/ok.png'));
         $this->assertStringContainsString($okPath, $html);
         $this->assertStringContainsString('Styled', $html);
-        $this->assertStringContainsString('href="chapter.xhtml#top"', $html);
+        // A link to the chapter itself becomes a link inside the PDF.
+        $this->assertStringContainsString('href="#epub-c0-top"', $html);
     }
 
     public function testSvgFilesAreInlinedWithEveryReferenceConfinedToTheBook(): void
@@ -214,6 +216,67 @@ final class EpubDocumentLoaderTest extends TestCase
         $this->assertSame(40 - $inlined, substr_count($html, 'src=""'));
     }
 
+    public function testLinksBetweenChaptersBecomeLinksInsideThePdf(): void
+    {
+        $directory = self::twoChapterBook()
+            ->withFile('EPUB/chapter.xhtml', '<html><body><p id="local">One</p>'
+                . '<a href="text/two.xhtml#sec">To section</a><a href="text/two.xhtml">To two</a><a href="#local">Here</a>'
+                . '<a href="https://example.com/">Web</a><a href="missing.xhtml#x">Missing</a><a href="../../out.xhtml">Out</a></body></html>')
+            ->withFile('EPUB/text/two.xhtml', '<html><body><h2 id="sec">Section</h2><img id="pic" src="p.png"/>'
+                . '<a href="../chapter.xhtml#local">Back</a><p id="n&#246;te 1">Odd id</p><a href="#n%C3%B6te%201">To odd id</a></body></html>')
+            ->writeTo($this->tmpDir . '/book');
+
+        $chapters = (new EpubDocumentLoader())->load($directory)->chapters;
+
+        // The spine lists two.xhtml first (epub-c0), then chapter.xhtml (epub-c1).
+        $this->assertStringStartsWith('<a id="epub-c1">', $chapters[1]);
+        $this->assertStringContainsString('href="#epub-c0-sec"', $chapters[1]);
+        $this->assertStringContainsString('href="#epub-c0"', $chapters[1]);
+        $this->assertStringContainsString('href="#epub-c1-local"', $chapters[1]);
+        $this->assertStringContainsString('href="https://example.com/"', $chapters[1]);
+        $this->assertStringContainsString('href="missing.xhtml#x"', $chapters[1]);
+        $this->assertStringContainsString('href="../../out.xhtml"', $chapters[1]);
+        $this->assertStringContainsString('<p id="local"><a id="epub-c1-local">', $chapters[1]);
+
+        $this->assertStringStartsWith('<a id="epub-c0">', $chapters[0]);
+        $this->assertStringContainsString('<h2 id="sec"><a id="epub-c0-sec">', $chapters[0]);
+        // Void elements get the anchor in front of them.
+        $this->assertStringContainsString('<a id="epub-c0-pic">', $chapters[0]);
+        $this->assertStringContainsString('href="#epub-c1-local"', $chapters[0]);
+        $this->assertSame(2, substr_count($chapters[0], 'epub-c0-n_c3_b6te_201'));
+    }
+
+    #[DataProvider('covers')]
+    public function testOffersACoverImageThatNoChapterShows(string $manifestItem, string $metadata, string $chapter, bool $offered): void
+    {
+        $directory = EpubBuilder::minimal()
+            ->withFile('EPUB/package.opf', EpubBuilder::opf($manifestItem, $metadata))
+            ->withFile('EPUB/chapter.xhtml', "<html><body>{$chapter}</body></html>")
+            ->withFile('EPUB/images/cover.png', (string) base64_decode(EpubBuilder::PNG, true))
+            ->withFile('EPUB/images/cover.svg', '<svg xmlns="http://www.w3.org/2000/svg"/>')
+            ->writeTo($this->tmpDir . '/book');
+
+        $cover = (new EpubDocumentLoader())->load($directory)->coverImage;
+
+        $expected = $offered ? str_replace('\\', '/', (string) realpath($directory . '/EPUB/images/cover.png')) : '';
+        $this->assertSame($expected, $cover);
+    }
+
+    /**
+     * @return iterable<string, array{string, string, string, bool}>
+     */
+    public static function covers(): iterable
+    {
+        $png = '<item id="cover" href="images/cover.png" media-type="image/png" properties="cover-image"/>';
+
+        yield 'EPUB 3 cover-image outside the spine' => [$png, '', '<p>Text</p>', true];
+        yield 'EPUB 2 meta' => ['<item id="art" href="images/cover.png" media-type="image/png"/>', '<meta name="cover" content="art"/>', '<p>Text</p>', true];
+        yield 'already shown by the first chapter' => [$png, '', '<img src="images/cover.png"/>', false];
+        yield 'SVG cover' => ['<item id="cover" href="images/cover.svg" media-type="image/svg+xml" properties="cover-image"/>', '', '<p>Text</p>', false];
+        yield 'missing file' => ['<item id="cover" href="images/gone.png" media-type="image/png" properties="cover-image"/>', '', '<p>Text</p>', false];
+        yield 'no cover' => ['', '', '<p>Text</p>', false];
+    }
+
     public function testTextAndPathsSurviveParsing(): void
     {
         $directory = EpubBuilder::minimal()
@@ -320,7 +383,7 @@ final class EpubDocumentLoaderTest extends TestCase
 
         $document = (new EpubDocumentLoader())->load($this->tmpDir . '/legacy');
 
-        $this->assertSame(['Legacy'], $document->chapters);
+        $this->assertSame(["<a id=\"epub-c0\">\u{200B}</a>Legacy"], $document->chapters);
         $this->assertSame('', $document->title);
     }
 

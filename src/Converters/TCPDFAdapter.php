@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PhpEpub\Converters;
 
 use PhpEpub\ConversionException;
+use PhpEpub\Util\FileSystemHelper;
 use TCPDF;
 
 class TCPDFAdapter implements ConverterInterface
@@ -69,10 +70,27 @@ class TCPDFAdapter implements ConverterInterface
      */
     protected function createPdf(EpubDocument $document): TCPDF
     {
+        // Inlined SVGs are written here for TCPDF (see svgImagesAsFiles()); a private directory,
+        // so TCPDF can be allowed to read it without the rest of the system temp dir.
+        $svgDirectory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'epub_pdf_' . bin2hex(random_bytes(16));
+        @mkdir($svgDirectory, 0700) || throw new ConversionException("Failed to create temporary directory: {$svgDirectory}");
+
+        try {
+            return $this->fillPdf($document, array_values(array_filter([$document->directory, $svgDirectory])), $svgDirectory);
+        } finally {
+            (new FileSystemHelper())->deleteDirectory($svgDirectory);
+        }
+    }
+
+    /**
+     * @param list<string> $readableDirectories
+     */
+    private function fillPdf(EpubDocument $document, array $readableDirectories, string $svgDirectory): TCPDF
+    {
         $author = implode(', ', $document->authors);
 
         $orientation = strtolower($this->stringStyle('orientation')) === 'landscape' ? 'L' : 'P';
-        $pdf = $this->newPdf($orientation, strtoupper($this->stringStyle('paper_size')));
+        $pdf = $this->newPdf($orientation, strtoupper($this->stringStyle('paper_size')), $readableDirectories);
         $pdf->SetCreator(PDF_CREATOR);
         $pdf->SetTitle($document->title);
         $pdf->SetAuthor($author);
@@ -95,24 +113,31 @@ class TCPDFAdapter implements ConverterInterface
         $pdf->SetAutoPageBreak(true, $this->intStyle('margin_bottom'));
         $pdf->SetFont($this->stringStyle('font'), '', $this->intStyle('font_size'));
 
-        $svgFiles = [];
-        try {
-            foreach ($document->chapters as $index => $chapter) {
-                $pdf->AddPage();
-                if ($this->boolStyle('bookmarks')) {
-                    $title = $document->chapterTitles[$index] ?? '';
-                    $pdf->Bookmark($title !== '' ? $title : 'Chapter ' . ($index + 1), 0, 0);
-                }
+        if ($document->coverImage !== '') {
+            $pdf->AddPage();
+            if ($this->boolStyle('bookmarks')) {
+                $pdf->Bookmark('Cover', 0, 0);
+            }
 
-                $pdf->writeHTML($this->chapterHtml($document, $this->svgImagesAsFiles($chapter, $svgFiles)), true, false, true, false, '');
-            }
-        } finally {
-            foreach ($svgFiles as $file) {
-                @unlink($file);
-            }
+            // Scaled to fit the area inside the margins, centred.
+            $left = $this->intStyle('margin_left');
+            $top = $this->intStyle('margin_top');
+            $width = $pdf->getPageWidth() - $left - $this->intStyle('margin_right');
+            $height = $pdf->getPageHeight() - $top - $this->intStyle('margin_bottom');
+            $pdf->Image($document->coverImage, $left, $top, $width, $height, '', '', '', true, 300, '', false, false, 0, 'CM');
         }
 
-        if ($document->chapters === []) {
+        foreach ($document->chapters as $index => $chapter) {
+            $pdf->AddPage();
+            if ($this->boolStyle('bookmarks')) {
+                $title = $document->chapterTitles[$index] ?? '';
+                $pdf->Bookmark($title !== '' ? $title : 'Chapter ' . ($index + 1), 0, 0);
+            }
+
+            $pdf->writeHTML($this->chapterHtml($document, $this->svgImagesAsFiles($chapter, $svgDirectory)), true, false, true, false, '');
+        }
+
+        if ($document->chapters === [] && $document->coverImage === '') {
             $pdf->AddPage();
         }
 
@@ -124,10 +149,11 @@ class TCPDFAdapter implements ConverterInterface
      *
      * @param string $orientation "P" or "L".
      * @param string $format A TCPDF page format, e.g. "A4" or "LETTER".
+     * @param list<string> $readableDirectories The only directories (besides TCPDF's own files) TCPDF may read.
      */
-    protected function newPdf(string $orientation, string $format): TCPDF
+    protected function newPdf(string $orientation, string $format, array $readableDirectories = []): TCPDF
     {
-        return new TCPDF($orientation, 'mm', $format);
+        return new ConfinedTcpdf($orientation, $format, $readableDirectories);
     }
 
     /**
@@ -143,19 +169,16 @@ class TCPDFAdapter implements ConverterInterface
      * TCPDF only renders an <img> as SVG when its source ends in ".svg", so the sanitised SVG
      * data: URIs of EpubDocumentLoader are written to temporary files for the conversion.
      *
-     * @param list<string> $files The temporary files, for createPdf() to delete.
+     * @param string $directory The private directory createPdf() deletes afterwards.
      */
-    private function svgImagesAsFiles(string $html, array &$files): string
+    private function svgImagesAsFiles(string $html, string $directory): string
     {
         return (string) preg_replace_callback(
             '#\bsrc="data:image/svg\+xml;base64,([A-Za-z0-9+/=]+)"#',
-            static function (array $match) use (&$files): string {
-                // tempnam() reserves a unique name; the SVG goes next to it with the extension TCPDF needs.
-                $reserved = (string) tempnam(sys_get_temp_dir(), 'epub_svg_');
-                $file = $reserved . '.svg';
-                array_push($files, $reserved, $file);
+            static function (array $match) use ($directory): string {
+                $file = $directory . DIRECTORY_SEPARATOR . bin2hex(random_bytes(8)) . '.svg';
 
-                return $reserved !== '' && @file_put_contents($file, (string) base64_decode($match[1], true)) !== false
+                return @file_put_contents($file, (string) base64_decode($match[1], true)) !== false
                     ? 'src="' . htmlspecialchars(str_replace('\\', '/', $file)) . '"'
                     : $match[0];
             },

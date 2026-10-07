@@ -100,6 +100,35 @@ final class DompdfAdapterTest extends TestCase
         }
     }
 
+    public function testLinksBetweenChaptersWorkInThePdf(): void
+    {
+        $directory = TCPDFAdapterTest::linkedBook()->writeTo($this->epubDirectory . '-links');
+
+        try {
+            (new DompdfAdapter())->convert($directory, $this->outputPdfPath);
+
+            $this->assertMatchesRegularExpression('#/Dest|/GoTo#', (string) file_get_contents($this->outputPdfPath));
+        } finally {
+            $this->fileSystemHelper->deleteDirectory($directory);
+        }
+    }
+
+    public function testACoverOutsideTheSpineBecomesTheFirstPage(): void
+    {
+        $directory = TCPDFAdapterTest::coverBook()->writeTo($this->epubDirectory . '-cover');
+
+        try {
+            $dompdf = (new ExposedDompdfAdapter())->createDompdfFor($directory);
+            $dompdf->loadHtml((new DompdfAdapter())->buildHtml($directory));
+            $dompdf->render();
+
+            $this->assertSame(2, $dompdf->getCanvas()->get_page_count());
+            $this->assertMatchesRegularExpression('#/Subtype\s*/Image#', (string) $dompdf->output(['compress' => 0]));
+        } finally {
+            $this->fileSystemHelper->deleteDirectory($directory);
+        }
+    }
+
     public function testRendererCannotReachOutsideTheBook(): void
     {
         $dompdf = (new ExposedDompdfAdapter())->createDompdfFor($this->epubDirectory);

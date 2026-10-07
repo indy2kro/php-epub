@@ -107,8 +107,26 @@ class DompdfAdapter implements ConverterInterface
             // The book's own CSS comes after the defaults, so the book's styling wins.
             . ($document->styles === [] ? '' : '<style>' . EpubDocument::styleSheet($document->styles) . '</style>')
             . '</head><body>'
-            . implode('<div style="page-break-before: always"></div>', $document->chapters)
+            . implode('<div style="page-break-before: always"></div>', $this->pages($document))
             . '</body></html>';
+    }
+
+    /**
+     * The chapters, after a cover page when the book has a cover no chapter shows.
+     *
+     * @return list<string>
+     */
+    private function pages(EpubDocument $document): array
+    {
+        if ($document->coverImage === '') {
+            return $document->chapters;
+        }
+
+        // Scaled down to fit the page, keeping its proportions.
+        $cover = '<div style="height: 100%; text-align: center;"><img src="' . htmlspecialchars($document->coverImage)
+            . '" alt="" style="max-width: 100%; max-height: 100%;"/></div>';
+
+        return [$cover, ...$document->chapters];
     }
 
     /**

@@ -80,17 +80,99 @@ final class TCPDFAdapterTest extends TestCase
     public function testSvgImagesAreRenderedWithTheImagesTheyReference(): void
     {
         $directory = self::svgBook()->writeTo($this->epubDirectory . '-svg');
-        $svgFiles = glob(sys_get_temp_dir() . '/epu*.svg') ?: [];
+        $svgFiles = glob(sys_get_temp_dir() . '/epub_pdf_*') ?: [];
 
         try {
             (new TCPDFAdapter())->convert($directory, $this->outputPdfPath);
 
             // The PNG drawn by the SVG; TCPDF only reaches it by rendering the SVG.
             $this->assertMatchesRegularExpression('#/Subtype\s*/Image#', (string) file_get_contents($this->outputPdfPath));
-            $this->assertSame($svgFiles, glob(sys_get_temp_dir() . '/epu*.svg') ?: [], 'Temporary SVG files are deleted.');
+            $this->assertSame($svgFiles, glob(sys_get_temp_dir() . '/epub_pdf_*') ?: [], 'The temporary SVG directory is deleted.');
         } finally {
             $this->fileSystemHelper->deleteDirectory($directory);
         }
+    }
+
+    public function testImagesOfABookOutsideTcpdfsDefaultPathsAreRendered(): void
+    {
+        // TCPDF 7 reads only from its allowlist; by default the system temp dir, the working
+        // directory and the script directory. This book is in none of them.
+        $directory = EpubBuilder::minimal()
+            ->withFile('EPUB/chapter.xhtml', '<html><body><p>Picture</p><img src="pixel.png" width="20" height="20"/></body></html>')
+            ->withFile('EPUB/pixel.png', (string) base64_decode(EpubBuilder::PNG, true))
+            ->writeTo($this->epubDirectory . '-outside');
+        $workingDirectory = (string) getcwd();
+        chdir(sys_get_temp_dir());
+
+        try {
+            (new TCPDFAdapter())->convert($directory, $this->outputPdfPath);
+
+            $this->assertMatchesRegularExpression('#/Subtype\s*/Image#', (string) file_get_contents($this->outputPdfPath));
+        } finally {
+            chdir($workingDirectory);
+            $this->fileSystemHelper->deleteDirectory($directory);
+        }
+    }
+
+    public function testTcpdfReadsOnlyTheBookAndItsOwnFiles(): void
+    {
+        $pdf = $this->exposedAdapter()->createPdfFor($this->epubDirectory);
+        $allowed = (new \ReflectionMethod($pdf, 'fileAllowedPaths'))->invoke($pdf);
+
+        $this->assertIsArray($allowed);
+        $this->assertContains(realpath($this->epubDirectory), $allowed);
+        $this->assertNotContains(realpath(sys_get_temp_dir()), $allowed);
+        $this->assertNotContains(realpath((string) getcwd()), $allowed);
+    }
+
+    public function testLinksBetweenChaptersWorkInThePdf(): void
+    {
+        $directory = self::linkedBook()->writeTo($this->epubDirectory . '-links');
+
+        try {
+            (new TCPDFAdapter())->convert($directory, $this->outputPdfPath);
+
+            $this->assertStringContainsString('/S /GoTo /D /epub-c0-sec', (string) file_get_contents($this->outputPdfPath));
+        } finally {
+            $this->fileSystemHelper->deleteDirectory($directory);
+        }
+    }
+
+    /**
+     * Two chapters: two.xhtml (first in the spine) has a section that chapter.xhtml links to.
+     */
+    public function testACoverOutsideTheSpineBecomesTheFirstPage(): void
+    {
+        $directory = self::coverBook()->writeTo($this->epubDirectory . '-cover');
+
+        try {
+            $adapter = $this->exposedAdapter();
+            $pdf = $adapter->createPdfFor($directory);
+
+            $this->assertSame(2, $pdf->getNumPages());
+            $this->assertSame(['Cover', 'Minimal chapter'], array_column($adapter->bookmarks, 0));
+            $this->assertMatchesRegularExpression('#/Subtype\s*/Image#', $pdf->Output('', 'S'));
+        } finally {
+            $this->fileSystemHelper->deleteDirectory($directory);
+        }
+    }
+
+    /**
+     * One chapter, and a PNG cover that only the manifest names.
+     */
+    public static function coverBook(): EpubBuilder
+    {
+        return EpubBuilder::minimal()
+            ->withFile('EPUB/package.opf', EpubBuilder::opf('<item id="cover" href="cover.png" media-type="image/png" properties="cover-image"/>'))
+            ->withFile('EPUB/chapter.xhtml', '<html><body><h1>Minimal chapter</h1></body></html>')
+            ->withFile('EPUB/cover.png', (string) base64_decode(EpubBuilder::PNG, true));
+    }
+
+    public static function linkedBook(): EpubBuilder
+    {
+        return EpubDocumentLoaderTest::twoChapterBook()
+            ->withFile('EPUB/chapter.xhtml', '<html><body><p><a href="text/two.xhtml#sec">See the section</a></p></body></html>')
+            ->withFile('EPUB/text/two.xhtml', '<html><body><h2 id="sec">Section</h2><p>Text</p></body></html>');
     }
 
     public static function svgBook(): EpubBuilder
@@ -170,7 +252,7 @@ final class TCPDFAdapterTest extends TestCase
             $this->fileSystemHelper->deleteDirectory($this->epubDirectory . '-css');
         }
 
-        $this->assertSame(['<style>p { color: #336699; }</style><p>Text</p>'], $chapters);
+        $this->assertSame(["<style>p { color: #336699; }</style><a id=\"epub-c0\">\u{200B}</a><p>Text</p>"], $chapters);
     }
 
     public function testHeaderAndFooterCanBeSwitchedOff(): void

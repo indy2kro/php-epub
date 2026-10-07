@@ -88,11 +88,11 @@ The target was 30 items; the audit found 28, and none were added just to reach t
 
 ### Converters
 
-- [ ] **CONV-01** Make TCPDF 7 render the images of books extracted outside its default read allowlist, or report that it cannot — `src/Converters/TCPDFAdapter.php:65-110`, `vendor/tecnickcom/tcpdf/tcpdf.php:491-520` — M · med
+- [x] **CONV-01** Make TCPDF 7 render the images of books extracted outside its default read allowlist, or report that it cannot — `src/Converters/TCPDFAdapter.php:65-110`, `vendor/tecnickcom/tcpdf/tcpdf.php:491-520` — M · med
   TCPDF 7 only reads local files from the system temp dir, working dir, script dir and `K_ALLOWED_PATHS`, so `TCPDFAdapter::convert()` on a directory elsewhere (for example through `Converter`) silently drops every image.
-- [ ] **CONV-02** Turn links between chapters into PDF-internal links — `src/Converters/EpubDocumentLoader.php:170-190` — M · low
+- [x] **CONV-02** Turn links between chapters into PDF-internal links — `src/Converters/EpubDocumentLoader.php:170-190` — M · low
   `<a href="chapter2.xhtml#note1">` is kept as written, so footnotes and cross-references are dead links in the PDF.
-- [ ] **CONV-03** Render the cover image as the first PDF page when it is not in the spine — `src/Converters/EpubDocumentLoader.php:85-105` — S · low
+- [x] **CONV-03** Render the cover image as the first PDF page when it is not in the spine — `src/Converters/EpubDocumentLoader.php:85-105` — S · low
   Many EPUB 3 books keep the cover only as a `cover-image` manifest item, so their PDFs start without a cover.
 
 ### Features
