@@ -159,6 +159,9 @@ jobs:
 
     runs-on: ubuntu-latest
 
+    # A stalled package download should fail the job, not hold it for hours.
+    timeout-minutes: 30
+
     env:
       # ebook-convert is a Qt application; run it without a display.
       QT_QPA_PLATFORM: offscreen
@@ -177,10 +180,32 @@ jobs:
             extensions: xml, zip, curl, dom, mbstring, gd, json
             coverage: none
 
+        # Calibre and its dependencies are a few hundred MB from the Ubuntu mirrors, which often fail
+        # mid-download: keep the .deb files in the Actions cache. The key changes weekly, so updated
+        # packages are picked up, and a new week starts from the previous week's files.
+        - name: Week of the year
+          id: week
+          run: echo "week=$(date -u +%G-%V)" >> "$GITHUB_OUTPUT"
+
+        - name: Cache Calibre packages
+          uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+          with:
+            path: ~/.cache/calibre-debs
+            key: calibre-debs-${{ runner.os }}-${{ steps.week.outputs.week }}
+            restore-keys: calibre-debs-${{ runner.os }}-
+
         - name: Install Calibre
           run: |
-            sudo apt-get update
-            sudo apt-get install -y --no-install-recommends calibre
+            archives="$HOME/.cache/calibre-debs"
+            mkdir -p "$archives/partial"
+            sudo apt-get -o Acquire::Retries=5 update
+            sudo apt-get install -y --no-install-recommends \
+              -o Acquire::Retries=5 \
+              -o Dir::Cache::Archives="$archives" \
+              -o APT::Keep-Downloaded-Packages=true \
+              calibre
+            # apt runs as root; the cache is saved by the runner user.
+            sudo chown -R "$(id -u):$(id -g)" "$archives"
             ebook-convert --version
 
         - name: Update Dependencies with latest stable
