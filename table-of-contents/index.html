@@ -148,7 +148,14 @@
 <li>
 <p><strong><code>addEntry(TocEntry $entry): void</code></strong>: Appends a top-level entry.</p>
 </li>
+<li>
+<p><strong><code>isAvailable(): bool</code></strong>: Whether the book has a navigation document or an NCX that can hold a table of contents, i.e. whether <code>setEntries()</code> can work.</p>
+</li>
+<li>
+<p><strong><code>getBook(): ?EpubFile</code></strong>: The book this table of contents belongs to, when it came from <code>EpubFile::getTableOfContents()</code>. Holding the object keeps the book's extracted files alive, so <code>EpubFile::open($path)-&gt;getTableOfContents()</code> is safe to use on its own.</p>
+</li>
 </ul>
+<p>Deleting a file with <code>ContentManager::deleteContent()</code> removes its entries, and <code>EpubFile::save()</code> keeps the NCX <code>docTitle</code> in step with the book title.</p>
 <h2 id="usage-example">Usage Example<a class="headerlink" href="#usage-example" title="Permanent link">&para;</a></h2>
 <pre class="codehilite"><code class="language-php">use PhpEpub\EpubFile;
 use PhpEpub\TocEntry;

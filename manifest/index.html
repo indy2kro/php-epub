@@ -173,8 +173,7 @@
 <h2 id="usage-example">Usage Example<a class="headerlink" href="#usage-example" title="Permanent link">&para;</a></h2>
 <pre class="codehilite"><code class="language-php">use PhpEpub\EpubFile;
 
-$epubFile = new EpubFile('/path/to/your.epub');
-$epubFile-&gt;load();
+$epubFile = EpubFile::open('/path/to/your.epub');
 
 $manifest = $epubFile-&gt;getManifest();
 

@@ -51,9 +51,19 @@
               <ul class="current">
                   <li class="toctree-l1 current"><a class="reference internal current" href="#">Basic Usage</a>
     <ul class="current">
-    <li class="toctree-l2"><a class="reference internal" href="#loading-an-epub-file">Loading an EPUB File</a>
+    <li class="toctree-l2"><a class="reference internal" href="#opening-a-book">Opening a Book</a>
     </li>
-    <li class="toctree-l2"><a class="reference internal" href="#accessing-metadata">Accessing Metadata</a>
+    <li class="toctree-l2"><a class="reference internal" href="#reading-and-editing-metadata">Reading and Editing Metadata</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#saving">Saving</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#creating-a-book">Creating a Book</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#table-of-contents">Table of Contents</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#checking-a-book">Checking a Book</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#converting">Converting</a>
     </li>
     </ul>
                   </li>
@@ -122,21 +132,61 @@
             <div class="section" itemprop="articleBody">
               
                 <h1 id="basic-usage">Basic Usage<a class="headerlink" href="#basic-usage" title="Permanent link">&para;</a></h1>
-<h2 id="loading-an-epub-file">Loading an EPUB File<a class="headerlink" href="#loading-an-epub-file" title="Permanent link">&para;</a></h2>
-<p>To load an EPUB file, use the EpubFile class:</p>
+<h2 id="opening-a-book">Opening a Book<a class="headerlink" href="#opening-a-book" title="Permanent link">&para;</a></h2>
+<p><code>EpubFile::open()</code> extracts a book to a private temporary directory and parses it:</p>
 <pre class="codehilite"><code class="language-php">use PhpEpub\EpubFile;
 
-$epubFile = new EpubFile('/path/to/your.epub');
-$epubFile-&gt;load();
+$epubFile = EpubFile::open('/path/to/your.epub');
 </code></pre>
 
-<h2 id="accessing-metadata">Accessing Metadata<a class="headerlink" href="#accessing-metadata" title="Permanent link">&para;</a></h2>
-<p>Once the EPUB is loaded, you can access and modify its metadata:</p>
+<p>It is the same as <code>new EpubFile($path)</code> followed by <code>load()</code>. The temporary directory is deleted when the object is destroyed, or by <code>cleanup()</code>.</p>
+<h2 id="reading-and-editing-metadata">Reading and Editing Metadata<a class="headerlink" href="#reading-and-editing-metadata" title="Permanent link">&para;</a></h2>
 <pre class="codehilite"><code class="language-php">$metadata = $epubFile-&gt;getMetadata();
-$title = $metadata-&gt;getTitle();
+
+echo $metadata-&gt;getTitle(), ' by ', implode(', ', $metadata-&gt;getAuthors()), &quot;\n&quot;;
+echo 'ISBN: ', $metadata-&gt;getIsbn() ?? 'none', &quot;\n&quot;;
+
 $metadata-&gt;setTitle('New Title');
-$metadata-&gt;save();
+$metadata-&gt;setSeries('The Expanse', 2);
 </code></pre>
+
+<p>See <a href="../metadata/">Metadata</a> for every field.</p>
+<h2 id="saving">Saving<a class="headerlink" href="#saving" title="Permanent link">&para;</a></h2>
+<pre class="codehilite"><code class="language-php">$epubFile-&gt;save();                    // overwrite the original file
+$epubFile-&gt;save('/path/to/copy.epub'); // or write a new one
+</code></pre>
+
+<p><code>save()</code> writes pending metadata, manifest and spine changes and packages the book; calling <code>Metadata::save()</code> first is not needed.</p>
+<h2 id="creating-a-book">Creating a Book<a class="headerlink" href="#creating-a-book" title="Permanent link">&para;</a></h2>
+<pre class="codehilite"><code class="language-php">$epubFile = EpubFile::create('/path/to/new.epub', 'My Book', 'en');
+$epubFile-&gt;getMetadata()-&gt;setAuthors(['Ann Author']);
+$epubFile-&gt;addChapter('Chapter One', '&lt;h1&gt;Chapter One&lt;/h1&gt;&lt;p&gt;It begins.&lt;/p&gt;');
+$epubFile-&gt;setCoverImage(file_get_contents('/path/to/cover.jpg'), 'image/jpeg');
+$epubFile-&gt;save();
+</code></pre>
+
+<p><code>addChapter()</code> writes the XHTML document and adds it to the manifest, the reading order and the table of contents.</p>
+<h2 id="table-of-contents">Table of Contents<a class="headerlink" href="#table-of-contents" title="Permanent link">&para;</a></h2>
+<pre class="codehilite"><code class="language-php">foreach ($epubFile-&gt;getTableOfContents()-&gt;getEntries() as $entry) {
+    echo $entry-&gt;title, ' -&gt; ', $entry-&gt;path, &quot;\n&quot;;
+}
+</code></pre>
+
+<p>See <a href="../table-of-contents/">Table of Contents</a> to change it.</p>
+<h2 id="checking-a-book">Checking a Book<a class="headerlink" href="#checking-a-book" title="Permanent link">&para;</a></h2>
+<pre class="codehilite"><code class="language-php">foreach ($epubFile-&gt;validate() as $issue) {
+    echo $issue, &quot;\n&quot;; // e.g. &quot;error MANIFEST_FILE_MISSING (EPUB/images/gone.png): ...&quot;
+}
+</code></pre>
+
+<p><code>validate()</code> is a quick check of common problems before publishing; <a href="https://www.w3.org/publishing/epubcheck/">EPUBCheck</a> remains the reference.</p>
+<h2 id="converting">Converting<a class="headerlink" href="#converting" title="Permanent link">&para;</a></h2>
+<pre class="codehilite"><code class="language-php">use PhpEpub\Converters\DompdfAdapter;
+
+$epubFile-&gt;convert(new DompdfAdapter(), '/path/to/output.pdf');
+</code></pre>
+
+<p>Unsaved changes are included. See <a href="../converter/">Converter</a> for the TCPDF and Calibre adapters.</p>
               
             </div>
           </div><footer>

@@ -305,7 +305,7 @@ No source changes were made while compiling this list.</p>
 <ul>
 <li>[x] <strong>FEAT-01</strong> Series API that reads and writes both <code>calibre:series</code>/<code>calibre:series_index</code> and EPUB 3 <code>belongs-to-collection</code> (<code>collection-type</code> series, <code>group-position</code>) — <code>src/Metadata.php:94-200</code> — M · med
   Series is the most common metadata after title and author, and the two conventions disagree, so callers have to know about and update both by hand.</li>
-<li>[ ] <strong>FEAT-02</strong> Check XHTML content documents in <code>validate()</code>: well-formedness and local references (<code>img</code>, <code>link</code>, <code>a</code>) that are missing or not in the manifest — <code>src/Validator.php</code> — M · med
+<li>[x] <strong>FEAT-02</strong> Check XHTML content documents in <code>validate()</code>: well-formedness and local references (<code>img</code>, <code>link</code>, <code>a</code>) that are missing or not in the manifest — <code>src/Validator.php</code> — M · med
   Broken references are EPUBCheck's most common errors and <code>addChapter()</code> inserts caller markup as is, but <code>validate()</code> never looks inside content documents.</li>
 <li>[x] <strong>FEAT-03</strong> Access the remaining Dublin Core elements (rights, source, type, format, relation, coverage) and all languages — <code>src/Metadata.php:180-260</code>, <code>src/Traits/InteractsWithLanguage.php</code> — S · low
   Only eight DC elements have accessors and <code>getDcValues()</code> is protected, so <code>dc:rights</code> (licence text) and multilingual books cannot be handled.</li>
@@ -327,21 +327,21 @@ No source changes were made while compiling this list.</p>
 </ul>
 <h3 id="documentation">Documentation<a class="headerlink" href="#documentation" title="Permanent link">&para;</a></h3>
 <ul>
-<li>[ ] <strong>DOC-01</strong> Refresh <code>basic-usage.md</code> and <code>advanced-usage.md</code> for <code>open()</code>/<code>convert()</code>, <code>create()</code>/<code>addChapter()</code>, the table of contents and <code>validate()</code> — <code>docs/basic-usage.md</code>, <code>docs/advanced-usage.md:10-90</code> — S · low
+<li>[x] <strong>DOC-01</strong> Refresh <code>basic-usage.md</code> and <code>advanced-usage.md</code> for <code>open()</code>/<code>convert()</code>, <code>create()</code>/<code>addChapter()</code>, the table of contents and <code>validate()</code> — <code>docs/basic-usage.md</code>, <code>docs/advanced-usage.md:10-90</code> — S · low
   The guides still show <code>new EpubFile()</code> plus <code>load()</code> and converting an extracted directory directly, and never mention the newer, simpler APIs.</li>
-<li>[ ] <strong>DOC-02</strong> Document only the public <code>Parser</code> API, and document the <code>TableOfContents</code> <code>getBook()</code>/<code>isAvailable()</code> methods — <code>docs/parser.md:10-20</code>, <code>docs/table-of-contents.md</code> — S · low
+<li>[x] <strong>DOC-02</strong> Document only the public <code>Parser</code> API, and document the <code>TableOfContents</code> <code>getBook()</code>/<code>isAvailable()</code> methods — <code>docs/parser.md:10-20</code>, <code>docs/table-of-contents.md</code> — S · low
   <code>parser.md</code> tells readers they can call <code>validateMimetype()</code>, <code>extractOpfPath()</code>, <code>validateOpf()</code> and <code>validateNcx()</code>, which are private, while two public <code>TableOfContents</code> methods are undocumented.</li>
 </ul>
 <h3 id="tests">Tests<a class="headerlink" href="#tests" title="Permanent link">&para;</a></h3>
 <ul>
-<li>[ ] <strong>TEST-01</strong> Run EPUBCheck on saved EPUB 2 books too (NCX writing, <code>opf:role</code>/<code>opf:file-as</code>, guide) — <code>tests/EpubCheckTest.php</code>, <code>tests/Support/EpubBuilder.php</code> — S · med
+<li>[x] <strong>TEST-01</strong> Run EPUBCheck on saved EPUB 2 books too (NCX writing, <code>opf:role</code>/<code>opf:file-as</code>, guide) — <code>tests/EpubCheckTest.php</code>, <code>tests/Support/EpubBuilder.php</code> — S · med
   Every EPUBCheck scenario is EPUB 3, so the EPUB 2 writers (NCX navPoints, <code>opf:*</code> attributes, guide cleanup) are never checked against the validator.</li>
-<li>[ ] <strong>TEST-02</strong> Round-trip every fixture book through open, <code>validate()</code>, save and EPUBCheck — <code>tests/fixtures/valid_*.epub</code>, <code>tests/EpubFileTest.php:190-300</code> — S · low
+<li>[x] <strong>TEST-02</strong> Round-trip every fixture book through open, <code>validate()</code>, save and EPUBCheck — <code>tests/fixtures/valid_*.epub</code>, <code>tests/EpubFileTest.php:190-300</code> — S · low
   The six real-world fixtures are only loaded and saved; nothing checks that the library's output for them stays valid or that <code>validate()</code> agrees with EPUBCheck.</li>
 </ul>
 <h3 id="ci">CI<a class="headerlink" href="#ci" title="Permanent link">&para;</a></h3>
 <ul>
-<li>[ ] <strong>CI-01</strong> Add <code>codecov.yml</code> with an explicit patch target and threshold — <code>.github/workflows/tests.yml</code> — S · low
+<li>[x] <strong>CI-01</strong> Add <code>codecov.yml</code> with an explicit patch target and threshold — <code>.github/workflows/tests.yml</code> — S · low
   Without a config Codecov's patch target is the project's current coverage (about 99.5%), so a single unreachable defensive line fails a PR; three round-2 PRs needed workarounds for it.</li>
 </ul>
 <h3 id="sweeps">Sweeps<a class="headerlink" href="#sweeps" title="Permanent link">&para;</a></h3>

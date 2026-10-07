@@ -280,6 +280,16 @@ $epubFile-&gt;save();
 <td>A spine item is not a content document and has no fallback</td>
 </tr>
 <tr>
+<td><code>CONTENT_NOT_WELL_FORMED</code></td>
+<td>error</td>
+<td>An XHTML content document is not well-formed XML</td>
+</tr>
+<tr>
+<td><code>CONTENT_REFERENCE_MISSING</code>, <code>CONTENT_REFERENCE_NOT_IN_MANIFEST</code></td>
+<td>error</td>
+<td>A content document refers (<code>src</code>, <code>href</code>, <code>data</code>, <code>poster</code>) to a local file that is missing or outside the book, or that is not in the manifest; remote URLs, <code>data:</code> URIs and links within the document are not checked</td>
+</tr>
+<tr>
 <td><code>NAV_MISSING</code> / <code>NCX_MISSING</code></td>
 <td>error</td>
 <td>An EPUB 3 book has no navigation document / an EPUB 2 book has no NCX</td>
@@ -338,8 +348,7 @@ $epubFile-&gt;save();
 <h2 id="usage-example">Usage Example<a class="headerlink" href="#usage-example" title="Permanent link">&para;</a></h2>
 <pre class="codehilite"><code class="language-php">use PhpEpub\EpubFile;
 
-$epubFile = new EpubFile('/path/to/your.epub');
-$epubFile-&gt;load();
+$epubFile = EpubFile::open('/path/to/your.epub');
 
 // Access and modify metadata
 $metadata = $epubFile-&gt;getMetadata();

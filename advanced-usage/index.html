@@ -66,14 +66,6 @@
         </ul>
     </li>
     <li class="toctree-l2"><a class="reference internal" href="#converting-epub">Converting EPUB</a>
-        <ul>
-    <li class="toctree-l3"><a class="reference internal" href="#convert-to-pdf-using-dompdfadapter">Convert to PDF Using DompdfAdapter</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#convert-to-pdf-using-tcpdfadapter">Convert to PDF Using TCPDFAdapter</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#convert-to-mobi-using-calibreadapter">Convert to MOBI Using CalibreAdapter</a>
-    </li>
-        </ul>
     </li>
     <li class="toctree-l2"><a class="reference internal" href="#handling-untrusted-epubs">Handling Untrusted EPUBs</a>
     </li>
@@ -145,15 +137,11 @@
 <h2 id="modifying-epub-content">Modifying EPUB Content<a class="headerlink" href="#modifying-epub-content" title="Permanent link">&para;</a></h2>
 <p>To modify the content within an EPUB file, you can use the ContentManager class to access specific files, make changes, and save them.</p>
 <pre class="codehilite"><code class="language-php">use PhpEpub\EpubFile;
-use PhpEpub\ContentManager;
-
-$epubFilePath = '/path/to/your.epub';
 
 // Load the EPUB file
-$epubFile = new EpubFile($epubFilePath);
-$epubFile-&gt;load();
+$epubFile = EpubFile::open('/path/to/your.epub');
 
-// Access the content manager (it keeps the manifest and spine in sync)
+// Access the content manager (it keeps the manifest, spine and table of contents in sync)
 $contentManager = $epubFile-&gt;getContentManager();
 
 // Retrieve and modify content; paths are relative to the book root
@@ -186,35 +174,23 @@ $epubFile-&gt;save($newEpubFilePath);
 
 <p>This will create a new EPUB file with the changes, leaving the original file unchanged.</p>
 <h2 id="converting-epub">Converting EPUB<a class="headerlink" href="#converting-epub" title="Permanent link">&para;</a></h2>
-<p>You can convert an EPUB to PDF using one of the available adapters.</p>
-<h3 id="convert-to-pdf-using-dompdfadapter">Convert to PDF Using DompdfAdapter<a class="headerlink" href="#convert-to-pdf-using-dompdfadapter" title="Permanent link">&para;</a></h3>
-<pre class="codehilite"><code class="language-php">use PhpEpub\Converters\DompdfAdapter;
-
-$dompdfAdapter = new DompdfAdapter();
-$dompdfAdapter-&gt;convert('/path/to/extracted/epub', '/path/to/output.pdf');
-</code></pre>
-
-<h3 id="convert-to-pdf-using-tcpdfadapter">Convert to PDF Using TCPDFAdapter<a class="headerlink" href="#convert-to-pdf-using-tcpdfadapter" title="Permanent link">&para;</a></h3>
-<p>To convert using TCPDF:</p>
-<pre class="codehilite"><code class="language-php">use PhpEpub\Converters\TCPDFAdapter;
-
-$tcpdfAdapter = new TCPDFAdapter();
-$tcpdfAdapter-&gt;convert('/path/to/extracted/epub', '/path/to/output.pdf');
-</code></pre>
-
-<h3 id="convert-to-mobi-using-calibreadapter">Convert to MOBI Using CalibreAdapter<a class="headerlink" href="#convert-to-mobi-using-calibreadapter" title="Permanent link">&para;</a></h3>
-<p>To convert using Calibre:</p>
+<p>Pass an adapter to <code>EpubFile::convert()</code>; the book's unsaved changes are included:</p>
 <pre class="codehilite"><code class="language-php">use PhpEpub\Converters\CalibreAdapter;
+use PhpEpub\Converters\DompdfAdapter;
+use PhpEpub\Converters\TCPDFAdapter;
+use PhpEpub\EpubFile;
 
-$options = [
-    'calibre_path' =&gt; '/usr/bin/ebook-convert',
-    'extra_args' =&gt; ['--output-profile', 'kindle'],
-];
+$epubFile = EpubFile::open('/path/to/your.epub');
 
-$calibreAdapter = new CalibreAdapter($options);
-$calibreAdapter-&gt;convert('/path/to/input.epub', '/path/to/output.mobi');
+// PDF with Dompdf or TCPDF (both pure PHP)
+$epubFile-&gt;convert(new DompdfAdapter(['paper_size' =&gt; 'A5']), '/path/to/output.pdf');
+$epubFile-&gt;convert(new TCPDFAdapter(['font_size' =&gt; 11]), '/path/to/output.pdf');
+
+// MOBI, AZW3 and other formats with Calibre's ebook-convert (found on the PATH by default)
+$epubFile-&gt;convert(new CalibreAdapter(['extra_args' =&gt; ['--output-profile', 'kindle']]), '/path/to/output.mobi');
 </code></pre>
 
+<p>The adapters also convert an extracted book directory directly (<code>$adapter-&gt;convert('/path/to/extracted/epub', $output)</code>), and <code>CalibreAdapter</code> takes an <code>.epub</code> file as well. See <a href="../converter/">Converter</a> for every option and for how the PDF adapters read a book.</p>
 <h2 id="handling-untrusted-epubs">Handling Untrusted EPUBs<a class="headerlink" href="#handling-untrusted-epubs" title="Permanent link">&para;</a></h2>
 <p>An EPUB is a ZIP of XML and HTML, so a book uploaded by a user can be hostile. php-epub treats every book as untrusted input:</p>
 <table>
@@ -265,8 +241,7 @@ $zipHandler = new ZipHandler(
 );
 
 try {
-    $epubFile = new EpubFile($uploadedPath, $zipHandler);
-    $epubFile-&gt;load();
+    $epubFile = EpubFile::open($uploadedPath, $zipHandler);
 } catch (ZipException $e) {
     // Not a readable archive, or it exceeds the limits.
 } catch (InvalidEpubException $e) {

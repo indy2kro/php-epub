@@ -152,7 +152,7 @@
 
 <p>Initializes the ContentManager with the path to the extracted EPUB. Throws an exception if the directory does not exist. Without a manifest, only files are touched.</p>
 <p>Typically, you'll get this from EpubFile:</p>
-<pre class="codehilite"><code class="language-php">$epubFile-&gt;load();
+<pre class="codehilite"><code class="language-php">$epubFile = EpubFile::open('/path/to/book.epub');
 $contentManager = $epubFile-&gt;getContentManager();
 </code></pre>
 
@@ -184,8 +184,7 @@ $contentManager = $epubFile-&gt;getContentManager();
 <h2 id="usage-example">Usage Example<a class="headerlink" href="#usage-example" title="Permanent link">&para;</a></h2>
 <pre class="codehilite"><code class="language-php">use PhpEpub\EpubFile;
 
-$epubFile = new EpubFile('/path/to/book.epub');
-$epubFile-&gt;load();
+$epubFile = EpubFile::open('/path/to/book.epub');
 
 $content = $epubFile-&gt;getContentManager();
 
