@@ -212,7 +212,7 @@ class ContentManager
 
         // On a case-insensitive filesystem the target of a case-only rename "exists": it is the source itself.
         $caseOnly = file_exists($target) && $fromPath !== $toPath && strcasecmp($fromPath, $toPath) === 0
-            && realpath($source) === realpath($target);
+            && FileSystemHelper::isSameFile($source, $target);
         if (file_exists($target) && ! $caseOnly) {
             throw new Exception("Cannot move {$from}: {$to} already exists");
         }

@@ -285,8 +285,13 @@ class ZipHandler
             }
         } catch (Throwable $throwable) {
             if (! $closed) {
-                $zip->unchangeAll();
-                @$zip->close();
+                // Discard the pending entries, or the archive is written when the object is destroyed.
+                // A close() that failed may already have released it (it does on Linux and macOS).
+                try {
+                    $zip->unchangeAll();
+                    @$zip->close();
+                } catch (\ValueError) {
+                }
             }
             @unlink($temporary);
 

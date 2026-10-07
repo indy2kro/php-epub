@@ -170,6 +170,23 @@ class FileSystemHelper
         return $content === false || error_get_last() !== null ? null : $content;
     }
 
+    /**
+     * Whether two paths name the same existing file, e.g. two spellings that differ only in case on
+     * a case-insensitive filesystem. realpath() does not settle it everywhere (on macOS it keeps the
+     * case it is given), so the device and inode are compared too where the OS reports them.
+     */
+    public static function isSameFile(string $first, string $second): bool
+    {
+        $firstStat = @stat($first);
+        $secondStat = @stat($second);
+        if ($firstStat === false || $secondStat === false) {
+            return false;
+        }
+
+        return realpath($first) === realpath($second)
+            || ($firstStat['ino'] !== 0 && $firstStat['dev'] === $secondStat['dev'] && $firstStat['ino'] === $secondStat['ino']);
+    }
+
     public function fileSize(string $path): int|false
     {
         return filesize($path);
