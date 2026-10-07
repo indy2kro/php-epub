@@ -294,11 +294,11 @@ No source changes were made while compiling this list.</p>
 </ul>
 <h3 id="converters">Converters<a class="headerlink" href="#converters" title="Permanent link">&para;</a></h3>
 <ul>
-<li>[ ] <strong>CONV-01</strong> Make TCPDF 7 render the images of books extracted outside its default read allowlist, or report that it cannot — <code>src/Converters/TCPDFAdapter.php:65-110</code>, <code>vendor/tecnickcom/tcpdf/tcpdf.php:491-520</code> — M · med
+<li>[x] <strong>CONV-01</strong> Make TCPDF 7 render the images of books extracted outside its default read allowlist, or report that it cannot — <code>src/Converters/TCPDFAdapter.php:65-110</code>, <code>vendor/tecnickcom/tcpdf/tcpdf.php:491-520</code> — M · med
   TCPDF 7 only reads local files from the system temp dir, working dir, script dir and <code>K_ALLOWED_PATHS</code>, so <code>TCPDFAdapter::convert()</code> on a directory elsewhere (for example through <code>Converter</code>) silently drops every image.</li>
-<li>[ ] <strong>CONV-02</strong> Turn links between chapters into PDF-internal links — <code>src/Converters/EpubDocumentLoader.php:170-190</code> — M · low
+<li>[x] <strong>CONV-02</strong> Turn links between chapters into PDF-internal links — <code>src/Converters/EpubDocumentLoader.php:170-190</code> — M · low
   <code>&lt;a href="chapter2.xhtml#note1"&gt;</code> is kept as written, so footnotes and cross-references are dead links in the PDF.</li>
-<li>[ ] <strong>CONV-03</strong> Render the cover image as the first PDF page when it is not in the spine — <code>src/Converters/EpubDocumentLoader.php:85-105</code> — S · low
+<li>[x] <strong>CONV-03</strong> Render the cover image as the first PDF page when it is not in the spine — <code>src/Converters/EpubDocumentLoader.php:85-105</code> — S · low
   Many EPUB 3 books keep the cover only as a <code>cover-image</code> manifest item, so their PDFs start without a cover.</li>
 </ul>
 <h3 id="features">Features<a class="headerlink" href="#features" title="Permanent link">&para;</a></h3>
