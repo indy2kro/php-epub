@@ -103,7 +103,7 @@ Every byte of a book is treated as hostile. Preserve these invariants:
   `validate()`, `XmlParser::parseString()` and `EpubDocumentLoader::load()`. Only `PhpEpub\Exception` subclasses
   are allowed; warnings, notices and deprecations fail. `EPUB_FUZZ_SEED` (fixed by default), `EPUB_FUZZ_ITERATIONS`
   (default 40) and `EPUB_FUZZ_FIRST` control it, and a failure prints the seed and the command to reproduce it. The
-  `fuzz` CI job runs it with 5000 iterations on the nightly schedule and on `workflow_dispatch`.
+  `fuzz` CI job runs it with 5000 iterations on the weekly schedule and on `workflow_dispatch`.
 
 ## Documentation and releases
 
