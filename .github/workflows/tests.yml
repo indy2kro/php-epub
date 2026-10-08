@@ -25,11 +25,11 @@ jobs:
 
     strategy:
       fail-fast: false
-      # Pull requests and pushes are a Linux smoke test on the oldest and newest PHP. The full OS and PHP matrix
+      # Pull requests and pushes are a Linux smoke test on every supported PHP version. The full OS and PHP matrix
       # (path separators, symlinks, temp dirs and file locking differ per OS) runs weekly and on demand.
       matrix: ${{ fromJSON(github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
         && '{"os":["ubuntu-latest","windows-latest","macos-latest"],"php-version":["8.3","8.4","8.5"]}'
-        || '{"os":["ubuntu-latest"],"php-version":["8.3","8.5"]}') }}
+        || '{"os":["ubuntu-latest"],"php-version":["8.3","8.4","8.5"]}') }}
 
     env:
       # Style and static analysis do not depend on the OS, so run them once per PHP version.
