@@ -50,9 +50,13 @@ final readonly class Merger
 
     private const string NCX_TYPE = 'application/x-dtbncx+xml';
 
+    /**
+     * @param XmlParser|null $xmlParser The parser for the books' documents; by default each book's own, which keeps
+     *                                  the Limits it was opened with.
+     */
     public function __construct(
         private PathResolver $paths = new PathResolver(),
-        private XmlParser $xmlParser = new XmlParser(),
+        private ?XmlParser $xmlParser = null,
         private ReferenceRewriter $rewriter = new ReferenceRewriter()
     ) {
     }
@@ -164,12 +168,13 @@ final readonly class Merger
         $outputDirectory = dirname($merged->getManifest()->getOpfPath());
         $outputDirectory = $outputDirectory === '.' ? '' : $outputDirectory;
 
+        $parsers = array_map(fn (EpubFile $book): XmlParser => $this->xmlParser ?? $book->getXmlParser(), $books);
         $files = [];
         foreach ($books as $index => $book) {
-            $this->collect($book, $index, $outputDirectory, $files);
+            $this->collect($book, $index, $outputDirectory, $files, $parsers[$index]);
         }
 
-        $deduplicated = $options->deduplicate ? $this->deduplicate($files) : 0;
+        $deduplicated = $options->deduplicate ? $this->deduplicate($files, $parsers) : 0;
         $directory = $merged->getTempDir() ?? throw new Exception('The merged book is not loaded.');
         [$pathMaps, $idMaps] = $this->write($merged, $directory, $books, $files, $identifier);
 
@@ -190,7 +195,7 @@ final readonly class Merger
      *
      * @throws Exception
      */
-    private function collect(EpubFile $book, int $index, string $outputDirectory, array &$files): void
+    private function collect(EpubFile $book, int $index, string $outputDirectory, array &$files, XmlParser $xmlParser): void
     {
         $directory = (string) $book->getTempDir();
         $manifest = $book->getManifest();
@@ -213,8 +218,8 @@ final readonly class Merger
         }
 
         $prefix = ($outputDirectory === '' ? '' : $outputDirectory . '/') . sprintf('book-%02d/', $index + 1);
-        $obfuscated = $this->obfuscatedFonts($directory);
-        $links = new LinkRemover($this->paths, $this->xmlParser);
+        $obfuscated = $this->obfuscatedFonts($directory, $xmlParser);
+        $links = new LinkRemover($this->paths, $xmlParser);
 
         foreach ($manifest->getItems() as $item) {
             $fallback = $manifest->getFallback($item->id);
@@ -296,10 +301,10 @@ final readonly class Merger
     /**
      * @return array<string, string> path => algorithm
      */
-    private function obfuscatedFonts(string $directory): array
+    private function obfuscatedFonts(string $directory, XmlParser $xmlParser): array
     {
         try {
-            return (new FontObfuscation($directory, $this->xmlParser, $this->paths))->obfuscatedFonts();
+            return (new FontObfuscation($directory, $xmlParser, $this->paths))->obfuscatedFonts();
         } catch (Exception) {
             return [];
         }
@@ -310,10 +315,11 @@ final readonly class Merger
      * a document that mentions the file cannot be rewritten.
      *
      * @param list<MergeFile> $files
+     * @param list<XmlParser> $parsers The parser of each book.
      *
      * @return int How many files were left out.
      */
-    private function deduplicate(array $files): int
+    private function deduplicate(array $files, array $parsers): int
     {
         $kept = [];
         foreach ($files as $position => $file) {
@@ -331,7 +337,7 @@ final readonly class Merger
         }
 
         foreach ($files as $document) {
-            if ($document->url !== '' || $this->isBinary($document) || $this->isRewritable($document)) {
+            if ($document->url !== '' || $this->isBinary($document) || $this->isRewritable($document, $parsers[$document->book])) {
                 continue;
             }
 
@@ -354,7 +360,7 @@ final readonly class Merger
         }
 
         foreach ($files as $document) {
-            if ($document->url === '' && $document->aliasOf === null && ! $this->isBinary($document) && $this->isRewritable($document)) {
+            if ($document->url === '' && $document->aliasOf === null && ! $this->isBinary($document) && $this->isRewritable($document, $parsers[$document->book])) {
                 $document->content = $this->rewrite($document, $rewrites);
             }
         }
@@ -383,7 +389,7 @@ final readonly class Merger
         return $this->isFont($file) || preg_match('~^(image/(?!svg)|audio/|video/|application/(pdf|octet-stream))~', $file->mediaType) === 1;
     }
 
-    private function isRewritable(MergeFile $file): bool
+    private function isRewritable(MergeFile $file, XmlParser $xmlParser): bool
     {
         if ($file->mediaType === 'text/css') {
             return true;
@@ -394,7 +400,7 @@ final readonly class Merger
         }
 
         try {
-            $this->xmlParser->parseString($file->content, $file->newPath);
+            $xmlParser->parseString($file->content, $file->newPath);
 
             return true;
         } catch (XmlException) {
@@ -442,7 +448,7 @@ final readonly class Merger
     private function write(EpubFile $merged, string $directory, array $books, array $files, string $identifier): array
     {
         $manifest = $merged->getManifest();
-        $obfuscation = new FontObfuscation($directory, $this->xmlParser, $this->paths);
+        $obfuscation = new FontObfuscation($directory, $this->xmlParser ?? $merged->getXmlParser(), $this->paths);
         $fontKey = (string) FontObfuscation::key(FontObfuscation::IDPF, $identifier);
         $pathMaps = array_fill(0, count($books), []);
         $idMaps = array_fill(0, count($books), []);

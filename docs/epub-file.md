@@ -301,7 +301,7 @@ Returns the path to the temporary directory where EPUB contents are extracted. R
 public function getXmlParser(): XmlParser
 ```
 
-Returns the parser the book's XML documents are read with, bounded by the `Limits` the book was opened with. `Cleanup` and `ReferenceGraph::forBook()` use it by default, so cleaning up an untrusted book keeps the same per-document cap.
+Returns the parser the book's XML documents are read with, bounded by the `Limits` the book was opened with. `Cleanup`, `ReferenceGraph::forBook()`, `Merger` and `Splitter` use it by default, so cleaning up, merging or splitting an untrusted book keeps the same per-document cap.
 
 ## Usage Example
 

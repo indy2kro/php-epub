@@ -13,7 +13,10 @@ use PhpEpub\EpubFile;
 use PhpEpub\Exception;
 use PhpEpub\InvalidEpubException;
 use PhpEpub\Limits;
+use PhpEpub\Merge\MergeOptions;
+use PhpEpub\Merge\Merger;
 use PhpEpub\Test\Support\EpubBuilder;
+use PhpEpub\Test\Support\MergeBook;
 use PhpEpub\Util\FileSystemHelper;
 use PhpEpub\XmlException;
 use PhpEpub\XmlParser;
@@ -226,6 +229,25 @@ final class LimitsTest extends TestCase
         } finally {
             $epubFile->close();
         }
+    }
+
+    public function testMergerParsesEachBookWithItsCappedXmlParser(): void
+    {
+        $body = [1 => '<p>x</p><!--' . str_repeat('x', 20000) . '-->'];
+        $books = [
+            MergeBook::builder('urn:uuid:11111111-1111-4111-8111-111111111111', 'One', 1, chapterBodies: $body),
+            MergeBook::builder('urn:uuid:22222222-2222-4222-8222-222222222222', 'Two', 1, chapterBodies: $body),
+        ];
+
+        $deduplicated = [];
+        foreach ([null, new Limits(maxXmlBytes: 10000)] as $limits) {
+            $opened = array_map(fn (EpubBuilder $builder): EpubFile => EpubFile::open($builder->buildEpub($this->workDir . '/book-' . bin2hex(random_bytes(4)) . '.epub'), limits: $limits), $books);
+            $deduplicated[] = (new Merger())->merge($opened, new MergeOptions(), $this->workDir . '/merged-' . bin2hex(random_bytes(4)) . '.epub')->deduplicated;
+            array_walk($opened, static fn (EpubFile $book) => $book->close());
+        }
+
+        // Under the cap the chapters cannot be parsed, so the stylesheet they name cannot be replaced by the other book's.
+        $this->assertSame([1, 0], $deduplicated);
     }
 
     public function testHtmlSizeBoundaryForConversion(): void

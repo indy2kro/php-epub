@@ -42,9 +42,13 @@ use PhpEpub\XmlParser;
  */
 final readonly class Splitter
 {
+    /**
+     * @param XmlParser|null $xmlParser The parser for the book's documents; by default the book's own, which keeps
+     *                                  the Limits it was opened with.
+     */
     public function __construct(
         private PathResolver $paths = new PathResolver(),
-        private XmlParser $xmlParser = new XmlParser()
+        private ?XmlParser $xmlParser = null
     ) {
     }
 
@@ -74,7 +78,7 @@ final readonly class Splitter
 
         $spinePaths !== [] || throw new Exception('The book has no content to split');
 
-        $analysis = ReferenceGraph::forBook($book)->analyzeFrom($this->roots($book, $spinePaths));
+        $analysis = ReferenceGraph::forBook($book, $this->xmlParser)->analyzeFrom($this->roots($book, $spinePaths));
         $groups = $this->groups($book, $plan, $spinePaths, $analysis, $directory);
         $total = count($groups);
         $total <= $plan->maxParts || throw new Exception("The split plan would produce {$total} parts; the limit is {$plan->maxParts}");
@@ -90,7 +94,7 @@ final readonly class Splitter
         try {
             foreach ($groups as $number => $positions) {
                 $path = rtrim($outputDirectory, '/\\') . DIRECTORY_SEPARATOR . sprintf('%s-%0' . $width . 'd.epub', $plan->filePrefix, $number + 1);
-                $part = EpubFile::openString($archive);
+                $part = EpubFile::openString($archive, null, $this->xmlParser ?? $book->getXmlParser());
 
                 try {
                     $this->buildPart($part, $book, $plan, $positions, $spinePaths, $analysis, $toc, $landmarks, $number + 1, $total);
@@ -447,7 +451,7 @@ final readonly class Splitter
     private function prune(EpubFile $part, string $directory, array $keep): void
     {
         $manifest = $part->getManifest();
-        $obfuscation = new FontObfuscation($directory, $this->xmlParser, $this->paths);
+        $obfuscation = new FontObfuscation($directory, $part->getXmlParser(), $this->paths);
         try {
             $fonts = $obfuscation->obfuscatedFonts();
         } catch (Exception) {
@@ -486,7 +490,7 @@ final readonly class Splitter
             }
 
             $content = FileSystemHelper::readFile($this->paths->resolve($directory, $item->path));
-            $unlinked = $content === null ? null : (new LinkRemover($this->paths, $this->xmlParser))->remove($item->path, $content, $removed);
+            $unlinked = $content === null ? null : (new LinkRemover($this->paths, $part->getXmlParser()))->remove($item->path, $content, $removed);
             if ($unlinked !== null) {
                 $part->getContentManager()->updateContent($item->path, $unlinked);
             }
@@ -508,7 +512,7 @@ final readonly class Splitter
 
             $file = $this->paths->resolve($directory, $item->path);
             try {
-                $xml = $this->xmlParser->parse($file);
+                $xml = $part->getXmlParser()->parse($file);
             } catch (XmlException) {
                 continue;
             }
@@ -528,7 +532,7 @@ final readonly class Splitter
             }
 
             if ($changed) {
-                $this->xmlParser->save($xml, $file);
+                $part->getXmlParser()->save($xml, $file);
             }
         }
     }
@@ -543,7 +547,7 @@ final readonly class Splitter
      */
     private function pruneNavigations(EpubFile $part, string $directory, array $keep): void
     {
-        $links = new LinkRemover($this->paths, $this->xmlParser);
+        $links = new LinkRemover($this->paths, $part->getXmlParser());
         foreach ($part->getManifest()->getItems() as $item) {
             if ($item->path === '' || ! in_array('nav', explode(' ', $item->properties), true)) {
                 continue;
@@ -551,7 +555,7 @@ final readonly class Splitter
 
             $file = $this->paths->resolve($directory, $item->path);
             try {
-                $xml = $this->xmlParser->parse($file);
+                $xml = $part->getXmlParser()->parse($file);
             } catch (XmlException) {
                 continue;
             }
@@ -580,7 +584,7 @@ final readonly class Splitter
             }
 
             if ($changed) {
-                $this->xmlParser->save($xml, $file);
+                $part->getXmlParser()->save($xml, $file);
             }
         }
     }
