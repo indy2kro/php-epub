@@ -6,6 +6,10 @@ namespace PhpEpub\Test;
 
 use PhpEpub\Cleanup\CleanupPreset;
 use PhpEpub\EpubFile;
+use PhpEpub\Merge\MergeOptions;
+use PhpEpub\Merge\Merger;
+use PhpEpub\Split\SplitPlan;
+use PhpEpub\Split\Splitter;
 use PhpEpub\TocEntry;
 use PhpEpub\Test\Support\EpubBuilder;
 use PhpEpub\Util\FileSystemHelper;
@@ -128,6 +132,101 @@ final class EpubCheckTest extends TestCase
         $this->assertSame([], array_values(array_diff($after, $before)), 'validate() reports new problems after compressing.');
         $this->assertLessThanOrEqual((int) filesize($fixture), (int) filesize($compressed), 'The compressed book is larger.');
         $this->assertSame([], array_values(array_diff($this->epubCheckCodes($compressed), $this->epubCheckCodes($fixture))), 'EPUBCheck reports new problems after compressing.');
+    }
+
+    /**
+     * Books merged from EPUB 3 and EPUB 2 books are valid EPUB 3 books.
+     */
+    public function testMergedBookIsValid(): void
+    {
+        $first = EpubBuilder::epub3()->buildEpub($this->tmpDir . DIRECTORY_SEPARATOR . 'first.epub');
+        $second = EpubBuilder::epub2()->buildEpub($this->tmpDir . DIRECTORY_SEPARATOR . 'second.epub');
+        $third = EpubBuilder::epub3()->buildEpub($this->tmpDir . DIRECTORY_SEPARATOR . 'third.epub');
+        $merged = $this->tmpDir . DIRECTORY_SEPARATOR . 'merged.epub';
+
+        $books = [EpubFile::open($first), EpubFile::open($second), EpubFile::open($third)];
+        (new Merger())->merge($books, new MergeOptions(), $merged);
+        foreach ($books as $book) {
+            $book->cleanup();
+        }
+
+        $reopened = EpubFile::open($merged);
+        $this->assertCount(3, $reopened->getTableOfContents()->getEntries());
+        $this->assertSame([], array_map(strval(...), $reopened->validate()));
+        $reopened->cleanup();
+
+        $this->assertPassesEpubCheck($merged);
+    }
+
+    /**
+     * Merging a real-world book must not add problems that validate() finds in the inputs.
+     */
+    #[DataProvider('fixtureBooks')]
+    public function testMergingAFixtureBookAddsNoProblems(string $fixture): void
+    {
+        $other = EpubBuilder::epub3()->buildEpub($this->tmpDir . DIRECTORY_SEPARATOR . 'other.epub');
+        $merged = $this->tmpDir . DIRECTORY_SEPARATOR . 'merged.epub';
+
+        $books = [EpubFile::open($fixture), EpubFile::open($other)];
+        $before = array_merge(self::codes($books[0]->validate()), self::codes($books[1]->validate()));
+        (new Merger())->merge($books, new MergeOptions(), $merged);
+        foreach ($books as $book) {
+            $book->cleanup();
+        }
+
+        $reopened = EpubFile::open($merged);
+        $errors = array_filter($reopened->validate(), static fn (\PhpEpub\ValidationIssue $issue): bool => $issue->severity === \PhpEpub\ValidationIssue::ERROR);
+        $reopened->cleanup();
+
+        $this->assertSame([], array_values(array_diff(self::codes(array_values($errors)), $before)), 'validate() reports new errors after merging.');
+    }
+
+    /**
+     * The parts of a split book are valid when the book is, and add no problems when it is not.
+     */
+    public function testSplitPartsAreValid(): void
+    {
+        $source = EpubBuilder::epub3()->buildEpub($this->tmpDir . DIRECTORY_SEPARATOR . 'source.epub');
+        $book = EpubFile::open($source);
+        $book->addChapter('Second', '<h1>Second</h1><p>More text.</p>');
+        $book->addChapter('Third', '<h1>Third</h1><p>Even more text.</p>');
+        $book->save();
+
+        $paths = (new Splitter())->split($book, SplitPlan::everySpineItems(1), $this->tmpDir . DIRECTORY_SEPARATOR . 'parts');
+        $book->cleanup();
+
+        $this->assertCount(3, $paths);
+        foreach ($paths as $path) {
+            $part = EpubFile::open($path);
+            $this->assertSame(['Valid Book (Part ' . (array_search($path, $paths, true) + 1) . ' of 3)'], [$part->getMetadata()->getTitle()]);
+            $this->assertSame([], array_map(strval(...), $part->validate()));
+            $part->cleanup();
+
+            $this->assertPassesEpubCheck($path);
+        }
+    }
+
+    /**
+     * Splitting a real-world book must not add problems (found by validate() and, with EPUBCheck, by it).
+     */
+    #[DataProvider('fixtureBooks')]
+    public function testSplittingAFixtureBookAddsNoProblems(string $fixture): void
+    {
+        $original = EpubFile::open($fixture);
+        $before = self::codes($original->validate());
+        $expected = $this->epubCheckCodes($fixture);
+
+        $paths = (new Splitter())->split($original, SplitPlan::everySpineItems(4), $this->tmpDir . DIRECTORY_SEPARATOR . 'parts');
+        $original->cleanup();
+
+        foreach ($paths as $path) {
+            $part = EpubFile::open($path);
+            $after = self::codes($part->validate());
+            $part->cleanup();
+
+            $this->assertSame([], array_values(array_diff($after, $before)), 'validate() reports new problems in a part.');
+            $this->assertSame([], array_values(array_diff($this->epubCheckCodes($path), $expected)), 'EPUBCheck reports new problems in a part.');
+        }
     }
 
     /**

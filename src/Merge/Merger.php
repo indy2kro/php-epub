@@ -10,6 +10,7 @@ use PhpEpub\Exception;
 use PhpEpub\FontObfuscation;
 use PhpEpub\Landmark;
 use PhpEpub\ManifestItem;
+use PhpEpub\Metadata;
 use PhpEpub\TocEntry;
 use PhpEpub\Util\FileSystemHelper;
 use PhpEpub\Util\ModifiedDate;
@@ -491,6 +492,50 @@ final readonly class Merger
         if (array_unique($this->layouts($books)) === ['pre-paginated']) {
             $metadata->setRenditionLayout('pre-paginated');
         }
+
+        $this->copyAccessibility($metadata, $books);
+    }
+
+    /**
+     * What a reader can rely on in the merged book: the access modes, features and hazards of all the books together
+     * (a "none" or "unknown" hazard only when no book names a hazard) and their summaries one after the other.
+     *
+     * @param list<EpubFile> $books
+     */
+    private function copyAccessibility(Metadata $metadata, array $books): void
+    {
+        $modes = [];
+        $features = [];
+        $hazards = [];
+        $summaries = [];
+        foreach ($books as $book) {
+            $source = $book->getMetadata();
+            array_push($modes, ...$source->getAccessModes());
+            array_push($features, ...$source->getAccessibilityFeatures());
+            array_push($hazards, ...$source->getAccessibilityHazards());
+            $summary = trim((string) $source->getAccessibilitySummary());
+            if ($summary !== '') {
+                $summaries[] = $summary;
+            }
+        }
+
+        $named = array_diff($hazards, ['none', 'unknown']);
+        $hazards = $named !== [] ? $named : array_slice($hazards, 0, 1);
+
+        $modes === [] || $metadata->setAccessModes($this->unique($modes));
+        $features === [] || $metadata->setAccessibilityFeatures($this->unique($features));
+        $hazards === [] || $metadata->setAccessibilityHazards($this->unique($hazards));
+        $summaries === [] || $metadata->setAccessibilitySummary(implode(' ', $this->unique($summaries)));
+    }
+
+    /**
+     * @param array<int, string> $values
+     *
+     * @return list<string>
+     */
+    private function unique(array $values): array
+    {
+        return array_values(array_unique($values));
     }
 
     /**

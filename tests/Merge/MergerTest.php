@@ -340,6 +340,21 @@ final class MergerTest extends TestCase
         $this->assertSame('urn:isbn:9780000000002', $options->getUniqueIdentifier());
     }
 
+    public function testAccessibilityMetadataIsCombined(): void
+    {
+        $one = $this->open(MergeBook::builder(self::UID_ONE, 'One'));
+        $two = $this->open(MergeBook::builder(self::UID_TWO, 'Two'));
+        $two->getMetadata()->setAccessibilityHazards(['flashing']);
+        $two->getMetadata()->setAccessibilityFeatures(['tableOfContents', 'alternativeText']);
+
+        $metadata = $this->merge([$one, $two])->getMetadata();
+
+        $this->assertSame(['textual'], $metadata->getAccessModes());
+        $this->assertSame(['tableOfContents', 'alternativeText'], $metadata->getAccessibilityFeatures());
+        $this->assertSame(['flashing'], $metadata->getAccessibilityHazards());
+        $this->assertSame('Plain text with a table of contents.', $metadata->getAccessibilitySummary());
+    }
+
     public function testModifiedDateComesFromTheClock(): void
     {
         $clock = static fn (): \DateTimeImmutable => new \DateTimeImmutable('2030-05-06 07:08:09', new \DateTimeZone('Europe/Bucharest'));
