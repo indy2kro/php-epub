@@ -400,6 +400,35 @@ class Manifest
     }
 
     /**
+     * The files (paths relative to the book root) the package document refers to besides the manifest
+     * items: the spine's toc and page-map items, the handlers of <bindings>, and the href of <link>
+     * and other elements (<guide> references, collections). Paths are not checked against the manifest.
+     *
+     * @return list<string>
+     */
+    public function getPackageReferences(): array
+    {
+        $paths = [];
+        foreach (['/opf:package/opf:spine/@toc', '/opf:package/opf:spine/@page-map', '/opf:package/opf:bindings/opf:mediaType/@handler'] as $expression) {
+            foreach ($this->query($expression) as $attribute) {
+                $path = $this->get((string) $attribute)?->path;
+                if ($path !== null && $path !== '') {
+                    $paths[] = $path;
+                }
+            }
+        }
+
+        foreach ($this->query('//*[@href][not(self::opf:item)]') as $element) {
+            $path = $this->tryHrefToPath((string) $element['href']);
+            if ($path !== null) {
+                $paths[] = $path;
+            }
+        }
+
+        return array_values(array_unique($paths));
+    }
+
+    /**
      * Sets the media overlay (SMIL document) that narrates an XHTML or SVG content document, or
      * removes it with null. Media overlays exist only in EPUB 3; give the overlay its total duration
      * with Metadata::setMediaDurationOf().

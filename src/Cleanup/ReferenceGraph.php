@@ -6,6 +6,7 @@ namespace PhpEpub\Cleanup;
 
 use DOMDocument;
 use DOMElement;
+use DOMProcessingInstruction;
 use DOMText;
 use PhpEpub\EpubFile;
 use PhpEpub\Exception;
@@ -34,7 +35,10 @@ use PhpEpub\XmlParser;
  */
 final readonly class ReferenceGraph
 {
-    private const array REFERENCE_ATTRIBUTES = ['src', 'href', 'poster', 'data', 'background', 'longdesc', 'cite', 'manifest'];
+    private const array REFERENCE_ATTRIBUTES = [
+        'src', 'href', 'poster', 'data', 'background', 'longdesc', 'cite', 'manifest', 'altimg', 'icon', 'action', 'formaction',
+        'archive', 'codebase', 'classid', 'profile', 'lowsrc', 'dynsrc', 'usemap', 'ping',
+    ];
 
     private const array SRCSET_ATTRIBUTES = ['srcset', 'imagesrcset'];
 
@@ -71,7 +75,7 @@ final readonly class ReferenceGraph
 
     /**
      * The files a book needs whatever else it contains: the spine items, the navigation document,
-     * the NCX, the cover and the guide references.
+     * the NCX, the cover, the guide references and the other files the package document points at.
      *
      * @return list<string> Manifest paths.
      */
@@ -98,6 +102,9 @@ final readonly class ReferenceGraph
             $roots[] = $reference->path;
         }
 
+        // Everything else the package document points at: spine@toc and @page-map, bindings handlers, <link> elements.
+        array_push($roots, ...$this->manifest->getPackageReferences());
+
         return $this->manifestPaths($roots);
     }
 
@@ -122,6 +129,7 @@ final readonly class ReferenceGraph
         $references = [];
         $unparsable = [];
         $unmanifested = [];
+        $mentioned = [];
 
         while ($queue !== []) {
             $path = array_shift($queue);
@@ -130,7 +138,7 @@ final readonly class ReferenceGraph
                 continue;
             }
 
-            $found = $this->scan($item, $unparsable, $unmanifested);
+            $found = $this->scan($item, $unparsable, $unmanifested, $mentioned);
             $found = array_values(array_unique(array_diff($found, [$path])));
             sort($found, SORT_STRING);
             $references[$path] = $found;
@@ -157,9 +165,11 @@ final readonly class ReferenceGraph
         sort($unparsable, SORT_STRING);
         $unmanifested = array_values(array_unique($unmanifested));
         sort($unmanifested, SORT_STRING);
+        $mentioned = array_values(array_unique($mentioned));
+        sort($mentioned, SORT_STRING);
         ksort($references, SORT_STRING);
 
-        return new ReferenceAnalysis($reachable, $unreachable, $references, $unparsable, $unmanifested);
+        return new ReferenceAnalysis($reachable, $unreachable, $references, $unparsable, $unmanifested, $mentioned);
     }
 
     /**
@@ -177,7 +187,8 @@ final readonly class ReferenceGraph
 
         $unparsable = [];
         $unmanifested = [];
-        $found = array_values(array_unique(array_diff($this->scan($item, $unparsable, $unmanifested), [$item->path])));
+        $mentioned = [];
+        $found = array_values(array_unique(array_diff($this->scan($item, $unparsable, $unmanifested, $mentioned), [$item->path])));
         sort($found, SORT_STRING);
 
         return $found;
@@ -186,10 +197,11 @@ final readonly class ReferenceGraph
     /**
      * @param list<string> $unparsable
      * @param list<string> $unmanifested
+     * @param list<string> $mentioned
      *
      * @return list<string> Manifest paths the item refers to.
      */
-    private function scan(ManifestItem $item, array &$unparsable, array &$unmanifested): array
+    private function scan(ManifestItem $item, array &$unparsable, array &$unmanifested, array &$mentioned): array
     {
         // A fallback or media overlay is only needed along with the item that names it.
         $paths = [];
@@ -206,22 +218,28 @@ final readonly class ReferenceGraph
         }
 
         $references = [];
+        $text = '';
+        $escaped = [];
         $extension = strtolower(pathinfo($item->path, PATHINFO_EXTENSION));
         if ($item->mediaType === 'text/css' || $extension === 'css') {
-            $references = $this->cssReferences($content);
+            [$references, $escaped] = $this->cssReferences($content);
         } elseif (in_array($item->mediaType, self::XML_TYPES, true) || in_array($extension, ['xhtml', 'html', 'htm', 'svg', 'smil', 'xml', 'ncx'], true)) {
             $parsed = $this->xmlReferences($content, $item->path);
             if ($parsed === null) {
                 $unparsable[] = $item->path;
-
-                return array_merge($paths, $this->mentioned($content));
+                $text = $content;
+            } else {
+                [$references, $text, $escaped] = $parsed;
             }
-
-            [$references, $scripts] = $parsed;
-            $paths = array_merge($paths, $this->mentioned($scripts));
         } elseif (in_array($item->mediaType, self::OPAQUE_TYPES, true) || in_array($extension, ['js', 'mjs'], true)) {
-            return array_merge($paths, $this->mentioned($content));
+            $text = $content;
         }
+
+        // Names found in code, in unreadable documents or written with CSS escapes cannot be rewritten
+        // reliably: they keep the files alive, and the files must keep their names.
+        $names = array_merge($this->mentioned($text), $this->existingPaths($escaped, $item->path));
+        array_push($mentioned, ...$names);
+        array_push($paths, ...$names);
 
         foreach ($references as $reference) {
             $target = $this->targetPath($reference, $item->path);
@@ -240,8 +258,9 @@ final readonly class ReferenceGraph
     }
 
     /**
-     * @return array{list<string>, string}|null The references and the text of the scripts (searched by name),
-     *                                          or null when the document is not well-formed.
+     * @return array{list<string>, string, list<string>}|null The references, the text of the scripts and other
+     *         code (searched by name) and the references written with CSS escapes, or null when the document
+     *         is not well-formed.
      */
     private function xmlReferences(string $content, string $path): ?array
     {
@@ -252,8 +271,21 @@ final readonly class ReferenceGraph
         }
 
         $references = [];
+        $escaped = [];
         $scripts = '';
         $document = $root->ownerDocument ?? new DOMDocument();
+
+        foreach ($document->childNodes as $node) {
+            // An xml-stylesheet processing instruction (href="style.css" type="text/css").
+            if ($node instanceof DOMProcessingInstruction && strtolower($node->target) === 'xml-stylesheet') {
+                if (preg_match_all('/href\s*=\s*(?:"([^"]*)"|\'([^\']*)\')/i', $node->data, $matches, PREG_SET_ORDER | PREG_UNMATCHED_AS_NULL) > 0) {
+                    foreach ($matches as $match) {
+                        $references[] = html_entity_decode((string) ($match[1] ?? $match[2] ?? ''), ENT_QUOTES | ENT_XML1);
+                    }
+                }
+            }
+        }
+
         foreach ($document->getElementsByTagName('*') as $element) {
             $tag = strtolower($element->localName ?? '');
             foreach ($element->attributes ?? [] as $attribute) {
@@ -262,14 +294,19 @@ final readonly class ReferenceGraph
                     $references[] = $attribute->value;
                 } elseif (in_array($name, self::SRCSET_ATTRIBUTES, true)) {
                     array_push($references, ...$this->srcsetUrls($attribute->value));
-                } elseif ($name === 'style') {
-                    array_push($references, ...$this->cssReferences($attribute->value));
                 } elseif ($name === 'content' && $tag === 'meta') {
                     // <meta http-equiv="refresh" content="0; url=x.xhtml"> and similar.
                     $scripts .= ' ' . $attribute->value;
-                } elseif (str_starts_with($name, 'on')) {
-                    // Inline event handlers are code: searched by name like a script.
+                } elseif (str_starts_with($name, 'on') || in_array($name, ['srcdoc', 'values', 'from', 'to', 'by'], true)) {
+                    // Inline event handlers, srcdoc documents and SVG animation targets are code or markup: searched by name.
                     $scripts .= ' ' . $attribute->value;
+                }
+
+                // style attributes and SVG presentation attributes (fill, mask, filter, ...) may hold url(file#id).
+                if ($name === 'style' || str_contains($attribute->value, 'url(')) {
+                    [$found, $foundEscaped] = $this->cssReferences($attribute->value);
+                    array_push($references, ...$found);
+                    array_push($escaped, ...$foundEscaped);
                 }
             }
 
@@ -281,7 +318,9 @@ final readonly class ReferenceGraph
                     }
 
                     if ($tag === 'style') {
-                        array_push($references, ...$this->cssReferences($child->data));
+                        [$found, $foundEscaped] = $this->cssReferences($child->data);
+                        array_push($references, ...$found);
+                        array_push($escaped, ...$foundEscaped);
                     } else {
                         $scripts .= ' ' . $child->data;
                     }
@@ -289,34 +328,88 @@ final readonly class ReferenceGraph
             }
         }
 
-        return [$references, $scripts];
+        return [$references, $scripts, $escaped];
     }
 
     /**
-     * @return list<string>
+     * @return array{list<string>, list<string>} The references (CSS escapes decoded) and those of them that
+     *                                          were written with escapes.
      */
     private function cssReferences(string $css): array
     {
-        $references = [];
-        if (preg_match_all('/url\(\s*(?:"([^"]*)"|\'([^\']*)\'|([^)"\'\s]*))\s*\)/i', $css, $matches, PREG_SET_ORDER | PREG_UNMATCHED_AS_NULL) > 0) {
+        $raw = [];
+        if (preg_match_all('/url\(\s*(?:"((?:\\\\.|[^"\\\\])*)"|\'((?:\\\\.|[^\'\\\\])*)\'|((?:\\\\.|[^)"\'\s\\\\])*))\s*\)/is', $css, $matches, PREG_SET_ORDER | PREG_UNMATCHED_AS_NULL) > 0) {
             foreach ($matches as $match) {
-                $references[] = (string) ($match[1] ?? $match[2] ?? $match[3] ?? '');
+                $raw[] = (string) ($match[1] ?? $match[2] ?? $match[3] ?? '');
             }
         }
 
-        if (preg_match_all('/@import\s+(["\'])([^"\']*)\1/i', $css, $matches) > 0) {
-            array_push($references, ...$matches[2]);
+        if (preg_match_all('/@import\s+(?:"((?:\\\\.|[^"\\\\])*)"|\'((?:\\\\.|[^\'\\\\])*)\')/is', $css, $matches, PREG_SET_ORDER | PREG_UNMATCHED_AS_NULL) > 0) {
+            foreach ($matches as $match) {
+                $raw[] = (string) ($match[1] ?? $match[2] ?? '');
+            }
         }
 
-        if (preg_match_all('/image-set\(([^)]*)\)/i', $css, $sets) > 0) {
+        if (preg_match_all('/image-set\(((?:[^()]|\([^()]*\))*)\)/i', $css, $sets) > 0) {
             foreach ($sets[1] as $set) {
-                if (preg_match_all('/(["\'])([^"\']*)\1/', $set, $matches) > 0) {
-                    array_push($references, ...$matches[2]);
+                if (preg_match_all('/(["\'])((?:\\\\.|(?!\1)[^\\\\])*)\1/s', $set, $matches) > 0) {
+                    array_push($raw, ...$matches[2]);
                 }
             }
         }
 
-        return $references;
+        $references = [];
+        $escaped = [];
+        foreach ($raw as $value) {
+            $decoded = $this->unescapeCss($value);
+            $references[] = $decoded;
+            if ($decoded !== $value) {
+                $escaped[] = $decoded;
+            }
+        }
+
+        return [$references, $escaped];
+    }
+
+    private function unescapeCss(string $value): string
+    {
+        if (! str_contains($value, '\\')) {
+            return $value;
+        }
+
+        return (string) preg_replace_callback(
+            '/\\\\(?:([0-9a-fA-F]{1,6})\s?|(.))/s',
+            static function (array $match): string {
+                if ($match[1] !== '') {
+                    $code = (int) hexdec($match[1]);
+
+                    return $code > 0 && $code <= 0x10FFFF && ($code < 0xD800 || $code > 0xDFFF) ? html_entity_decode('&#' . $code . ';', ENT_QUOTES | ENT_HTML5, 'UTF-8') : "\u{FFFD}";
+                }
+
+                return $match[2];
+            },
+            $value
+        );
+    }
+
+    /**
+     * The manifest paths that references point to.
+     *
+     * @param list<string> $references
+     *
+     * @return list<string>
+     */
+    private function existingPaths(array $references, string $fromPath): array
+    {
+        $paths = [];
+        foreach ($references as $reference) {
+            $target = $this->targetPath($reference, $fromPath);
+            if ($target !== null && $this->manifest->findByPath($target) instanceof ManifestItem) {
+                $paths[] = $target;
+            }
+        }
+
+        return $paths;
     }
 
     /**

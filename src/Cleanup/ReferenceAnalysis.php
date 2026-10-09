@@ -17,13 +17,16 @@ final readonly class ReferenceAnalysis
      *                                 (any whose name appears in their text) are counted as reachable.
      * @param list<string> $unmanifested Files that exist in the book and are referenced by a reachable document
      *                                   but are not listed in the manifest (sorted).
+     * @param list<string> $mentioned Reachable manifest files that code (scripts, event handlers, unreadable
+     *                                documents) or CSS escapes name: they are kept, and cannot be renamed safely.
      */
     public function __construct(
         public array $reachable,
         public array $unreachable,
         public array $references = [],
         public array $unparsable = [],
-        public array $unmanifested = []
+        public array $unmanifested = [],
+        public array $mentioned = []
     ) {
     }
 

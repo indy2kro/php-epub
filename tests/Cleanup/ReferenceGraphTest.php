@@ -231,4 +231,82 @@ XML,
 
         $this->assertSame(['EPUB/loose.png'], $analysis->unmanifested);
     }
+
+    public function testXmlStylesheetInstructionsMathmlAndSvgPaintReferencesAreFollowed(): void
+    {
+        $svg = '<?xml version="1.0"?><?xml-stylesheet href="svg.css" type="text/css"?>'
+            . '<svg xmlns="http://www.w3.org/2000/svg"><rect fill="url(defs.svg#grad)" mask="url(&quot;mask.svg#m&quot;)" style="filter: url(filter.svg#f)"/></svg>';
+        $builder = CleanupBook::builder(
+            <<<XML
+<item id="pic" href="pic.svg" media-type="image/svg+xml"/>
+<item id="css" href="svg.css" media-type="text/css"/>
+<item id="defs" href="defs.svg" media-type="image/svg+xml"/>
+<item id="mask" href="mask.svg" media-type="image/svg+xml"/>
+<item id="filter" href="filter.svg" media-type="image/svg+xml"/>
+<item id="math" href="math.png" media-type="image/png"/>
+<item id="orphan" href="orphan.png" media-type="image/png"/>
+XML,
+            [
+                'EPUB/pic.svg' => $svg,
+                'EPUB/svg.css' => 'rect { stroke: red }',
+                'EPUB/defs.svg' => '<svg xmlns="http://www.w3.org/2000/svg"/>',
+                'EPUB/mask.svg' => '<svg xmlns="http://www.w3.org/2000/svg"/>',
+                'EPUB/filter.svg' => '<svg xmlns="http://www.w3.org/2000/svg"/>',
+                'EPUB/math.png' => 'png',
+                'EPUB/orphan.png' => 'png',
+            ],
+            chapterBody: '<img src="pic.svg" alt=""/><math xmlns="http://www.w3.org/1998/Math/MathML" altimg="math.png"><mi>x</mi></math>'
+        );
+
+        $analysis = $this->graph($builder)->analyze();
+
+        $this->assertSame(['EPUB/orphan.png'], $analysis->unreachable);
+    }
+
+    public function testDocumentsWithAnXmlStylesheetProcessingInstructionKeepTheirStylesheet(): void
+    {
+        $xhtml = '<?xml version="1.0"?><?xml-stylesheet href="s.css" type="text/css"?><html xmlns="http://www.w3.org/1999/xhtml"><head><title>t</title></head><body><p>x</p></body></html>';
+        $builder = CleanupBook::builder(
+            '<item id="css" href="s.css" media-type="text/css"/><item id="orphan" href="orphan.css" media-type="text/css"/>',
+            ['EPUB/s.css' => 'p{}', 'EPUB/orphan.css' => 'p{}']
+        )->withFile('EPUB/chapter.xhtml', $xhtml);
+
+        $this->assertSame(['EPUB/orphan.css'], $this->graph($builder)->analyze()->unreachable);
+    }
+
+    public function testPackageDocumentReferencesAreRoots(): void
+    {
+        $builder = CleanupBook::builder(
+            <<<XML
+<item id="map" href="pagemap.xml" media-type="application/oebps-page-map+xml"/>
+<item id="handler" href="handler.xhtml" media-type="application/xhtml+xml"/>
+<item id="record" href="record.xml" media-type="application/xml"/>
+<item id="orphan" href="orphan.png" media-type="image/png"/>
+XML,
+            ['EPUB/pagemap.xml' => '<page-map/>', 'EPUB/handler.xhtml' => EpubBuilder::xhtml('H', '<p>h</p>'), 'EPUB/record.xml' => '<r/>', 'EPUB/orphan.png' => 'png'],
+            metadata: '<link rel="record" href="record.xml" media-type="application/xml"/>'
+        );
+        $opf = (string) $builder->getFile('EPUB/package.opf');
+        $opf = str_replace('<spine>', '<spine page-map="map">', $opf);
+        $opf = str_replace('</package>', '<bindings><mediaType media-type="application/x-demo" handler="handler"/></bindings></package>', $opf);
+        $builder->withFile('EPUB/package.opf', $opf);
+
+        $analysis = $this->graph($builder)->analyze();
+
+        $this->assertSame(['EPUB/orphan.png'], $analysis->unreachable);
+    }
+
+    public function testCssEscapesAreDecodedAndRememberedAsMentioned(): void
+    {
+        $css = 'a { background: url(a\(b.png) } b { background: url("\63 over.png") } i { background: url(plain.png) }';
+        $builder = CleanupBook::builder(
+            '<item id="css" href="s.css" media-type="text/css"/><item id="ab" href="a(b.png" media-type="image/png"/><item id="cover" href="cover.png" media-type="image/png"/><item id="plain" href="plain.png" media-type="image/png"/><item id="js" href="app.js" media-type="text/javascript"/><item id="scripted" href="scripted.png" media-type="image/png"/>',
+            ['EPUB/s.css' => $css, 'EPUB/a(b.png' => 'png', 'EPUB/cover.png' => 'png', 'EPUB/plain.png' => 'png', 'EPUB/app.js' => 'load("scripted.png")', 'EPUB/scripted.png' => 'png']
+        )->withFile('EPUB/chapter.xhtml', EpubBuilder::xhtml('Chapter', '<script src="app.js"></script>', 's.css'));
+
+        $analysis = $this->graph($builder)->analyze();
+
+        $this->assertSame([], $analysis->unreachable);
+        $this->assertSame(['EPUB/a(b.png', 'EPUB/cover.png', 'EPUB/scripted.png'], $analysis->mentioned);
+    }
 }
