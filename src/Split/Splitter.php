@@ -572,17 +572,10 @@ final readonly class Splitter
             $xpath = new DOMXPath($root->ownerDocument ?? new DOMDocument());
             $changed = false;
             $navs = $xpath->query("//*[local-name()='nav'][not(@*[local-name()='type' and (contains(concat(' ', normalize-space(.), ' '), ' toc ') or contains(concat(' ', normalize-space(.), ' '), ' landmarks '))])]");
-            foreach (iterator_to_array($navs ?: []) as $nav) {
-                if (! $nav instanceof DOMElement) {
-                    continue;
-                }
-
+            foreach ($this->elements($navs) as $nav) {
                 // Deepest entries first, so a parent is judged after its children.
-                $entries = array_reverse(iterator_to_array($xpath->query(".//*[local-name()='li']", $nav) ?: []));
-                foreach ($entries as $entry) {
-                    if ($entry instanceof DOMElement && $entry->parentNode instanceof \DOMNode) {
-                        $changed = $this->pruneEntry($entry, $xpath, $links, $item->path, $keep) || $changed;
-                    }
+                foreach (array_reverse($this->elements($xpath->query(".//*[local-name()='li']", $nav))) as $entry) {
+                    $changed = $this->pruneEntry($entry, $xpath, $links, $item->path, $keep) || $changed;
                 }
 
                 if ($this->countNodes($xpath, ".//*[local-name()='li']", $nav) === 0 && $nav->parentNode instanceof \DOMNode) {
@@ -595,6 +588,23 @@ final readonly class Splitter
                 $part->getXmlParser()->save($xml, $file);
             }
         }
+    }
+
+    /**
+     * @param \DOMNodeList<\DOMNameSpaceNode|\DOMNode>|false $nodes
+     *
+     * @return list<DOMElement> The elements of a query result, in order.
+     */
+    private function elements(\DOMNodeList|false $nodes): array
+    {
+        $elements = [];
+        foreach ($nodes ?: [] as $node) {
+            if ($node instanceof DOMElement) {
+                $elements[] = $node;
+            }
+        }
+
+        return $elements;
     }
 
     private function countNodes(DOMXPath $xpath, string $expression, DOMElement $context): int
@@ -615,11 +625,7 @@ final readonly class Splitter
     private function pruneEntry(DOMElement $entry, DOMXPath $xpath, LinkRemover $links, string $navPath, array $keep): bool
     {
         $changed = false;
-        foreach (iterator_to_array($xpath->query("./*[local-name()='a']", $entry) ?: []) as $link) {
-            if (! $link instanceof DOMElement) {
-                continue;
-            }
-
+        foreach ($this->elements($xpath->query("./*[local-name()='a']", $entry)) as $link) {
             $target = $links->target($link->getAttribute('href'), $navPath);
             if ($target === null || isset($keep[$target])) {
                 continue;
@@ -643,8 +649,8 @@ final readonly class Splitter
         }
 
         // A list without items is not valid; its parent item is judged next, as the order is deepest first.
-        foreach (iterator_to_array($xpath->query("./*[local-name()='ol' or local-name()='ul']", $entry) ?: []) as $list) {
-            if ($list instanceof DOMElement && $this->countNodes($xpath, "./*[local-name()='li']", $list) === 0) {
+        foreach ($this->elements($xpath->query("./*[local-name()='ol' or local-name()='ul']", $entry)) as $list) {
+            if ($this->countNodes($xpath, "./*[local-name()='li']", $list) === 0) {
                 $entry->removeChild($list);
                 $changed = true;
             }
