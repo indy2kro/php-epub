@@ -36,6 +36,7 @@ nav:
     - Parser: parser.md
     - XmlParser: xml-parser.md
     - ZipHandler: zip-handler.md
+    - Cleanup: cleanup.md
     - Converter: converter.md
     - Converters:
       - Calibre Adapter: converters/calibre-adapter.md

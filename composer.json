@@ -41,6 +41,7 @@
         "dompdf/dompdf": "^3.1"
     },
     "suggest": {
+        "ext-gd": "Lets EpubFile::compress() recompress images.",
         "dompdf/dompdf": "Required for PDF generation using Dompdf.",
         "tecnickcom/tcpdf": "Required for PDF generation using TCPDF."
     },
