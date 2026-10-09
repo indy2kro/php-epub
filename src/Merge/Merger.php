@@ -14,6 +14,7 @@ use PhpEpub\Metadata;
 use PhpEpub\TocEntry;
 use PhpEpub\Util\FileSystemHelper;
 use PhpEpub\Util\LinkRemover;
+use PhpEpub\Util\MetadataSyntax;
 use PhpEpub\Util\ModifiedDate;
 use PhpEpub\Util\PathResolver;
 use PhpEpub\Util\ReferenceRewriter;
@@ -672,6 +673,8 @@ final readonly class Merger
 
             $merged->getManifest()->setMediaOverlay($file->newId, $overlayId);
             $duration = $book->getMetadata()->getMediaDurationOf($overlay);
+            // A value that is not a clock value (the source is untrusted) is not copied and leaves the total out.
+            $duration = $duration !== null && MetadataSyntax::isSmilClockValue($duration) ? $duration : null;
             if ($duration !== null) {
                 $merged->getMetadata()->setMediaDurationOf($overlayId, $duration);
             }
@@ -685,25 +688,20 @@ final readonly class Merger
     }
 
     /**
-     * A SMIL clock value in seconds, or null when it is not one this understands.
+     * A valid SMIL clock value (see MetadataSyntax::isSmilClockValue()) in seconds.
      */
-    private function clockSeconds(string $clock): ?float
+    private function clockSeconds(string $clock): float
     {
-        $clock = trim($clock);
-        if (preg_match('/^(\d+(?:\.\d+)?)(h|min|s|ms)?$/', $clock, $match) === 1) {
-            return (float) $match[1] * match ($match[2] ?? 's') {
-                'h' => 3600.0,
-                'min' => 60.0,
-                'ms' => 0.001,
-                default => 1.0,
-            };
+        if (str_contains($clock, ':')) {
+            return array_reduce(explode(':', $clock), static fn (float $total, string $part): float => $total * 60 + (float) $part, 0.0);
         }
 
-        if (preg_match('/^(?:(\d+):)?(\d{1,2}):(\d{2}(?:\.\d+)?)$/', $clock, $match) === 1) {
-            return (float) $match[1] * 3600 + (float) $match[2] * 60 + (float) $match[3];
-        }
-
-        return null;
+        return (float) $clock * match ((string) preg_replace('/^[\d.]+/', '', $clock)) {
+            'h' => 3600.0,
+            'min' => 60.0,
+            'ms' => 0.001,
+            default => 1.0,
+        };
     }
 
     /**
