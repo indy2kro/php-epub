@@ -246,10 +246,12 @@ class ZipHandler
      *
      * @param string $source The directory to compress.
      * @param string $zipFilePath The path where the ZIP file should be created.
+     * @param int|null $compressionLevel The deflate level, 1 (fastest) to 9 (smallest), for a compact archive without
+     *                                   directory entries; null for libzip's default and the directory entries.
      *
      * @throws ZipException If the compression fails.
      */
-    public function compress(string $source, string $zipFilePath): void
+    public function compress(string $source, string $zipFilePath, ?int $compressionLevel = null): void
     {
         $realSource = realpath($source);
         if ($realSource === false) {
@@ -267,7 +269,7 @@ class ZipHandler
         $closed = false;
 
         try {
-            $this->addEntries($zip, $realSource);
+            $this->addEntries($zip, $realSource, $compressionLevel);
 
             if (! $zip->close()) {
                 throw new ZipException("Failed to finalize ZIP file: {$zipFilePath} ({$zip->getStatusString()})");
@@ -310,7 +312,7 @@ class ZipHandler
     /**
      * @throws ZipException
      */
-    private function addEntries(ZipArchive $zip, string $realSource): void
+    private function addEntries(ZipArchive $zip, string $realSource, ?int $compressionLevel): void
     {
         // OCF: "mimetype" must be the first entry and must be stored uncompressed.
         $mimetypePath = $realSource . DIRECTORY_SEPARATOR . 'mimetype';
@@ -324,8 +326,17 @@ class ZipHandler
         // the same book twice (on any OS) produces the same bytes.
         foreach ($this->entries($realSource) as $relativePath => $filePath) {
             $isDirectory = is_dir($filePath);
+            if ($isDirectory && $compressionLevel !== null) {
+                // Readers do not need directory entries; a compact archive leaves them out.
+                continue;
+            }
+
             $added = $isDirectory ? $zip->addEmptyDir($relativePath) : $zip->addFile($filePath, $relativePath);
             $this->assertDone($added, $zip, 'add', $relativePath);
+            if ($compressionLevel !== null) {
+                // CM_DEFAULT stores an entry that deflate would not shrink.
+                $this->assertDone($zip->setCompressionName($relativePath, ZipArchive::CM_DEFAULT, max(1, min(9, $compressionLevel))), $zip, 'compress', $relativePath);
+            }
 
             $this->normalizeEntry($zip, $isDirectory ? $relativePath . '/' : $relativePath, $isDirectory);
         }
