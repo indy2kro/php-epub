@@ -9,7 +9,7 @@ use PhpEpub\Exception;
 use PhpEpub\FontObfuscation;
 use PhpEpub\Merge\MergeOptions;
 use PhpEpub\Merge\Merger;
-use PhpEpubTestNcxPlayOrderTest;
+use PhpEpub\Test\NcxPlayOrderTest;
 use PhpEpub\Test\Support\EpubBuilder;
 use PhpEpub\Test\Support\MergeBook;
 use PhpEpub\TocEntry;
