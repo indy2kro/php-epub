@@ -117,7 +117,7 @@ class ZipHandler
 
         // OCF requires names that are unique after case folding: on case-insensitive file systems
         // (Windows, macOS) one entry would silently replace the other.
-        $folded = $this->fold($target);
+        $folded = self::foldName($target);
         if (isset($files[$folded])) {
             throw new ZipException("ZIP entries differ only in case: {$files[$folded]} and {$name}");
         }
@@ -177,8 +177,10 @@ class ZipHandler
      * Folds a path the way case-insensitive file systems compare names: Unicode case folding and
      * NFC normalization when mbstring and intl are available, ASCII lower-casing otherwise
      * (and for names that are not valid UTF-8).
+     *
+     * @internal Shared with EpubReader, which applies the same rule to entry names.
      */
-    private function fold(string $path): string
+    public static function foldName(string $path): string
     {
         $path = class_exists(Normalizer::class) ? (Normalizer::normalize($path) ?: $path) : $path;
 
