@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PhpEpub\Test;
 
+use PhpEpub\Cleanup\CleanupPreset;
 use PhpEpub\EpubFile;
 use PhpEpub\TocEntry;
 use PhpEpub\Test\Support\EpubBuilder;
@@ -100,6 +101,33 @@ final class EpubCheckTest extends TestCase
 
         $this->assertSame([], array_values(array_diff($after, $before)), 'validate() reports new problems after saving.');
         $this->assertSame([], array_values(array_diff($this->epubCheckCodes($saved), $this->epubCheckCodes($fixture))), 'EPUBCheck reports new problems after saving.');
+    }
+
+    /**
+     * A balanced cleanup of a real-world book leaves a book that opens, validates without new problems
+     * (and, with EPUBCheck, without new errors) and is not larger than the original.
+     */
+    #[DataProvider('fixtureBooks')]
+    public function testCompressingAFixtureBookAddsNoProblemsAndDoesNotGrow(string $fixture): void
+    {
+        $compressed = $this->tmpDir . DIRECTORY_SEPARATOR . 'compressed.epub';
+        copy($fixture, $compressed);
+
+        $original = EpubFile::open($fixture);
+        $before = self::codes($original->validate());
+        $original->cleanup();
+
+        $book = EpubFile::open($compressed);
+        $book->compress(CleanupPreset::Balanced);
+        $book->cleanup();
+
+        $reopened = EpubFile::open($compressed);
+        $after = self::codes($reopened->validate());
+        $reopened->cleanup();
+
+        $this->assertSame([], array_values(array_diff($after, $before)), 'validate() reports new problems after compressing.');
+        $this->assertLessThanOrEqual((int) filesize($fixture), (int) filesize($compressed), 'The compressed book is larger.');
+        $this->assertSame([], array_values(array_diff($this->epubCheckCodes($compressed), $this->epubCheckCodes($fixture))), 'EPUBCheck reports new problems after compressing.');
     }
 
     /**

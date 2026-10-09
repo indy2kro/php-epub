@@ -32,7 +32,7 @@ use PhpEpub\XmlParser;
  *
  * Merge, split and pruning features can reuse it: analyzeFrom() starts from any set of files.
  */
-final class ReferenceGraph
+final readonly class ReferenceGraph
 {
     private const array REFERENCE_ATTRIBUTES = ['src', 'href', 'poster', 'data', 'background', 'longdesc', 'cite', 'manifest'];
 
@@ -48,12 +48,12 @@ final class ReferenceGraph
     ];
 
     public function __construct(
-        private readonly string $rootDirectory,
-        private readonly Manifest $manifest,
-        private readonly Spine $spine,
-        private readonly ?Metadata $metadata = null,
-        private readonly PathResolver $paths = new PathResolver(),
-        private readonly XmlParser $xmlParser = new XmlParser()
+        private string $rootDirectory,
+        private Manifest $manifest,
+        private Spine $spine,
+        private ?Metadata $metadata = null,
+        private PathResolver $paths = new PathResolver(),
+        private XmlParser $xmlParser = new XmlParser()
     ) {
     }
 

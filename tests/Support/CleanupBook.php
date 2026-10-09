@@ -28,6 +28,10 @@ final class CleanupBook
     <dc:title>Cleanup</dc:title>
     <dc:language>en</dc:language>
     <meta property="dcterms:modified">2026-01-01T00:00:00Z</meta>
+    <meta property="schema:accessMode">textual</meta>
+    <meta property="schema:accessibilityFeature">tableOfContents</meta>
+    <meta property="schema:accessibilityHazard">none</meta>
+    <meta property="schema:accessibilitySummary">Plain text.</meta>
     {$metadata}
   </metadata>
   <manifest>
