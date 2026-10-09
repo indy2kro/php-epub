@@ -816,17 +816,22 @@ class EpubFile
      * Checks the book for common structural problems (required metadata, manifest and spine
      * consistency, navigation), including unsaved changes. A quick check, not a replacement for EPUBCheck.
      *
+     * @param ValidationProfile|null $profile A set of extra checks for a target, e.g. ValidationProfile::kindle(); its
+     *                                        issues follow the structural ones.
+     *
      * @return list<ValidationIssue> Empty when no problem was found.
      *
      * @throws Exception If the book is not loaded or its navigation cannot be parsed.
      */
-    public function validate(): array
+    public function validate(?ValidationProfile $profile = null): array
     {
         if ($this->tempDir === null || $this->opfXml === null || $this->metadata === null || $this->manifest === null || $this->spine === null) {
             throw new Exception('EPUB file must be loaded before validating.');
         }
 
-        return (new Validator($this->tempDir, $this->opfXml, $this->metadata, $this->manifest, $this->spine, $this->getTableOfContents()))->validate();
+        $issues = (new Validator($this->tempDir, $this->opfXml, $this->metadata, $this->manifest, $this->spine, $this->getTableOfContents()))->validate();
+
+        return $profile instanceof ValidationProfile ? [...$issues, ...$profile->check($this)] : $issues;
     }
 
     /**
