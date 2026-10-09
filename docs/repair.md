@@ -33,12 +33,14 @@ A repair never deletes a file of the book. `PhpEpub\Repair\Repairer` is the clas
 | `TocLinks` | `TOC_LINK_NOT_IN_MANIFEST` | Drops table-of-contents entries that link to a file that is not in the manifest; an entry with children stays as a heading |
 | `MissingFiles` | `MANIFEST_FILE_MISSING` | Removes a manifest item whose file is missing from the manifest and the spine |
 | `SpineReferences` | `SPINE_UNKNOWN_IDREF`, `SPINE_DUPLICATE_IDREF` | Removes spine references to unknown items, and repeated references (the first stays) |
-| `UnlistedFiles` | `FILE_NOT_IN_MANIFEST` | Adds the file to the manifest. An XHTML document is **not** added to the spine: the reading order is a decision for the author. Editor and system files (`.DS_Store`, `Thumbs.db`, `desktop.ini`, `__MACOSX/`, any hidden file) are left alone |
-| `MediaTypes` | `MEDIA_TYPE_MISMATCH` | Corrects an image's media type from its content, and a type declared as XHTML for a file that is not XML from its extension; a file that cannot be decided stays reported |
+| `UnlistedFiles` | `FILE_NOT_IN_MANIFEST` | Adds the file to the manifest. An XHTML document is **not** added to the spine: the reading order is a decision for the author. Editor and system files (`.DS_Store`, `Thumbs.db`, `desktop.ini`, `__MACOSX/`, `iTunesMetadata.plist`, `iTunesArtwork`, any hidden file) are left alone |
+| `MediaTypes` | `MEDIA_TYPE_MISMATCH` | Corrects an image's media type from its content, and a type declared as XHTML for a file that is not XML from its extension; a file that cannot be decided stays reported, and a document of the reading order is never retyped as a non-content type |
 | `DuplicateIds` | `DUPLICATE_ID` | Gives a manifest item whose id an earlier item uses a new id (`id-2`). The first keeps the id, so the spine and other references keep pointing at it. Repeated ids outside the manifest are not fixed |
-| `Cover` | `COVER_NOT_IMAGE` | Removes the `cover-image` property from an item that is not an image; completes a half-declared cover (the EPUB 3 `cover-image` property and the EPUB 2 `cover` meta, including a cover named by the `<guide>`); declares an image named `cover.*` or `cover-image.*` when the book declares none. Reported as `COVER_NOT_FLAGGED` and `COVER_NOT_DECLARED` |
+| `Cover` | `COVER_NOT_IMAGE` | Removes the `cover-image` property from an item that is not an image; completes a half-declared cover (the EPUB 3 `cover-image` property and the EPUB 2 `cover` meta, including a cover named by the `<guide>`); declares an image (its content must be one) named `cover.*` or `cover-image.*` when the book declares none. Reported as `COVER_NOT_FLAGGED` and `COVER_NOT_DECLARED` |
 | `ManifestProperties` | `MANIFEST_PROPERTY_MISSING`, `MANIFEST_PROPERTY_UNNEEDED` | Recomputes the `scripted`, `svg`, `remote-resources` and `mathml` properties of the XHTML documents |
 | `UpgradeToEpub3` | (none) | Converts an EPUB 2 book with `upgradeToEpub3()`; reported as `UPGRADED_TO_EPUB3`. **Off by default** |
+
+Fixes that address manifest items by id (`MissingFiles`, `MediaTypes`, `Cover`, `ManifestProperties`, `UpgradeToEpub3`) are skipped while the manifest repeats an id and `DuplicateIds` is not selected: they could change the wrong item.
 
 Everything else `validate()` reports has no safe fix and stays (a missing title, XHTML that is not well-formed, content documents that refer to missing files, hrefs that point outside the book, unreadable navigation).
 

@@ -35,20 +35,20 @@ final readonly class KindleChecker
     private const int EMAIL_LIMIT_BYTES = 50 * 1024 * 1024;
 
     /**
-     * KDP cover guidelines: "Your cover image must be less than 50MB", at least 1,000 pixels tall and 625 wide,
-     * at most 10,000 pixels in height and width, a height/width ratio of at least 1.6:1, JPEG or TIFF.
+     * KDP cover guidelines: "Your cover image must be less than 50MB", at most 10,000 pixels in height and width,
+     * JPEG or TIFF. (Its minimum size and 1.6:1 ratio are for the marketing cover and a recommendation: not checked.)
      *
      * @see https://kdp.amazon.com/en_US/help/topic/G200645690
      */
     private const int COVER_MAX_BYTES = 50 * 1024 * 1024;
 
-    private const int COVER_MIN_HEIGHT = 1000;
-
-    private const int COVER_MIN_WIDTH = 625;
+    /**
+     * Heuristic: the shortest side under which a cover is clearly too small (KDP's own minimum, 625 x 1,000, is for the
+     * cover it takes as an upload, so a book is only flagged well below it).
+     */
+    private const int COVER_MIN_SIDE = 500;
 
     private const int COVER_MAX_SIDE = 10000;
-
-    private const float COVER_MIN_RATIO = 1.6;
 
     /**
      * Content documents above this size are not read for the content checks.
@@ -101,13 +101,26 @@ final readonly class KindleChecker
 
     /**
      * Error above the 200 MB web upload limit; a warning above the 50 MB email limit. The size is that of the
-     * book's files packed into a scratch archive, which is removed again: nothing in the book changes, so package
+     * book's files packed into a scratch archive (skipped when the files are far below the limits), which is removed again: nothing in the book changes, so package
      * edits not yet saved (a few hundred bytes of the OPF) are not counted.
      *
      * @return list<ValidationIssue>
      */
     private function checkSize(string $root): array
     {
+        // Packing never makes the files much bigger: a book whose files, with the archive's headers, fit the smallest
+        // limit needs no archive.
+        $bytes = 0;
+        foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($root, \FilesystemIterator::SKIP_DOTS)) as $file) {
+            if ($file instanceof \SplFileInfo && $file->isFile()) {
+                $bytes += $file->getSize() + 256;
+            }
+        }
+
+        if ($bytes + 1024 <= min($this->webLimitBytes, $this->emailLimitBytes)) {
+            return [];
+        }
+
         $archive = tempnam(sys_get_temp_dir(), 'epub-size-');
         if ($archive === false) {
             return [];
@@ -210,16 +223,12 @@ final readonly class KindleChecker
         $size = @getimagesize($file);
         if ($size !== false) {
             [$width, $height] = $size;
-            if ($height < self::COVER_MIN_HEIGHT || $width < self::COVER_MIN_WIDTH) {
-                $issues[] = $this->issue(ValidationIssue::WARNING, 'KINDLE_COVER_TOO_SMALL', "The cover is {$width} x {$height} pixels; KDP wants at least " . self::COVER_MIN_WIDTH . ' x ' . self::COVER_MIN_HEIGHT . ' (2,560 pixels tall by 1,600 wide is ideal).', $cover->path, 'Use a larger cover image.');
+            if (min($width, $height) < self::COVER_MIN_SIDE) {
+                $issues[] = $this->issue(ValidationIssue::WARNING, 'KINDLE_COVER_TOO_SMALL', "The cover is {$width} x {$height} pixels; heuristic: under " . self::COVER_MIN_SIDE . ' pixels on a side it looks poor (KDP asks for at least 625 x 1,000 and ideally 1,600 x 2,560 for its cover upload).', $cover->path, 'Use a larger cover image.');
             }
 
             if ($height > self::COVER_MAX_SIDE || $width > self::COVER_MAX_SIDE) {
                 $issues[] = $this->issue(ValidationIssue::WARNING, 'KINDLE_COVER_TOO_LARGE', "The cover is {$width} x {$height} pixels; KDP allows at most " . self::COVER_MAX_SIDE . ' pixels in height and width.', $cover->path, 'Scale the cover down.');
-            }
-
-            if ($width > 0 && $height / $width < self::COVER_MIN_RATIO) {
-                $issues[] = $this->issue(ValidationIssue::WARNING, 'KINDLE_COVER_RATIO', 'The cover is not tall enough; KDP wants a height/width ratio of at least 1.6:1.', $cover->path, 'Use a cover of at least 1.6 times as tall as wide.');
             }
         }
 

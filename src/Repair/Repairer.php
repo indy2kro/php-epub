@@ -34,7 +34,7 @@ final class Repairer
     /**
      * Files that editors and operating systems leave in a book folder: never listed in a manifest.
      */
-    private const string JUNK = '#(^|/)(\.[^/]*|Thumbs\.db|desktop\.ini|__MACOSX(/.*)?)$#i';
+    private const string JUNK = '#(^|/)(\.[^/]*|Thumbs\.db|desktop\.ini|__MACOSX(/.*)?)$|^(iTunesMetadata\.plist|iTunesArtwork)$#i';
 
     /**
      * @var list<AppliedFix>
@@ -65,11 +65,15 @@ final class Repairer
         $issues = $options->includes(RepairFix::UnlistedFiles) || $options->includes(RepairFix::MediaTypes) ? $this->epub->validate() : [];
 
         $this->when($options, RepairFix::DuplicateIds, $this->repairDuplicateIds(...));
+        // These address manifest items by id: with a repeated id they would change the wrong item, so they wait
+        // until DuplicateIds has made the ids unique.
+        $ambiguous = ! $options->includes(RepairFix::DuplicateIds) && $this->hasDuplicateIds();
+        $options = $ambiguous ? $options->without(RepairFix::MissingFiles, RepairFix::MediaTypes, RepairFix::Cover, RepairFix::UpgradeToEpub3, RepairFix::ManifestProperties) : $options;
         $this->when($options, RepairFix::MissingFiles, fn () => $this->repairMissingFiles($root));
         $this->when($options, RepairFix::SpineReferences, $this->repairSpine(...));
         $this->when($options, RepairFix::UnlistedFiles, fn () => $this->repairUnlistedFiles($root, $issues));
         $this->when($options, RepairFix::MediaTypes, fn () => $this->repairMediaTypes($root, $issues));
-        $this->when($options, RepairFix::Cover, $this->repairCover(...));
+        $this->when($options, RepairFix::Cover, fn () => $this->repairCover($root));
         $this->when($options, RepairFix::UpgradeToEpub3, $this->upgrade(...));
 
         $codes = $this->codes($options);
@@ -117,6 +121,13 @@ final class Repairer
     private function fixed(string $code, string $description, ?string $location = null): void
     {
         $this->applied[] = new AppliedFix($code, $description, $location);
+    }
+
+    private function hasDuplicateIds(): bool
+    {
+        $ids = array_map(static fn (ManifestItem $item): string => $item->id, $this->epub->getManifest()->getItems());
+
+        return count(array_unique($ids)) !== count($ids);
     }
 
     private function repairDuplicateIds(): void
@@ -203,7 +214,9 @@ final class Repairer
                 continue;
             }
 
-            $mediaType = $item->mediaType === self::XHTML_MEDIA_TYPE ? $manifest->guessMediaType($item->path) : $this->sniffImage($root, $item->path);
+            // A document of the reading order never becomes a non-content type: that would trade one problem for another.
+            $inSpine = $this->epub->getSpine()->contains($item->id);
+            $mediaType = $item->mediaType === self::XHTML_MEDIA_TYPE ? ($inSpine ? null : $manifest->guessMediaType($item->path)) : $this->sniffImage($root, $item->path);
             if ($mediaType === null || $mediaType === $item->mediaType || $mediaType === self::XHTML_MEDIA_TYPE || $mediaType === 'application/octet-stream') {
                 continue;
             }
@@ -213,7 +226,7 @@ final class Repairer
         }
     }
 
-    private function repairCover(): void
+    private function repairCover(string $root): void
     {
         $manifest = $this->epub->getManifest();
         $metadata = $this->epub->getMetadata();
@@ -227,7 +240,7 @@ final class Repairer
 
         $cover = $this->epub->getCoverImage();
         $declared = $cover instanceof ManifestItem;
-        $cover ??= $this->obviousCover($manifest);
+        $cover ??= $this->obviousCover($manifest, $root);
         if (! $cover instanceof ManifestItem || ! str_starts_with($cover->mediaType, 'image/')) {
             return;
         }
@@ -256,12 +269,12 @@ final class Repairer
     /**
      * The image of the manifest named like a cover ("cover.jpg", "cover-image.png"), the plainest name first.
      */
-    private function obviousCover(Manifest $manifest): ?ManifestItem
+    private function obviousCover(Manifest $manifest, string $root): ?ManifestItem
     {
         $found = null;
         foreach ($manifest->getItems() as $item) {
             $stem = strtolower(pathinfo($item->path, PATHINFO_FILENAME));
-            if ($item->path === '' || ! in_array($item->mediaType, self::IMAGE_TYPES, true) || preg_match('/^cover([-_]?image)?$/', $stem) !== 1) {
+            if ($item->path === '' || ! in_array($item->mediaType, self::IMAGE_TYPES, true) || preg_match('/^cover([-_]?image)?$/', $stem) !== 1 || $this->sniffImage($root, $item->path) === null) {
                 continue;
             }
 

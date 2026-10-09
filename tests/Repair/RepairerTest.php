@@ -503,6 +503,76 @@ final class RepairerTest extends TestCase
         $this->expectException(Exception::class);
         $epub->getSpine()->removeAt(5);
     }
+    public function testEverySingleFixIsCorrectOnABookWithRepeatedManifestIds(): void
+    {
+        $book = $this->withOpf(
+            EpubBuilder::epub3(),
+            static fn (string $opf): string => str_replace(
+                '</manifest>',
+                '<item id="style" href="css/missing.css" media-type="text/css"/><item id="style" href="pic.png" media-type="image/jpeg"/></manifest>',
+                $opf
+            )
+        )->withFile('EPUB/pic.png', (string) base64_decode(EpubBuilder::PNG, true));
+        $before = $this->codes($this->open($book)->validate());
+
+        foreach (RepairFix::cases() as $fix) {
+            $epub = $this->open($book);
+            $first = $epub->repair(RepairOptions::only($fix));
+            $codes = $this->codes($epub->validate());
+
+            $this->assertSame([], array_values(array_diff($codes, $before)), "{$fix->value} adds problems.");
+            $this->assertSame('EPUB/css/style.css', $epub->getManifest()->get('style')?->path, "{$fix->value} changed the first item.");
+            $this->assertSame([], $epub->repair(RepairOptions::only($fix)), "{$fix->value} is not idempotent after " . count($first) . ' fixes.');
+        }
+    }
+
+    public function testMissingFilesWaitForUniqueIdsWhenIdsAreRepeated(): void
+    {
+        $book = $this->withOpf(
+            EpubBuilder::epub3(),
+            static fn (string $opf): string => str_replace('</manifest>', '<item id="style" href="css/missing.css" media-type="text/css"/></manifest>', $opf)
+        );
+        $epub = $this->open($book);
+
+        $this->assertSame([], $epub->repair(RepairOptions::only(RepairFix::MissingFiles)), 'Removing by a repeated id would remove the wrong item.');
+        $this->assertSame('EPUB/css/style.css', $epub->getManifest()->get('style')?->path);
+
+        $fixes = $epub->repair(RepairOptions::only(RepairFix::DuplicateIds, RepairFix::MissingFiles));
+        $this->assertSame(['DUPLICATE_ID', 'MANIFEST_FILE_MISSING'], $this->fixCodes($fixes));
+        $this->assertSame('style', $epub->getManifest()->findByPath('EPUB/css/style.css')?->id);
+    }
+
+    public function testACoverNamedLikeOneMustBeAnImage(): void
+    {
+        $book = $this->withOpf(
+            EpubBuilder::epub3(),
+            static fn (string $opf): string => str_replace('</manifest>', '<item id="img" href="cover.jpg" media-type="image/jpeg"/></manifest>', $opf)
+        )->withFile('EPUB/cover.jpg', '<html>not an image</html>');
+        $epub = $this->open($book);
+
+        $this->assertNotContains('COVER_NOT_DECLARED', $this->fixCodes($epub->repair(RepairOptions::only(RepairFix::Cover))));
+        $this->assertNotInstanceOf(ManifestItem::class, $epub->getCoverImage());
+    }
+
+    public function testASpineDocumentIsNeverRetypedAsANonContentType(): void
+    {
+        $book = $this->withOpf(
+            EpubBuilder::epub3(),
+            static fn (string $opf): string => str_replace(['</manifest>', '</spine>'], ['<item id="front" href="front.txt" media-type="application/xhtml+xml"/></manifest>', '<itemref idref="front"/></spine>'], $opf)
+        )->withFile('EPUB/front.txt', 'plain text');
+        $epub = $this->open($book);
+
+        $this->assertSame([], $this->fixCodes($epub->repair(RepairOptions::only(RepairFix::MediaTypes))));
+        $this->assertSame('application/xhtml+xml', $epub->getManifest()->get('front')?->mediaType);
+    }
+
+    public function testBookkeepingFilesOfAppleToolsAreNotListed(): void
+    {
+        $book = EpubBuilder::epub3()->withFile('iTunesMetadata.plist', 'x')->withFile('ITUNESARTWORK', 'x');
+        $epub = $this->open($book);
+
+        $this->assertSame([], $this->fixCodes($epub->repair(RepairOptions::only(RepairFix::UnlistedFiles))));
+    }
     /**
      * A book with a dozen problems at once.
      */

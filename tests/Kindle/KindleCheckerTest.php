@@ -108,7 +108,7 @@ final class KindleCheckerTest extends TestCase
     public function testASmallCover(): void
     {
         $epub = $this->open($this->goodBook());
-        $epub->setCoverImage($this->image(500, 900, 'jpeg'), 'image/jpeg');
+        $epub->setCoverImage($this->image(400, 700, 'jpeg'), 'image/jpeg');
 
         $this->assertSame(['KINDLE_COVER_TOO_SMALL'], $this->codes($epub->validate(ValidationProfile::kindle())));
     }
@@ -122,12 +122,12 @@ final class KindleCheckerTest extends TestCase
         $this->assertContains('KINDLE_COVER_TOO_LARGE', $codes);
     }
 
-    public function testACoverThatIsNotTallEnough(): void
+    public function testASquareCoverIsFine(): void
     {
         $epub = $this->open($this->goodBook());
         $epub->setCoverImage($this->image(1000, 1000, 'jpeg'), 'image/jpeg');
 
-        $this->assertSame(['KINDLE_COVER_RATIO'], $this->codes($epub->validate(ValidationProfile::kindle())));
+        $this->assertSame([], $this->codes($epub->validate(ValidationProfile::kindle())), 'The 1.6:1 ratio is a recommendation, not checked.');
     }
 
     public function testAFixedLayoutBookIsAHeuristicWarning(): void
