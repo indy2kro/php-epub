@@ -11,7 +11,9 @@ use PhpEpub\ManifestItem;
 use PhpEpub\Repair\AppliedFix;
 use PhpEpub\Repair\RepairFix;
 use PhpEpub\Repair\RepairOptions;
+use PhpEpub\Repair\Repairer;
 use PhpEpub\Test\Support\EpubBuilder;
+use PhpEpub\Test\Support\ThrowingPathResolver;
 use PhpEpub\Util\FileSystemHelper;
 use PhpEpub\ValidationIssue;
 use PHPUnit\Framework\TestCase;
@@ -573,6 +575,88 @@ final class RepairerTest extends TestCase
 
         $this->assertSame([], $this->fixCodes($epub->repair(RepairOptions::only(RepairFix::UnlistedFiles))));
     }
+    public function testTheCoverNamedCoverImageIsUsedWhenThereIsNoPlainCover(): void
+    {
+        $book = $this->withOpf(
+            EpubBuilder::epub3(),
+            static fn (string $opf): string => str_replace('</manifest>', '<item id="img" href="images/Cover-Image.png" media-type="image/png"/></manifest>', $opf)
+        )->withFile('EPUB/images/Cover-Image.png', (string) base64_decode(EpubBuilder::PNG, true));
+        $epub = $this->open($book);
+
+        $this->assertSame(['COVER_NOT_DECLARED'], $this->fixCodes($epub->repair(RepairOptions::only(RepairFix::Cover))));
+        $this->assertSame('img', $epub->getMetadata()->getMeta('cover'));
+    }
+
+    public function testAnNcxCannotBeBuiltWithoutADocumentToLinkTo(): void
+    {
+        $book = $this->withOpf(EpubBuilder::epub2(), static fn (string $opf): string => (string) preg_replace('#<item id="ncx"[^>]*/>#', '', str_replace(['<spine toc="ncx">', '<itemref idref="chapter"/>'], ['<spine>', '<itemref idref="chapter" linear="no"/>'], $opf)))
+            ->withoutFile('OEBPS/toc.ncx');
+        $epub = $this->open($book);
+
+        $this->assertNotContains('NCX_MISSING', $this->fixCodes($epub->repair()));
+        $this->assertContains('NCX_MISSING', $this->codes($epub->validate()));
+    }
+
+    public function testANavigationDocumentWithoutHeadingsIsTitledAfterTheFiles(): void
+    {
+        $book = $this->withOpf(EpubBuilder::epub3(), static fn (string $opf): string => (string) preg_replace('#<item id="nav"[^>]*/>#', '', $opf))
+            ->withoutFile('EPUB/nav.xhtml')
+            ->withFile('EPUB/text/chapter.xhtml', EpubBuilder::xhtml('Chapter', '<p>No headings.</p>', '../css/style.css'));
+        $epub = $this->open($book);
+
+        $this->assertSame(['NAV_MISSING'], $this->fixCodes($epub->repair()));
+        $this->assertSame('chapter', $epub->getTableOfContents()->getEntries()[0]->title);
+    }
+
+    public function testUnreadableNavigationIsLeftToValidate(): void
+    {
+        $epub = $this->open(EpubBuilder::epub3()->withFile('EPUB/nav.xhtml', '<html><nav>'));
+
+        $this->assertSame([], $this->fixCodes($epub->repair(RepairOptions::only(RepairFix::Navigation, RepairFix::TocLinks))));
+        $this->assertContains('NAV_INVALID', $this->codes($epub->validate()));
+    }
+
+    public function testAnEmptyTableOfContentsStaysWhenThereIsNothingToFillItWith(): void
+    {
+        $book = $this->withOpf(EpubBuilder::epub3(), static fn (string $opf): string => str_replace('<itemref idref="chapter"/>', '<itemref idref="chapter" linear="no"/>', $opf))
+            ->withFile('EPUB/nav.xhtml', EpubBuilder::xhtml('Contents', '<nav epub:type="toc"><ol></ol></nav>'))
+            ->withFile('EPUB/text/chapter.xhtml', EpubBuilder::xhtml('Chapter', '<p>No headings.</p>'));
+        $epub = $this->open($book);
+
+        $this->assertSame([], $this->fixCodes($epub->repair(RepairOptions::only(RepairFix::Navigation))));
+        $this->assertContains('NAV_EMPTY', $this->codes($epub->validate()));
+    }
+
+    public function testPathsThatCannotBeResolvedCountAsMissingFilesAndNotAsImages(): void
+    {
+        $book = $this->withOpf(
+            EpubBuilder::epub3(),
+            static fn (string $opf): string => str_replace('</manifest>', '<item id="img" href="cover.png" media-type="image/png"/></manifest>', $opf)
+        )->withFile('EPUB/cover.png', (string) base64_decode(EpubBuilder::PNG, true));
+
+        $epub = $this->open($book);
+        $this->assertSame([], (new Repairer($epub, new ThrowingPathResolver()))->repair(RepairOptions::only(RepairFix::Cover)), 'No cover can be confirmed as an image.');
+
+        $epub = $this->open($book);
+        $fixes = (new Repairer($epub, new ThrowingPathResolver()))->repair(RepairOptions::only(RepairFix::MissingFiles));
+        $this->assertContains('MANIFEST_FILE_MISSING', $this->fixCodes($fixes));
+    }
+
+    public function testAnAppliedFixPrintsWithAndWithoutALocation(): void
+    {
+        $this->assertSame('X: did it', (string) new AppliedFix('X', 'did it'));
+        $this->assertSame('X (a.xhtml): did it', (string) new AppliedFix('X', 'did it', 'a.xhtml'));
+    }
+
+    public function testTheClockOfTheOptionsCanBeReplaced(): void
+    {
+        $now = new DateTimeImmutable('2026-01-02T03:04:05Z');
+        $options = (new RepairOptions())->withNow($now);
+
+        $this->assertSame($now, $options->now);
+        $this->assertNull($options->withNow(null)->now);
+    }
+
     /**
      * A book with a dozen problems at once.
      */

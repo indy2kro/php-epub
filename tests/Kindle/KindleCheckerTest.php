@@ -8,6 +8,7 @@ use PhpEpub\EpubFile;
 use PhpEpub\Exception;
 use PhpEpub\Kindle\KindleChecker;
 use PhpEpub\Test\Support\EpubBuilder;
+use PhpEpub\Test\Support\ThrowingPathResolver;
 use PhpEpub\Util\FileSystemHelper;
 use PhpEpub\ValidationIssue;
 use PhpEpub\ValidationProfile;
@@ -251,6 +252,37 @@ final class KindleCheckerTest extends TestCase
 
         return $files;
     }
+    public function testACoverThatIsNotAnImageIsLeftToTheStructuralChecks(): void
+    {
+        $epub = $this->open($this->goodBook());
+        $epub->getManifest()->setMediaType('cover', 'text/css');
+
+        $this->assertSame([], $this->codes((new KindleChecker($epub))->check()));
+    }
+
+    public function testAnSvgCoverIsFlaggedByTypeOnly(): void
+    {
+        $epub = $this->open($this->goodBook());
+        $epub->setCoverImage('<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>', 'image/svg+xml');
+
+        $this->assertSame(['KINDLE_COVER_TYPE'], $this->codes($epub->validate(ValidationProfile::kindle())));
+    }
+
+    public function testPathsThatCannotBeResolvedAreSkipped(): void
+    {
+        $epub = $this->open($this->goodBook());
+
+        $this->assertSame([], (new KindleChecker($epub, new ThrowingPathResolver()))->check());
+    }
+
+    public function testADocumentWithoutAFileIsSkipped(): void
+    {
+        $opf = (string) $this->goodBook()->getFile('EPUB/package.opf');
+        $book = $this->goodBook()->withFile('EPUB/package.opf', str_replace('</manifest>', '<item id="gone" href="gone.xhtml" media-type="application/xhtml+xml"/></manifest>', $opf));
+
+        $this->assertSame([], $this->codes((new KindleChecker($this->open($book)))->check()));
+    }
+
     public function testCheckingAnUnloadedBookIsRefused(): void
     {
         $epub = $this->open($this->goodBook());
