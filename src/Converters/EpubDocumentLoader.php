@@ -77,9 +77,10 @@ final class EpubDocumentLoader
     private const array UNANCHORED_ELEMENTS = ['thead', 'tbody', 'tfoot', 'tr', 'colgroup', 'col'];
 
     /**
-     * SVG elements that run code or embed (X)HTML.
+     * SVG elements that run code, embed (X)HTML or animate attributes (a <set attributeName="href" to="javascript:...">
+     * rewrites a link after the sanitiser has looked at it).
      */
-    private const array REMOVED_SVG_ELEMENTS = ['script', 'foreignobject'];
+    private const array REMOVED_SVG_ELEMENTS = ['script', 'foreignobject', 'set', 'animate', 'animatemotion', 'animatetransform', 'animatecolor'];
 
     /**
      * How deeply data: SVGs may nest inside SVGs.
@@ -731,7 +732,7 @@ final class EpubDocumentLoader
         foreach (iterator_to_array($element->attributes ?? []) as $attribute) {
             $name = strtolower($attribute->localName ?? '');
 
-            if (str_starts_with($name, 'on')) {
+            if (str_starts_with($name, 'on') || (in_array($name, ['to', 'from', 'by', 'values'], true) && preg_match('/script\s*:/i', (string) preg_replace('/[\x00-\x20]+/', '', $attribute->value)) === 1)) {
                 $element->removeAttributeNode($attribute);
             } elseif ($name === 'href') {
                 $attribute->value = $this->resolveSource($root, $directory, $attribute->value, $svgDepth);

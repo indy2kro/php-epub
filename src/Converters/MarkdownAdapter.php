@@ -60,15 +60,24 @@ final readonly class MarkdownAdapter implements ConverterInterface
         $files = [];
         /** @var array<string, string|null> $paths */
         $paths = [];
+        /** @var list<string> $warnings */
+        $warnings = [];
         $total = 0;
 
-        $imagePath = function (string $source) use ($reader, &$files, &$paths, &$total): ?string {
+        $imagePath = function (string $source) use ($reader, &$files, &$paths, &$total, &$warnings): ?string {
             if (array_key_exists($source, $paths)) {
                 return $paths[$source];
             }
 
             $image = $reader->read($source, min($this->maxImageSize, $this->maxImageBytes - $total));
             if ($image === null) {
+                return $paths[$source] = null;
+            }
+
+            // An SVG file is a document that can carry script and animations; only raster images are exported.
+            if ($image['mime'] === 'image/svg+xml') {
+                $warnings[] = 'SVG image left out (only JPEG, PNG, GIF and WebP images are exported): ' . substr((string) preg_replace('/[^\x20-\x7E]/', '?', basename(str_starts_with(strtolower($source), 'data:') ? 'data URI' : $source)), 0, 100);
+
                 return $paths[$source] = null;
             }
 
@@ -106,7 +115,7 @@ final readonly class MarkdownAdapter implements ConverterInterface
 
         $text = implode("\n\n", $parts);
 
-        return new MarkdownExport($text === '' ? '' : $text . "\n", $files);
+        return new MarkdownExport($text === '' ? '' : $text . "\n", $files, array_values(array_unique($warnings)));
     }
 
     private function escape(string $text): string

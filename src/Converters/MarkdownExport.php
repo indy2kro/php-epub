@@ -14,8 +14,9 @@ final readonly class MarkdownExport
     /**
      * @param string $markdown The Markdown text; images are referenced by the paths below.
      * @param array<string, string> $images Image path relative to the Markdown file ("images/cover.jpg") => bytes.
+     * @param list<string> $warnings What was left out of the export (SVG images).
      */
-    public function __construct(public string $markdown, public array $images = [])
+    public function __construct(public string $markdown, public array $images = [], public array $warnings = [])
     {
     }
 

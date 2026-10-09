@@ -197,6 +197,34 @@ final class ExportAdaptersTest extends TestCase
         $this->assertStringContainsString('color:green', $html);
         $this->assertDoesNotMatchRegularExpression('/position:\s*(?:fixed|sticky)/i', $html);
     }
+    public function testSvgImagesAreNotExportedToMarkdownAndAnimationsAreStrippedFromThem(): void
+    {
+        $svg = '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><a id="l" xlink:href="x.png"><rect width="1" height="1"/>'
+            . '<set attributeName="href" to="javascript:alert(1)"/><animate attributeName="href" values="javascript:alert(2)"/><animateTransform to="0"/>'
+            . '<rect width="1" height="1" from="javascript:alert(3)" by=" java script:alert(4)"/></a></svg>';
+        $directory = EpubBuilder::minimal()
+            ->withFile('EPUB/package.opf', EpubBuilder::opf('<item id="svg" href="v.svg" media-type="image/svg+xml"/>'))
+            ->withFile('EPUB/chapter.xhtml', self::chapter('Svg', '<p><img src="v.svg" alt="Vector"/></p>'))
+            ->withFile('EPUB/v.svg', $svg)
+            ->writeTo($this->tmpDir . '/book');
+
+        $export = (new MarkdownAdapter())->export($directory);
+
+        $this->assertSame([], $export->images);
+        $this->assertStringContainsString('\[Vector\]', $export->markdown);
+        $this->assertStringNotContainsString('.svg', $export->markdown);
+        $this->assertCount(1, $export->warnings);
+        $this->assertStringContainsString('SVG image left out', $export->warnings[0]);
+
+        // The HTML export may still inline the (sanitised) SVG in an <img>.
+        $html = (new HtmlAdapter())->toString($directory);
+        preg_match('#data:image/svg\+xml;base64,([A-Za-z0-9+/=]+)#', $html, $match);
+        $decoded = base64_decode($match[1] ?? '', true);
+        $this->assertIsString($decoded);
+        foreach (['<set', '<animate', 'javascript', 'script:'] as $forbidden) {
+            $this->assertStringNotContainsStringIgnoringCase($forbidden, $decoded);
+        }
+    }
     public function testMarkdownConvertsStructure(): void
     {
         $directory = self::markdownBook()->writeTo($this->tmpDir . '/book');
