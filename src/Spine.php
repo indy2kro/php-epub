@@ -63,7 +63,8 @@ class Spine
             fn (SimpleXMLElement $itemref): SpineItem => new SpineItem(
                 (string) $itemref['idref'],
                 (string) $itemref['linear'] !== 'no',
-                $this->manifest?->get((string) $itemref['idref'])
+                $this->manifest?->get((string) $itemref['idref']),
+                $this->tokens((string) $itemref['properties'])
             ),
             $this->itemrefNodes()
         );
@@ -100,6 +101,53 @@ class Spine
         array_splice($entries, $position, 0, [$entry]);
 
         $this->write($entries);
+    }
+
+    /**
+     * Appends many manifest items to the reading order at once; add() and setItemProperties() rewrite the whole
+     * spine each time, which is slow for thousands of items.
+     *
+     * @param list<array{idref: string, linear?: bool, properties?: list<string>}> $entries
+     *
+     * @throws Exception If an item is unknown or already in the spine (or listed twice), a property is invalid, or
+     *                   properties are given for a package that is not EPUB 3. Nothing is added then.
+     */
+    public function addMany(array $entries): void
+    {
+        $all = $this->entries();
+        $known = array_flip($this->spine);
+        foreach ($entries as $entry) {
+            $idref = $entry['idref'];
+            if ($this->manifest instanceof Manifest && ! $this->manifest->get($idref) instanceof ManifestItem) {
+                throw new Exception("Item \"{$idref}\" is not in the manifest");
+            }
+
+            isset($known[$idref]) && throw new Exception("Item \"{$idref}\" is already in the spine");
+            $known[$idref] = true;
+
+            $row = ['idref' => $idref];
+            if (($entry['linear'] ?? true) === false) {
+                $row['linear'] = 'no';
+            }
+
+            $properties = $entry['properties'] ?? [];
+            if ($properties !== []) {
+                $this->assertEpub3('Spine item properties');
+                foreach ($properties as $property) {
+                    XmlText::assertValid($property);
+                    preg_match('/^\S+$/', $property) === 1 || throw new Exception('A spine item property must not be empty or contain white space');
+                    if (str_starts_with($property, 'rendition:')) {
+                        Rendition::declarePrefix($this->opfXml);
+                    }
+                }
+
+                $row['properties'] = implode(' ', array_unique($properties));
+            }
+
+            $all[] = $row;
+        }
+
+        $this->write($all);
     }
 
     /**

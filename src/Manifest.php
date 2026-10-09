@@ -162,6 +162,81 @@ class Manifest
     }
 
     /**
+     * Adds many items at once. add() checks each id against the whole package document, which is slow for thousands
+     * of items; this checks them against one list. Each spec has an "id" and either a "path" (a file of the book,
+     * relative to the book root) or a "url" (a remote resource, which has no file), plus an optional "mediaType"
+     * (guessed from the path when missing) and "properties" (space separated tokens).
+     *
+     * @param list<array{id: string, path?: string, url?: string, mediaType?: string|null, properties?: string}> $specs
+     *
+     * @return list<ManifestItem> The added items.
+     *
+     * @throws Exception If a path is already listed, an id is taken, a spec has neither path nor a remote url, or a value
+     *                   is not valid XML text. Items before the failing one stay added.
+     */
+    public function addMany(array $specs): array
+    {
+        $used = [];
+        foreach ($this->opfXml->xpath('//@id') ?: [] as $attribute) {
+            $used[(string) $attribute] = true;
+        }
+
+        $added = [];
+        foreach ($specs as $spec) {
+            $id = $spec['id'];
+            $properties = trim($spec['properties'] ?? '');
+            XmlText::assertValid($id, $spec['mediaType'] ?? '', $properties, $spec['url'] ?? '');
+            isset($used[$id]) && throw new Exception("Manifest id is already in use: {$id}");
+
+            if (isset($spec['path'])) {
+                $path = $this->paths->normalize($spec['path']);
+                $this->findByPath($path) instanceof ManifestItem && throw new Exception("File is already in the manifest: {$path}");
+                $href = $this->pathToHref($path);
+                $mediaType = $spec['mediaType'] ?? $this->guessMediaType($path);
+            } else {
+                $href = $spec['url'] ?? '';
+                preg_match('#^[a-z][a-z0-9+.-]*:#i', $href) === 1 || throw new Exception("A manifest item needs a path or a remote URL, got: {$href}");
+                $mediaType = $spec['mediaType'] ?? 'application/octet-stream';
+            }
+
+            $used[$id] = true;
+            $node = $this->manifestNode->addChild('item', null, Metadata::OPF_NAMESPACE);
+            $node->addAttribute('id', $id);
+            $node->addAttribute('href', $href);
+            $node->addAttribute('media-type', $mediaType);
+            if ($properties !== '') {
+                $node->addAttribute('properties', $properties);
+            }
+
+            $this->modified = true;
+            $this->items();
+            $added[] = $this->indexItem($node);
+        }
+
+        return $added;
+    }
+
+    /**
+     * Sets the fallback of an item (the item to use when a reading system cannot render this one), or removes it with null.
+     *
+     * @throws Exception If an item is unknown.
+     */
+    public function setFallback(string $id, ?string $fallbackId): void
+    {
+        $node = $this->requireNode($id);
+        if ($fallbackId !== null) {
+            $this->requireNode($fallbackId);
+        }
+
+        unset($node['fallback']);
+        if ($fallbackId !== null) {
+            $node->addAttribute('fallback', $fallbackId);
+        }
+
+        $this->modified = true;
+    }
+
+    /**
      * Removes an item from the manifest, together with the package references to it:
      * the EPUB 2 cover meta, refinements, spine@toc, fallback / media-overlay
      * attributes of other items and <guide> references to its file.
