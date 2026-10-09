@@ -10,6 +10,7 @@ use PhpEpub\Test\Support\EpubBuilder;
 use PhpEpub\Util\FileSystemHelper;
 use PhpEpub\ValidationIssue;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
 
 final class ValidatorTest extends TestCase
@@ -239,6 +240,10 @@ final class ValidatorTest extends TestCase
         yield 'not well-formed content is reported once' => ['<p>Open', '', ['CONTENT_NOT_WELL_FORMED']];
     }
 
+    /**
+     * Builds a document over 8 MiB several times over; a process of its own keeps that peak out of the shared suite.
+     */
+    #[RunInSeparateProcess]
     public function testHugeDocumentsAreNotExaminedForManifestProperties(): void
     {
         $padding = '<!--' . chunk_split(base64_encode(random_bytes(7 * 1024 * 1024)), 76, ' ') . '-->';
