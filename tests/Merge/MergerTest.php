@@ -9,6 +9,7 @@ use PhpEpub\Exception;
 use PhpEpub\FontObfuscation;
 use PhpEpub\Merge\MergeOptions;
 use PhpEpub\Merge\Merger;
+use PhpEpubTestNcxPlayOrderTest;
 use PhpEpub\Test\Support\EpubBuilder;
 use PhpEpub\Test\Support\MergeBook;
 use PhpEpub\TocEntry;
@@ -572,5 +573,18 @@ final class MergerTest extends TestCase
 
         $this->assertCount(1400, $merged->getSpine()->get());
         $this->assertLessThan(8.0, $seconds, 'Merging 2800 files took too long: something is quadratic again.');
+    }
+
+    public function testMergedNcxFollowsThePlayOrderRule(): void
+    {
+        $merged = $this->merge([$this->open(MergeBook::builder(self::UID_ONE, 'One')), $this->open(MergeBook::builder(self::UID_TWO, 'Two', 3))]);
+
+        $points = NcxPlayOrderTest::navPoints((string) file_get_contents($merged->getTempDir() . '/EPUB/toc.ncx'));
+
+        $this->assertCount(7, $points);
+        // The parent of each book points at its first chapter and shares its playOrder.
+        $this->assertSame($points[0][1], $points[1][1]);
+        $this->assertSame([1, 1, 2, 3, 3, 4, 5], array_column($points, 1));
+        NcxPlayOrderTest::assertPlayOrderRule($points);
     }
 }
