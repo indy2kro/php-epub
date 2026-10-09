@@ -407,6 +407,11 @@ final readonly class Splitter
             }
         }
 
+        $ncx = array_values(array_filter($part->getManifest()->getItems(), static fn (ManifestItem $item): bool => $item->mediaType === 'application/x-dtbncx+xml'));
+        if ($ncx !== [] && $spine->getToc() === null) {
+            $spine->setToc($ncx[0]->id);
+        }
+
         $this->unlinkRemovedDocuments($part, $directory, $removedDocuments);
         $this->dropPageLists($part, $directory);
         $this->setMetadata($part, $plan, $number, $total);

@@ -368,6 +368,7 @@ final class SplitterTest extends TestCase
                 $this->assertInstanceOf(\PhpEpub\ManifestItem::class, $part->getManifest()->findByHref($source), "The NCX points outside the part: {$source}");
             }
 
+            $this->assertSame($ncx[0]->id, $part->getSpine()->getToc());
             $this->assertStringContainsString((string) $part->getMetadata()->getUniqueIdentifier(), $contents);
             $this->assertSame([], $this->errors($part));
         }

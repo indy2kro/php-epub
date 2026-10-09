@@ -300,6 +300,7 @@ final class MergerTest extends TestCase
         $this->assertCount(3, $entries[1]->children);
         $this->assertSame('EPUB/book-02/text/chapter-3.xhtml', $entries[1]->children[2]->path);
 
+        $this->assertSame('ncx', $merged->getSpine()->getToc());
         // The NCX carries the same tree.
         $ncx = (string) file_get_contents($merged->getTempDir() . '/EPUB/toc.ncx');
         $this->assertSame(7, substr_count($ncx, '<navPoint'));

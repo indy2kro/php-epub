@@ -154,6 +154,36 @@ class Spine
     }
 
     /**
+     * The id of the NCX manifest item the spine names (<spine toc="…">); null when it names none.
+     */
+    public function getToc(): ?string
+    {
+        $toc = (string) ($this->spineNode()['toc'] ?? '');
+
+        return $toc === '' ? null : $toc;
+    }
+
+    /**
+     * Points the spine at the NCX manifest item (EPUB 2 reading systems find the NCX this way); null removes it.
+     *
+     * @throws Exception If the item is not in the manifest.
+     */
+    public function setToc(?string $id): void
+    {
+        if ($id !== null && $this->manifest instanceof Manifest && ! $this->manifest->get($id) instanceof ManifestItem) {
+            throw new Exception("Item \"{$id}\" is not in the manifest");
+        }
+
+        $spineNode = $this->spineNode();
+        unset($spineNode['toc']);
+        if ($id !== null) {
+            $spineNode->addAttribute('toc', $id);
+        }
+
+        $this->modified = true;
+    }
+
+    /**
      * The EPUB 3 page-progression-direction of the book ("ltr", "rtl" or "default"), or null when not set.
      */
     public function getPageProgressionDirection(): ?string

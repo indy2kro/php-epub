@@ -654,6 +654,7 @@ final readonly class Merger
         $target = $this->paths->resolve((string) $merged->getTempDir(), $ncxPath);
         @file_put_contents($target, $ncx) !== false || throw new Exception("Failed to write: {$ncxPath}");
         $merged->getManifest()->add($ncxPath, self::NCX_TYPE, 'ncx');
+        $merged->getSpine()->setToc('ncx');
 
         $entries = [];
         foreach ($books as $index => $book) {
