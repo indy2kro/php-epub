@@ -595,6 +595,36 @@ final class ZipHandlerTest extends TestCase
         return $zipPath;
     }
 
+    public function testCompressionLevelChangesTheArchiveSizeAndStoresIncompressibleEntries(): void
+    {
+        mt_srand(7);
+        $words = ['alpha', 'beta', 'gamma', 'delta', 'epsilon', 'zeta', 'eta', 'theta', 'iota', 'kappa', 'lambda', 'mu'];
+        $text = '';
+        for ($i = 0; $i < 40000; $i++) {
+            $text .= $words[mt_rand(0, 11)] . ' ';
+        }
+        file_put_contents($this->compressDir . DIRECTORY_SEPARATOR . 'mimetype', 'application/epub+zip');
+        file_put_contents($this->compressDir . DIRECTORY_SEPARATOR . 'text.xhtml', $text);
+        file_put_contents($this->compressDir . DIRECTORY_SEPARATOR . 'random.jpg', random_bytes(5000));
+        mkdir($this->compressDir . DIRECTORY_SEPARATOR . 'dir');
+        file_put_contents($this->compressDir . DIRECTORY_SEPARATOR . 'dir' . DIRECTORY_SEPARATOR . 'a.txt', 'a');
+
+        $fast = dirname($this->outputZipPath) . DIRECTORY_SEPARATOR . 'fast.zip';
+        $small = dirname($this->outputZipPath) . DIRECTORY_SEPARATOR . 'small.zip';
+        $handler = new ZipHandler();
+        $handler->withCompressionLevel(1)->compress($this->compressDir, $fast);
+        $handler->withCompressionLevel(9)->compress($this->compressDir, $small);
+
+        $this->assertLessThan((int) filesize($fast), (int) filesize($small));
+        $zip = new ZipArchive();
+        $this->assertTrue($zip->open($small));
+        $this->assertSame('mimetype', $zip->getNameIndex(0));
+        $this->assertFalse($zip->locateName('dir/'), 'A compact archive has no directory entries.');
+        $this->assertSame(ZipArchive::CM_STORE, $zip->statName('random.jpg')['comp_method'] ?? null);
+        $this->assertSame(ZipArchive::CM_DEFLATE, $zip->statName('text.xhtml')['comp_method'] ?? null);
+        $zip->close();
+    }
+
     /**
      * Creates a minimal EPUB layout whose other entries sort before "mimetype".
      */

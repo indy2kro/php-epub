@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace PhpEpub;
 
+use PhpEpub\Cleanup\Cleanup;
+use PhpEpub\Cleanup\CleanupOptions;
+use PhpEpub\Cleanup\CleanupPreset;
+use PhpEpub\Cleanup\CleanupReport;
 use PhpEpub\Converters\ConverterInterface;
 use PhpEpub\Repair\AppliedFix;
 use PhpEpub\Repair\RepairOptions;
@@ -47,6 +51,11 @@ class EpubFile
     private ?SimpleXMLElement $opfXml = null;
     private ?ContentManager $contentManager = null;
     private readonly int $maxHtmlBytes;
+
+    /**
+     * The deflate level save() packs with while compress() runs (null: the zip handler's default).
+     */
+    private ?int $compressionLevel = null;
 
     /**
      * The unique identifier the book's obfuscated fonts are keyed with (as loaded or last saved).
@@ -400,7 +409,39 @@ class EpubFile
             || @file_put_contents($mimetype, 'application/epub+zip') !== false
             || throw new Exception("Failed to write the mimetype file: {$mimetype}");
 
-        $this->zipHandler->compress($tempDir, $filePath);
+        ($this->compressionLevel === null ? $this->zipHandler : $this->zipHandler->withCompressionLevel($this->compressionLevel))->compress($tempDir, $filePath);
+    }
+
+    /**
+     * Shrinks the book (see Cleanup) and saves it, repacking at maximum deflate level when the options ask for it.
+     * With a dry run nothing is changed or written; the report says what would happen.
+     *
+     * @param CleanupOptions|CleanupPreset $options What to do; a preset stands for CleanupOptions::preset().
+     * @param string|null $filePath Where to write the book; null overwrites the file it was opened from.
+     *
+     * @throws Exception If the book is not loaded or is DRM-protected, or cannot be written.
+     */
+    public function compress(CleanupOptions|CleanupPreset $options = CleanupPreset::Balanced, ?string $filePath = null): CleanupReport
+    {
+        $options = $options instanceof CleanupPreset ? CleanupOptions::preset($options) : $options;
+        $report = (new Cleanup($this))->run($options);
+        if ($options->dryRun) {
+            return $report;
+        }
+
+        $before = $this->hasFile && is_file($this->filePath) ? filesize($this->filePath) : false;
+        $target = $filePath ?? $this->filePath;
+        $this->compressionLevel = $options->maxDeflate ? 9 : null;
+
+        try {
+            $this->save($target);
+        } finally {
+            $this->compressionLevel = null;
+        }
+
+        $after = filesize($target);
+
+        return $report->withArchiveSizes($before === false ? null : $before, $after === false ? null : $after);
     }
 
     /**
