@@ -15,9 +15,14 @@ namespace PhpEpub\Cleanup;
 final readonly class ImageRecompressor
 {
     /**
-     * Images with more pixels than this are not decoded (GD needs about 5 bytes per pixel).
+     * Images with more pixels than this are not decoded (see estimatedMemory() for the memory it needs).
      */
     private const int MAX_PIXELS = 16_000_000;
+
+    /**
+     * Memory kept free for the rest of the script when deciding whether an image can be decoded.
+     */
+    private const int MEMORY_RESERVE = 16 * 1024 * 1024;
 
     /**
      * PNG images with more pixels than this are not scanned for transparency (the scan is per pixel).
@@ -90,9 +95,14 @@ final readonly class ImageRecompressor
             return null;
         }
 
+        // Decided on the full-size image, before it is scaled and released.
+        $opaque = ! $isJpeg && $convertOpaquePngToJpeg && $this->isOpaque($data, $source);
+
         $image = $source;
         if ($newWidth !== $width || $newHeight !== $height) {
             $image = $this->scaled($source, $newWidth, $newHeight, ! $isJpeg);
+            // The decoded original is not needed any more: free it before encoding.
+            unset($source);
             if ($image === null) {
                 return null;
             }
@@ -103,7 +113,7 @@ final readonly class ImageRecompressor
             $candidates[] = [$this->encodeJpeg($image, $jpegQuality), 'image/jpeg'];
         } else {
             $candidates[] = [$this->encodePng($image), 'image/png'];
-            if ($convertOpaquePngToJpeg && $this->isOpaque($data, $source)) {
+            if ($opaque) {
                 $candidates[] = [$this->encodeJpeg($image, $jpegQuality), 'image/jpeg'];
             }
         }
@@ -131,15 +141,20 @@ final readonly class ImageRecompressor
     }
 
     /**
-     * About 5 bytes per pixel for the decoded image and again for its scaled copy, plus the data and the result.
+     * The peak memory of recompressing an image, from measurements with GD: decoding peaks at about 8 bytes
+     * per pixel (4 for the image, the rest in the decoder), scaling needs 4 per pixel of each image, and encoding
+     * a PNG about 5 per pixel of the image it encodes; the original bytes stay in memory. A fixed reserve
+     * covers everything else the script is doing.
      */
     private function estimatedMemory(int $width, int $height, int $newWidth, int $newHeight, int $dataLength): int
     {
-        return 5 * $width * $height + ($newWidth === $width && $newHeight === $height ? 0 : 5 * $newWidth * $newHeight) + 3 * $dataLength;
+        $scaled = $newWidth !== $width || $newHeight !== $height;
+
+        return self::MEMORY_RESERVE + 4 * $dataLength + ($scaled ? max(8 * $width * $height, 4 * $width * $height + 9 * $newWidth * $newHeight) : 9 * $width * $height);
     }
 
     /**
-     * The memory the script may still allocate, with a margin (PHP_INT_MAX without a memory limit).
+     * The memory the script may still allocate (PHP_INT_MAX without a memory limit).
      */
     private function availableMemory(): int
     {
@@ -156,7 +171,7 @@ final readonly class ImageRecompressor
             default => 1,
         };
 
-        return (int) (max(0, $bytes - memory_get_usage()) * 0.7);
+        return max(0, $bytes - memory_get_usage());
     }
 
     /**
