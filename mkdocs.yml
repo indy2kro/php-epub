@@ -28,6 +28,7 @@ nav:
   - Architecture: architecture.md
   - Classes:
     - EpubFile: epub-file.md
+    - EpubReader and Limits: epub-reader.md
     - ContentManager: content-manager.md
     - Metadata: metadata.md
     - Manifest: manifest.md

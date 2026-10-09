@@ -3,6 +3,10 @@
 The `XmlParser` class in the PHP EPUB Processor library is responsible for handling XML file operations.
 It provides methods to load and save XML files, ensuring that the XML data is correctly parsed and stored.
 
+## Constructor
+
+- **`__construct(int $maxBytes = PHP_INT_MAX)`**: The largest document, in bytes, `parse()` and `parseString()` accept; a larger one throws an `XmlException` (`parse()` checks the file size before reading it). There is no cap by default; `Limits::xmlParser()` builds one from a `Limits` (see [EpubReader and Limits](epub-reader.md)). Nothing passes `LIBXML_PARSEHUGE`, so libxml's own depth limit applies.
+
 ## Key Methods
 
 - **`parse(string $filePath): SimpleXMLElement`**: Loads an XML file from the specified path and returns it as a `SimpleXMLElement`. Documents with entity declarations (`<!ENTITY`) are rejected, whatever their encoding, and the parser never fetches external resources, so DOCTYPE references in EPUB 2 NCX files are left alone. Throws an `XmlException` (a subclass of `InvalidEpubException`) if the file cannot be found or loaded; the message includes the first libxml error and its line.

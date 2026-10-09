@@ -81,15 +81,16 @@ An EPUB is a ZIP of XML and HTML, so a book uploaded by a user can be hostile. p
 | Risk | What php-epub does |
 |---|---|
 | Entry names or OPF/manifest hrefs with `../` or absolute paths (path traversal) | Rejected by `PathResolver`; nothing is read or written outside the extraction directory |
-| Zip bombs | `ZipHandler` limits entry count, total extracted size and per-entry compression ratio, measured on the bytes actually written |
+| Zip bombs | `ZipHandler` limits entry count, total extracted size and per-entry compression ratio, measured on the bytes actually written (`EpubReader` measures the bytes it reads) |
+| Huge or deeply nested XML and XHTML | `Limits::$maxXmlBytes` and `Limits::$maxHtmlBytes` refuse a document before it is read; libxml's depth limit is never lifted (`LIBXML_PARSEHUGE` is not used) |
 | XML entity expansion and external entities (XXE) | `<!ENTITY` declarations are rejected in any encoding (checked on the parsed DOCTYPE, not only the raw bytes) and the parser never fetches network resources |
 | Symlinks in the extraction directory | Cleanup deletes the link itself, never its target |
 | Scripts, local files and remote URLs in book HTML during PDF conversion | Documents are parsed as HTML; scripts and embeds are removed, CSS `url()`s, every resource attribute and the references inside SVG images are limited to files inside the book, and Dompdf runs without remote access, PHP or JavaScript, confined to the book directory |
 | Shell arguments for Calibre, and conversions that hang | Calibre is started without a shell, so no argument is interpreted, and a conversion is stopped after `timeout` seconds (600 by default) |
 
-The extraction directory is created with an unpredictable name and owner-only permissions, and is removed by `EpubFile::cleanup()` or when the object is destroyed.
+The extraction directory is created with an unpredictable name and owner-only permissions, and is removed by `EpubFile::close()` (or `cleanup()`) or when the object is destroyed; a failed open removes it too. `EpubReader` creates none.
 
-Tighten the limits for user uploads by passing your own `ZipHandler`:
+Use `Limits::web()` for user uploads: it caps the entry count, the total size, the compression ratio and the size of each XML or XHTML document (see [EpubReader and Limits](epub-reader.md)). To inspect an upload without extracting it, use `EpubReader`. For finer control, pass your own `ZipHandler`:
 
 ```php
 use PhpEpub\EpubFile;
@@ -117,3 +118,4 @@ All exceptions extend `PhpEpub\Exception`:
 - `InvalidEpubException`: invalid structure or a path outside the book; `XmlException` (a subclass) for unparseable or unsafe XML.
 - `ZipException`: the archive cannot be read, extracted or written, or exceeds a limit.
 - `ConversionException`: a converter could not read the book or write its output.
+- `ReadOnlyException`: a change was asked of a book opened with `EpubReader`.
