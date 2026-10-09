@@ -12,6 +12,7 @@ use DOMProcessingInstruction;
 use DOMXPath;
 use PhpEpub\ConversionException;
 use PhpEpub\Encryption;
+use PhpEpub\Exception;
 use PhpEpub\FontObfuscation;
 use PhpEpub\InvalidEpubException;
 use PhpEpub\Manifest;
@@ -19,6 +20,8 @@ use PhpEpub\ManifestItem;
 use PhpEpub\Metadata;
 use PhpEpub\Parser;
 use PhpEpub\Spine;
+use PhpEpub\TableOfContents;
+use PhpEpub\TocEntry;
 use PhpEpub\Util\FileSystemHelper;
 use PhpEpub\Util\PathResolver;
 use PhpEpub\Util\TextEncoding;
@@ -95,6 +98,11 @@ final class EpubDocumentLoader
      */
     private const int FONT_BUDGET = 16 * 1024 * 1024;
 
+    /**
+     * File extensions counted against the image budget of PdfConversionOptions.
+     */
+    private const array IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'tif', 'tiff', 'avif', 'ico'];
+
     private int $svgBudget = self::SVG_BUDGET;
 
     private int $fontBudget = self::FONT_BUDGET;
@@ -118,6 +126,24 @@ final class EpubDocumentLoader
      */
     private array $fontUris = [];
 
+    private PdfConversionOptions $options;
+
+    /**
+     * Microtime after which the conversion in progress is over its time budget; null for no limit.
+     */
+    private ?float $deadline = null;
+
+    private int $htmlBytes = 0;
+
+    private int $imageBytes = 0;
+
+    /**
+     * The image files counted so far (real path => true), each counted once.
+     *
+     * @var array<string, true>
+     */
+    private array $countedImages = [];
+
     public function __construct(
         private readonly XmlParser $xmlParser = new XmlParser(),
         private readonly PathResolver $paths = new PathResolver()
@@ -125,10 +151,21 @@ final class EpubDocumentLoader
     }
 
     /**
-     * @throws ConversionException If the directory holds no readable book, or the book is DRM-protected.
+     * @param PdfConversionOptions|null $options The limits and inclusions (see there); null for the defaults.
+     * @param float|null $deadline The microtime() after which the conversion is over its time budget, when
+     *                             the caller started the clock earlier; by default the budget starts now.
+     *
+     * @throws ConversionException If the directory holds no readable book, the book is DRM-protected, or a limit
+     *                             of the options is exceeded or a fixed-layout book is not allowed.
      */
-    public function load(string $epubDirectory): EpubDocument
+    public function load(string $epubDirectory, ?PdfConversionOptions $options = null, ?float $deadline = null): EpubDocument
     {
+        $this->options = $options ?? new PdfConversionOptions(allowFixedLayout: true);
+        $this->deadline = $deadline ?? $this->options->deadline();
+        $this->htmlBytes = 0;
+        $this->imageBytes = 0;
+        $this->countedImages = [];
+
         $root = is_dir($epubDirectory) ? realpath($epubDirectory) : false;
         if ($root === false) {
             throw new ConversionException("EPUB directory does not exist: {$epubDirectory}");
@@ -149,7 +186,9 @@ final class EpubDocumentLoader
         // Legacy layout: a single content.xhtml without an OPF package.
         if (is_file($root . DIRECTORY_SEPARATOR . 'content.xhtml')) {
             $styles = [];
+            $this->checkDeadline();
             $chapter = $this->prepareChapter($root, 'content.xhtml', $styles, $chapterTitle, ['content.xhtml' => 0]);
+            $this->countHtml($chapter);
 
             return new EpubDocument('', [], [$chapter], array_values($styles), [$chapterTitle], $root);
         }
@@ -177,16 +216,25 @@ final class EpubDocumentLoader
             }
         }
 
+        $this->assertChapterCount(count($chapterIndexes));
+        $this->assertRenderableLayout($metadata, $spine);
+
         $chapters = [];
         $chapterTitles = [];
         $styles = [];
         foreach (array_keys($chapterIndexes) as $path) {
-            $chapters[] = $this->prepareChapter($root, (string) $path, $styles, $chapterTitle, $chapterIndexes);
+            $this->checkDeadline();
+            $chapter = $this->prepareChapter($root, (string) $path, $styles, $chapterTitle, $chapterIndexes);
+            $this->countHtml($chapter);
+            $chapters[] = $chapter;
             $chapterTitles[] = $chapterTitle;
         }
 
         $language = $metadata->getLanguage();
         $direction = $spine->getPageProgressionDirection();
+        $cover = $this->options->includeCover ? $this->coverImage($root, $manifest, $metadata, $chapters[0] ?? '') : '';
+        $contents = $this->options->includeToc ? $this->contentsPage($root, $manifest, $chapterIndexes) : '';
+        $this->checkDeadline();
 
         return new EpubDocument(
             $metadata->getTitle(),
@@ -195,11 +243,125 @@ final class EpubDocumentLoader
             array_values($styles),
             $chapterTitles,
             $root,
-            $this->coverImage($root, $manifest, $metadata, $chapters[0] ?? ''),
+            $cover,
             $language,
             // A spine that says "ltr" or "rtl" wins over the language.
-            $direction === null || $direction === 'default' ? EpubDocument::isRightToLeftLanguage($language) : $direction === 'rtl'
+            $direction === null || $direction === 'default' ? EpubDocument::isRightToLeftLanguage($language) : $direction === 'rtl',
+            $contents
         );
+    }
+
+    /**
+     * @throws ConversionException If the options limit the chapters and the book has more.
+     */
+    private function assertChapterCount(int $count): void
+    {
+        $max = $this->options->maxChapters;
+        if ($max !== null && $count > $max) {
+            throw new ConversionException("The book has {$count} chapters, more than the limit of {$max}", ConversionException::CODE_BUDGET_EXCEEDED);
+        }
+    }
+
+    /**
+     * Refuses a fixed-layout book (pre-paginated for the whole book or for most of its spine documents),
+     * which a flowing PDF cannot reproduce, unless the options allow it.
+     *
+     * @throws ConversionException
+     */
+    private function assertRenderableLayout(Metadata $metadata, Spine $spine): void
+    {
+        if ($this->options->allowFixedLayout) {
+            return;
+        }
+
+        $global = $metadata->getRenditionLayout();
+        $items = $spine->getItems();
+        $fixed = 0;
+        foreach ($items as $spineItem) {
+            $layout = $spineItem->idref === '' ? null : $spine->getItemRendition($spineItem->idref, 'layout');
+            if (($layout ?? $global) === 'pre-paginated') {
+                ++$fixed;
+            }
+        }
+
+        if (($items !== [] && $fixed * 2 > count($items)) || ($items === [] && $global === 'pre-paginated')) {
+            throw new ConversionException(
+                'The book is fixed layout (pre-paginated); a PDF would reflow its pages. Allow it with PdfConversionOptions(allowFixedLayout: true)',
+                ConversionException::CODE_FIXED_LAYOUT
+            );
+        }
+    }
+
+    /**
+     * @throws ConversionException If the conversion is over its time budget.
+     */
+    private function checkDeadline(): void
+    {
+        $this->options->assertWithinBudget($this->deadline);
+    }
+
+    /**
+     * @throws ConversionException If the sanitised chapters together are over the HTML limit.
+     */
+    private function countHtml(string $chapter): void
+    {
+        $this->htmlBytes += strlen($chapter);
+        $max = $this->options->maxHtmlBytes;
+        if ($max !== null && $this->htmlBytes > $max) {
+            throw new ConversionException("The book's HTML is over the limit of {$max} bytes", ConversionException::CODE_BUDGET_EXCEEDED);
+        }
+    }
+
+    /**
+     * @throws ConversionException If the images together are over the image limit.
+     */
+    private function countImage(int $bytes): void
+    {
+        $this->imageBytes += $bytes;
+        $max = $this->options->maxImageBytes;
+        if ($max !== null && $this->imageBytes > $max) {
+            throw new ConversionException("The book's images are over the limit of {$max} bytes", ConversionException::CODE_BUDGET_EXCEEDED);
+        }
+    }
+
+    /**
+     * The HTML of a contents page: the entries of the book's table of contents, titles only, nested,
+     * each linking to its chapter. "" when the book has no table of contents.
+     *
+     * @param array<string, int> $chapterIndexes
+     */
+    private function contentsPage(string $root, Manifest $manifest, array $chapterIndexes): string
+    {
+        try {
+            $entries = (new TableOfContents($root, $manifest, $this->xmlParser, $this->paths))->getEntries();
+        } catch (Exception) {
+            return '';
+        }
+
+        if ($entries === []) {
+            return '';
+        }
+
+        return '<h1>Contents</h1>' . $this->contentsList($entries, $chapterIndexes);
+    }
+
+    /**
+     * @param list<TocEntry> $entries
+     * @param array<string, int> $chapterIndexes
+     */
+    private function contentsList(array $entries, array $chapterIndexes): string
+    {
+        $html = '<ul>';
+        foreach ($entries as $entry) {
+            $title = htmlspecialchars($entry->title, ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML5);
+            $chapter = $entry->path === '' ? null : ($chapterIndexes[$entry->path] ?? null);
+            $label = $chapter === null
+                ? $title
+                : '<a href="#' . self::anchorId($chapter, $entry->fragment) . '">' . $title . '</a>';
+            $html .= '<li>' . $label . ($entry->children === [] ? '' : $this->contentsList($entry->children, $chapterIndexes)) . '</li>';
+        }
+
+        return $html . '</ul>';
     }
 
     /**
@@ -300,6 +462,8 @@ final class EpubDocumentLoader
             // The leading declaration makes the HTML parser read the bytes as UTF-8.
             $document->loadHTML('<?xml encoding="UTF-8">' . TextEncoding::toUtf8($content), LIBXML_NONET);
         } finally {
+            // The DOM is all that is needed from here on; do not keep the raw text beside it.
+            unset($content);
             libxml_clear_errors();
             libxml_use_internal_errors($useInternalErrors);
         }
@@ -588,6 +752,11 @@ final class EpubDocumentLoader
             return $svgDepth === 0 ? $this->inlineSvgFile($root, $real) : '';
         }
 
+        if (in_array(strtolower(pathinfo($real, PATHINFO_EXTENSION)), self::IMAGE_EXTENSIONS, true) && ! isset($this->countedImages[$real])) {
+            $this->countedImages[$real] = true;
+            $this->countImage((int) filesize($real));
+        }
+
         return str_replace('\\', '/', $real);
     }
 
@@ -631,6 +800,10 @@ final class EpubDocumentLoader
             return $svgDepth < self::SVG_NESTING_LIMIT ? $this->svgDataUri($root, $directory, $data, $svgDepth + 1) : '';
         }
 
+        if (str_starts_with($mediaType, 'image/')) {
+            $this->countImage(strlen($data));
+        }
+
         return "data:{$mediaType};base64," . base64_encode($data);
     }
 
@@ -667,6 +840,9 @@ final class EpubDocumentLoader
         $markup = (string) $document->saveXML($svgElement);
         $fits = strlen($markup) <= $this->svgBudget;
         $this->svgBudget -= $fits ? strlen($markup) : 0;
+        if ($fits) {
+            $this->countImage(strlen($markup));
+        }
 
         return $fits ? 'data:image/svg+xml;base64,' . base64_encode($markup) : '';
     }
