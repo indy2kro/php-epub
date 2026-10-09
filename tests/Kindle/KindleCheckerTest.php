@@ -97,12 +97,22 @@ final class KindleCheckerTest extends TestCase
         $this->assertSame(['KINDLE_COVER_MISSING'], $this->codes($epub->validate(ValidationProfile::kindle())));
     }
 
-    public function testACoverMustBeJpeg(): void
+    public function testPngAndGifCoversAreFine(): void
     {
         $epub = $this->open($this->goodBook());
         $epub->setCoverImage($this->image(1000, 1700, 'png'), 'image/png');
+        $this->assertSame([], $this->codes($epub->validate(ValidationProfile::kindle())));
 
-        $this->assertSame(['KINDLE_COVER_TYPE'], $this->codes($epub->validate(ValidationProfile::kindle())));
+        $epub->setCoverImage((string) base64_decode(EpubBuilder::GIF, true), 'image/gif');
+        $this->assertNotContains('KINDLE_COVER_TYPE', $this->codes($epub->validate(ValidationProfile::kindle())));
+    }
+
+    public function testOtherCoverFormatsAreFlagged(): void
+    {
+        $epub = $this->open($this->goodBook());
+        $epub->setCoverImage((string) base64_decode(EpubBuilder::WEBP, true), 'image/webp');
+
+        $this->assertContains('KINDLE_COVER_TYPE', $this->codes($epub->validate(ValidationProfile::kindle())));
     }
 
     public function testASmallCover(): void

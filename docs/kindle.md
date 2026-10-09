@@ -26,7 +26,7 @@ A rule is **sourced** when a figure or requirement comes from an Amazon page; a 
 |---|---|---|---|
 | `KINDLE_FILE_TOO_LARGE` | error | The packaged book is above 200 MB, the web upload limit | [Send to Kindle](https://www.amazon.com/sendtokindle) |
 | `KINDLE_FILE_TOO_LARGE_FOR_EMAIL` | warning | Above 50 MB, the limit for sending by email | [Send to Kindle by email](https://www.amazon.com/gp/help/customer/display.html?nodeId=G7NECT4B4ZWHQ8WV) |
-| `KINDLE_COVER_TYPE` | warning | The cover is not a JPEG (or TIFF) | [KDP cover guidelines](https://kdp.amazon.com/en_US/help/topic/G200645690) |
+| `KINDLE_COVER_TYPE` | warning | The cover is not a JPEG, PNG or GIF (e.g. WebP or SVG). KDP's JPEG/TIFF rule is for its cover upload, so the in-book formats are not held to it | [KDP cover guidelines](https://kdp.amazon.com/en_US/help/topic/G200645690) |
 | `KINDLE_COVER_TOO_LARGE` | warning | The cover is above 10,000 pixels in height or width, or 50 MB or more | KDP cover guidelines |
 | `KINDLE_NOT_UTF8` | warning | A content document is UTF-16, declares another encoding or is not valid UTF-8 | [Kindle Publishing Guidelines](https://kdp.amazon.com/en_US/help/topic/GH4DRT75GWWAGBTU) (characters should be UTF-8) |
 | `KINDLE_UNSUPPORTED_SPACE` | warning | A content document uses a space other than the space, no-break space and zero-width non-joiner (e.g. the thin space or the ideographic space) | Kindle Publishing Guidelines, [kindleformat](https://www.amazon.com/kindleformat) |

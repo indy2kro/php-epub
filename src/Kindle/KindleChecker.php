@@ -205,8 +205,8 @@ final readonly class KindleChecker
         }
 
         $issues = [];
-        if (! in_array($cover->mediaType, ['image/jpeg', 'image/tiff'], true)) {
-            $issues[] = $this->issue(ValidationIssue::WARNING, 'KINDLE_COVER_TYPE', "The cover is {$cover->mediaType}; KDP takes cover images as JPEG or TIFF.", $cover->path, 'Convert the cover to JPEG.');
+        if (! in_array($cover->mediaType, ['image/jpeg', 'image/png', 'image/gif'], true)) {
+            $issues[] = $this->issue(ValidationIssue::WARNING, 'KINDLE_COVER_TYPE', "The cover is {$cover->mediaType}; Kindle covers are JPEG, PNG or GIF (KDP takes its cover upload as JPEG or TIFF).", $cover->path, 'Convert the cover to JPEG or PNG.');
         }
 
         try {
