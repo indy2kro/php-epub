@@ -344,7 +344,6 @@ final class HtmlToMarkdown
             case 'rt':
                 return ' (' . trim($this->inlineChildren($element, $depth)) . ')';
             case 'rp':
-            case 'wbr':
                 return '';
             default:
                 return $this->inlineChildren($element, $depth);

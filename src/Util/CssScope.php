@@ -510,7 +510,8 @@ final class CssScope
 
         $tokens = CssTokenizer::tokenize($value);
         if ($tokens === null) {
-            return $value;
+            // A value is a piece of a sheet that was tokenized as a whole: it cannot fail here.
+            return $value; // @codeCoverageIgnore
         }
 
         $output = '';
