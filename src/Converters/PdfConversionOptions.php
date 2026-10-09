@@ -10,8 +10,9 @@ use PhpEpub\Exception;
 /**
  * What a PDF adapter (TCPDFAdapter, DompdfAdapter) includes in the PDF and how much book it accepts.
  *
- * The defaults keep the behaviour of an adapter without options: the cover is included, there is no
- * contents page, fixed-layout books are refused (see $allowFixedLayout) and nothing is limited. The page
+ * An adapter constructed without options behaves as it always did: nothing is limited and fixed-layout books
+ * are converted. Once options are passed, their defaults apply: the cover is included, there is no contents
+ * page, nothing is limited and fixed-layout books are refused (see $allowFixedLayout). The page
  * size, margins and base font size are styles of the adapters; only a custom page size is an option, as
  * the styles take paper sizes by name.
  *

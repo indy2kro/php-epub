@@ -36,7 +36,7 @@ try {
 
 ## Limits and options for untrusted books
 
-`PdfConversionOptions` is passed as the third constructor argument of `DompdfAdapter` and `TCPDFAdapter` (after the styles and the loader). It is immutable, and its defaults are: the cover is included, there is no contents page, nothing is limited, and **fixed-layout books are refused**. Page size by name, margins, base font size and orientation stay styles of the adapters; only a custom page size is an option.
+`PdfConversionOptions` is passed as the third constructor argument of `DompdfAdapter` and `TCPDFAdapter` (after the styles and the loader). It is immutable. An adapter built **without** options behaves exactly as before (nothing is limited, fixed-layout books are converted). Once you pass options, their defaults apply: the cover is included, there is no contents page, nothing is limited, and **fixed-layout books are refused** unless `allowFixedLayout` is `true`. Page size by name, margins, base font size and orientation stay styles of the adapters; only a custom page size is an option.
 
 | Option | Default | |
 | --- | --- | --- |

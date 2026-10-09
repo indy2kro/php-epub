@@ -193,6 +193,23 @@ final class PdfConversionOptionsTest extends TestCase
         $this->assertStringStartsWith('%PDF', $this->convert($adapter, new PdfConversionOptions(allowFixedLayout: true), $book));
     }
 
+    /**
+     * @param Closure(PdfConversionOptions): ConverterInterface $adapter
+     */
+    #[DataProvider('adapters')]
+    public function testAdaptersWithoutOptionsStillConvertFixedLayoutBooks(Closure $adapter): void
+    {
+        $book = $this->book(2, '', '<meta property="rendition:layout">pre-paginated</meta>');
+        $output = $this->directory . '/legacy.pdf';
+        $legacy = $adapter(new PdfConversionOptions()) instanceof DompdfAdapter
+            ? new DompdfAdapter()
+            : new TCPDFAdapter();
+
+        $legacy->convert($book, $output);
+
+        $this->assertStringStartsWith('%PDF', (string) file_get_contents($output));
+    }
+
     public function testFixedLayoutFollowsTheMajorityOfTheSpine(): void
     {
         $fixed = 'rendition:layout-pre-paginated';

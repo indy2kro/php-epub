@@ -55,6 +55,8 @@ class TCPDFAdapter implements ConverterInterface
      */
     private array $styles;
 
+    private readonly PdfConversionOptions $options;
+
     /**
      * Whether the font is the default one, which may fall back to FALLBACK_FONT.
      */
@@ -74,17 +76,21 @@ class TCPDFAdapter implements ConverterInterface
      *                                     ("portrait" or "landscape"), as in DompdfAdapter, and bookmarks (bool,
      *                                     default true: a PDF outline entry per chapter).
      *
-     * @param PdfConversionOptions $options What to include and the limits to enforce (see there); the defaults
-     *                                      include the cover, add no contents page, refuse fixed-layout books
-     *                                      and limit nothing.
+     * @param PdfConversionOptions|null $options What to include and the limits to enforce (see there). Without
+     *                                      options nothing is limited and fixed-layout books are converted as before; given options (the
+     *                                      defaults include the cover, add no contents page and limit nothing) refuse fixed-layout books
+     *                                      unless allowFixedLayout is true.
      *
      * @throws Exception If a style is unknown, of the wrong type or has an unusable value (such as a paper size TCPDF does not know).
      */
     public function __construct(
         array $styles = [],
         private readonly EpubDocumentLoader $loader = new EpubDocumentLoader(),
-        private readonly PdfConversionOptions $options = new PdfConversionOptions()
+        ?PdfConversionOptions $options = null
     ) {
+        // Without options the adapter behaves as it always did, fixed-layout books included.
+        $this->options = $options ?? new PdfConversionOptions(allowFixedLayout: true);
+
         PdfStyles::validate(
             'TCPDFAdapter',
             self::STYLE_TYPES,

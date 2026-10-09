@@ -7,7 +7,7 @@ Requires `tecnickcom/tcpdf` and its core fonts; see [Installation](../installati
 
 ## Key Methods
 
-- **`__construct(array $styles = [], EpubDocumentLoader $loader = new EpubDocumentLoader(), PdfConversionOptions $options = new PdfConversionOptions())`**: Optional styling parameters (the options, such as limits, a contents page and a custom page size, are described in [Converter](../converter.md#limits-and-options-for-untrusted-books)):
+- **`__construct(array $styles = [], EpubDocumentLoader $loader = new EpubDocumentLoader(), ?PdfConversionOptions $options = null)`**: Optional styling parameters (the options, such as limits, a contents page and a custom page size, are described in [Converter](../converter.md#limits-and-options-for-untrusted-books); without options the adapter behaves as before, and with options fixed-layout books are refused unless `allowFixedLayout` is set):
 
     | Style | Type | Default | |
     | --- | --- | --- | --- |

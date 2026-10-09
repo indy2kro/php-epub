@@ -41,6 +41,8 @@ class DompdfAdapter implements ConverterInterface
      */
     private array $styles;
 
+    private readonly PdfConversionOptions $options;
+
     /**
      * The private font directory of the conversion in progress (see convert()).
      */
@@ -53,17 +55,21 @@ class DompdfAdapter implements ConverterInterface
      *                                     paper_size, orientation, and margin_top/right/bottom/left (int or float,
      *                                     mm, as in TCPDFAdapter; without any, Dompdf keeps its own margins).
      *
-     * @param PdfConversionOptions $options What to include and the limits to enforce (see there); the defaults
-     *                                      include the cover, add no contents page, refuse fixed-layout books
-     *                                      and limit nothing.
+     * @param PdfConversionOptions|null $options What to include and the limits to enforce (see there). Without
+     *                                      options nothing is limited and fixed-layout books are converted as before; given options (the
+     *                                      defaults include the cover, add no contents page and limit nothing) refuse fixed-layout books
+     *                                      unless allowFixedLayout is true.
      *
      * @throws Exception If a style is unknown, of the wrong type or has an unusable value (such as a paper size Dompdf does not know).
      */
     public function __construct(
         array $styles = [],
         private readonly EpubDocumentLoader $loader = new EpubDocumentLoader(),
-        private readonly PdfConversionOptions $options = new PdfConversionOptions()
+        ?PdfConversionOptions $options = null
     ) {
+        // Without options the adapter behaves as it always did, fixed-layout books included.
+        $this->options = $options ?? new PdfConversionOptions(allowFixedLayout: true);
+
         PdfStyles::validate(
             'DompdfAdapter',
             self::STYLE_TYPES,
