@@ -32,7 +32,7 @@ use PhpEpub\XmlParser;
  *     $book = (new BookBuilder(new BookOptions(title: 'My Book', authors: ['Jane Doe'])))->fromMarkdown($markdown);
  *     $book->save('/path/to/book.epub');
  */
-final class BookBuilder
+final readonly class BookBuilder
 {
     private const array IMAGE_TYPES = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/gif' => 'gif', 'image/webp' => 'webp'];
 
@@ -45,9 +45,9 @@ final class BookBuilder
 
     private const string PAGES_CSS = 'html,body{margin:0;padding:0}img{display:block;position:absolute;top:0;left:0}';
 
-    private readonly XmlParser $xmlParser;
+    private XmlParser $xmlParser;
 
-    public function __construct(private readonly BookOptions $options = new BookOptions(), ?XmlParser $xmlParser = null)
+    public function __construct(private BookOptions $options = new BookOptions(), ?XmlParser $xmlParser = null)
     {
         $this->xmlParser = $xmlParser ?? new XmlParser();
     }
@@ -116,7 +116,7 @@ final class BookBuilder
 
         $pages = [];
         $total = 0;
-        foreach (array_values($images) as $index => $image) {
+        foreach ($images as $index => $image) {
             /** @phpstan-ignore-next-line */
             if (! is_array($image) || ! isset($image['name'], $image['bytes']) || ! is_string($image['name']) || ! is_string($image['bytes'])) {
                 throw new BuildException('Image ' . ($index + 1) . ' needs a name and bytes');
@@ -274,7 +274,7 @@ final class BookBuilder
             trim($options->title),
             trim($options->language),
             $options->identifier === null ? BookTemplate::uuidUrn() : trim($options->identifier),
-            array_values(array_map(trim(...), $options->authors)),
+            array_map(trim(...), $options->authors),
             trim($options->description),
             trim($options->publisher),
             $this->normalizedDate(),
@@ -397,28 +397,25 @@ final class BookBuilder
 
         $html = '';
         $paragraph = [];
-        $flush = static function () use (&$html, &$paragraph): void {
-            if ($paragraph !== []) {
+        // The last, empty line ends the last paragraph.
+        foreach ([...explode("\n", str_replace(["\r\n", "\r"], "\n", $text)), ''] as $line) {
+            $line = trim($line);
+            $isChapter = $line !== '' ? @preg_match($pattern, $line) : 0;
+            if ($isChapter === false) {
+                throw new BuildException('The chapter pattern failed: ' . preg_last_error_msg());
+            }
+
+            if (($line === '' || $isChapter === 1) && $paragraph !== []) {
                 $html .= '<p>' . htmlspecialchars(implode(' ', $paragraph), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . "</p>\n";
                 $paragraph = [];
             }
-        };
 
-        foreach (explode("\n", str_replace(["\r\n", "\r"], "\n", $text)) as $line) {
-            $line = trim($line);
-            if ($line === '') {
-                $flush();
-            } elseif (($isChapter = @preg_match($pattern, $line)) === false) {
-                throw new BuildException('The chapter pattern failed: ' . preg_last_error_msg());
-            } elseif ($isChapter === 1) {
-                $flush();
+            if ($isChapter === 1) {
                 $html .= '<h1>' . htmlspecialchars($line, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . "</h1>\n";
-            } else {
+            } elseif ($line !== '') {
                 $paragraph[] = $line;
             }
         }
-
-        $flush();
 
         return $html;
     }

@@ -165,7 +165,7 @@ final class MarkdownParser
             'indent' => strlen($match[1]),
             'ordered' => $ordered,
             'number' => $ordered ? (int) $match[3] : 0,
-            'delimiter' => $ordered ? $match[4] : $match[2],
+            'delimiter' => $ordered ? ($match[4] ?? '') : $match[2],
             'width' => strlen($match[1]) + strlen($match[2]) + $gap,
             'content' => $content,
         ];
@@ -368,16 +368,27 @@ final class MarkdownParser
         $this->held = [];
         $html = $this->inlineText($text);
 
-        // Held pieces can hold other held pieces (link text).
-        for ($round = 0; $round < self::MAX_DEPTH && str_contains($html, self::HOLD); $round++) {
-            $html = (string) preg_replace_callback(
+        return $this->release($html, false);
+    }
+
+    /**
+     * Puts the held pieces back (they can hold other pieces: link text), as plain text for an attribute.
+     */
+    private function release(string $text, bool $plain): string
+    {
+        for ($round = 0; $round < self::MAX_DEPTH && str_contains($text, self::HOLD); $round++) {
+            $text = (string) preg_replace_callback(
                 '/' . self::HOLD . '(\d+)' . self::HOLD . '/',
-                fn (array $match): string => $this->held[(int) $match[1]] ?? '',
-                $html
+                function (array $match) use ($plain): string {
+                    $piece = $this->held[(int) $match[1]] ?? '';
+
+                    return $plain ? strip_tags($piece) : $piece;
+                },
+                $text
             );
         }
 
-        return $html;
+        return $text;
     }
 
     private function inlineText(string $text): string
@@ -443,15 +454,7 @@ final class MarkdownParser
      */
     private function plain(string $text): string
     {
-        for ($round = 0; $round < self::MAX_DEPTH && str_contains($text, self::HOLD); $round++) {
-            $text = (string) preg_replace_callback(
-                '/' . self::HOLD . '(\d+)' . self::HOLD . '/',
-                fn (array $match): string => strip_tags($this->held[(int) $match[1]] ?? ''),
-                $text
-            );
-        }
-
-        return (string) preg_replace('/[*_~]+/', '', $text);
+        return (string) preg_replace('/[*_~]+/', '', $this->release($text, true));
     }
 
     /**

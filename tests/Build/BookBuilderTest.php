@@ -74,7 +74,7 @@ final class BookBuilderTest extends TestCase
         $this->assertCount(5, $book->getSpine()->get());
 
         $cover = $book->getCoverImage();
-        $this->assertNotNull($cover);
+        $this->assertInstanceOf(\PhpEpub\ManifestItem::class, $cover);
         $this->assertSame('image/png', $cover->mediaType);
 
         // The EPUB 2 NCX is there and lists the same chapters, and the spine points at it.
@@ -124,21 +124,20 @@ echo "<b>";
 |----|:--:|
 | a  | b \| c |
 
-Hard
-break and \*literal\* & <b>raw</b>
+Hard break and \*literal\* & <b>raw</b>
 MD;
 
-        $built = (new BookBuilder())->fromMarkdown(str_replace("Hard
-break", "Hard  
-break", $markdown));
+        $built = (new BookBuilder())->fromMarkdown(str_replace('Hard break', "Hard  \nbreak", $markdown));
         $html = $this->chapterHtml($built, 1) . $this->chapterHtml($built, 2);
 
-        foreach ([
+        foreach (
+            [
             '<em>em</em>', '<strong>strong</strong>', '<del>gone</del>', '<code>co&lt;de</code>',
             '<a href="http://example.com/x_y_z" rel="noopener noreferrer" title="T">link</a>', '<a href="http://auto.example" rel="noopener noreferrer">http://auto.example</a>',
             '<h1 id="setext">Setext</h1>', '<ul>', '<li>a</li>', '<ol>', '<blockquote>', '<pre><code class="language-php">echo "&lt;b&gt;";</code></pre>',
             '<pre><code>indented</code></pre>', '<hr/>', '<th>h1</th>', '<td>b | c</td>', '<br/>', '*literal*', '&lt;b&gt;raw&lt;/b&gt;', '&amp;',
-        ] as $expected) {
+            ] as $expected
+        ) {
             $this->assertStringContainsString($expected, $html);
         }
     }
@@ -180,10 +179,13 @@ break", $markdown));
         $book->cleanup();
     }
 
+    /**
+     * @param \Closure(BookBuilder, string): BuiltBook $build
+     */
     #[DataProvider('hostileInputs')]
-    public function testHostileInputNeverReachesTheBook(string $method, string $input): void
+    public function testHostileInputNeverReachesTheBook(\Closure $build, string $input): void
     {
-        $built = (new BookBuilder(new BookOptions(images: ['a.png' => self::png()], css: '@import url(http://evil.example/x.css); p { background: url(http://evil.example/y.png) }')))->{$method}($input);
+        $built = $build(new BookBuilder(new BookOptions(images: ['a.png' => self::png()], css: '@import url(http://evil.example/x.css); p { background: url(http://evil.example/y.png) }')), $input);
 
         $book = $built->open();
         $this->assertSame([], array_map(strval(...), $book->validate()));
@@ -208,13 +210,13 @@ break", $markdown));
     }
 
     /**
-     * @return Iterator<string, array{string, string}>
+     * @return Iterator<string, array{\Closure(BookBuilder, string): BuiltBook, string}>
      */
     public static function hostileInputs(): Iterator
     {
-        yield 'markdown' => ['fromMarkdown', "# Visible\n\n<script>alert(1)</script> <img src=x onerror=alert(2)> [js](javascript:alert(3)) [js2](JaVa\tScript:alert(4)) ![x](http://evil.example/a.png)\n\n<iframe src=\"http://evil.example\"></iframe>"];
-        yield 'html' => ['fromHtml', '<h1 onclick="alert(1)">Visible</h1><script>alert(2)</script><a href="javascript:alert(3)">js</a><img src="http://evil.example/a.png" onerror="alert(4)" alt="r"/><img src="a.png" onload="alert(5)" style="x:y" srcset="http://evil.example/z 2x"/><iframe src="http://evil.example"></iframe><object data="x"></object><embed src="x"/><form action="http://evil.example"><input name="q"/></form><svg onload="alert(6)"><script>alert(7)</script></svg><style>p{background:url(http://evil.example/s.png)}</style><p style="color:red" onmouseover="alert(8)">p</p>'];
-        yield 'text' => ['fromText', "Chapter One\n\nVisible <script>alert(1)</script> onerror=alert(2) javascript:alert(3)"];
+        yield 'markdown' => [static fn (BookBuilder $builder, string $input): BuiltBook => $builder->fromMarkdown($input), "# Visible\n\n<script>alert(1)</script> <img src=x onerror=alert(2)> [js](javascript:alert(3)) [js2](JaVa\tScript:alert(4)) ![x](http://evil.example/a.png)\n\n<iframe src=\"http://evil.example\"></iframe>"];
+        yield 'html' => [static fn (BookBuilder $builder, string $input): BuiltBook => $builder->fromHtml($input), '<h1 onclick="alert(1)">Visible</h1><script>alert(2)</script><a href="javascript:alert(3)">js</a><img src="http://evil.example/a.png" onerror="alert(4)" alt="r"/><img src="a.png" onload="alert(5)" style="x:y" srcset="http://evil.example/z 2x"/><iframe src="http://evil.example"></iframe><object data="x"></object><embed src="x"/><form action="http://evil.example"><input name="q"/></form><svg onload="alert(6)"><script>alert(7)</script></svg><style>p{background:url(http://evil.example/s.png)}</style><p style="color:red" onmouseover="alert(8)">p</p>'];
+        yield 'text' => [static fn (BookBuilder $builder, string $input): BuiltBook => $builder->fromText($input), "Chapter One\n\nVisible <script>alert(1)</script> onerror=alert(2) javascript:alert(3)"];
     }
 
     public function testHtmlIsSplitAtHeadingsEvenInWrappersWithLinksAndUniqueIds(): void
@@ -287,34 +289,34 @@ break", $markdown));
     }
 
     /**
-     * @param array<string, mixed> $options
+     * @param \Closure(): BookOptions $options
      */
     #[DataProvider('invalidOptions')]
-    public function testInvalidOptionsAreRefused(array $options): void
+    public function testInvalidOptionsAreRefused(\Closure $options): void
     {
         $this->expectException(BuildException::class);
 
-        (new BookBuilder(new BookOptions(...$options)))->fromMarkdown('# x');
+        (new BookBuilder($options()))->fromMarkdown('# x');
     }
 
     /**
-     * @return Iterator<string, array{array<string, mixed>}>
+     * @return Iterator<string, array{\Closure(): BookOptions}>
      */
     public static function invalidOptions(): Iterator
     {
-        yield 'empty title' => [['title' => '  ']];
-        yield 'control character in the title' => [['title' => "Bad\x01title"]];
-        yield 'invalid UTF-8 in an author' => [['authors' => ["Bad\xFFauthor"]]];
-        yield 'empty author' => [['authors' => ['']]];
-        yield 'bad language' => [['language' => 'english please']];
-        yield 'empty identifier' => [['identifier' => ' ']];
-        yield 'bad date' => [['date' => 'next tuesday-ish?']];
-        yield 'impossible date' => [['date' => '2026-02-30']];
-        yield 'split level 0' => [['splitLevel' => 0]];
-        yield 'split level 7' => [['splitLevel' => 7]];
-        yield 'bad direction' => [['direction' => 'up']];
-        yield 'cover that is not an image' => [['coverImage' => 'not an image']];
-        yield 'svg cover' => [['coverImage' => '<svg xmlns="http://www.w3.org/2000/svg"/>']];
+        yield 'empty title' => [static fn (): BookOptions => new BookOptions(title: '  ')];
+        yield 'control character in the title' => [static fn (): BookOptions => new BookOptions(title: "Bad\x01title")];
+        yield 'invalid UTF-8 in an author' => [static fn (): BookOptions => new BookOptions(authors: ["Bad\xFFauthor"])];
+        yield 'empty author' => [static fn (): BookOptions => new BookOptions(authors: [''])];
+        yield 'bad language' => [static fn (): BookOptions => new BookOptions(language: 'english please')];
+        yield 'empty identifier' => [static fn (): BookOptions => new BookOptions(identifier: ' ')];
+        yield 'bad date' => [static fn (): BookOptions => new BookOptions(date: 'next tuesday-ish?')];
+        yield 'impossible date' => [static fn (): BookOptions => new BookOptions(date: '2026-02-30')];
+        yield 'split level 0' => [static fn (): BookOptions => new BookOptions(splitLevel: 0)];
+        yield 'split level 7' => [static fn (): BookOptions => new BookOptions(splitLevel: 7)];
+        yield 'bad direction' => [static fn (): BookOptions => new BookOptions(direction: 'up')];
+        yield 'cover that is not an image' => [static fn (): BookOptions => new BookOptions(coverImage: 'not an image')];
+        yield 'svg cover' => [static fn (): BookOptions => new BookOptions(coverImage: '<svg xmlns="http://www.w3.org/2000/svg"/>')];
     }
 
     public function testDatesAndIdentifier(): void
@@ -346,9 +348,14 @@ break", $markdown));
 
     public function testEmptyContentIsRefused(): void
     {
-        foreach (['fromMarkdown', 'fromText', 'fromHtml'] as $method) {
+        $builders = [
+            'fromMarkdown' => static fn (BookBuilder $builder): BuiltBook => $builder->fromMarkdown("  \n\n "),
+            'fromText' => static fn (BookBuilder $builder): BuiltBook => $builder->fromText("  \n\n "),
+            'fromHtml' => static fn (BookBuilder $builder): BuiltBook => $builder->fromHtml("  \n\n "),
+        ];
+        foreach ($builders as $method => $build) {
             try {
-                (new BookBuilder())->{$method}("  \n\n ");
+                $build(new BookBuilder());
                 $this->fail("{$method} accepted empty content");
             } catch (BuildException $exception) {
                 $this->assertStringContainsString('no content', $exception->getMessage());
@@ -450,7 +457,7 @@ break", $markdown));
         $this->assertStringContainsString('src="../images/page-003.jpg"', $content->getContent('EPUB/text/page-003.xhtml'));
 
         $cover = $book->getCoverImage();
-        $this->assertNotNull($cover);
+        $this->assertInstanceOf(\PhpEpub\ManifestItem::class, $cover);
         $this->assertSame('EPUB/images/page-001.png', $cover->path);
 
         $titles = array_map(static fn ($entry): string => $entry->title, $book->getTableOfContents()->getEntries());
@@ -560,7 +567,7 @@ break", $markdown));
      */
     private static function image(int $width, int $height, callable $encode): string
     {
-        $image = imagecreatetruecolor($width, $height) ?: throw new \RuntimeException('GD cannot create an image');
+        $image = imagecreatetruecolor(max(1, $width), max(1, $height)) ?: throw new \RuntimeException('GD cannot create an image');
         ob_start();
         $encode($image);
 
