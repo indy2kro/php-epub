@@ -364,7 +364,7 @@ class EpubFile
             $this->manifest = new Manifest($this->opfXml, $opfFilePath);
             $this->spine = new Spine($this->opfXml, $this->manifest);
             // Fonts are keyed with the identifier of the last load or save, which rekeyObfuscatedFonts() keeps current.
-            $this->contentManager = new ContentManager($directory, $this->manifest, $this->spine, new PathResolver(), fn (): ?string => $this->fontKeyIdentifier, $this->maxHtmlBytes);
+            $this->contentManager = new ContentManager($directory, $this->manifest, $this->spine, new PathResolver(), fn (): ?string => $this->fontKeyIdentifier, $this->maxHtmlBytes, $this->xmlParser);
         } catch (Throwable $throwable) {
             // Do not leave a half-loaded book (or its extracted files) behind,
             // and report why loading failed rather than a cleanup problem.
@@ -767,7 +767,7 @@ class EpubFile
             throw new Exception('EPUB file must be loaded before validating.');
         }
 
-        return (new Validator($this->tempDir, $this->opfXml, $this->metadata, $this->manifest, $this->spine, $this->getTableOfContents()))->validate();
+        return (new Validator($this->tempDir, $this->opfXml, $this->metadata, $this->manifest, $this->spine, $this->getTableOfContents(), new PathResolver(), $this->xmlParser))->validate();
     }
 
     /**

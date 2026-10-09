@@ -18,8 +18,9 @@ final readonly class Limits
      * @param int $maxUncompressedBytes Maximum total size of the book's contents, measured on the bytes actually read.
      * @param int $maxCompressionRatio Maximum uncompressed/compressed ratio for a single entry larger than 1 MiB.
      * @param int $maxXmlBytes Maximum size of one XML document (container, package, navigation, NCX, encryption).
-     * @param int $maxHtmlBytes Maximum size of one XHTML or HTML content document the library parses
-     *                          (text extraction, the cover page lookup and PDF conversion).
+     * @param int $maxHtmlBytes Maximum size of one XHTML or HTML content document the library parses (text extraction
+     *                          and the cover page lookup). A PDF conversion reads the book through an
+     *                          EpubDocumentLoader, which takes its own maxHtmlBytes: pass it to the adapter.
      *
      * @throws Exception If a limit is not positive.
      */

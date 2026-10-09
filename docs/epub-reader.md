@@ -50,7 +50,7 @@ public static function openString(string $data, ?Limits $limits = null, ?XmlPars
 public static function openStream($stream, ?Limits $limits = null, ?XmlParser $xmlParser = null): EpubReader
 ```
 
-`open()` reads the file in place. `openString()` reads the data in place from PHP 8.4 on; before that, and for `openStream()`, `ZipArchive` needs a real file, so the data is buffered in one private scratch file (random name, mode `0700`) that `close()` deletes. No extraction directory is ever created.
+`open()` reads the file in place. `openString()` reads the data in place where ext-zip has `ZipArchive::openString()` (newer builds only); otherwise, and for `openStream()`, `ZipArchive` needs a real file, so the data is buffered in one private scratch file (random name, mode `0700`) that `close()` deletes. No extraction directory is ever created.
 
 When the book is opened, the entry count, the entry names (they must stay inside the book and be unique after case folding, as `ZipHandler` requires) and the declared total size are checked, and the container and the package document are read and validated. A book that fails any of that throws, and nothing is left behind.
 

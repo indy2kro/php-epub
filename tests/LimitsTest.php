@@ -175,6 +175,37 @@ final class LimitsTest extends TestCase
         }
     }
 
+    public function testValidateAppliesTheXmlCapToContentDocuments(): void
+    {
+        $chapter = EpubBuilder::xhtml('Chapter', '<p>x</p><!--' . str_repeat('x', 3000) . '-->');
+        $path = $this->book(EpubBuilder::epub3()->withFile('EPUB/text/chapter.xhtml', $chapter));
+
+        $epubFile = EpubFile::open($path);
+        $this->assertSame([], $epubFile->validate());
+        $epubFile->close();
+
+        $epubFile = EpubFile::open($path, limits: new Limits(maxXmlBytes: strlen($chapter) - 1));
+        $messages = array_map(static fn (\PhpEpub\ValidationIssue $issue): string => $issue->message, $epubFile->validate());
+        $epubFile->close();
+
+        $this->assertNotEmpty(array_filter($messages, static fn (string $message): bool => str_contains($message, 'larger than the limit')));
+    }
+
+    public function testContentManagerEditsApplyTheXmlCap(): void
+    {
+        $path = $this->book(EpubBuilder::epub3());
+        $epubFile = EpubFile::open($path, limits: new Limits(maxXmlBytes: 2000));
+        $chapter = EpubBuilder::xhtml('Chapter', '<p>x</p><!--' . str_repeat('x', 3000) . '-->');
+
+        try {
+            $this->expectException(Exception::class);
+            $this->expectExceptionMessage('larger than the limit');
+            $epubFile->getContentManager()->updateContent('EPUB/text/chapter.xhtml', $chapter);
+        } finally {
+            $epubFile->close();
+        }
+    }
+
     public function testHtmlSizeBoundaryForConversion(): void
     {
         $chapter = EpubBuilder::xhtml('Chapter', '<p>Text.</p>');

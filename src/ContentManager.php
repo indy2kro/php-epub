@@ -29,6 +29,7 @@ class ContentManager
      * @param \Closure(): ?string|null $fontKeyIdentifier Gives the unique identifier the book's obfuscated fonts
      *                                                    are keyed with; without it, fonts can only be handled plain.
      * @param int $maxHtmlBytes Largest XHTML or HTML document getMarkup() and getText() read (no cap by default).
+     * @param XmlParser $xmlParser The parser for every XML document the manager reads (carries the XML size cap).
      */
     public function __construct(
         string $contentDirectory,
@@ -36,7 +37,8 @@ class ContentManager
         private readonly ?Spine $spine = null,
         private readonly PathResolver $paths = new PathResolver(),
         private readonly ?\Closure $fontKeyIdentifier = null,
-        private readonly int $maxHtmlBytes = PHP_INT_MAX
+        private readonly int $maxHtmlBytes = PHP_INT_MAX,
+        private readonly XmlParser $xmlParser = new XmlParser()
     ) {
         if (! is_dir($contentDirectory)) {
             throw new Exception("Content directory does not exist: {$contentDirectory}");
@@ -231,7 +233,7 @@ class ContentManager
         $rewrites = $updateReferences ? $this->referenceRewrites($fromPath, $toPath) : [];
 
         // Read the table of contents first: moving the navigation document changes how its links resolve.
-        $toc = $this->manifest instanceof Manifest ? new TableOfContents($this->contentDirectory, $this->manifest) : null;
+        $toc = $this->manifest instanceof Manifest ? new TableOfContents($this->contentDirectory, $this->manifest, $this->xmlParser, $this->paths) : null;
         try {
             $entries = $toc?->getEntries() ?? [];
         } catch (Exception) {
@@ -327,7 +329,7 @@ class ContentManager
             throw new Exception("A font cannot be stored in the container directory: {$path}");
         }
 
-        $obfuscation = new FontObfuscation($this->contentDirectory);
+        $obfuscation = new FontObfuscation($this->contentDirectory, $this->xmlParser);
         $stored = $fontData;
         if ($obfuscate) {
             $stored = FontObfuscation::apply($fontData, FontObfuscation::IDPF, $this->fontKey(FontObfuscation::IDPF));
@@ -352,7 +354,7 @@ class ContentManager
     public function getFontData(string $path): string
     {
         $font = $this->getContent($path);
-        $algorithm = (new FontObfuscation($this->contentDirectory))->obfuscatedFonts()[$this->paths->normalize($path)] ?? null;
+        $algorithm = (new FontObfuscation($this->contentDirectory, $this->xmlParser))->obfuscatedFonts()[$this->paths->normalize($path)] ?? null;
 
         return $algorithm === null ? $font : FontObfuscation::apply($font, $algorithm, $this->fontKey($algorithm));
     }
@@ -414,7 +416,7 @@ class ContentManager
         $item = $this->manifest?->findByPath($path);
         // detect() is null for a document that is not well-formed, which addContent() and updateContent() refuse.
         $needed = $item instanceof ManifestItem && $item->mediaType === 'application/xhtml+xml' && $this->manifest->isEpub3()
-            ? ContentDocumentProperties::detect($content)
+            ? ContentDocumentProperties::detect($content, $this->xmlParser)
             : null;
         if (! $item instanceof ManifestItem || $needed === null) {
             return;
@@ -442,7 +444,7 @@ class ContentManager
             return;
         }
 
-        $toc = new TableOfContents($this->contentDirectory, $this->manifest);
+        $toc = new TableOfContents($this->contentDirectory, $this->manifest, $this->xmlParser, $this->paths);
 
         try {
             $entries = $toc->getEntries();
@@ -486,7 +488,7 @@ class ContentManager
             return;
         }
 
-        $xmlParser = new XmlParser();
+        $xmlParser = $this->xmlParser;
         try {
             $encryption = $xmlParser->parse($file);
         } catch (XmlException) {
@@ -550,7 +552,7 @@ class ContentManager
      */
     private function referenceRewrites(string $from, string $to): array
     {
-        $rewriter = new ReferenceRewriter($this->paths);
+        $rewriter = new ReferenceRewriter($this->paths, $this->xmlParser);
         $rewrites = [];
         foreach ($this->getContentPaths() as $path) {
             $mediaType = $this->manifest?->findByPath($path)?->mediaType;
@@ -592,7 +594,7 @@ class ContentManager
         }
 
         try {
-            (new XmlParser())->parseString($content, $path);
+            $this->xmlParser->parseString($content, $path);
         } catch (XmlException $exception) {
             throw new Exception("The XHTML document is not well-formed XML: {$exception->getMessage()}", 0, $exception);
         }

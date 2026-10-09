@@ -116,7 +116,7 @@ final class EpubReader
     }
 
     /**
-     * Opens a book held in a string, e.g. an upload. From PHP 8.4 on the data is read in place; before that
+     * Opens a book held in a string, e.g. an upload. Where ext-zip has ZipArchive::openString() the data is read in place; otherwise
      * it is buffered in a private scratch file that close() deletes.
      *
      * @throws ZipException If the data is not a readable archive or exceeds a limit.
@@ -158,16 +158,23 @@ final class EpubReader
     }
 
     /**
-     * @param bool $buffer Whether to buffer the data in a scratch file (before PHP 8.4, which cannot read in place).
+     * @param bool $buffer Whether to buffer the data in a scratch file (needed where ZipArchive::openString() does not exist).
      *
      * @internal Public for the tests, which cover the buffered path on every PHP version.
      */
     public static function fromString(string $data, ?Limits $limits, ?XmlParser $xmlParser, bool $buffer): self
     {
         if (! $buffer) {
-            // ZipArchive::openString() exists from PHP 8.4 (the minimum version is 8.3); openString() checks for it.
-            $zip = ZipArchive::openString($data); // @phpstan-ignore staticMethod.notFound
-            $zip instanceof ZipArchive || throw new ZipException('Failed to open the EPUB data as a ZIP archive');
+            // ZipArchive::openString() is an instance method that only newer ext-zip builds have (the minimum PHP
+            // version does not); openString() checks for it. Whatever it throws is reported as a ZipException.
+            $zip = new ZipArchive();
+            try {
+                $opened = $zip->openString($data, ZipArchive::RDONLY); // @phpstan-ignore method.notFound
+            } catch (\Throwable $throwable) {
+                throw new ZipException('Failed to open the EPUB data as a ZIP archive', 0, $throwable);
+            }
+
+            $opened === true || throw new ZipException('Failed to open the EPUB data as a ZIP archive');
 
             return new self($zip, $limits, $xmlParser);
         }

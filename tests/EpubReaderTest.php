@@ -139,6 +139,33 @@ final class EpubReaderTest extends TestCase
         }
     }
 
+    #[\PHPUnit\Framework\Attributes\DoesNotPerformAssertions]
+    public function testInvalidDataIsAZipExceptionOnEveryPath(): void
+    {
+        $paths = [true];
+        if (method_exists(ZipArchive::class, 'openString')) {
+            $paths[] = false;
+        }
+
+        foreach ($paths as $buffer) {
+            try {
+                EpubReader::fromString('not a zip', null, null, $buffer);
+                $this->fail('Expected a ZipException.');
+            } catch (ZipException) {
+            }
+        }
+    }
+
+    public function testReadsInPlaceWhereZipArchiveCanOpenStrings(): void
+    {
+        if (! method_exists(ZipArchive::class, 'openString')) {
+            $this->markTestSkipped('ZipArchive::openString() is not available.');
+        }
+
+        $data = (string) file_get_contents(__DIR__ . '/fixtures/valid.epub');
+        $this->assertSame(EpubReader::open(__DIR__ . '/fixtures/valid.epub')->getText(), EpubReader::fromString($data, null, null, false)->getText());
+    }
+
     public function testChangesAreRefused(): void
     {
         $reader = EpubReader::open(EpubBuilder::epub3()->buildEpub($this->workDir . '/book.epub'));

@@ -438,7 +438,7 @@ final readonly class Validator
             && (int) @filesize($file) <= self::MAX_DOCUMENT_BYTES;
         $content = $isReadable ? FileSystemHelper::readFile($file) : null;
 
-        return $content === null ? null : ContentDocumentProperties::detect($content);
+        return $content === null ? null : ContentDocumentProperties::detect($content, $this->xmlParser);
     }
 
     /**
