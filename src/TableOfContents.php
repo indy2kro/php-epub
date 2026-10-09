@@ -817,8 +817,8 @@ final readonly class TableOfContents
             $navMap->removeChild($point);
         }
 
-        $playOrder = 0;
-        $this->appendNavPoints($document, $namespace, $navMap, $entries, $ncxPath, $playOrder);
+        $state = ['order' => 0, 'count' => 0, 'seen' => []];
+        $this->appendNavPoints($document, $namespace, $navMap, $entries, $ncxPath, $state);
 
         $this->updateDepth($root);
         $this->save($root, $ncxPath);
@@ -861,29 +861,34 @@ final readonly class TableOfContents
 
     /**
      * @param list<TocEntry> $entries
+     * @param array{order: int, count: int, seen: array<string, int>} $state The last playOrder, the number of navPoints
+     *                                                                       and the playOrder of every content src so far.
      */
-    private function appendNavPoints(DOMDocument $document, string $namespace, DOMElement $parent, array $entries, string $ncxPath, int &$playOrder): void
+    private function appendNavPoints(DOMDocument $document, string $namespace, DOMElement $parent, array $entries, string $ncxPath, array &$state): void
     {
         foreach ($entries as $entry) {
             if ($entry->path === '') {
                 // The NCX has no unlinked entries: the children take this entry's place.
-                $this->appendNavPoints($document, $namespace, $parent, $entry->children, $ncxPath, $playOrder);
+                $this->appendNavPoints($document, $namespace, $parent, $entry->children, $ncxPath, $state);
                 continue;
             }
 
-            $playOrder++;
+            // navPoints with the same content src must have the same playOrder (EPUBCheck RSC-005).
+            $src = $this->href($ncxPath, $entry);
+            $state['count']++;
+            $state['seen'][$src] ??= ++$state['order'];
             $point = $document->createElementNS($namespace, 'navPoint');
-            $point->setAttribute('id', 'navPoint-' . $playOrder);
-            $point->setAttribute('playOrder', (string) $playOrder);
+            $point->setAttribute('id', 'navPoint-' . $state['count']);
+            $point->setAttribute('playOrder', (string) $state['seen'][$src]);
 
             $label = $point->appendChild($document->createElementNS($namespace, 'navLabel'));
             $label->appendChild($document->createElementNS($namespace, 'text'))->appendChild($document->createTextNode($entry->title));
 
             $content = $point->appendChild($document->createElementNS($namespace, 'content'));
-            $content->setAttribute('src', $this->href($ncxPath, $entry));
+            $content->setAttribute('src', $src);
 
             $parent->appendChild($point);
-            $this->appendNavPoints($document, $namespace, $point, $entry->children, $ncxPath, $playOrder);
+            $this->appendNavPoints($document, $namespace, $point, $entry->children, $ncxPath, $state);
         }
     }
 
