@@ -129,7 +129,11 @@ final class PdfConversionOptionsTest extends TestCase
     public function testHtmlLimitAtTheBoundary(Closure $adapter): void
     {
         $book = $this->book(3);
-        $bytes = array_sum(array_map(strlen(...), (new EpubDocumentLoader())->load($book)->chapters));
+        // The chapter files as stored count, not the sanitised HTML.
+        $bytes = 0;
+        foreach (glob($book . '/EPUB/c*.xhtml') ?: [] as $file) {
+            $bytes += (int) filesize($file);
+        }
 
         $this->assertGreaterThan(0, $bytes);
         $this->assertStringStartsWith('%PDF', $this->convert($adapter, new PdfConversionOptions(maxHtmlBytes: $bytes), $book));
@@ -158,6 +162,63 @@ final class PdfConversionOptionsTest extends TestCase
         $this->assertRefused(ConversionException::CODE_BUDGET_EXCEEDED, $adapter, new PdfConversionOptions(maxImageBytes: $bytes - 1), $book, 'images are over the limit');
     }
 
+    public function testImagesCountWhateverTheirExtension(): void
+    {
+        $png = (string) base64_decode(EpubBuilder::PNG, true);
+        $loader = new EpubDocumentLoader();
+
+        foreach (['pic', 'pic.jfif', 'pic.jpe'] as $name) {
+            $book = $this->book(1, '', '', [], '<p><img src="' . $name . '" alt=""/></p>');
+            file_put_contents($book . '/EPUB/' . $name, $png);
+
+            $this->assertCount(1, $loader->load($book, new PdfConversionOptions(maxImageBytes: strlen($png)))->chapters, $name);
+            try {
+                $loader->load($book, new PdfConversionOptions(maxImageBytes: strlen($png) - 1));
+                $this->fail("{$name} was not counted");
+            } catch (ConversionException $exception) {
+                $this->assertSame(ConversionException::CODE_BUDGET_EXCEEDED, $exception->getCode());
+            }
+        }
+    }
+
+    public function testCssImagesCountButFontsAndStylesheetsDoNot(): void
+    {
+        $png = (string) base64_decode(EpubBuilder::PNG, true);
+        $book = $this->book(1, '', '', [], '<p style="background: url(bg)">x</p><style>@font-face { font-family: F; src: url(f.ttf); }</style>');
+        file_put_contents($book . '/EPUB/bg', $png);
+        file_put_contents($book . '/EPUB/f.ttf', str_repeat('x', 5000));
+        $loader = new EpubDocumentLoader();
+
+        $this->assertCount(1, $loader->load($book, new PdfConversionOptions(maxImageBytes: strlen($png)))->chapters);
+        $this->expectException(ConversionException::class);
+        $loader->load($book, new PdfConversionOptions(maxImageBytes: strlen($png) - 1));
+    }
+
+    public function testStylesheetsCountTowardsTheHtmlLimit(): void
+    {
+        $book = $this->book(1, '<item id="css" href="s.css" media-type="text/css"/>');
+        file_put_contents($book . '/EPUB/s.css', str_repeat('p { margin: 0; }', 100));
+        file_put_contents($book . '/EPUB/c0.xhtml', EpubBuilder::xhtml('C0', '<p>Text</p>', 's.css'));
+        $total = (int) filesize($book . '/EPUB/c0.xhtml') + (int) filesize($book . '/EPUB/s.css');
+        $loader = new EpubDocumentLoader();
+
+        $this->assertCount(1, $loader->load($book, new PdfConversionOptions(maxHtmlBytes: $total))->chapters);
+        $this->expectException(ConversionException::class);
+        $loader->load($book, new PdfConversionOptions(maxHtmlBytes: $total - 1));
+    }
+
+    public function testAnOversizedChapterIsRefusedBeforeItIsRead(): void
+    {
+        $book = $this->book(1);
+        $size = (int) filesize($book . '/EPUB/c0.xhtml');
+        // Not an XHTML document at all: refused on its size alone, never parsed.
+        file_put_contents($book . '/EPUB/c0.xhtml', str_repeat('<', $size * 4));
+
+        $this->expectException(ConversionException::class);
+        $this->expectExceptionMessage('HTML is over the limit');
+        (new EpubDocumentLoader())->load($book, new PdfConversionOptions(maxHtmlBytes: $size * 2));
+    }
+
     public function testDataUrisCountEachTimeTheyAreUsed(): void
     {
         $size = strlen((string) base64_decode(EpubBuilder::PNG, true));
@@ -178,7 +239,7 @@ final class PdfConversionOptionsTest extends TestCase
         $book = $this->book(2);
 
         $this->assertStringStartsWith('%PDF', $this->convert($adapter, new PdfConversionOptions(timeBudgetSeconds: 600.0), $book));
-        $this->assertRefused(ConversionException::CODE_TIME_BUDGET_EXCEEDED, $adapter, new PdfConversionOptions(timeBudgetSeconds: 0.0), $book, 'time budget of 0 seconds');
+        $this->assertRefused(ConversionException::CODE_TIME_BUDGET_EXCEEDED, $adapter, new PdfConversionOptions(timeBudgetSeconds: 1.0E-9), $book, 'time budget of 1.0E-9 seconds');
     }
 
     /**
@@ -261,6 +322,28 @@ final class PdfConversionOptionsTest extends TestCase
      * @param Closure(PdfConversionOptions): ConverterInterface $adapter
      */
     #[DataProvider('adapters')]
+    public function testCustomPageSizeFollowsTheOrientationStyleWhicheverWayRoundItIsGiven(Closure $adapter): void
+    {
+        foreach ([[297.0, 210.0], [210.0, 297.0]] as [$width, $height]) {
+            foreach (['portrait' => [210.0, 297.0], 'landscape' => [297.0, 210.0]] as $orientation => [$expectedWidth, $expectedHeight]) {
+                $options = new PdfConversionOptions(pageWidthMm: $width, pageHeightMm: $height);
+                $adapterWithStyle = $adapter($options) instanceof DompdfAdapter
+                    ? new DompdfAdapter(['orientation' => $orientation], new EpubDocumentLoader(), $options)
+                    : new TCPDFAdapter(['orientation' => $orientation], new EpubDocumentLoader(), $options);
+                $output = $this->directory . '/orientation.pdf';
+                $adapterWithStyle->convert($this->book(1), $output);
+
+                [$boxWidth, $boxHeight] = $this->mediaBox((string) file_get_contents($output));
+                $this->assertEqualsWithDelta($expectedWidth * 72 / 25.4, $boxWidth, 0.5, "{$width}x{$height} {$orientation}");
+                $this->assertEqualsWithDelta($expectedHeight * 72 / 25.4, $boxHeight, 0.5, "{$width}x{$height} {$orientation}");
+            }
+        }
+    }
+
+    /**
+     * @param Closure(PdfConversionOptions): ConverterInterface $adapter
+     */
+    #[DataProvider('adapters')]
     public function testWithoutACustomPageSizeThePaperSizeStyleApplies(Closure $adapter): void
     {
         $pdf = $this->convert($adapter, new PdfConversionOptions(), $this->book(1));
@@ -331,10 +414,14 @@ final class PdfConversionOptionsTest extends TestCase
      */
     public static function invalidOptions(): Iterator
     {
-        yield 'negative chapters' => [['maxChapters' => -1], 'maxChapters must not be negative'];
-        yield 'negative html' => [['maxHtmlBytes' => -1], 'maxHtmlBytes must not be negative'];
-        yield 'negative images' => [['maxImageBytes' => -1], 'maxImageBytes must not be negative'];
-        yield 'negative time' => [['timeBudgetSeconds' => -0.5], 'timeBudgetSeconds'];
+        yield 'negative chapters' => [['maxChapters' => -1], 'maxChapters must be greater than zero'];
+        yield 'zero chapters' => [['maxChapters' => 0], 'maxChapters must be greater than zero'];
+        yield 'negative html' => [['maxHtmlBytes' => -1], 'maxHtmlBytes must be greater than zero'];
+        yield 'zero html' => [['maxHtmlBytes' => 0], 'maxHtmlBytes must be greater than zero'];
+        yield 'negative images' => [['maxImageBytes' => -1], 'maxImageBytes must be greater than zero'];
+        yield 'zero images' => [['maxImageBytes' => 0], 'maxImageBytes must be greater than zero'];
+        yield 'negative time' => [['timeBudgetSeconds' => -0.5], 'timeBudgetSeconds must be a finite number greater than zero'];
+        yield 'zero time' => [['timeBudgetSeconds' => 0.0], 'timeBudgetSeconds must be a finite number greater than zero'];
         yield 'width alone' => [['pageWidthMm' => 100.0], 'must be given together'];
         yield 'zero height' => [['pageWidthMm' => 100.0, 'pageHeightMm' => 0.0], 'pageHeightMm must be'];
     }

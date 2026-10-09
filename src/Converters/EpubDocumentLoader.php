@@ -99,9 +99,10 @@ final class EpubDocumentLoader
     private const int FONT_BUDGET = 16 * 1024 * 1024;
 
     /**
-     * File extensions counted against the image budget of PdfConversionOptions.
+     * File extensions of resources (stylesheets and fonts) that do not count against the image budget
+     * of PdfConversionOptions; every other file a book references is counted, whatever its extension.
      */
-    private const array IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'tif', 'tiff', 'avif', 'ico'];
+    private const array NON_IMAGE_EXTENSIONS = ['css', 'ttf', 'otf', 'ttc', 'woff', 'woff2', 'eot'];
 
     private int $svgBudget = self::SVG_BUDGET;
 
@@ -188,7 +189,6 @@ final class EpubDocumentLoader
             $styles = [];
             $this->checkDeadline();
             $chapter = $this->prepareChapter($root, 'content.xhtml', $styles, $chapterTitle, ['content.xhtml' => 0]);
-            $this->countHtml($chapter);
 
             return new EpubDocument('', [], [$chapter], array_values($styles), [$chapterTitle], $root);
         }
@@ -224,9 +224,7 @@ final class EpubDocumentLoader
         $styles = [];
         foreach (array_keys($chapterIndexes) as $path) {
             $this->checkDeadline();
-            $chapter = $this->prepareChapter($root, (string) $path, $styles, $chapterTitle, $chapterIndexes);
-            $this->countHtml($chapter);
-            $chapters[] = $chapter;
+            $chapters[] = $this->prepareChapter($root, (string) $path, $styles, $chapterTitle, $chapterIndexes);
             $chapterTitles[] = $chapterTitle;
         }
 
@@ -301,11 +299,11 @@ final class EpubDocumentLoader
     }
 
     /**
-     * @throws ConversionException If the sanitised chapters together are over the HTML limit.
+     * @throws ConversionException If the chapter files and stylesheets together are over the HTML limit.
      */
-    private function countHtml(string $chapter): void
+    private function countHtml(int $bytes): void
     {
-        $this->htmlBytes += strlen($chapter);
+        $this->htmlBytes += $bytes;
         $max = $this->options->maxHtmlBytes;
         if ($max !== null && $this->htmlBytes > $max) {
             throw new ConversionException("The book's HTML is over the limit of {$max} bytes", ConversionException::CODE_BUDGET_EXCEEDED);
@@ -453,6 +451,8 @@ final class EpubDocumentLoader
         $title = '';
 
         $file = $this->paths->resolve($root, $path);
+        // Checked before the file is read, so an oversized chapter is never loaded.
+        $this->countHtml((int) @filesize($file));
         $content = FileSystemHelper::readFile($file) ?? throw new ConversionException("Failed to read content from: {$path}");
 
         $document = new DOMDocument();
@@ -651,7 +651,7 @@ final class EpubDocumentLoader
                 continue;
             }
 
-            $file = $this->resolveSource($root, $directory, $link->getAttribute('href'));
+            $file = $this->resolveSource($root, $directory, $link->getAttribute('href'), 0, false);
             if ($file === '' || str_starts_with($file, 'data:') || isset($styles[$file])) {
                 continue;
             }
@@ -659,6 +659,7 @@ final class EpubDocumentLoader
             // url() in a stylesheet is relative to the stylesheet, not to the chapter.
             $relative = substr($file, strlen(str_replace('\\', '/', $root)) + 1);
             $cssDirectory = dirname($relative) === '.' ? '' : dirname($relative) . '/';
+            $this->countHtml((int) @filesize($file));
             $css = FileSystemHelper::readFile($file);
             if ($css !== null) {
                 $styles[$file] = $this->sanitizeCss($css, $root, $cssDirectory);
@@ -669,6 +670,10 @@ final class EpubDocumentLoader
         if ($head instanceof DOMElement) {
             foreach ($head->getElementsByTagName('style') as $style) {
                 $css = $this->sanitizeCss($style->textContent, $root, $directory);
+                if (! isset($styles['style:' . md5($css)])) {
+                    $this->countHtml(strlen($css));
+                }
+
                 $styles['style:' . md5($css)] = $css;
             }
         }
@@ -714,8 +719,9 @@ final class EpubDocumentLoader
      *
      * @param int $svgDepth How many SVG documents enclose the reference. Inside an SVG, references
      *                      to its own elements (#id) are kept and SVG files are not inlined.
+     * @param bool $countAsImage Whether the file counts against the image budget (false for stylesheets).
      */
-    private function resolveSource(string $root, string $directory, string $source, int $svgDepth = 0): string
+    private function resolveSource(string $root, string $directory, string $source, int $svgDepth = 0, bool $countAsImage = true): string
     {
         $source = trim($source);
 
@@ -752,7 +758,7 @@ final class EpubDocumentLoader
             return $svgDepth === 0 ? $this->inlineSvgFile($root, $real) : '';
         }
 
-        if (in_array(strtolower(pathinfo($real, PATHINFO_EXTENSION)), self::IMAGE_EXTENSIONS, true) && ! isset($this->countedImages[$real])) {
+        if ($countAsImage && ! in_array(strtolower(pathinfo($real, PATHINFO_EXTENSION)), self::NON_IMAGE_EXTENSIONS, true) && ! isset($this->countedImages[$real])) {
             $this->countedImages[$real] = true;
             $this->countImage((int) filesize($real));
         }

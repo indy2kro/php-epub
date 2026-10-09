@@ -26,10 +26,13 @@ final readonly class PdfConversionOptions
      * @param bool $includeCover Whether a cover image that no chapter shows becomes the first page.
      * @param bool $includeToc Whether a contents page, generated from the book's table of contents (titles
      *                         only, nested, linking to the chapters), follows the cover.
-     * @param int|null $maxHtmlBytes The most chapter HTML, in bytes after sanitising, summed over the book;
-     *                               null for no limit.
-     * @param int|null $maxImageBytes The most image data, in bytes, summed over the book (each image file once,
-     *                                every inlined SVG and data: URI each time it is used); null for no limit.
+     * @param int|null $maxHtmlBytes The most text, in bytes, summed over the book: the chapter files as stored
+     *                               (checked before a file is read) and the stylesheets, each once; null for no
+     *                               limit.
+     * @param int|null $maxImageBytes The most image data, in bytes, summed over the book: every file used as an
+     *                                image or other resource, whatever its extension, once (fonts and stylesheets
+     *                                excluded), and every inlined SVG and data: URI each time it is used; null for
+     *                                no limit.
      * @param int|null $maxChapters The most spine documents rendered; null for no limit.
      * @param float|null $timeBudgetSeconds The time a conversion may take, from the start of convert(),
      *                                      checked between chapters while reading and rendering. Rendering one
@@ -38,10 +41,12 @@ final readonly class PdfConversionOptions
      * @param bool $allowFixedLayout Whether a fixed-layout (pre-paginated) book is converted although its
      *                               pages are then reflowed, not reproduced.
      * @param float|null $pageWidthMm A custom page width in mm; with $pageHeightMm it replaces the adapter's
-     *                                paper_size (the orientation style still applies).
+     *                                paper_size. The shorter side is the width of a portrait page and the longer
+     *                                the height, whichever order they are given in; the orientation style decides.
      * @param float|null $pageHeightMm A custom page height in mm.
      *
-     * @throws Exception If a limit is not positive or only one of the page dimensions is given.
+     * @throws Exception If a limit or the time budget is not greater than zero, or only one of the page
+     *                   dimensions is given.
      */
     public function __construct(
         public bool $includeCover = true,
@@ -55,13 +60,13 @@ final readonly class PdfConversionOptions
         public ?float $pageHeightMm = null
     ) {
         foreach (['maxHtmlBytes' => $maxHtmlBytes, 'maxImageBytes' => $maxImageBytes, 'maxChapters' => $maxChapters] as $name => $limit) {
-            if ($limit !== null && $limit < 0) {
-                throw new Exception("PdfConversionOptions {$name} must not be negative, {$limit} given");
+            if ($limit !== null && $limit < 1) {
+                throw new Exception("PdfConversionOptions {$name} must be greater than zero, {$limit} given");
             }
         }
 
-        if ($timeBudgetSeconds !== null && (! is_finite($timeBudgetSeconds) || $timeBudgetSeconds < 0)) {
-            throw new Exception('PdfConversionOptions timeBudgetSeconds must be a finite number, not negative');
+        if ($timeBudgetSeconds !== null && (! is_finite($timeBudgetSeconds) || $timeBudgetSeconds <= 0)) {
+            throw new Exception('PdfConversionOptions timeBudgetSeconds must be a finite number greater than zero');
         }
 
         if (($pageWidthMm === null) !== ($pageHeightMm === null)) {
@@ -99,12 +104,15 @@ final readonly class PdfConversionOptions
     }
 
     /**
-     * The custom page size as [width, height] in mm, or null when the adapter's paper_size applies.
+     * The custom page size as the [width, height] in mm of a portrait page (shorter side first), or null
+     * when the paper_size style of the adapter applies.
      *
      * @return array{float, float}|null
      */
     public function customPageSize(): ?array
     {
-        return $this->pageWidthMm === null || $this->pageHeightMm === null ? null : [$this->pageWidthMm, $this->pageHeightMm];
+        return $this->pageWidthMm === null || $this->pageHeightMm === null
+            ? null
+            : [min($this->pageWidthMm, $this->pageHeightMm), max($this->pageWidthMm, $this->pageHeightMm)];
     }
 }

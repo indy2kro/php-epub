@@ -42,14 +42,14 @@ try {
 | --- | --- | --- |
 | `includeCover` | `true` | A cover image that no chapter shows becomes the first page. |
 | `includeToc` | `false` | A generated contents page after the cover: the titles of `TableOfContents::getEntries()`, nested, escaped, each linking to its chapter. A book without a table of contents gets none. TCPDF adds a "Contents" bookmark. |
-| `maxHtmlBytes` | none | The most chapter HTML (after sanitising), in bytes, summed over the book. |
-| `maxImageBytes` | none | The most image data in bytes: each image file once, each inlined SVG or `data:` image every time it is used. |
+| `maxHtmlBytes` | none | The most text in bytes, summed over the book: the chapter files as stored (checked before a file is read, so an oversized chapter is never parsed) plus the stylesheets, each once. |
+| `maxImageBytes` | none | The most image data in bytes: every file used as an image or other resource (`<img>`, CSS `url()`, ...), whatever its extension or lack of one, once; fonts and stylesheets are not counted. Each inlined SVG or `data:` image counts every time it is used. |
 | `maxChapters` | none | The most spine documents. |
 | `timeBudgetSeconds` | none | Checked between chapters while reading and rendering, and before Dompdf starts rendering. Rendering one chapter (with Dompdf, the whole document) cannot be interrupted. |
 | `allowFixedLayout` | `false` | A book that is `pre-paginated` as a whole, or for more than half of its spine documents (a `rendition:layout-*` property of a spine entry wins over the book), is refused: a flowing PDF cannot reproduce its pages. |
-| `pageWidthMm`, `pageHeightMm` | none | A custom page size in mm, given together; replaces `paper_size` (the `orientation` style still applies). |
+| `pageWidthMm`, `pageHeightMm` | none | A custom page size in mm, given together; replaces `paper_size`. The shorter side is the width of a portrait page, whichever order they are given in, and the `orientation` style decides, in both adapters. |
 
-A limit equal to the size of the book is allowed, one more byte or chapter is not. A refusal throws a `ConversionException` whose code tells the reason: `CODE_FIXED_LAYOUT`, `CODE_BUDGET_EXCEEDED` (chapters, HTML or images) or `CODE_TIME_BUDGET_EXCEEDED`. The limits are checked while the book is read, before anything is rendered; invalid values (a negative limit, only one page dimension) throw an `Exception` from the `PdfConversionOptions` constructor.
+A limit equal to the size of the book is allowed, one more byte or chapter is not. A refusal throws a `ConversionException` whose code tells the reason: `CODE_FIXED_LAYOUT`, `CODE_BUDGET_EXCEEDED` (chapters, HTML or images) or `CODE_TIME_BUDGET_EXCEEDED`. The limits are checked while the book is read, before anything is rendered; invalid values (a limit or time budget that is not greater than zero, only one page dimension) throw an `Exception` from the `PdfConversionOptions` constructor.
 
 ```php
 use PhpEpub\ConversionException;
