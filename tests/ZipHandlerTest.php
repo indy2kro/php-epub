@@ -45,8 +45,11 @@ final class ZipHandlerTest extends TestCase
     protected function tearDown(): void
     {
         // Clean up any files or directories created during tests
-        if (file_exists($this->outputZipPath)) {
-            unlink($this->outputZipPath);
+        foreach (['output.zip', 'fast.zip', 'small.zip'] as $name) {
+            $path = dirname($this->outputZipPath) . DIRECTORY_SEPARATOR . $name;
+            if (file_exists($path)) {
+                unlink($path);
+            }
         }
 
         $builtZipPath = dirname($this->extractDir) . DIRECTORY_SEPARATOR . 'built.zip';
