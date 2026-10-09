@@ -41,6 +41,8 @@ nav:
     - ZipHandler: zip-handler.md
     - Cleanup: cleanup.md
     - Converter: converter.md
+    - Exporters: exporters.md
+    - Book builder: book-builder.md
     - Converters:
       - Calibre Adapter: converters/calibre-adapter.md
       - Dompdf Adapter: converters/dompdf-adapter.md

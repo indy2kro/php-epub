@@ -6,6 +6,9 @@ namespace PhpEpub\Test;
 
 use ErrorException;
 use PhpEpub\Converters\EpubDocumentLoader;
+use PhpEpub\Converters\HtmlAdapter;
+use PhpEpub\Converters\MarkdownAdapter;
+use PhpEpub\Converters\TextAdapter;
 use PhpEpub\EpubFile;
 use PhpEpub\EpubReader;
 use PhpEpub\Exception;
@@ -224,6 +227,9 @@ final class FuzzTest extends TestCase
             $this->guard(function () use ($book, $extracted): void {
                 (new ZipHandler())->extract($book, $extracted);
                 (new EpubDocumentLoader())->load($extracted);
+                (new TextAdapter())->toString($extracted);
+                (new HtmlAdapter())->toString($extracted);
+                (new MarkdownAdapter())->export($extracted);
             });
 
             $this->guard(function () use ($book): void {

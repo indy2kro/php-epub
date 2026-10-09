@@ -73,7 +73,10 @@ Extracts archives with limits (entry count, total size, compression ratio; `Limi
 `EpubFile::compress()` runs `Cleanup\Cleanup`, which applies the actions of a `CleanupOptions` (unreferenced and stray files, scripts, remote references, unused fonts, image recompression) to the loaded book and returns a `CleanupReport`. `Cleanup\ReferenceGraph` decides which manifest files are reachable from the spine, navigation, NCX and cover by following references through XHTML, SVG, SMIL and CSS; unreadable content is treated conservatively. See [Cleanup and Compression](cleanup.md).
 
 ### Converters
-`ConverterInterface` has three adapters: `TCPDFAdapter` and `DompdfAdapter` (PDF, via `EpubDocumentLoader`, which reads the spine documents and makes their HTML safe to render), and `CalibreAdapter` (any format Calibre's `ebook-convert` supports). `Converter` maps formats to adapters.
+`ConverterInterface` has three adapters: `TCPDFAdapter` and `DompdfAdapter` (PDF, via `EpubDocumentLoader`, which reads the spine documents and makes their HTML safe to render), and `CalibreAdapter` (any format Calibre's `ebook-convert` supports). `Converter` maps formats to adapters. `TextAdapter`, `HtmlAdapter` and `MarkdownAdapter` export text, one sanitised HTML file and Markdown from the same loader output (see [Exporters](exporters.md)).
+
+### BookBuilder
+Builds a new book from Markdown, text, HTML or images (see [Book builder](book-builder.md)): `MarkdownParser` turns Markdown into HTML (raw HTML is escaped), `Util\HtmlSanitizer` reduces any HTML to an allowlist and resolves images against the supplied map only, `BookBuilder` splits the result into chapters, and `BookPackage` writes the package, navigation document and NCX as an OCF archive through `ZipHandler`. `BuildLimits` bounds chapters, bytes and images.
 
 ## Untrusted input
 
@@ -81,7 +84,7 @@ Every byte of a book is treated as hostile: `PathResolver` keeps every path from
 
 ## Exceptions
 
-All exceptions extend `PhpEpub\Exception`: `ZipException` (archive problems and extraction limits), `InvalidEpubException` (invalid structure or paths outside the book) with its subclass `XmlException` (unreadable or unsafe XML), and `ConversionException` (PDF conversion failures) and `ReadOnlyException` (a change asked of an `EpubReader`).
+All exceptions extend `PhpEpub\Exception`: `ZipException` (archive problems and extraction limits), `InvalidEpubException` (invalid structure or paths outside the book) with its subclass `XmlException` (unreadable or unsafe XML), `ConversionException` (conversion failures), `ReadOnlyException` (a change asked of an `EpubReader`) and `BuildException` (invalid options, no content or a limit exceeded when building a book).
 
 ## Design Patterns
 

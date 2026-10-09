@@ -78,9 +78,10 @@ final class EpubDocumentLoader
     private const array UNANCHORED_ELEMENTS = ['thead', 'tbody', 'tfoot', 'tr', 'colgroup', 'col'];
 
     /**
-     * SVG elements that run code or embed (X)HTML.
+     * SVG elements that run code, embed (X)HTML or animate attributes (a <set attributeName="href" to="javascript:...">
+     * rewrites a link after the sanitiser has looked at it).
      */
-    private const array REMOVED_SVG_ELEMENTS = ['script', 'foreignobject'];
+    private const array REMOVED_SVG_ELEMENTS = ['script', 'foreignobject', 'set', 'animate', 'animatemotion', 'animatetransform', 'animatecolor'];
 
     /**
      * How deeply data: SVGs may nest inside SVGs.
@@ -214,10 +215,12 @@ final class EpubDocumentLoader
 
         // Book-relative path => chapter index, for links between chapters.
         $chapterIndexes = [];
+        $linear = [];
         foreach ($spine->getItems() as $spineItem) {
             $item = $spineItem->item;
             if ($item instanceof ManifestItem && $item->path !== '' && in_array($item->mediaType, self::XHTML_MEDIA_TYPES, true)) {
                 $chapterIndexes[$item->path] ??= count($chapterIndexes);
+                $linear[$item->path] ??= $spineItem->linear;
             }
         }
 
@@ -236,7 +239,9 @@ final class EpubDocumentLoader
         $language = $metadata->getLanguage();
         $direction = $spine->getPageProgressionDirection();
         $cover = $this->options->includeCover ? $this->coverImage($root, $manifest, $metadata, $chapters[0] ?? '') : '';
-        $contents = $this->options->includeToc ? $this->contentsPage($root, $manifest, $chapterIndexes) : '';
+        $tocEntries = $this->tocEntries($root, $manifest, $spine);
+        $contents = $this->options->includeToc ? $this->contentsPage($tocEntries, $chapterIndexes) : '';
+        $tocTitles = $this->tocTitles($tocEntries);
         $this->checkDeadline();
 
         return new EpubDocument(
@@ -250,7 +255,10 @@ final class EpubDocumentLoader
             $language,
             // A spine that says "ltr" or "rtl" wins over the language.
             $direction === null || $direction === 'default' ? EpubDocument::isRightToLeftLanguage($language) : $direction === 'rtl',
-            $contents
+            $contents,
+            array_map(strval(...), array_keys($chapterIndexes)),
+            array_values($linear),
+            array_map(static fn (int|string $path): string => $tocTitles[$path] ?? '', array_keys($chapterIndexes))
         );
     }
 
@@ -328,19 +336,29 @@ final class EpubDocumentLoader
     }
 
     /**
+     * The entries of the book's table of contents, read once for the contents page and the chapter titles; none
+     * when it cannot be read.
+     *
+     * @return list<TocEntry>
+     */
+    private function tocEntries(string $root, Manifest $manifest, Spine $spine): array
+    {
+        try {
+            return (new TableOfContents($root, $manifest, $this->xmlParser, $this->paths, null, $spine))->getEntries();
+        } catch (Exception) {
+            return [];
+        }
+    }
+
+    /**
      * The HTML of a contents page: the entries of the book's table of contents, titles only, nested,
      * each linking to its chapter. "" when the book has no table of contents.
      *
+     * @param list<TocEntry> $entries
      * @param array<string, int> $chapterIndexes
      */
-    private function contentsPage(string $root, Manifest $manifest, array $chapterIndexes): string
+    private function contentsPage(array $entries, array $chapterIndexes): string
     {
-        try {
-            $entries = (new TableOfContents($root, $manifest, $this->xmlParser, $this->paths))->getEntries();
-        } catch (Exception) {
-            return '';
-        }
-
         if ($entries === []) {
             return '';
         }
@@ -365,6 +383,37 @@ final class EpubDocumentLoader
         }
 
         return $html . '</ul>';
+    }
+
+    /**
+     * The title the book's table of contents gives each document: book-relative path => title. A document
+     * listed several times (an entry per section) is named by its first entry that has no fragment, else its
+     * first entry. A table of contents that cannot be read gives no titles.
+     *
+     * @param list<TocEntry> $entries
+     *
+     * @return array<string, string>
+     */
+    private function tocTitles(array $entries): array
+    {
+        $titles = [];
+        $whole = [];
+        $stack = $entries;
+        while ($stack !== []) {
+            $entry = array_shift($stack);
+            array_unshift($stack, ...$entry->children);
+            $title = $this->collapseWhitespace($entry->title);
+            if ($entry->path === '' || $title === '') {
+                continue;
+            }
+
+            $titles[$entry->path] ??= $title;
+            if ($entry->fragment === null || $entry->fragment === '') {
+                $whole[$entry->path] ??= $title;
+            }
+        }
+
+        return $whole + $titles;
     }
 
     /**
@@ -885,7 +934,7 @@ final class EpubDocumentLoader
         foreach (iterator_to_array($element->attributes ?? []) as $attribute) {
             $name = strtolower($attribute->localName ?? '');
 
-            if (str_starts_with($name, 'on')) {
+            if (str_starts_with($name, 'on') || (in_array($name, ['to', 'from', 'by', 'values'], true) && preg_match('/script\s*:/i', (string) preg_replace('/[\x00-\x20]+/', '', $attribute->value)) === 1)) {
                 $element->removeAttributeNode($attribute);
             } elseif ($name === 'href') {
                 $attribute->value = $this->resolveSource($root, $directory, $attribute->value, $svgDepth);

@@ -60,10 +60,13 @@ bundles the `ZipHandler` and `XmlParser` limits and the content-document size ca
 - `Parser` locates and checks the OPF via `META-INF/container.xml`. Problems that reading systems tolerate (a wrong
   `mimetype`, a broken NCX) are not thrown but reported by `Validator` through `EpubFile::validate()` as
   `ValidationIssue`s.
+- `Build\BookBuilder` makes a new book from Markdown, text, HTML or images; its input is untrusted, so HTML goes through
+  `Util\HtmlSanitizer` (allowlist, images only from the supplied map, no SVG) and `Build\BuildLimits` bounds the work.
 - `Encryption` and `FontObfuscation` handle `META-INF/encryption.xml` and IDPF/Adobe font obfuscation.
 - Converters (`src/Converters/`): `TCPDFAdapter` and `DompdfAdapter` render through `EpubDocumentLoader`, which reads
-  the spine documents and makes their HTML safe to render; `CalibreAdapter` runs `ebook-convert`. `Converter` maps
-  formats to adapters.
+  the spine documents and makes their HTML safe to render; `CalibreAdapter` runs `ebook-convert`; `TextAdapter`, `HtmlAdapter`
+  and `MarkdownAdapter` export text, sanitised HTML and Markdown from the loader's output (the HTML and Markdown go through
+  `Util\HtmlSanitizer`, an allowlist). `Converter` maps formats to adapters.
 - Core classes accept their collaborators as optional constructor arguments, which the tests use:
 
   ```php
@@ -83,7 +86,7 @@ Every byte of a book is treated as hostile. Preserve these invariants:
 - `EpubReader` applies the entry, size and ratio limits to the bytes it actually streams, never to declared sizes.
 - `EpubDocumentLoader` (with `ConfinedTcpdf`) confines everything the PDF renderers could load to the book.
 - Only `PhpEpub\Exception` subclasses may escape: `ZipException`, `InvalidEpubException` (and its subclass
-  `XmlException`), `ConversionException` and `ReadOnlyException`. Methods also throw when used incorrectly (e.g. `getMetadata()` before
+  `XmlException`), `ConversionException`, `ReadOnlyException` and `BuildException`. Methods also throw when used incorrectly (e.g. `getMetadata()` before
   `load()`).
 
 ## Testing

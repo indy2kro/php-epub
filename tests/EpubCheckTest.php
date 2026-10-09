@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace PhpEpub\Test;
 
+use PhpEpub\Build\BookBuilder;
+use PhpEpub\Build\BookOptions;
+use PhpEpub\Build\BuiltBook;
 use PhpEpub\Cleanup\CleanupPreset;
 use PhpEpub\EpubFile;
 use PhpEpub\TocEntry;
@@ -192,6 +195,55 @@ final class EpubCheckTest extends TestCase
         $reopened->cleanup();
 
         $this->assertPassesEpubCheck($path);
+    }
+
+    /**
+     * Books made by BookBuilder from Markdown, text, HTML and images must be valid, reflowable and fixed-layout alike.
+     *
+     * @param \Closure(): BuiltBook $build
+     */
+    #[DataProvider('builtBooks')]
+    public function testBuiltBookIsValid(\Closure $build): void
+    {
+        $path = $this->tmpDir . DIRECTORY_SEPARATOR . 'built.epub';
+        $build()->save($path);
+
+        $reopened = EpubFile::open($path);
+        $this->assertSame([], array_map(strval(...), $reopened->validate()));
+        $reopened->cleanup();
+
+        $this->assertPassesEpubCheck($path);
+    }
+
+    /**
+     * @return iterable<string, array{\Closure(): BuiltBook}>
+     */
+    public static function builtBooks(): iterable
+    {
+        $png = (string) base64_decode(EpubBuilder::PNG, true);
+        $jpeg = (string) base64_decode(EpubBuilder::JPEG, true);
+        $options = new BookOptions(
+            title: 'Built Book',
+            authors: ['Ann Author'],
+            language: 'en',
+            description: 'Made by BookBuilder',
+            publisher: 'Publisher',
+            date: '2026-10-09',
+            coverImage: $png,
+            css: 'p { text-indent: 1em }',
+            images: ['images/dot.png' => $png],
+            splitLevel: 2
+        );
+        $markdown = "Front matter.\n\n# One\n\nText with *emphasis*, a [link](http://example.com), [a jump](#two) and ![dot](images/dot.png).\n\n"
+            . "## Two\n\n- a\n- b\n\n> quote\n\n```\ncode\n```\n\n| h | i |\n|---|---|\n| 1 | 2 |\n";
+
+        yield 'markdown' => [static fn (): BuiltBook => (new BookBuilder($options))->fromMarkdown($markdown)];
+        yield 'html' => [static fn (): BuiltBook => (new BookBuilder($options))->fromHtml('<h1>One</h1><p id="a">Text <a href="#b">jump</a></p><h1>Two</h1><p id="b">More <img src="dot.png" alt="dot"/></p><table><tr><td>x</td></tr></table>')];
+        yield 'text' => [static fn (): BuiltBook => (new BookBuilder(new BookOptions(title: 'Plain', language: 'de')))->fromText("Chapter 1\n\nHello.\n\nChapter 2\n\nWorld.\n")];
+        yield 'images' => [static fn (): BuiltBook => (new BookBuilder(new BookOptions(title: 'Comic', direction: 'rtl', language: 'ja')))->fromImages([
+            ['name' => '1.png', 'bytes' => $png],
+            ['name' => '2.jpg', 'bytes' => $jpeg],
+        ])];
     }
 
     /**

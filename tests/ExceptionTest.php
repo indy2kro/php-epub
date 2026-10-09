@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PhpEpub\Test;
 
+use PhpEpub\BuildException;
 use PhpEpub\Exception;
 use PhpEpub\InvalidEpubException;
 use PhpEpub\XmlException;
@@ -18,6 +19,7 @@ final class ExceptionTest extends TestCase
         $this->assertInstanceOf(Exception::class, new XmlException());
         $this->assertInstanceOf(InvalidEpubException::class, new XmlException());
         $this->assertInstanceOf(Exception::class, new ZipException());
+        $this->assertInstanceOf(Exception::class, new BuildException());
     }
 
     public function testExceptionMessage(): void

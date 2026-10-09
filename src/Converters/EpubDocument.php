@@ -26,6 +26,11 @@ final readonly class EpubDocument
      *                          its main language is written right to left.
      * @param string $contents The HTML of a generated contents page (see PdfConversionOptions::$includeToc);
      *                         "" when there is none.
+     * @param list<string> $chapterPaths The book-relative path of each chapter, in the same order as $chapters.
+     * @param list<bool> $chapterLinear Whether each chapter is part of the primary reading order (false for
+     *                                  spine items marked linear="no"), in the same order as $chapters.
+     * @param list<string> $tocTitles The title the book's table of contents gives each chapter ("" when it
+     *                                lists none), in the same order as $chapters.
      */
     public function __construct(
         public string $title,
@@ -37,7 +42,10 @@ final readonly class EpubDocument
         public string $coverImage = '',
         public string $language = '',
         public bool $rightToLeft = false,
-        public string $contents = ''
+        public string $contents = '',
+        public array $chapterPaths = [],
+        public array $chapterLinear = [],
+        public array $tocTitles = []
     ) {
     }
 
