@@ -39,15 +39,16 @@ All arguments of `MergeOptions` are optional.
 | `deduplicate` | `true` | Keep one copy of byte-identical stylesheets, fonts and raster images. |
 | `maxBooks` | `10` | The most books accepted (at least 2). |
 | `maxTotalBytes` | 24 MiB | The most bytes accepted: the size of the books' extracted files together. |
+| `maxTotalFiles` | `5000` | The most files accepted: the number of files in the books' extracted directories together. |
 | `clock` | now | A closure returning the `DateTimeInterface` to record as `dcterms:modified`. |
 
-Fewer than two books, more than `maxBooks`, or more than `maxTotalBytes` throw a `PhpEpub\Exception`; so does a DRM-protected book.
+Fewer than two books, more than `maxBooks`, or more than `maxTotalBytes` or `maxTotalFiles` throw a `PhpEpub\Exception`; so does a DRM-protected book.
 
 ### What the merged book looks like
 
 - **Layout**: every book keeps its files in its own directory (`EPUB/book-01/`, `EPUB/book-02/`, …) with the layout it had, so the references between its files (XHTML, CSS `url()` and `@import`, SVG, `srcset`, media overlays) stay valid without rewriting. Manifest ids get the same prefix (`b01-chapter1`) and are unique.
 - **Reading order**: book order, then each book's own order. `linear="no"` and spine item properties (page spreads, rendition overrides) are kept, and so is the first book's page-progression direction.
-- **Navigation**: the sources' navigation documents and NCX files are not copied (a navigation document that is also in a book's reading order stays as an ordinary document). The merged book gets a new navigation document and NCX built from the books' table of contents (see `oneSectionPerBook`), and the first book's cover landmark. Page lists, the EPUB 2 `<guide>`, fallback chains and media overlay total durations are dropped; media overlays and their per-overlay durations follow their documents.
+- **Navigation**: the sources' navigation documents and NCX files are not copied (a navigation document that is also in a book's reading order stays as an ordinary document; links in the books' documents to a navigation document that is not copied become plain text). The merged book gets a new navigation document and NCX built from the books' table of contents (see `oneSectionPerBook`), and the first book's cover landmark. Page lists and the EPUB 2 `<guide>` are dropped. Remote resources (items with a URL instead of a file) are listed again with their new ids, `fallback` attributes follow the new ids, media overlays and their durations follow their documents, and the book's total media duration is the sum of the overlays' (left out when one overlay has no duration).
 - **EPUB 2 books** are upgraded as needed: the package is EPUB 3, the properties that XHTML documents need (`svg`, `mathml`, `scripted`, `remote-resources`) are set, and an XHTML 1.0 or 1.1 doctype becomes `<!DOCTYPE html>` (named entities such as `&nbsp;` become numeric references). Other XHTML 1.1 constructs that EPUB 3 does not allow are not rewritten.
 - **Metadata**: from the options or the first book. The access modes, features and hazards of all books are combined (a `none` or `unknown` hazard only when no book names a real one) and the accessibility summaries follow each other.
 - **Rendition**: when every book is pre-paginated the merged book is too. When the books mix reflowable and pre-paginated layouts, the spine items of the pre-paginated books carry a `rendition:layout-pre-paginated` override instead.
@@ -94,6 +95,7 @@ public static function byMaxBytes(int $bytes): self;
 public function withTitlePattern(string $pattern): self;
 public function withFilePrefix(string $prefix): self;
 public function withClock(\Closure $clock): self;
+public function withMaxParts(int $maxParts): self;
 ```
 
 `split()` creates the directory when needed, writes `part-01.epub`, `part-02.epub`, … (the prefix is configurable) and returns their paths in order.
@@ -105,12 +107,12 @@ public function withClock(\Closure $clock): self;
 - **`bySpineRanges($ranges)`**: `[first, last]` pairs of zero-based, inclusive positions in the reading order, in order and without overlap. Items outside every range are left out. A range beyond the reading order throws.
 - **`byMaxBytes($bytes)`**: items are added to a part while its files stay within the limit. The size counts the documents and the images, stylesheets and fonts they use (each once per part), uncompressed. An item that alone exceeds the limit gets a part of its own, so the limit is approximate.
 
-A part is never empty. A book that ends up in a single part is still written, with its title unchanged.
+With `withMaxParts()` (50 by default) a plan that would produce more parts is refused before anything is written, and if writing a part fails the parts already written are deleted. A part is never empty. A book that ends up in a single part is still written, with its title unchanged.
 
 ### What a part looks like
 
 - **Content**: the part's reading order items and what they need, found with `ReferenceGraph::analyzeFrom()`: images, stylesheets, fonts, fallbacks and media overlays, plus the navigation document, the NCX and the cover image. Everything else, including files nothing uses, is removed, together with the `META-INF/encryption.xml` entries of removed fonts.
-- **Navigation**: the navigation document, the NCX and the landmarks keep only the entries that point into the part. An entry whose own document is in another part stays as an unlinked heading when some of its children are in this one; otherwise it is dropped. A part without any entry gets one for its first document. Page lists are dropped, because their pages are spread over the whole book.
+- **Navigation**: the navigation document, the NCX and the landmarks keep only the entries that point into the part. An entry whose own document is in another part stays as an unlinked heading when some of its children are in this one; otherwise it is dropped. A part without any entry gets one for its first document. Page lists are dropped, because their pages are spread over the whole book. Other navs (lists of figures or tables and the like) keep only the entries that point into the part, and a nav left empty is removed.
 - **Links to other parts**: an `<a>` or `<area>` that points to a document of another part is replaced by its content (the link text stays, the link goes), and a `<link>` element to it is removed. Links within the part, to resources and to fragments of the same document are kept. A document that is not well-formed is left as it is.
 - **Metadata**: cloned from the book, with a new `urn:uuid:` unique identifier for each part (other identifiers, such as an ISBN, are dropped because they identify the whole book), the title from the pattern and a new `dcterms:modified`. Obfuscated fonts are re-keyed to the part's identifier.
 
