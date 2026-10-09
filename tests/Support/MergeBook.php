@@ -15,6 +15,7 @@ final class MergeBook
     /**
      * @param string $items Extra <item> elements.
      * @param array<string, string> $files Extra files by book path (or replacements of the generated ones).
+     * @param string $spineItems Extra <itemref> elements.
      * @param array<int, string> $chapterBodies Bodies by chapter number (1-based); the others get a paragraph.
      */
     public static function builder(
@@ -26,7 +27,8 @@ final class MergeBook
         string $css = 'p { margin: 0; }',
         array $chapterBodies = [],
         string $metadata = '',
-        string $spineAttributes = ''
+        string $spineAttributes = '',
+        string $spineItems = ''
     ): EpubBuilder {
         $manifest = '';
         $spine = '';
@@ -60,6 +62,7 @@ final class MergeBook
   </manifest>
   <spine{$spineAttributes}>
     {$spine}
+    {$spineItems}
   </spine>
 </package>
 XML;
