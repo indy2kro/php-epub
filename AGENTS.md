@@ -59,8 +59,9 @@ once and repacks. `create()` starts a new book, `convert()` runs a converter on 
   `ValidationIssue`s.
 - `Encryption` and `FontObfuscation` handle `META-INF/encryption.xml` and IDPF/Adobe font obfuscation.
 - Converters (`src/Converters/`): `TCPDFAdapter` and `DompdfAdapter` render through `EpubDocumentLoader`, which reads
-  the spine documents and makes their HTML safe to render; `CalibreAdapter` runs `ebook-convert`. `Converter` maps
-  formats to adapters.
+  the spine documents and makes their HTML safe to render; `CalibreAdapter` runs `ebook-convert`; `TextAdapter`, `HtmlAdapter`
+  and `MarkdownAdapter` export text, sanitised HTML and Markdown from the loader's output (the HTML and Markdown go through
+  `Util\HtmlSanitizer`, an allowlist). `Converter` maps formats to adapters.
 - Core classes accept their collaborators as optional constructor arguments, which the tests use:
 
   ```php

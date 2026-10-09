@@ -37,6 +37,7 @@ nav:
     - XmlParser: xml-parser.md
     - ZipHandler: zip-handler.md
     - Converter: converter.md
+    - Exporters: exporters.md
     - Converters:
       - Calibre Adapter: converters/calibre-adapter.md
       - Dompdf Adapter: converters/dompdf-adapter.md

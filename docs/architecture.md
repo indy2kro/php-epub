@@ -59,7 +59,7 @@ Reads and edits the EPUB 3 navigation document's `toc` nav and the EPUB 2 NCX as
 Extracts archives with limits (entry count, total size, compression ratio) and writes OCF-valid archives (`mimetype` first and uncompressed, `/` separators).
 
 ### Converters
-`ConverterInterface` has three adapters: `TCPDFAdapter` and `DompdfAdapter` (PDF, via `EpubDocumentLoader`, which reads the spine documents and makes their HTML safe to render), and `CalibreAdapter` (any format Calibre's `ebook-convert` supports). `Converter` maps formats to adapters.
+`ConverterInterface` has three adapters: `TCPDFAdapter` and `DompdfAdapter` (PDF, via `EpubDocumentLoader`, which reads the spine documents and makes their HTML safe to render), and `CalibreAdapter` (any format Calibre's `ebook-convert` supports). `Converter` maps formats to adapters. `TextAdapter`, `HtmlAdapter` and `MarkdownAdapter` export text, one sanitised HTML file and Markdown from the same loader output (see [Exporters](exporters.md)).
 
 ## Untrusted input
 

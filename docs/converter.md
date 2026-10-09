@@ -34,6 +34,8 @@ try {
 }
 ```
 
+Other adapters export plain text, a single HTML file and Markdown: see [Exporters](exporters.md).
+
 ## How the PDF adapters read a book
 
 `DompdfAdapter` and `TCPDFAdapter` render every XHTML document in the **spine**, in reading order, each starting on a new page, and take the PDF title and author from the EPUB metadata. A directory that only contains a `content.xhtml` file (the layout older versions required) is still accepted.
