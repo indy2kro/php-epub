@@ -485,4 +485,64 @@ final class SplitterTest extends TestCase
 
         $this->assertSame([], glob($directory . '/*.epub'));
     }
+
+    /**
+     * Every hyperlink of every document of a part points to a document of the part's reading order.
+     */
+    private function assertLinksStayInTheReadingOrder(EpubFile $part, string $label): void
+    {
+        $manifest = $part->getManifest();
+        $spine = [];
+        foreach ($part->getSpine()->get() as $idref) {
+            $spine[$manifest->get($idref)->path ?? ''] = true;
+        }
+
+        foreach ($manifest->getItems() as $item) {
+            if ($item->mediaType !== 'application/xhtml+xml' || $item->path === '') {
+                continue;
+            }
+
+            $content = (string) file_get_contents($part->getTempDir() . '/' . $item->path);
+            preg_match_all('/<a\b[^>]*\bhref="([^"#]+)/', $content, $matches);
+            foreach ($matches[1] as $href) {
+                if (preg_match('#^[a-z][a-z0-9+.-]*:#i', $href) === 1) {
+                    continue;
+                }
+
+                $directory = dirname($item->path);
+                $path = (string) preg_replace('#[^/]+/\.\./#', '', ($directory === '.' ? '' : $directory . '/') . rawurldecode($href));
+                $this->assertArrayHasKey($path, $spine, "{$label}: {$item->path} links to {$href}, which is not in the reading order");
+            }
+        }
+    }
+
+    public function testNoPartLinksToADocumentOutsideItsReadingOrder(): void
+    {
+        foreach (['valid.epub', 'valid_2.epub', 'valid_4.epub', 'valid_6.epub'] as $name) {
+            $book = $this->opened[] = EpubFile::open(dirname(__DIR__) . '/fixtures/' . $name);
+
+            foreach ([SplitPlan::everySpineItems(4), SplitPlan::byToc()] as $plan) {
+                foreach ($this->split($book, $plan) as $number => $part) {
+                    $this->assertLinksStayInTheReadingOrder($part, $name . ' part ' . ($number + 1));
+                }
+            }
+        }
+    }
+
+    public function testASelfLinkOfTheNavigationDocumentBecomesTextInPartsThatDoNotListIt(): void
+    {
+        $nav = EpubBuilder::xhtml('Contents', '<nav epub:type="toc"><h1>Contents</h1><ol><li><a href="text/chapter-1.xhtml">One</a></li><li><a href="text/chapter-2.xhtml">Two</a></li></ol></nav>'
+            . '<p>See <a href="nav.xhtml">this page</a> and <a href="text/chapter-2.xhtml">chapter two</a>.</p>');
+        $book = $this->open(MergeBook::builder(self::UID, 'Book', 2, files: ['EPUB/nav.xhtml' => $nav]));
+
+        $parts = $this->split($book, SplitPlan::everySpineItems(1));
+
+        $navigation = $parts[0]->getContentManager()->getContent('EPUB/nav.xhtml');
+        $this->assertStringNotContainsString('href="nav.xhtml"', $navigation);
+        $this->assertStringContainsString('this page', $navigation);
+        $this->assertStringNotContainsString('chapter-2', $navigation);
+        foreach ($parts as $number => $part) {
+            $this->assertLinksStayInTheReadingOrder($part, 'part ' . ($number + 1));
+        }
+    }
 }

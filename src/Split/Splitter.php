@@ -411,10 +411,19 @@ final readonly class Splitter
 
         $this->prune($part, $directory, $keep);
 
+        // A hyperlink may only point to a document of the reading order, so every other content document
+        // (another part's, and the navigation document when it is not in this part's reading order) is unlinked.
+        $inSpine = array_fill_keys($partPaths, true);
         $removedDocuments = [];
-        foreach ($spinePaths as $position => $path) {
-            if (! isset($inPart[$position]) && ! isset($keep[$path])) {
+        foreach ($spinePaths as $path) {
+            if (! isset($inSpine[$path])) {
                 $removedDocuments[$path] = true;
+            }
+        }
+
+        foreach ($part->getManifest()->getItems() as $item) {
+            if ($item->path !== '' && $item->mediaType === 'application/xhtml+xml' && ! isset($inSpine[$item->path])) {
+                $removedDocuments[$item->path] = true;
             }
         }
 
@@ -423,19 +432,19 @@ final readonly class Splitter
             $spine->setToc($ncx[0]->id);
         }
 
+        $this->pruneNavigations($part, $directory, $inSpine);
         $this->unlinkRemovedDocuments($part, $directory, $removedDocuments);
         $this->dropPageLists($part, $directory);
-        $this->pruneNavigations($part, $directory, $keep);
         $this->setMetadata($part, $plan, $number, $total);
 
         $navigation = $part->getTableOfContents();
         if ($navigation->isAvailable()) {
-            $entries = $this->keptEntries($toc, $keep);
+            $entries = $this->keptEntries($toc, $inSpine);
             $navigation->setEntries($entries !== [] ? $entries : [new TocEntry($part->getMetadata()->getTitle(), $partPaths[0])]);
         }
 
         try {
-            $navigation->setLandmarks(array_values(array_filter($landmarks, static fn (Landmark $landmark): bool => isset($keep[$landmark->path]))));
+            $navigation->setLandmarks(array_values(array_filter($landmarks, static fn (Landmark $landmark): bool => isset($inSpine[$landmark->path]))));
         } catch (Exception) {
             // A book with neither a navigation document nor a guide has nowhere to keep landmarks.
         }
@@ -484,8 +493,7 @@ final readonly class Splitter
         }
 
         foreach ($part->getManifest()->getItems() as $item) {
-            $isNavigation = in_array('nav', explode(' ', $item->properties), true);
-            if ($item->path === '' || $isNavigation || $item->mediaType !== 'application/xhtml+xml') {
+            if ($item->path === '' || $item->mediaType !== 'application/xhtml+xml') {
                 continue;
             }
 
