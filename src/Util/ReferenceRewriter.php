@@ -17,7 +17,7 @@ use PhpEpub\XmlParser;
  * and the relative references of a document that moves to another directory.
  *
  * References are resource attributes (the set Validator checks: src, poster, data, and href on
- * a, area, link, image and use, including xlink:href) and CSS url() / @import "…" values, in
+ * a, area, link, image and use, including xlink:href), srcset and imagesrcset candidates, and CSS url() / @import "…" values, in
  * stylesheets, style elements and style attributes. Query strings and fragments are kept.
  *
  * @internal
@@ -97,9 +97,12 @@ final readonly class ReferenceRewriter
         $value = $attribute->value;
         $isReference = in_array($name, ['src', 'poster', 'data'], true)
             || ($name === 'href' && in_array($element->localName, ['a', 'area', 'link', 'image', 'use'], true));
-        $rewritten = $isReference
-            ? $this->retarget($value, $directories, $from, $to)
-            : ($name === 'style' ? $this->rewriteCssText($value, $directories, $from, $to) : $value);
+        $rewritten = match (true) {
+            $isReference => $this->retarget($value, $directories, $from, $to),
+            $name === 'style' => $this->rewriteCssText($value, $directories, $from, $to),
+            in_array($name, ['srcset', 'imagesrcset'], true) => $this->rewriteSrcset($value, $directories, $from, $to),
+            default => $value,
+        };
         if ($rewritten === null || $rewritten === $value) {
             return false;
         }
@@ -108,6 +111,21 @@ final readonly class ReferenceRewriter
         $element->setAttributeNS($attribute->namespaceURI, $attribute->nodeName, $rewritten);
 
         return true;
+    }
+
+    /**
+     * @param array{string, string} $directories
+     */
+    private function rewriteSrcset(string $srcset, array $directories, string $from, string $to): string
+    {
+        $candidates = array_map(function (string $candidate) use ($directories, $from, $to): string {
+            // A candidate is a URL, optionally followed by a width or density descriptor.
+            $parts = preg_split('/\s+/', trim($candidate), 2) ?: [''];
+
+            return $parts[0] === '' ? $candidate : implode(' ', [$this->retarget($parts[0], $directories, $from, $to) ?? $parts[0], ...array_slice($parts, 1)]);
+        }, explode(',', $srcset));
+
+        return implode(',', $candidates) === $srcset ? $srcset : implode(', ', array_map(trim(...), $candidates));
     }
 
     /**
