@@ -390,6 +390,16 @@ class Manifest
     }
 
     /**
+     * The id of the fallback item of an item, from its fallback attribute; null when it has none.
+     */
+    public function getFallback(string $id): ?string
+    {
+        $fallback = (string) ($this->findNode($id)['fallback'] ?? '');
+
+        return $fallback === '' ? null : $fallback;
+    }
+
+    /**
      * Sets the media overlay (SMIL document) that narrates an XHTML or SVG content document, or
      * removes it with null. Media overlays exist only in EPUB 3; give the overlay its total duration
      * with Metadata::setMediaDurationOf().
