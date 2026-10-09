@@ -212,6 +212,43 @@ class Manifest
     }
 
     /**
+     * Gives every manifest item whose id is already used by an earlier item a new, unique id ("id-2", "id-3", ...);
+     * the first item keeps the id, which is also the one spine itemrefs and other references resolve to.
+     *
+     * @return list<array{string, string, string}> [old id, new id, path] of each renamed item.
+     */
+    public function renameDuplicateIds(): array
+    {
+        $seen = [];
+        $renamed = [];
+        foreach ($this->itemNodes() as $node) {
+            $id = (string) $node['id'];
+            if (! isset($seen[$id])) {
+                $seen[$id] = true;
+                continue;
+            }
+
+            $base = $id === '' ? 'item' : $id;
+            $suffix = 2;
+            while ($this->idInUse("{$base}-{$suffix}")) {
+                $suffix++;
+            }
+
+            $new = "{$base}-{$suffix}";
+            $node['id'] = $new;
+            $seen[$new] = true;
+            $renamed[] = [$id, $new, $this->tryHrefToPath((string) $node['href']) ?? ''];
+        }
+
+        if ($renamed !== []) {
+            $this->modified = true;
+            $this->forgetItems();
+        }
+
+        return $renamed;
+    }
+
+    /**
      * Changes the media type of an item, e.g. after its file was replaced with another format.
      *
      * @throws Exception If no item has this id, or the media type is not valid XML text.
@@ -671,7 +708,10 @@ class Manifest
         return false;
     }
 
-    private function guessMediaType(string $path): string
+    /**
+     * The media type for a file name's extension; "application/octet-stream" when it is not known.
+     */
+    public function guessMediaType(string $path): string
     {
         return self::MEDIA_TYPES[strtolower(pathinfo($path, PATHINFO_EXTENSION))] ?? 'application/octet-stream';
     }

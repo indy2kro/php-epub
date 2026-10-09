@@ -67,6 +67,49 @@ trait InteractsWithIdentifier
     }
 
     /**
+     * Makes package@unique-identifier name a dc:identifier that has a value: a package without a usable one gets
+     * the first non-empty dc:identifier (given an id when it has none), else the first dc:identifier, else a
+     * new one, holding $fallback.
+     *
+     * @return bool True when the package was changed; false when its unique identifier was already usable.
+     *
+     * @throws Exception If $fallback is empty or not valid XML text.
+     */
+    public function ensureUniqueIdentifier(string $fallback): bool
+    {
+        $unique = $this->uniqueIdentifierElement();
+        if ($unique instanceof SimpleXMLElement && trim((string) $unique) !== '') {
+            return false;
+        }
+
+        $this->assertDcValues('identifier', [$fallback]);
+        $elements = $this->dcElements('identifier');
+        $chosen = null;
+        foreach ($elements as $element) {
+            if (trim((string) $element) !== '') {
+                $chosen = $element;
+                break;
+            }
+        }
+
+        $chosen ??= $elements[0] ?? $this->addDcElement('identifier', $fallback);
+        if (trim((string) $chosen) === '') {
+            $this->setText($chosen, $fallback);
+        }
+
+        $id = (string) $chosen['id'];
+        if ($id === '') {
+            $id = $this->unusedId('pub-id');
+            $chosen->addAttribute('id', $id);
+        }
+
+        $this->opfXml['unique-identifier'] = $id;
+        $this->modified = true;
+
+        return true;
+    }
+
+    /**
      * Gets the identifiers with their schemes, in document order. The scheme comes from the EPUB 2
      * opf:scheme attribute, else the EPUB 3 identifier-type refinement (ONIX codes 02 and 15 are
      * "ISBN", 06 "DOI"), else a "urn:<scheme>:" or "doi:" prefix, else an ISBN check digit.

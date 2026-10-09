@@ -6,6 +6,9 @@ namespace PhpEpub;
 
 use DOMDocument;
 use PhpEpub\Converters\ConverterInterface;
+use PhpEpub\Repair\AppliedFix;
+use PhpEpub\Repair\RepairOptions;
+use PhpEpub\Repair\Repairer;
 use PhpEpub\Util\FileSystemHelper;
 use PhpEpub\Util\PathResolver;
 use PhpEpub\Util\TextEncoding;
@@ -824,6 +827,19 @@ class EpubFile
         }
 
         return (new Validator($this->tempDir, $this->opfXml, $this->metadata, $this->manifest, $this->spine, $this->getTableOfContents()))->validate();
+    }
+
+    /**
+     * Fixes the problems validate() reports that have one safe, deterministic fix (see Repairer), in the loaded book;
+     * save() writes the result.
+     *
+     * @return list<AppliedFix> The changes made; empty when the book needed none.
+     *
+     * @throws Exception If the book is not loaded or a file cannot be written.
+     */
+    public function repair(?RepairOptions $options = null): array
+    {
+        return (new Repairer($this))->repair($options);
     }
 
     /**
