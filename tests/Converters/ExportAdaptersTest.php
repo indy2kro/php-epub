@@ -35,6 +35,17 @@ final class ExportAdaptersTest extends TestCase
         (new FileSystemHelper())->deleteDirectory($this->tmpDir);
     }
 
+    public function testLoaderReportsChapterPathsLinearFlagsAndTocTitles(): void
+    {
+        $directory = self::twoChapterBook()->writeTo($this->tmpDir . '/book');
+
+        $document = (new \PhpEpub\Converters\EpubDocumentLoader())->load($directory);
+
+        $this->assertSame(['EPUB/one.xhtml', 'EPUB/two.xhtml', 'EPUB/notes.xhtml'], $document->chapterPaths);
+        $this->assertSame([true, true, false], $document->chapterLinear);
+        $this->assertSame(['Part One', 'The Second Part', ''], $document->tocTitles);
+    }
+
     public function testTextHasTitleChapterHeadingsAndBlankLineSeparatedParagraphs(): void
     {
         $directory = self::twoChapterBook()->writeTo($this->tmpDir . '/book');
@@ -44,8 +55,9 @@ final class ExportAdaptersTest extends TestCase
         $this->assertStringStartsWith("Two Chapters\n============\n\nby Ann Author", $text);
         // The TOC titles the chapters; the first line repeating the title is shown once.
         $this->assertStringContainsString("Part One\n========\n\nFirst paragraph.\n\nSecond paragraph.\n", $text);
-        $this->assertStringContainsString("Part Two\n========\n\nIn part two.", $text);
-        $this->assertLessThan(strpos($text, 'Part Two'), strpos($text, 'Part One'));
+        // A TOC title that differs from the chapter's own first line is shown above it.
+        $this->assertStringContainsString("The Second Part\n===============\n\nPart Two\n\nIn part two.", $text);
+        $this->assertLessThan(strpos($text, 'The Second Part'), strpos($text, 'Part One'));
         $this->assertStringNotContainsString('<', $text);
         $this->assertStringNotContainsString("\u{200B}", $text);
         $this->assertStringNotContainsString('Notes text', $text);
@@ -96,6 +108,7 @@ final class ExportAdaptersTest extends TestCase
         $this->assertStringStartsWith('<!DOCTYPE html>', $html);
         $this->assertStringContainsString('<title>Two Chapters</title>', $html);
         $this->assertStringContainsString('<nav class="epub-toc">', $html);
+        $this->assertStringContainsString('<a href="#epub-c1">The Second Part</a>', $html);
         $this->assertMatchesRegularExpression('/\.epub-book \.note\s*\{\s*color:\s*red/', $html);
         $this->assertMatchesRegularExpression('/\.epub-book\s*\{\s*font-family:\s*serif/', $html);
         $this->assertDoesNotMatchRegularExpression('/^body\s*\{/m', $html);
@@ -360,7 +373,10 @@ MD;
         return '<?xml version="1.0" encoding="UTF-8"?><html xmlns="http://www.w3.org/1999/xhtml"><head><title>' . $title . '</title>' . $head . '</head><body>' . $body . '</body></html>';
     }
 
-    private static function nav(string ...$entries): string
+    /**
+     * @param array<string, string> $entries href => title
+     */
+    private static function nav(array $entries): string
     {
         $items = '';
         foreach ($entries as $href => $title) {
@@ -386,7 +402,7 @@ MD;
             ->withFile('mimetype', 'application/epub+zip')
             ->withContainer('EPUB/package.opf')
             ->withFile('EPUB/package.opf', $opf)
-            ->withFile('EPUB/nav.xhtml', self::nav('one.xhtml', 'Part One', 'two.xhtml', 'Part Two'))
+            ->withFile('EPUB/nav.xhtml', self::nav(['one.xhtml' => 'Part One', 'two.xhtml' => 'The Second Part']))
             ->withFile('EPUB/style.css', "body { font-family: serif }\n.note { color: red }")
             ->withFile('EPUB/one.xhtml', self::chapter('Part One', '<h1>Part One</h1><p>First paragraph.</p><p>Second paragraph.</p><p><a href="two.xhtml#sec">Go</a> <a href="#missing">Dangling</a> <a href="notes.xhtml">Notes</a></p>', '<link rel="stylesheet" href="style.css"/>'))
             ->withFile('EPUB/two.xhtml', self::chapter('Part Two', '<h2 id="sec">Part Two</h2><p>In part two.</p>'))
