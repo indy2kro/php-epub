@@ -138,7 +138,8 @@ final readonly class ReferenceGraph
             $path = array_shift($queue);
             $item = $this->manifest->findByPath($path);
             if (! $item instanceof ManifestItem) {
-                continue;
+                // The queue only holds manifest paths.
+                continue; // @codeCoverageIgnore
             }
 
             $found = $this->scan($item, $unparsable, $unmanifested, $mentioned);
