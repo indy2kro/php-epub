@@ -16,6 +16,7 @@ A PHP library for reading and editing EPUB 2 and EPUB 3 books: metadata, cover, 
 - **New books**: `EpubFile::create()` and `addChapter()` build a valid EPUB 3 from scratch.
 - **Checks**: loading rejects a book without a readable `container.xml` or package document but, like reading systems, accepts a wrong `mimetype` or a broken NCX; `validate()` reports common problems (a wrong `mimetype`, missing metadata, invalid language tags and dates, manifest and spine inconsistencies, media types that contradict the content, missing manifest properties, missing or broken navigation, missing accessibility metadata). This is not a full validator like EPUBCheck.
 - **Cleanup**: `compress()` shrinks a book with presets (unreferenced files, scripts, remote references, unused fonts, image recompression with GD, maximum deflate) and a dry-run report; the reusable `ReferenceGraph` finds the files a book really uses. See [Cleanup and Compression](https://indy2kro.github.io/php-epub/cleanup/).
+- **Merge and split**: `Merger` combines 2 to 10 books into one EPUB 3 book (own directory and unique ids per book, a combined table of contents, optional deduplication of identical stylesheets, fonts and images, fonts re-obfuscated for the new identifier) and `Splitter` cuts a book into parts by table of contents, item count, ranges or size, each with only the files it needs and its own identifier. See [Merging and Splitting Books](https://indy2kro.github.io/php-epub/merge-split/).
 - **Conversion**: PDF with TCPDF or Dompdf, and any format Calibre's `ebook-convert` supports.
 - **Fonts and DRM**: embedded fonts can be added obfuscated (IDPF) and read back de-obfuscated, Dompdf uses a book's obfuscated fonts, and DRM-protected books (encrypted resources, Adobe ADEPT, Readium LCP) are detected, reported by `validate()` and never converted; nothing is ever decrypted.
 - **Hostile books**: paths are confined to the book, extraction is limited (zip bombs), XML entity declarations are refused, and PDF renderers cannot load anything outside the book. See [Handling Untrusted EPUBs](https://indy2kro.github.io/php-epub/advanced-usage/#handling-untrusted-epubs).
@@ -131,6 +132,21 @@ echo $report->archiveBytesBefore . ' -> ' . $report->archiveBytesAfter . " bytes
 ```
 
 See [Cleanup and Compression](https://indy2kro.github.io/php-epub/cleanup/) for the options and the dry-run report.
+
+### Merging and splitting
+
+```php
+use PhpEpub\Merge\MergeOptions;
+use PhpEpub\Merge\Merger;
+use PhpEpub\Split\SplitPlan;
+use PhpEpub\Split\Splitter;
+
+(new Merger())->merge([$firstBook, $secondBook], new MergeOptions(title: 'Omnibus'), '/path/to/omnibus.epub');
+
+$paths = (new Splitter())->split($epubFile, SplitPlan::byToc(), '/path/to/parts');
+```
+
+See [Merging and Splitting Books](https://indy2kro.github.io/php-epub/merge-split/) for the options, the plans and what the output looks like.
 
 ### Errors
 
