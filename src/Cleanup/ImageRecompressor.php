@@ -131,11 +131,13 @@ final readonly class ImageRecompressor
     }
 
     /**
-     * About 5 bytes per pixel for the decoded image and again for its scaled copy, plus the data and the result.
+     * About 8 bytes per pixel for the decoded image and again for its scaled copy (GD's 4 bytes per truecolor
+     * pixel plus the decoder's buffers and heap fragmentation, as measured), 4 bytes per pixel of the result for
+     * the encoder's output buffer, plus the data.
      */
     private function estimatedMemory(int $width, int $height, int $newWidth, int $newHeight, int $dataLength): int
     {
-        return 5 * $width * $height + ($newWidth === $width && $newHeight === $height ? 0 : 5 * $newWidth * $newHeight) + 3 * $dataLength;
+        return 8 * $width * $height + ($newWidth === $width && $newHeight === $height ? 0 : 8 * $newWidth * $newHeight) + 4 * $newWidth * $newHeight + 3 * $dataLength;
     }
 
     /**
@@ -156,7 +158,8 @@ final readonly class ImageRecompressor
             default => 1,
         };
 
-        return (int) (max(0, $bytes - memory_get_usage()) * 0.7);
+        // The limit applies to the memory the allocator holds, which a long-running process fragments.
+        return (int) (max(0, $bytes - memory_get_usage(true)) * 0.7);
     }
 
     /**
