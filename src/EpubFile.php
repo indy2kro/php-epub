@@ -46,7 +46,7 @@ class EpubFile
     private ?ContentManager $contentManager = null;
 
     /**
-     * The deflate level save() packs with while compress() runs (null: libzip's default).
+     * The deflate level save() packs with while compress() runs (null: the zip handler's default).
      */
     private ?int $compressionLevel = null;
 
@@ -382,7 +382,7 @@ class EpubFile
             || @file_put_contents($mimetype, 'application/epub+zip') !== false
             || throw new Exception("Failed to write the mimetype file: {$mimetype}");
 
-        $this->zipHandler->compress($tempDir, $filePath, $this->compressionLevel);
+        ($this->compressionLevel === null ? $this->zipHandler : $this->zipHandler->withCompressionLevel($this->compressionLevel))->compress($tempDir, $filePath);
     }
 
     /**
