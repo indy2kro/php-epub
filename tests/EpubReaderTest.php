@@ -166,6 +166,18 @@ final class EpubReaderTest extends TestCase
         $this->assertSame(EpubReader::open(__DIR__ . '/fixtures/valid.epub')->getText(), EpubReader::fromString($data, null, null, false)->getText());
     }
 
+    public function testAnInvalidStreamIsAZipExceptionAndLeavesNoScratchFile(): void
+    {
+        $data = 'not a zip ' . bin2hex(random_bytes(16));
+
+        try {
+            EpubReader::openStream($this->stream($data));
+            $this->fail('Expected a ZipException.');
+        } catch (ZipException) {
+            $this->assertSame([], $this->scratchArchives($data));
+        }
+    }
+
     public function testChangesAreRefused(): void
     {
         $reader = EpubReader::open(EpubBuilder::epub3()->buildEpub($this->workDir . '/book.epub'));

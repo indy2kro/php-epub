@@ -120,6 +120,24 @@ final class ZipHandlerTest extends TestCase
         $this->assertFileDoesNotExist($this->extractDir . DIRECTORY_SEPARATOR . 'evil.txt');
     }
 
+    public function testCompressSkipsADanglingSymlink(): void
+    {
+        $source = $this->compressDir . DIRECTORY_SEPARATOR . 'dangling';
+        mkdir($source, 0777, true);
+        file_put_contents($source . DIRECTORY_SEPARATOR . 'mimetype', 'application/epub+zip');
+
+        if (! @symlink($source . DIRECTORY_SEPARATOR . 'missing-target', $source . DIRECTORY_SEPARATOR . 'link')) {
+            $this->markTestSkipped('Creating symlinks is not permitted on this system.');
+        }
+
+        (new ZipHandler())->compress($source, $this->outputZipPath);
+
+        $zip = new \ZipArchive();
+        $zip->open($this->outputZipPath);
+        $this->assertSame(1, $zip->numFiles);
+        $zip->close();
+    }
+
     public function testExtractRejectsTooManyEntries(): void
     {
         $zipPath = $this->buildZip(['1.txt' => '1', '2.txt' => '2', '3.txt' => '3', '4.txt' => '4']);
