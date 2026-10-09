@@ -12,6 +12,7 @@ use DOMProcessingInstruction;
 use DOMXPath;
 use PhpEpub\ConversionException;
 use PhpEpub\Encryption;
+use PhpEpub\Exception;
 use PhpEpub\FontObfuscation;
 use PhpEpub\InvalidEpubException;
 use PhpEpub\Manifest;
@@ -19,6 +20,7 @@ use PhpEpub\ManifestItem;
 use PhpEpub\Metadata;
 use PhpEpub\Parser;
 use PhpEpub\Spine;
+use PhpEpub\TableOfContents;
 use PhpEpub\Util\FileSystemHelper;
 use PhpEpub\Util\PathResolver;
 use PhpEpub\Util\TextEncoding;
@@ -170,10 +172,12 @@ final class EpubDocumentLoader
 
         // Book-relative path => chapter index, for links between chapters.
         $chapterIndexes = [];
+        $linear = [];
         foreach ($spine->getItems() as $spineItem) {
             $item = $spineItem->item;
             if ($item instanceof ManifestItem && $item->path !== '' && in_array($item->mediaType, self::XHTML_MEDIA_TYPES, true)) {
                 $chapterIndexes[$item->path] ??= count($chapterIndexes);
+                $linear[$item->path] ??= $spineItem->linear;
             }
         }
 
@@ -187,6 +191,7 @@ final class EpubDocumentLoader
 
         $language = $metadata->getLanguage();
         $direction = $spine->getPageProgressionDirection();
+        $tocTitles = $this->tocTitles($root, $manifest, $spine);
 
         return new EpubDocument(
             $metadata->getTitle(),
@@ -198,8 +203,46 @@ final class EpubDocumentLoader
             $this->coverImage($root, $manifest, $metadata, $chapters[0] ?? ''),
             $language,
             // A spine that says "ltr" or "rtl" wins over the language.
-            $direction === null || $direction === 'default' ? EpubDocument::isRightToLeftLanguage($language) : $direction === 'rtl'
+            $direction === null || $direction === 'default' ? EpubDocument::isRightToLeftLanguage($language) : $direction === 'rtl',
+            array_map(strval(...), array_keys($chapterIndexes)),
+            array_values($linear),
+            array_map(static fn (int|string $path): string => $tocTitles[$path] ?? '', array_keys($chapterIndexes))
         );
+    }
+
+    /**
+     * The title the book's table of contents gives each document: book-relative path => title. A document
+     * listed several times (an entry per section) is named by its first entry that has no fragment, else its
+     * first entry. A table of contents that cannot be read gives no titles.
+     *
+     * @return array<string, string>
+     */
+    private function tocTitles(string $root, Manifest $manifest, Spine $spine): array
+    {
+        try {
+            $entries = (new TableOfContents($root, $manifest, $this->xmlParser, $this->paths, null, $spine))->getEntries();
+        } catch (Exception) {
+            return [];
+        }
+
+        $titles = [];
+        $whole = [];
+        $stack = $entries;
+        while ($stack !== []) {
+            $entry = array_shift($stack);
+            array_unshift($stack, ...$entry->children);
+            $title = $this->collapseWhitespace($entry->title);
+            if ($entry->path === '' || $title === '') {
+                continue;
+            }
+
+            $titles[$entry->path] ??= $title;
+            if ($entry->fragment === null || $entry->fragment === '') {
+                $whole[$entry->path] ??= $title;
+            }
+        }
+
+        return $whole + $titles;
     }
 
     /**
