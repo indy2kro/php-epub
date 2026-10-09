@@ -101,8 +101,8 @@ final class BookSummary
                     static fn (Landmark $landmark): array => [
                         'type' => $landmark->type,
                         'title' => $landmark->title,
-                        'path' => $landmark->path,
-                        'fragment' => $landmark->fragment,
+                        'path' => self::utf8($landmark->path),
+                        'fragment' => self::utf8Or($landmark->fragment),
                     ],
                     self::safeList(static fn (): array => $toc->getLandmarks())
                 ),
@@ -190,7 +190,7 @@ final class BookSummary
         $cover = $book->getCoverImage();
 
         return $cover instanceof ManifestItem
-            ? ['path' => $cover->path, 'mediaType' => $cover->mediaType, 'bytes' => self::fileSize($book, $cover->path)]
+            ? ['path' => self::utf8($cover->path), 'mediaType' => $cover->mediaType, 'bytes' => self::fileSize($book, $cover->path)]
             : null;
     }
 
@@ -204,8 +204,8 @@ final class BookSummary
         return array_map(
             static fn (TocEntry $entry): array => [
                 'title' => $entry->title,
-                'path' => $entry->path,
-                'fragment' => $entry->fragment,
+                'path' => self::utf8($entry->path),
+                'fragment' => self::utf8Or($entry->fragment),
                 'children' => self::tocNodes($entry->children),
             ],
             $entries
@@ -241,7 +241,7 @@ final class BookSummary
             $path = $spineItem->item instanceof ManifestItem ? $spineItem->item->path : '';
             $spine[] = [
                 'idref' => $spineItem->idref,
-                'path' => $path,
+                'path' => self::utf8($path),
                 'linear' => $spineItem->linear,
                 'title' => $titles[$path] ?? null,
                 'bytes' => self::fileSize($book, $path),
@@ -298,17 +298,34 @@ final class BookSummary
     }
 
     /**
-     * The words of the linear content; encrypted documents are skipped, as their bytes are not text.
+     * The words of the linear content, document by document so only one text is held at a time. Encrypted
+     * documents are skipped without being read (their bytes are not text), as are unreadable ones.
      */
     private static function wordCount(EpubFile $book): int
     {
-        try {
-            $texts = array_diff_key($book->getText(), array_flip($book->getEncryptedPaths()));
-        } catch (Exception) {
-            return 0;
+        $encrypted = array_flip($book->getEncryptedPaths());
+        $contentManager = $book->getContentManager();
+        $existing = array_flip($contentManager->getContentPaths());
+
+        $words = 0;
+        foreach ($book->getSpine()->getItems() as $spineItem) {
+            $item = $spineItem->item;
+            if (! $spineItem->linear || ! $item instanceof ManifestItem || self::group($item->mediaType) !== 'xhtml') {
+                continue;
+            }
+
+            if (isset($encrypted[$item->path]) || ! isset($existing[$item->path])) {
+                continue;
+            }
+
+            try {
+                $words += WordCount::count($contentManager->getText($item->path));
+            } catch (Exception) {
+                // An unreadable document adds nothing; the others are still counted.
+            }
         }
 
-        return array_sum(array_map(WordCount::count(...), $texts));
+        return $words;
     }
 
     private static function totalBytes(EpubFile $book): int
@@ -364,6 +381,20 @@ final class BookSummary
             // A navigation document or NCX that cannot be parsed counts as missing; validate() reports it.
             return [];
         }
+    }
+
+    /**
+     * Paths and fragments are percent-decoded from hrefs, so they can hold bytes that are not UTF-8, which
+     * json_encode() refuses: invalid sequences become "?".
+     */
+    private static function utf8(string $value): string
+    {
+        return mb_scrub($value, 'UTF-8');
+    }
+
+    private static function utf8Or(?string $value): ?string
+    {
+        return $value === null ? null : self::utf8($value);
     }
 
     private static function nonEmpty(string $value): ?string

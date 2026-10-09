@@ -190,6 +190,48 @@ final class BookSummaryTest extends TestCase
         $this->assertJsonRoundTrip($summary);
     }
 
+    public function testHostileHrefsStillEncodeAsJson(): void
+    {
+        $opf = str_replace(
+            ['<item id="style"', '<itemref idref="chapter"/>', '</package>'],
+            [
+                '<item id="bad" href="x%FF.xhtml" media-type="application/xhtml+xml"/>'
+                . '<item id="cover" href="c%FF.png" media-type="image/png" properties="cover-image"/><item id="style"',
+                '<itemref idref="chapter"/><itemref idref="bad"/>',
+                '<guide><reference type="cover" title="Cover" href="text/chapter.xhtml#%C3"/></guide></package>',
+            ],
+            (string) EpubBuilder::epub3()->getFile('EPUB/package.opf')
+        );
+        $nav = EpubBuilder::xhtml('Contents', '<nav epub:type="toc"><ol>'
+            . '<li><a href="text/chapter.xhtml#%FF">Chapter</a></li><li><a href="x%FF.xhtml">Bad</a></li></ol></nav>');
+
+        $summary = $this->open(EpubBuilder::epub3()->withFile('EPUB/package.opf', $opf)->withFile('EPUB/nav.xhtml', $nav))->toArray();
+
+        $this->assertJson(json_encode($summary, JSON_THROW_ON_ERROR));
+        $this->assertSame('bad', $summary['spine'][1]['idref']);
+        $this->assertTrue(mb_check_encoding($summary['spine'][1]['path'], 'UTF-8'));
+        $this->assertSame(0, $summary['spine'][1]['bytes']);
+        $this->assertSame('Bad', $summary['spine'][1]['title']);
+        $this->assertTrue(mb_check_encoding((string) $summary['toc']['entries'][0]['fragment'], 'UTF-8'));
+        $this->assertTrue(mb_check_encoding((string) $summary['toc']['landmarks'][0]['fragment'], 'UTF-8'));
+        $this->assertIsArray($summary['cover']);
+        $this->assertTrue(mb_check_encoding($summary['cover']['path'], 'UTF-8'));
+    }
+
+    public function testMissingDocumentIsSkippedInTheWordCount(): void
+    {
+        $opf = str_replace(
+            ['<item id="style"', '<itemref idref="chapter"/>'],
+            ['<item id="gone" href="text/gone.xhtml" media-type="application/xhtml+xml"/><item id="style"', '<itemref idref="gone"/><itemref idref="chapter"/>'],
+            (string) EpubBuilder::epub3()->getFile('EPUB/package.opf')
+        );
+
+        $summary = $this->open(EpubBuilder::epub3()->withFile('EPUB/package.opf', $opf))->toArray();
+
+        $this->assertSame(2, $summary['stats']['wordCount']);
+        $this->assertSame(0, $summary['spine'][0]['bytes']);
+    }
+
     public function testThrowsWhenNotLoaded(): void
     {
         $this->expectException(Exception::class);
