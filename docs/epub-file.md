@@ -127,10 +127,12 @@ $epubFile->save();
 ### Validating
 
 ```php
-public function validate(): array
+public function validate(?ValidationProfile $profile = null): array
 ```
 
-Checks the book, including unsaved changes, and returns a list of `PhpEpub\ValidationIssue` objects (`severity`, `code`, `message`, `location`); an empty list means no problem was found. It is a quick check before publishing, not a replacement for [EPUBCheck](https://www.w3.org/publishing/epubcheck/).
+Checks the book, including unsaved changes, and returns a list of `PhpEpub\ValidationIssue` objects (`severity`, `code`, `message`, `location`, and a `fix` hint for some; `ValidationProfile::kindle()` adds [Kindle checks](kindle.md), and [`repair()`](repair.md) fixes many problems); an empty list means no problem was found. It is a quick check before publishing, not a replacement for [EPUBCheck](https://www.w3.org/publishing/epubcheck/).
+
+*Upgrade note:* `validate()` gained an optional `?ValidationProfile` parameter and `Manifest::guessMediaType()` became public; a subclass overriding either must match.
 
 | Code | Severity | Problem |
 |---|---|---|

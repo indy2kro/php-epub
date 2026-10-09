@@ -25,6 +25,8 @@ nav:
     - Basic Usage: basic-usage.md
     - Advanced Features: advanced-usage.md
     - EPUB 3 Features: epub3-features.md
+    - Repairing a Book: repair.md
+    - Checking for Kindle: kindle.md
   - Architecture: architecture.md
   - Classes:
     - EpubFile: epub-file.md

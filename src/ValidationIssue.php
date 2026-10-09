@@ -20,12 +20,14 @@ final readonly class ValidationIssue implements Stringable
      * @param string $code A stable identifier, e.g. "MANIFEST_FILE_MISSING".
      * @param string $message A readable description.
      * @param string|null $location The file (relative to the book root) or package value concerned, if any.
+     * @param string|null $fix How to resolve the issue, when there is advice to give (the Kindle profile always has some).
      */
     public function __construct(
         public string $severity,
         public string $code,
         public string $message,
-        public ?string $location = null
+        public ?string $location = null,
+        public ?string $fix = null
     ) {
     }
 

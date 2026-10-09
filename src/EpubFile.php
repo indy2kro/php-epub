@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace PhpEpub;
 
 use PhpEpub\Converters\ConverterInterface;
+use PhpEpub\Repair\AppliedFix;
+use PhpEpub\Repair\RepairOptions;
+use PhpEpub\Repair\Repairer;
 use PhpEpub\Util\CoverLocator;
 use PhpEpub\Util\FileSystemHelper;
 use PhpEpub\Util\PathResolver;
@@ -777,17 +780,35 @@ class EpubFile
      * Checks the book for common structural problems (required metadata, manifest and spine
      * consistency, navigation), including unsaved changes. A quick check, not a replacement for EPUBCheck.
      *
+     * @param ValidationProfile|null $profile A set of extra checks for a target, e.g. ValidationProfile::kindle(); its
+     *                                        issues follow the structural ones.
+     *
      * @return list<ValidationIssue> Empty when no problem was found.
      *
      * @throws Exception If the book is not loaded or its navigation cannot be parsed.
      */
-    public function validate(): array
+    public function validate(?ValidationProfile $profile = null): array
     {
         if ($this->tempDir === null || $this->opfXml === null || $this->metadata === null || $this->manifest === null || $this->spine === null) {
             throw new Exception('EPUB file must be loaded before validating.');
         }
 
-        return (new Validator($this->tempDir, $this->opfXml, $this->metadata, $this->manifest, $this->spine, $this->getTableOfContents(), new PathResolver(), $this->xmlParser))->validate();
+        $issues = (new Validator($this->tempDir, $this->opfXml, $this->metadata, $this->manifest, $this->spine, $this->getTableOfContents(), new PathResolver(), $this->xmlParser))->validate();
+
+        return $profile instanceof ValidationProfile ? [...$issues, ...$profile->check($this)] : $issues;
+    }
+
+    /**
+     * Fixes the problems validate() reports that have one safe, deterministic fix (see Repairer), in the loaded book;
+     * save() writes the result.
+     *
+     * @return list<AppliedFix> The changes made; empty when the book needed none.
+     *
+     * @throws Exception If the book is not loaded or a file cannot be written.
+     */
+    public function repair(?RepairOptions $options = null): array
+    {
+        return (new Repairer($this))->repair($options);
     }
 
     /**

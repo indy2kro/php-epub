@@ -103,6 +103,31 @@ final class EpubCheckTest extends TestCase
     }
 
     /**
+     * Repairing a real-world book must not add problems, the problems it fixes must be gone, and the repaired book
+     * must save and open cleanly.
+     */
+    #[DataProvider('fixtureBooks')]
+    public function testRepairingAFixtureBookAddsNoProblems(string $fixture): void
+    {
+        $saved = $this->tmpDir . DIRECTORY_SEPARATOR . 'repaired.epub';
+
+        $original = EpubFile::open($fixture);
+        $before = self::codes($original->validate());
+        $fixed = array_unique(array_map(static fn (\PhpEpub\Repair\AppliedFix $fix): string => $fix->code, $original->repair()));
+        $original->save($saved);
+        $original->cleanup();
+
+        $reopened = EpubFile::open($saved);
+        $after = self::codes($reopened->validate());
+        $this->assertSame([], $reopened->repair(), 'A repaired book needs no more repair.');
+        $reopened->cleanup();
+
+        $this->assertSame([], array_values(array_diff($after, $before)), 'validate() reports new problems after repairing.');
+        $this->assertSame([], array_values(array_intersect($after, $fixed)), 'A fixed problem is still reported.');
+        $this->assertSame([], array_values(array_diff($this->epubCheckCodes($saved), $this->epubCheckCodes($fixture))), 'EPUBCheck reports new problems after repairing.');
+    }
+
+    /**
      * @return iterable<string, array{string}>
      */
     public static function fixtureBooks(): iterable

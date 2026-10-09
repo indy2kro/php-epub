@@ -118,6 +118,38 @@ class Spine
     }
 
     /**
+     * Removes the itemref at a zero-based position, e.g. a duplicate that is not the first (remove() takes the first).
+     *
+     * @throws Exception If the position is outside the spine.
+     */
+    public function removeAt(int $position): void
+    {
+        $entries = $this->entries();
+        if ($position < 0 || $position >= count($entries)) {
+            throw new Exception("Position {$position} is outside the spine (0 to " . max(0, count($entries) - 1) . ')');
+        }
+
+        array_splice($entries, $position, 1);
+
+        $this->write($entries);
+    }
+
+    /**
+     * Sets the id of the NCX manifest item that spine@toc names (EPUB 2 packages need it); null removes it.
+     */
+    public function setToc(?string $ncxId): void
+    {
+        $node = $this->spineNode();
+        if ($ncxId === null) {
+            unset($node['toc']);
+        } else {
+            $node['toc'] = $ncxId;
+        }
+
+        $this->modified = true;
+    }
+
+    /**
      * Moves an item to a new zero-based position in the reading order (0 to the spine length - 1).
      *
      * @throws Exception If the item is not in the spine or the position is out of range.
