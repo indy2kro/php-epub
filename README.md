@@ -16,6 +16,7 @@ A PHP library for reading and editing EPUB 2 and EPUB 3 books: metadata, cover, 
 - **New books**: `EpubFile::create()` and `addChapter()` build a valid EPUB 3 from scratch, and `BookBuilder` makes one from Markdown, plain text, HTML or a list of images (fixed-layout comics, left-to-right or right-to-left), with sanitised content, limits for untrusted input and an NCX for EPUB 2 readers; see [Book builder](https://indy2kro.github.io/php-epub/book-builder/).
 - **Checks**: loading rejects a book without a readable `container.xml` or package document but, like reading systems, accepts a wrong `mimetype` or a broken NCX; `validate()` reports common problems (a wrong `mimetype`, missing metadata, invalid language tags and dates, manifest and spine inconsistencies, media types that contradict the content, missing manifest properties, missing or broken navigation, missing accessibility metadata). This is not a full validator like EPUBCheck.
 - **Cleanup**: `compress()` shrinks a book with presets (unreferenced files, scripts, remote references, unused fonts, image recompression with GD, maximum deflate) and a dry-run report; the reusable `ReferenceGraph` finds the files a book really uses. See [Cleanup and Compression](https://indy2kro.github.io/php-epub/cleanup/).
+- **Merge and split**: `Merger` combines 2 to 10 books into one EPUB 3 book (own directory and unique ids per book, a combined table of contents, optional deduplication of identical stylesheets, fonts and images, fonts re-obfuscated for the new identifier) and `Splitter` cuts a book into parts by table of contents, item count, ranges or size, each with only the files it needs and its own identifier. See [Merging and Splitting Books](https://indy2kro.github.io/php-epub/merge-split/).
 - **Conversion**: PDF with TCPDF or Dompdf, and any format Calibre's `ebook-convert` supports.
 - **Repair and Kindle**: `repair()` fixes the problems `validate()` reports that have a safe fix (missing `dcterms:modified`, language, identifier or navigation, manifest and spine inconsistencies, unlisted files, media types, cover declarations, manifest properties) and lists each change ([docs](docs/repair.md)); `validate(ValidationProfile::kindle())` adds checks for Send to Kindle and KDP with fix hints ([docs](docs/kindle.md)).
 - **Export**: plain text, one self-contained sanitised HTML file (scoped CSS, inlined images) and Markdown with its images, safe to show for hostile books; see [Exporters](https://indy2kro.github.io/php-epub/exporters/).
@@ -187,6 +188,21 @@ $comic = (new BookBuilder(new BookOptions(title: 'My Manga', direction: 'rtl')))
 ```
 
 See [Book builder](https://indy2kro.github.io/php-epub/book-builder/).
+
+### Merging and splitting
+
+```php
+use PhpEpub\Merge\MergeOptions;
+use PhpEpub\Merge\Merger;
+use PhpEpub\Split\SplitPlan;
+use PhpEpub\Split\Splitter;
+
+(new Merger())->merge([$firstBook, $secondBook], new MergeOptions(title: 'Omnibus'), '/path/to/omnibus.epub');
+
+$paths = (new Splitter())->split($epubFile, SplitPlan::byToc(), '/path/to/parts');
+```
+
+See [Merging and Splitting Books](https://indy2kro.github.io/php-epub/merge-split/) for the options, the plans and what the output looks like.
 
 ### Errors
 

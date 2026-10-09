@@ -72,6 +72,9 @@ Extracts archives with limits (entry count, total size, compression ratio; `Limi
 ### Cleanup
 `EpubFile::compress()` runs `Cleanup\Cleanup`, which applies the actions of a `CleanupOptions` (unreferenced and stray files, scripts, remote references, unused fonts, image recompression) to the loaded book and returns a `CleanupReport`. `Cleanup\ReferenceGraph` decides which manifest files are reachable from the spine, navigation, NCX and cover by following references through XHTML, SVG, SMIL and CSS; unreadable content is treated conservatively. See [Cleanup and Compression](cleanup.md).
 
+### Merge and Split
+`Merge\Merger` combines several books into one EPUB 3 book: each book's files go into their own directory (so their relative references stay valid), manifest ids are prefixed, byte-identical stylesheets, fonts and images can be shared, obfuscated fonts are re-keyed for the new identifier, and the navigation document and NCX are generated. `Split\Splitter` cuts a book into parts (`Split\SplitPlan`: by table of contents, item count, ranges or size), pruning each part to the files `ReferenceGraph` finds reachable from its reading order items. See [Merging and Splitting Books](merge-split.md).
+
 ### Converters
 `ConverterInterface` has three adapters: `TCPDFAdapter` and `DompdfAdapter` (PDF, via `EpubDocumentLoader`, which reads the spine documents and makes their HTML safe to render), and `CalibreAdapter` (any format Calibre's `ebook-convert` supports). `Converter` maps formats to adapters. `TextAdapter`, `HtmlAdapter` and `MarkdownAdapter` export text, one sanitised HTML file and Markdown from the same loader output (see [Exporters](exporters.md)).
 

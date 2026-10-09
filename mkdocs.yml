@@ -40,6 +40,7 @@ nav:
     - XmlParser: xml-parser.md
     - ZipHandler: zip-handler.md
     - Cleanup: cleanup.md
+    - Merge and Split: merge-split.md
     - Converter: converter.md
     - Exporters: exporters.md
     - Book builder: book-builder.md
