@@ -24,6 +24,8 @@ final readonly class EpubDocument
      * @param bool $rightToLeft Whether the book reads right to left: its spine says so
      *                          (page-progression-direction="rtl"), or, when the spine does not say,
      *                          its main language is written right to left.
+     * @param string $contents The HTML of a generated contents page (see PdfConversionOptions::$includeToc);
+     *                         "" when there is none.
      */
     public function __construct(
         public string $title,
@@ -34,7 +36,8 @@ final readonly class EpubDocument
         public string $directory = '',
         public string $coverImage = '',
         public string $language = '',
-        public bool $rightToLeft = false
+        public bool $rightToLeft = false,
+        public string $contents = ''
     ) {
     }
 

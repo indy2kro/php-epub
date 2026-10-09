@@ -55,10 +55,17 @@ class TCPDFAdapter implements ConverterInterface
      */
     private array $styles;
 
+    private readonly PdfConversionOptions $options;
+
     /**
      * Whether the font is the default one, which may fall back to FALLBACK_FONT.
      */
     private readonly bool $defaultFont;
+
+    /**
+     * The microtime() at which the conversion in progress is over its time budget; null for no limit.
+     */
+    private ?float $deadline = null;
 
     /**
      * TCPDFAdapter constructor.
@@ -69,10 +76,21 @@ class TCPDFAdapter implements ConverterInterface
      *                                     ("portrait" or "landscape"), as in DompdfAdapter, and bookmarks (bool,
      *                                     default true: a PDF outline entry per chapter).
      *
+     * @param PdfConversionOptions|null $options What to include and the limits to enforce (see there). Without
+     *                                      options nothing is limited and fixed-layout books are converted as before; given options (the
+     *                                      defaults include the cover, add no contents page and limit nothing) refuse fixed-layout books
+     *                                      unless allowFixedLayout is true.
+     *
      * @throws Exception If a style is unknown, of the wrong type or has an unusable value (such as a paper size TCPDF does not know).
      */
-    public function __construct(array $styles = [], private readonly EpubDocumentLoader $loader = new EpubDocumentLoader())
-    {
+    public function __construct(
+        array $styles = [],
+        private readonly EpubDocumentLoader $loader = new EpubDocumentLoader(),
+        ?PdfConversionOptions $options = null
+    ) {
+        // Without options the adapter behaves as it always did, fixed-layout books included.
+        $this->options = $options ?? new PdfConversionOptions(allowFixedLayout: true);
+
         PdfStyles::validate(
             'TCPDFAdapter',
             self::STYLE_TYPES,
@@ -94,11 +112,13 @@ class TCPDFAdapter implements ConverterInterface
      * @param string $outputPath The path where the converted PDF should be saved.
      *
      * @throws ConversionException If the book cannot be read, TCPDF fails (for example because the
-     *                             generated fonts are missing) or the PDF cannot be written.
+     *                             generated fonts are missing), the PDF cannot be written, or the book is
+     *                             refused by the options (fixed layout, a limit, the time budget).
      */
     public function convert(string $epubDirectory, string $outputPath): void
     {
-        $document = $this->loader->load($epubDirectory);
+        $this->deadline = $this->options->deadline();
+        $document = $this->loader->load($epubDirectory, $this->options, $this->deadline);
 
         try {
             // TCPDF resolves K_PATH_FONTS itself (through Composer), whether php-epub is the root
@@ -181,7 +201,7 @@ class TCPDFAdapter implements ConverterInterface
         }
 
         if ($document->coverImage !== '') {
-            $pdf->AddPage();
+            $this->addPage($pdf);
             if ($this->boolStyle('bookmarks')) {
                 $pdf->Bookmark('Cover', 0, 0);
             }
@@ -194,8 +214,18 @@ class TCPDFAdapter implements ConverterInterface
             $pdf->Image($document->coverImage, $left, $top, $width, $height, '', '', '', true, 300, '', false, false, 0, 'CM');
         }
 
+        if ($document->contents !== '') {
+            $this->addPage($pdf);
+            if ($this->boolStyle('bookmarks')) {
+                $pdf->Bookmark('Contents', 0, 0);
+            }
+
+            $pdf->writeHTML($this->chapterHtml($document, $document->contents), true, false, true, false, '');
+        }
+
         foreach ($document->chapters as $index => $chapter) {
-            $pdf->AddPage();
+            $this->options->assertWithinBudget($this->deadline);
+            $this->addPage($pdf);
             if ($this->boolStyle('bookmarks')) {
                 $title = $document->chapterTitles[$index] ?? '';
                 $pdf->Bookmark($title !== '' ? $title : 'Chapter ' . ($index + 1), 0, 0);
@@ -204,11 +234,27 @@ class TCPDFAdapter implements ConverterInterface
             $pdf->writeHTML($this->chapterHtml($document, $this->svgImagesAsFiles($chapter, $svgDirectory)), true, false, true, false, '');
         }
 
-        if ($document->chapters === [] && $document->coverImage === '') {
-            $pdf->AddPage();
+        if ($document->chapters === [] && $document->coverImage === '' && $document->contents === '') {
+            $this->addPage($pdf);
         }
 
         return $pdf;
+    }
+
+    /**
+     * Adds a page, of the custom size in mm when the options have one (else of the paper_size style the
+     * document was created with).
+     */
+    private function addPage(TCPDF $pdf): void
+    {
+        $custom = $this->options->customPageSize();
+        if ($custom === null) {
+            $pdf->AddPage();
+
+            return;
+        }
+
+        $pdf->AddPage(strtolower($this->stringStyle('orientation')) === 'landscape' ? 'L' : 'P', $custom);
     }
 
     /**

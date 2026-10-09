@@ -41,6 +41,8 @@ class DompdfAdapter implements ConverterInterface
      */
     private array $styles;
 
+    private readonly PdfConversionOptions $options;
+
     /**
      * The private font directory of the conversion in progress (see convert()).
      */
@@ -53,10 +55,21 @@ class DompdfAdapter implements ConverterInterface
      *                                     paper_size, orientation, and margin_top/right/bottom/left (int or float,
      *                                     mm, as in TCPDFAdapter; without any, Dompdf keeps its own margins).
      *
+     * @param PdfConversionOptions|null $options What to include and the limits to enforce (see there). Without
+     *                                      options nothing is limited and fixed-layout books are converted as before; given options (the
+     *                                      defaults include the cover, add no contents page and limit nothing) refuse fixed-layout books
+     *                                      unless allowFixedLayout is true.
+     *
      * @throws Exception If a style is unknown, of the wrong type or has an unusable value (such as a paper size Dompdf does not know).
      */
-    public function __construct(array $styles = [], private readonly EpubDocumentLoader $loader = new EpubDocumentLoader())
-    {
+    public function __construct(
+        array $styles = [],
+        private readonly EpubDocumentLoader $loader = new EpubDocumentLoader(),
+        ?PdfConversionOptions $options = null
+    ) {
+        // Without options the adapter behaves as it always did, fixed-layout books included.
+        $this->options = $options ?? new PdfConversionOptions(allowFixedLayout: true);
+
         PdfStyles::validate(
             'DompdfAdapter',
             self::STYLE_TYPES,
@@ -76,11 +89,19 @@ class DompdfAdapter implements ConverterInterface
      * @param string $epubDirectory The directory containing the extracted EPUB contents.
      * @param string $outputPath The path where the converted PDF should be saved.
      *
-     * @throws ConversionException If the book cannot be read, Dompdf fails or the PDF cannot be written.
+     * @throws ConversionException If the book cannot be read, Dompdf fails, the PDF cannot be written, or the
+     *                             book is refused by the options (fixed layout, a limit, the time budget).
      */
     public function convert(string $epubDirectory, string $outputPath): void
     {
-        $document = $this->loader->load($epubDirectory);
+        $deadline = $this->options->deadline();
+        $document = $this->loader->load($epubDirectory, $this->options, $deadline);
+        $title = $document->title;
+        $authors = $document->authors;
+        $html = $this->renderHtml($document);
+        // The chapters are in $html now; do not hold them twice while Dompdf builds its own copy.
+        unset($document);
+        $this->options->assertWithinBudget($deadline);
 
         // Dompdf stores the fonts it loads (the book's @font-face fonts) and a registry of them in its
         // font directory, by default inside vendor/: give every conversion its own, deleted afterwards,
@@ -91,15 +112,17 @@ class DompdfAdapter implements ConverterInterface
         try {
             $this->fontDirectory = $fontDirectory;
             $dompdf = $this->createDompdf($epubDirectory);
-            $dompdf->loadHtml($this->renderHtml($document));
-            $dompdf->setPaper($this->stringStyle('paper_size'), $this->stringStyle('orientation'));
+            $dompdf->loadHtml($html);
+            unset($html);
+            $custom = $this->options->customPageSize();
+            $dompdf->setPaper($custom === null ? $this->stringStyle('paper_size') : [0.0, 0.0, $custom[0] * 72 / 25.4, $custom[1] * 72 / 25.4], $this->stringStyle('orientation'));
 
-            if ($document->title !== '') {
-                $dompdf->addInfo('Title', $document->title);
+            if ($title !== '') {
+                $dompdf->addInfo('Title', $title);
             }
 
-            if ($document->authors !== []) {
-                $dompdf->addInfo('Author', implode(', ', $document->authors));
+            if ($authors !== []) {
+                $dompdf->addInfo('Author', implode(', ', $authors));
             }
 
             $dompdf->render();
@@ -121,11 +144,11 @@ class DompdfAdapter implements ConverterInterface
     /**
      * Returns the HTML document that convert() renders, e.g. for previews.
      *
-     * @throws ConversionException If the book cannot be read.
+     * @throws ConversionException If the book cannot be read or is refused by the options.
      */
     public function buildHtml(string $epubDirectory): string
     {
-        return $this->renderHtml($this->loader->load($epubDirectory));
+        return $this->renderHtml($this->loader->load($epubDirectory, $this->options));
     }
 
     /**
@@ -169,21 +192,25 @@ class DompdfAdapter implements ConverterInterface
     }
 
     /**
-     * The chapters, after a cover page when the book has a cover no chapter shows.
+     * The chapters, after a cover page when the book has a cover no chapter shows and a contents page
+     * when the options ask for one.
      *
      * @return list<string>
      */
     private function pages(EpubDocument $document): array
     {
-        if ($document->coverImage === '') {
-            return $document->chapters;
+        $front = [];
+        if ($document->coverImage !== '') {
+            // Scaled down to fit the page, keeping its proportions.
+            $front[] = '<div style="height: 100%; text-align: center;"><img src="' . htmlspecialchars($document->coverImage)
+                . '" alt="" style="max-width: 100%; max-height: 100%;"/></div>';
         }
 
-        // Scaled down to fit the page, keeping its proportions.
-        $cover = '<div style="height: 100%; text-align: center;"><img src="' . htmlspecialchars($document->coverImage)
-            . '" alt="" style="max-width: 100%; max-height: 100%;"/></div>';
+        if ($document->contents !== '') {
+            $front[] = '<div>' . $document->contents . '</div>';
+        }
 
-        return [$cover, ...$document->chapters];
+        return [...$front, ...$document->chapters];
     }
 
     /**
