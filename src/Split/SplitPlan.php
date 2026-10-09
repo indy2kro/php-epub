@@ -20,6 +20,8 @@ final readonly class SplitPlan
 {
     public const string DEFAULT_TITLE_PATTERN = '{title} (Part {n} of {total})';
 
+    public const int DEFAULT_MAX_PARTS = 50;
+
     /**
      * @param list<array{int, int}> $ranges
      */
@@ -31,7 +33,8 @@ final readonly class SplitPlan
         public int $maxBytes = 0,
         public string $titlePattern = self::DEFAULT_TITLE_PATTERN,
         public string $filePrefix = 'part',
-        public ?\Closure $clock = null
+        public ?\Closure $clock = null,
+        public int $maxParts = self::DEFAULT_MAX_PARTS
     ) {
     }
 
@@ -102,7 +105,7 @@ final readonly class SplitPlan
      */
     public function withTitlePattern(string $pattern): self
     {
-        return new self($this->kind, $this->level, $this->count, $this->ranges, $this->maxBytes, $pattern, $this->filePrefix, $this->clock);
+        return new self($this->kind, $this->level, $this->count, $this->ranges, $this->maxBytes, $pattern, $this->filePrefix, $this->clock, $this->maxParts);
     }
 
     /**
@@ -114,7 +117,7 @@ final readonly class SplitPlan
     {
         preg_match('/^[A-Za-z0-9][A-Za-z0-9._-]*$/', $prefix) === 1 || throw new Exception("Invalid file name prefix: {$prefix}");
 
-        return new self($this->kind, $this->level, $this->count, $this->ranges, $this->maxBytes, $this->titlePattern, $prefix, $this->clock);
+        return new self($this->kind, $this->level, $this->count, $this->ranges, $this->maxBytes, $this->titlePattern, $prefix, $this->clock, $this->maxParts);
     }
 
     /**
@@ -124,6 +127,18 @@ final readonly class SplitPlan
      */
     public function withClock(\Closure $clock): self
     {
-        return new self($this->kind, $this->level, $this->count, $this->ranges, $this->maxBytes, $this->titlePattern, $this->filePrefix, $clock);
+        return new self($this->kind, $this->level, $this->count, $this->ranges, $this->maxBytes, $this->titlePattern, $this->filePrefix, $clock, $this->maxParts);
+    }
+
+    /**
+     * The most parts split() writes (50 by default); a plan that would produce more is refused before anything is written.
+     *
+     * @throws Exception If the limit is below 1.
+     */
+    public function withMaxParts(int $maxParts): self
+    {
+        $maxParts >= 1 || throw new Exception('The part limit must be at least 1');
+
+        return new self($this->kind, $this->level, $this->count, $this->ranges, $this->maxBytes, $this->titlePattern, $this->filePrefix, $this->clock, $maxParts);
     }
 }

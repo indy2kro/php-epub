@@ -42,6 +42,7 @@ final class SplitterTest extends TestCase
             $book->cleanup();
         }
 
+        $this->opened = [];
         (new FileSystemHelper())->deleteDirectory($this->tmpDir);
     }
 
@@ -421,5 +422,67 @@ final class SplitterTest extends TestCase
                 }
             }
         }
+    }
+
+    public function testOtherNavigationsKeepOnlyEntriesOfThePart(): void
+    {
+        $nav = EpubBuilder::xhtml('Contents', '<nav epub:type="toc"><h1>Contents</h1><ol><li><a href="text/chapter-1.xhtml">One</a></li><li><a href="text/chapter-2.xhtml">Two</a></li></ol></nav>'
+            . '<nav epub:type="lot"><h2>Tables</h2><ol><li><a href="text/chapter-1.xhtml">T1</a></li><li><a href="text/chapter-2.xhtml">T2</a></li></ol></nav>'
+            . '<nav epub:type="loi"><ol><li><a href="text/chapter-2.xhtml">I2</a><ol><li><a href="text/chapter-2.xhtml#x">I2x</a></li></ol></li></ol></nav>');
+        $book = $this->open(MergeBook::builder(self::UID, 'Book', 2, files: ['EPUB/nav.xhtml' => $nav]));
+
+        $parts = $this->split($book, SplitPlan::everySpineItems(1));
+
+        $first = $parts[0]->getContentManager()->getContent('EPUB/nav.xhtml');
+        $this->assertStringContainsString('T1', $first);
+        $this->assertStringNotContainsString('T2', $first);
+        $this->assertStringNotContainsString('I2', $first);
+        $this->assertStringNotContainsString('loi', $first);
+        $second = $parts[1]->getContentManager()->getContent('EPUB/nav.xhtml');
+        $this->assertStringContainsString('T2', $second);
+        $this->assertStringNotContainsString('T1', $second);
+        $this->assertStringContainsString('I2x', $second);
+        foreach ($parts as $part) {
+            $this->assertSame([], $this->errors($part));
+        }
+    }
+
+    public function testRefusesPlansWithTooManyPartsBeforeWritingAnything(): void
+    {
+        $book = $this->open(MergeBook::builder(self::UID, 'Book', 4));
+        $directory = $this->tmpDir . '/too-many';
+
+        try {
+            (new Splitter())->split($book, SplitPlan::everySpineItems(1)->withMaxParts(3), $directory);
+            $this->fail('A plan above the part limit must be refused');
+        } catch (Exception $exception) {
+            $this->assertStringContainsString('limit', $exception->getMessage());
+        }
+
+        $this->assertDirectoryDoesNotExist($directory);
+        $this->assertCount(4, (new Splitter())->split($book, SplitPlan::everySpineItems(1)->withMaxParts(4), $directory));
+    }
+
+    public function testAFailureLeavesNoPartsBehind(): void
+    {
+        $book = $this->open(MergeBook::builder(self::UID, 'Book', 3));
+        $calls = 0;
+        $plan = SplitPlan::everySpineItems(1)->withClock(static function () use (&$calls): \DateTimeImmutable {
+            if (++$calls === 2) {
+                throw new Exception('The clock broke');
+            }
+
+            return new \DateTimeImmutable('2030-01-01');
+        });
+        $directory = $this->tmpDir . '/failing';
+
+        try {
+            (new Splitter())->split($book, $plan, $directory);
+            $this->fail('The clock failure must escape');
+        } catch (Exception $exception) {
+            $this->assertSame('The clock broke', $exception->getMessage());
+        }
+
+        $this->assertSame([], glob($directory . '/*.epub'));
     }
 }

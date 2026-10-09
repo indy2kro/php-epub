@@ -13,11 +13,11 @@ use PhpEpub\Cleanup\ReferenceGraph;
 use PhpEpub\EpubFile;
 use PhpEpub\Exception;
 use PhpEpub\FontObfuscation;
-use PhpEpub\InvalidEpubException;
 use PhpEpub\Landmark;
 use PhpEpub\ManifestItem;
 use PhpEpub\TocEntry;
 use PhpEpub\Util\FileSystemHelper;
+use PhpEpub\Util\LinkRemover;
 use PhpEpub\Util\ModifiedDate;
 use PhpEpub\Util\PathResolver;
 use PhpEpub\XmlException;
@@ -42,8 +42,6 @@ use PhpEpub\XmlParser;
  */
 final readonly class Splitter
 {
-    private const string XLINK = 'http://www.w3.org/1999/xlink';
-
     public function __construct(
         private PathResolver $paths = new PathResolver(),
         private XmlParser $xmlParser = new XmlParser()
@@ -79,6 +77,7 @@ final readonly class Splitter
         $analysis = ReferenceGraph::forBook($book)->analyzeFrom($this->roots($book, $spinePaths));
         $groups = $this->groups($book, $plan, $spinePaths, $analysis, $directory);
         $total = count($groups);
+        $total <= $plan->maxParts || throw new Exception("The split plan would produce {$total} parts; the limit is {$plan->maxParts}");
 
         is_dir($outputDirectory) || @mkdir($outputDirectory, 0777, true) || is_dir($outputDirectory) || throw new Exception("Failed to create directory: {$outputDirectory}");
 
@@ -88,18 +87,26 @@ final readonly class Splitter
         $width = max(2, strlen((string) $total));
         $written = [];
 
-        foreach ($groups as $number => $positions) {
-            $path = rtrim($outputDirectory, '/\\') . DIRECTORY_SEPARATOR . sprintf('%s-%0' . $width . 'd.epub', $plan->filePrefix, $number + 1);
-            $part = EpubFile::openString($archive);
+        try {
+            foreach ($groups as $number => $positions) {
+                $path = rtrim($outputDirectory, '/\\') . DIRECTORY_SEPARATOR . sprintf('%s-%0' . $width . 'd.epub', $plan->filePrefix, $number + 1);
+                $part = EpubFile::openString($archive);
 
-            try {
-                $this->buildPart($part, $book, $plan, $positions, $spinePaths, $analysis, $toc, $landmarks, $number + 1, $total);
-                ModifiedDate::save($part, $path, $plan->clock);
-            } finally {
-                $part->cleanup();
+                try {
+                    $this->buildPart($part, $book, $plan, $positions, $spinePaths, $analysis, $toc, $landmarks, $number + 1, $total);
+                    $written[] = $path;
+                    ModifiedDate::save($part, $path, $plan->clock);
+                } finally {
+                    $part->cleanup();
+                }
+            }
+        } catch (\Throwable $throwable) {
+            // No half-finished set of parts is left behind.
+            foreach ($written as $path) {
+                @unlink($path);
             }
 
-            $written[] = $path;
+            throw $throwable;
         }
 
         return $written;
@@ -414,6 +421,7 @@ final readonly class Splitter
 
         $this->unlinkRemovedDocuments($part, $directory, $removedDocuments);
         $this->dropPageLists($part, $directory);
+        $this->pruneNavigations($part, $directory, $keep);
         $this->setMetadata($part, $plan, $number, $total);
 
         $navigation = $part->getTableOfContents();
@@ -478,85 +486,10 @@ final readonly class Splitter
             }
 
             $content = FileSystemHelper::readFile($this->paths->resolve($directory, $item->path));
-            $unlinked = $content === null ? null : $this->unlink($item->path, $content, $removed);
+            $unlinked = $content === null ? null : (new LinkRemover($this->paths, $this->xmlParser))->remove($item->path, $content, $removed);
             if ($unlinked !== null) {
                 $part->getContentManager()->updateContent($item->path, $unlinked);
             }
-        }
-    }
-
-    /**
-     * The document without its links to the removed documents, or null when it has none (or is not well-formed).
-     *
-     * @param array<string, true> $removed
-     */
-    private function unlink(string $path, string $content, array $removed): ?string
-    {
-        $names = array_map(basename(...), array_keys($removed));
-        $mentioned = false;
-        foreach ($names as $name) {
-            if (str_contains($content, $name) || str_contains($content, rawurlencode($name))) {
-                $mentioned = true;
-                break;
-            }
-        }
-
-        if (! $mentioned) {
-            return null;
-        }
-
-        try {
-            $root = dom_import_simplexml($this->xmlParser->parseString($content, $path));
-        } catch (XmlException) {
-            return null;
-        }
-
-        $document = $root->ownerDocument ?? new DOMDocument();
-        $changed = false;
-        foreach (iterator_to_array($document->getElementsByTagName('*')) as $element) {
-            $name = strtolower($element->localName ?? '');
-            if (! in_array($name, ['a', 'area', 'link'], true)) {
-                continue;
-            }
-
-            $href = $element->getAttribute('href');
-            $href = $href !== '' ? $href : $element->getAttributeNS(self::XLINK, 'href');
-            $target = $this->target($href, $path);
-            if ($target === null || ! isset($removed[$target]) || ! $element->parentNode instanceof \DOMNode) {
-                continue;
-            }
-
-            if ($name === 'a') {
-                while ($element->firstChild instanceof \DOMNode) {
-                    $element->parentNode->insertBefore($element->firstChild, $element);
-                }
-            }
-
-            $element->parentNode->removeChild($element);
-            $changed = true;
-        }
-
-        return $changed ? ($document->saveXML() ?: null) : null;
-    }
-
-    private function target(string $reference, string $fromPath): ?string
-    {
-        $reference = trim($reference);
-        if ($reference === '' || str_starts_with($reference, '#') || str_starts_with($reference, '//') || preg_match('#^[a-z][a-z0-9+.-]*:#i', $reference) === 1) {
-            return null;
-        }
-
-        $file = rawurldecode(substr($reference, 0, strcspn($reference, '?#')));
-        if ($file === '') {
-            return null;
-        }
-
-        $directory = dirname($fromPath);
-
-        try {
-            return $this->paths->normalize(($directory === '.' ? '' : $directory . '/') . $file);
-        } catch (InvalidEpubException) {
-            return null;
         }
     }
 
@@ -598,6 +531,114 @@ final readonly class Splitter
                 $this->xmlParser->save($xml, $file);
             }
         }
+    }
+
+    /**
+     * Prunes the navs other than the table of contents, landmarks and page list (lists of figures, tables and the
+     * like): an entry that points to a document that is not in the part goes, and so does a list or nav left empty.
+     *
+     * @param array<string, true> $keep
+     *
+     * @throws Exception
+     */
+    private function pruneNavigations(EpubFile $part, string $directory, array $keep): void
+    {
+        $links = new LinkRemover($this->paths, $this->xmlParser);
+        foreach ($part->getManifest()->getItems() as $item) {
+            if ($item->path === '' || ! in_array('nav', explode(' ', $item->properties), true)) {
+                continue;
+            }
+
+            $file = $this->paths->resolve($directory, $item->path);
+            try {
+                $xml = $this->xmlParser->parse($file);
+            } catch (XmlException) {
+                continue;
+            }
+
+            $root = dom_import_simplexml($xml);
+            $xpath = new DOMXPath($root->ownerDocument ?? new DOMDocument());
+            $changed = false;
+            $navs = $xpath->query("//*[local-name()='nav'][not(@*[local-name()='type' and (contains(concat(' ', normalize-space(.), ' '), ' toc ') or contains(concat(' ', normalize-space(.), ' '), ' landmarks '))])]");
+            foreach (iterator_to_array($navs ?: []) as $nav) {
+                if (! $nav instanceof DOMElement) {
+                    continue;
+                }
+
+                // Deepest entries first, so a parent is judged after its children.
+                $entries = array_reverse(iterator_to_array($xpath->query(".//*[local-name()='li']", $nav) ?: []));
+                foreach ($entries as $entry) {
+                    if ($entry instanceof DOMElement && $entry->parentNode instanceof \DOMNode) {
+                        $changed = $this->pruneEntry($entry, $xpath, $links, $item->path, $keep) || $changed;
+                    }
+                }
+
+                if ($this->countNodes($xpath, ".//*[local-name()='li']", $nav) === 0 && $nav->parentNode instanceof \DOMNode) {
+                    $nav->parentNode->removeChild($nav);
+                    $changed = true;
+                }
+            }
+
+            if ($changed) {
+                $this->xmlParser->save($xml, $file);
+            }
+        }
+    }
+
+    private function countNodes(DOMXPath $xpath, string $expression, DOMElement $context): int
+    {
+        $nodes = $xpath->query($expression, $context);
+
+        return $nodes === false ? 0 : $nodes->length;
+    }
+
+    /**
+     * Removes a list item whose own link leaves the part and that has no item left below it; with items left, only
+     * its link becomes plain text. Lists left without items go too.
+     *
+     * @param array<string, true> $keep
+     *
+     * @return bool Whether something changed.
+     */
+    private function pruneEntry(DOMElement $entry, DOMXPath $xpath, LinkRemover $links, string $navPath, array $keep): bool
+    {
+        $changed = false;
+        foreach (iterator_to_array($xpath->query("./*[local-name()='a']", $entry) ?: []) as $link) {
+            if (! $link instanceof DOMElement) {
+                continue;
+            }
+
+            $target = $links->target($link->getAttribute('href'), $navPath);
+            if ($target === null || isset($keep[$target])) {
+                continue;
+            }
+
+            if ($this->countNodes($xpath, ".//*[local-name()='li']", $entry) === 0) {
+                $entry->parentNode?->removeChild($entry);
+
+                return true;
+            }
+
+            $span = $link->ownerDocument?->createElementNS($link->namespaceURI, 'span');
+            if ($span instanceof DOMElement) {
+                while ($link->firstChild instanceof \DOMNode) {
+                    $span->appendChild($link->firstChild);
+                }
+
+                $entry->replaceChild($span, $link);
+                $changed = true;
+            }
+        }
+
+        // A list without items is not valid; its parent item is judged next, as the order is deepest first.
+        foreach (iterator_to_array($xpath->query("./*[local-name()='ol' or local-name()='ul']", $entry) ?: []) as $list) {
+            if ($list instanceof DOMElement && $this->countNodes($xpath, "./*[local-name()='li']", $list) === 0) {
+                $entry->removeChild($list);
+                $changed = true;
+            }
+        }
+
+        return $changed;
     }
 
     /**
