@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="author" content="indy2kro" /><link rel="canonical" href="https://indy2kro.github.io/php-epub/repair/" />
+      <link rel="shortcut icon" href="../img/favicon.ico" />
+    <title>Repairing a Book - PHP EPUB</title>
+    <link rel="stylesheet" href="../css/theme.css" />
+    <link rel="stylesheet" href="../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Repairing a Book";
+        var mkdocs_page_input_path = "repair.md";
+        var mkdocs_page_url = "/php-epub/repair/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href=".." class="icon icon-home"> PHP EPUB
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="..">Index</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../installation/">Installation</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Usage</span></p>
+              <ul class="current">
+                  <li class="toctree-l1"><a class="reference internal" href="../basic-usage/">Basic Usage</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../advanced-usage/">Advanced Features</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../epub3-features/">EPUB 3 Features</a>
+                  </li>
+                  <li class="toctree-l1 current"><a class="reference internal current" href="#">Repairing a Book</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#what-is-fixed">What is fixed</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#choosing-the-fixes">Choosing the fixes</a>
+    </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../kindle/">Checking for Kindle</a>
+                  </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../architecture/">Architecture</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Classes</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../epub-file/">EpubFile</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../epub-reader/">EpubReader and Limits</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../content-manager/">ContentManager</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../metadata/">Metadata</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../manifest/">Manifest</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../spine/">Spine</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../table-of-contents/">TableOfContents</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../parser/">Parser</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../xml-parser/">XmlParser</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../zip-handler/">ZipHandler</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../cleanup/">Cleanup</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../merge-split/">Merge and Split</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../converter/">Converter</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../exporters/">Exporters</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../book-builder/">Book builder</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Converters</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../converters/calibre-adapter/">Calibre Adapter</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../converters/dompdf-adapter/">Dompdf Adapter</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../converters/tcpdf-adapter/">TCPDF Adapter</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="..">PHP EPUB</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
+          <li class="breadcrumb-item">Usage</li>
+      <li class="breadcrumb-item active">Repairing a Book</li>
+    <li class="wy-breadcrumbs-aside">
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="repairing-a-book">Repairing a book<a class="headerlink" href="#repairing-a-book" title="Permanent link">&para;</a></h1>
+<p><code>EpubFile::repair()</code> fixes the problems <a href="../epub-file/#validating"><code>validate()</code></a> reports that have one safe, deterministic fix, and returns every change it made. It works on the loaded book, including unsaved edits; <code>save()</code> writes the result.</p>
+<pre class="codehilite"><code class="language-php">use PhpEpub\EpubFile;
+
+$epubFile = EpubFile::open('/path/to/book.epub');
+
+foreach ($epubFile-&gt;repair() as $fix) {
+    echo $fix, &quot;\n&quot;; // e.g. &quot;MANIFEST_FILE_MISSING (EPUB/gone.xhtml): Removed the manifest item &quot;gone&quot;, which has no file, from the manifest and the spine.&quot;
+}
+
+$epubFile-&gt;save('/path/to/repaired.epub');
+</code></pre>
+
+<pre class="codehilite"><code class="language-php">public function repair(?RepairOptions $options = null): array
+</code></pre>
+
+<p>Returns a list of <code>PhpEpub\Repair\AppliedFix</code> objects with a <code>code</code> (the <code>ValidationIssue</code> code the change resolves), a <code>description</code> and a <code>location</code> (a file relative to the book root or a package value, or <code>null</code>). The list is empty when the book needed nothing. A second <code>repair()</code> changes nothing, and re-running <code>validate()</code> reports none of the fixed codes for that book.</p>
+<p>A repair never deletes a file of the book. <code>PhpEpub\Repair\Repairer</code> is the class behind <code>EpubFile::repair()</code>; <code>new Repairer($epubFile)</code> does the same.</p>
+<h2 id="what-is-fixed">What is fixed<a class="headerlink" href="#what-is-fixed" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Fix (<code>RepairFix</code>)</th>
+<th>Codes</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ModifiedDate</code></td>
+<td><code>METADATA_MODIFIED_MISSING</code></td>
+<td>Sets <code>dcterms:modified</code> to the current time (UTC)</td>
+</tr>
+<tr>
+<td><code>Language</code></td>
+<td><code>METADATA_LANGUAGE_MISSING</code></td>
+<td>Sets <code>dc:language</code> to the default language (<code>en</code>)</td>
+</tr>
+<tr>
+<td><code>Identifier</code></td>
+<td><code>METADATA_IDENTIFIER_MISSING</code>, <code>METADATA_UNIQUE_IDENTIFIER</code></td>
+<td>Gives the package a unique identifier: a <code>urn:uuid:</code> when it has no value, else its first non-empty <code>dc:identifier</code> is made the unique one</td>
+</tr>
+<tr>
+<td><code>Navigation</code></td>
+<td><code>NAV_MISSING</code>, <code>NCX_MISSING</code>, <code>NAV_EMPTY</code>, <code>NCX_EMPTY</code></td>
+<td>Creates the navigation document (from the NCX, else the headings, else the reading order) or the NCX (from the headings, else the reading order); fills an empty table of contents from the headings, else the reading order</td>
+</tr>
+<tr>
+<td><code>TocLinks</code></td>
+<td><code>TOC_LINK_NOT_IN_MANIFEST</code></td>
+<td>Drops table-of-contents entries that link to a file that is not in the manifest; an entry with children stays as a heading</td>
+</tr>
+<tr>
+<td><code>MissingFiles</code></td>
+<td><code>MANIFEST_FILE_MISSING</code></td>
+<td>Removes a manifest item whose file is missing from the manifest and the spine</td>
+</tr>
+<tr>
+<td><code>SpineReferences</code></td>
+<td><code>SPINE_UNKNOWN_IDREF</code>, <code>SPINE_DUPLICATE_IDREF</code></td>
+<td>Removes spine references to unknown items, and repeated references (the first stays)</td>
+</tr>
+<tr>
+<td><code>UnlistedFiles</code></td>
+<td><code>FILE_NOT_IN_MANIFEST</code></td>
+<td>Adds the file to the manifest. An XHTML document is <strong>not</strong> added to the spine: the reading order is a decision for the author. Editor and system files (<code>.DS_Store</code>, <code>Thumbs.db</code>, <code>desktop.ini</code>, <code>__MACOSX/</code>, <code>iTunesMetadata.plist</code>, <code>iTunesArtwork</code>, any hidden file) are left alone</td>
+</tr>
+<tr>
+<td><code>MediaTypes</code></td>
+<td><code>MEDIA_TYPE_MISMATCH</code></td>
+<td>Corrects an image's media type from its content, and a type declared as XHTML for a file that is not XML from its extension; a file that cannot be decided stays reported, and a document of the reading order is never retyped as a non-content type</td>
+</tr>
+<tr>
+<td><code>DuplicateIds</code></td>
+<td><code>DUPLICATE_ID</code></td>
+<td>Gives a manifest item whose id an earlier item uses a new id (<code>id-2</code>). The first keeps the id, so the spine and other references keep pointing at it. Repeated ids outside the manifest are not fixed</td>
+</tr>
+<tr>
+<td><code>Cover</code></td>
+<td><code>COVER_NOT_IMAGE</code></td>
+<td>Removes the <code>cover-image</code> property from an item that is not an image; completes a half-declared cover (the EPUB 3 <code>cover-image</code> property and the EPUB 2 <code>cover</code> meta, including a cover named by the <code>&lt;guide&gt;</code>); declares an image (its content must be one) named <code>cover.*</code> or <code>cover-image.*</code> when the book declares none. Reported as <code>COVER_NOT_FLAGGED</code> and <code>COVER_NOT_DECLARED</code></td>
+</tr>
+<tr>
+<td><code>ManifestProperties</code></td>
+<td><code>MANIFEST_PROPERTY_MISSING</code>, <code>MANIFEST_PROPERTY_UNNEEDED</code></td>
+<td>Recomputes the <code>scripted</code>, <code>svg</code>, <code>remote-resources</code> and <code>mathml</code> properties of the XHTML documents</td>
+</tr>
+<tr>
+<td><code>UpgradeToEpub3</code></td>
+<td>(none)</td>
+<td>Converts an EPUB 2 book with <code>upgradeToEpub3()</code>; reported as <code>UPGRADED_TO_EPUB3</code>. <strong>Off by default</strong></td>
+</tr>
+</tbody>
+</table>
+<p>Fixes that address manifest items by id (<code>MissingFiles</code>, <code>MediaTypes</code>, <code>Cover</code>, <code>ManifestProperties</code>, <code>UpgradeToEpub3</code>) are skipped while the manifest repeats an id and <code>DuplicateIds</code> is not selected: they could change the wrong item.</p>
+<p>Everything else <code>validate()</code> reports has no safe fix and stays (a missing title, XHTML that is not well-formed, content documents that refer to missing files, hrefs that point outside the book, unreadable navigation).</p>
+<h2 id="choosing-the-fixes">Choosing the fixes<a class="headerlink" href="#choosing-the-fixes" title="Permanent link">&para;</a></h2>
+<pre class="codehilite"><code class="language-php">use PhpEpub\Repair\RepairFix;
+use PhpEpub\Repair\RepairOptions;
+
+$options = (new RepairOptions())
+    -&gt;without(RepairFix::UnlistedFiles)
+    -&gt;with(RepairFix::UpgradeToEpub3)
+    -&gt;withDefaultLanguage('fr');
+
+$fixes = $epubFile-&gt;repair($options);
+
+// Only these:
+$fixes = $epubFile-&gt;repair(RepairOptions::only(RepairFix::Language, RepairFix::ModifiedDate));
+</code></pre>
+
+<pre class="codehilite"><code class="language-php">public function __construct(?array $fixes = null, string $defaultLanguage = 'en', ?DateTimeInterface $now = null)
+public static function only(RepairFix ...$fixes): self
+public function with(RepairFix ...$fixes): self
+public function without(RepairFix ...$fixes): self
+public function withDefaultLanguage(string $language): self
+public function withNow(?DateTimeInterface $now): self
+public function includes(RepairFix $fix): bool
+</code></pre>
+
+<p><code>$fixes</code> defaults to every fix except <code>UpgradeToEpub3</code> (<code>RepairFix::defaults()</code>). The default language must be a well-formed BCP 47 tag, else an <code>Exception</code> is thrown. <code>$now</code> is the time written as a missing <code>dcterms:modified</code> (the current time when <code>null</code>); pass a fixed time in tests.</p>
+              
+            </div>
+          </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href="../epub3-features/" class="btn btn-neutral float-left" title="EPUB 3 Features"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../kindle/" class="btn btn-neutral float-right" title="Checking for Kindle">Next <span class="icon icon-circle-arrow-right"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+    
+      <span><a href="../epub3-features/" style="color: #fcfcfc">&laquo; Previous</a></span>
+    
+    
+      <span><a href="../kindle/" style="color: #fcfcfc">Next &raquo;</a></span>
+    
+  </span>
+</div>
+    <script src="../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "..";</script>
+    <script src="../js/theme_extra.js"></script>
+    <script src="../js/theme.js"></script>
+      <script src="../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

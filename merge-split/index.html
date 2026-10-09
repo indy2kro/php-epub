@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="author" content="indy2kro" /><link rel="canonical" href="https://indy2kro.github.io/php-epub/merge-split/" />
+      <link rel="shortcut icon" href="../img/favicon.ico" />
+    <title>Merge and Split - PHP EPUB</title>
+    <link rel="stylesheet" href="../css/theme.css" />
+    <link rel="stylesheet" href="../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Merge and Split";
+        var mkdocs_page_input_path = "merge-split.md";
+        var mkdocs_page_url = "/php-epub/merge-split/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href=".." class="icon icon-home"> PHP EPUB
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="..">Index</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../installation/">Installation</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Usage</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../basic-usage/">Basic Usage</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../advanced-usage/">Advanced Features</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../epub3-features/">EPUB 3 Features</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../repair/">Repairing a Book</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../kindle/">Checking for Kindle</a>
+                  </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../architecture/">Architecture</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Classes</span></p>
+              <ul class="current">
+                  <li class="toctree-l1"><a class="reference internal" href="../epub-file/">EpubFile</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../epub-reader/">EpubReader and Limits</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../content-manager/">ContentManager</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../metadata/">Metadata</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../manifest/">Manifest</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../spine/">Spine</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../table-of-contents/">TableOfContents</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../parser/">Parser</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../xml-parser/">XmlParser</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../zip-handler/">ZipHandler</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../cleanup/">Cleanup</a>
+                  </li>
+                  <li class="toctree-l1 current"><a class="reference internal current" href="#">Merge and Split</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#merging">Merging</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#options">Options</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#what-the-merged-book-looks-like">What the merged book looks like</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#deduplication">Deduplication</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#fonts">Fonts</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#splitting">Splitting</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#plans">Plans</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#what-a-part-looks-like">What a part looks like</a>
+    </li>
+        </ul>
+    </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../converter/">Converter</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../exporters/">Exporters</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../book-builder/">Book builder</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Converters</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../converters/calibre-adapter/">Calibre Adapter</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../converters/dompdf-adapter/">Dompdf Adapter</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../converters/tcpdf-adapter/">TCPDF Adapter</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="..">PHP EPUB</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
+          <li class="breadcrumb-item">Classes</li>
+      <li class="breadcrumb-item active">Merge and Split</li>
+    <li class="wy-breadcrumbs-aside">
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="merging-and-splitting-books">Merging and Splitting Books<a class="headerlink" href="#merging-and-splitting-books" title="Permanent link">&para;</a></h1>
+<p><code>Merge\Merger</code> combines several books (the volumes of a series, the chapters of a serial) into one EPUB 3 book. <code>Split\Splitter</code> does the opposite and cuts a book into parts. Both only read the books they are given: nothing in them changes, and their files on disk are not touched (unsaved edits are included). Both treat the books as untrusted, like the rest of the library, and both refuse DRM-protected books.</p>
+<h2 id="merging">Merging<a class="headerlink" href="#merging" title="Permanent link">&para;</a></h2>
+<pre class="codehilite"><code class="language-php">use PhpEpub\EpubFile;
+use PhpEpub\Merge\MergeOptions;
+use PhpEpub\Merge\Merger;
+
+$books = [
+    EpubFile::open('/path/to/volume-1.epub'),
+    EpubFile::open('/path/to/volume-2.epub'),
+    EpubFile::open('/path/to/volume-3.epub'),
+];
+
+$report = (new Merger())-&gt;merge($books, new MergeOptions(title: 'The Complete Series'), '/path/to/series.epub');
+
+echo $report-&gt;books . ' books, ' . $report-&gt;files . ' files, ' . $report-&gt;deduplicated . &quot; duplicates left out\n&quot;;
+</code></pre>
+
+<pre class="codehilite"><code class="language-php">public function merge(array $books, MergeOptions $options, string $outputPath): MergeReport;
+</code></pre>
+
+<h3 id="options">Options<a class="headerlink" href="#options" title="Permanent link">&para;</a></h3>
+<p>All arguments of <code>MergeOptions</code> are optional.</p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>title</code></td>
+<td>first book's title</td>
+<td>Title of the merged book.</td>
+</tr>
+<tr>
+<td><code>authors</code></td>
+<td>first book's authors</td>
+<td>List of author names.</td>
+</tr>
+<tr>
+<td><code>language</code></td>
+<td>first book's language</td>
+<td>Main language. The other books' languages follow it as additional <code>dc:language</code> values.</td>
+</tr>
+<tr>
+<td><code>identifier</code></td>
+<td>new <code>urn:uuid:…</code></td>
+<td>Unique identifier.</td>
+</tr>
+<tr>
+<td><code>coverImage</code>, <code>coverMediaType</code></td>
+<td>first book's cover</td>
+<td>Image bytes (and media type, <code>image/jpeg</code> by default) for another cover.</td>
+</tr>
+<tr>
+<td><code>oneSectionPerBook</code></td>
+<td><code>true</code></td>
+<td>One table of contents entry per book (titled with the book's title, linking to its first document) with the book's own entries below it; <code>false</code> puts the books' entries one after the other.</td>
+</tr>
+<tr>
+<td><code>deduplicate</code></td>
+<td><code>true</code></td>
+<td>Keep one copy of byte-identical stylesheets, fonts and raster images.</td>
+</tr>
+<tr>
+<td><code>maxBooks</code></td>
+<td><code>10</code></td>
+<td>The most books accepted (at least 2).</td>
+</tr>
+<tr>
+<td><code>maxTotalBytes</code></td>
+<td>24 MiB</td>
+<td>The most bytes accepted: the size of the books' extracted files together.</td>
+</tr>
+<tr>
+<td><code>maxTotalFiles</code></td>
+<td><code>5000</code></td>
+<td>The most files accepted: the number of files in the books' extracted directories together.</td>
+</tr>
+<tr>
+<td><code>clock</code></td>
+<td>now</td>
+<td>A closure returning the <code>DateTimeInterface</code> to record as <code>dcterms:modified</code>.</td>
+</tr>
+</tbody>
+</table>
+<p>Fewer than two books, more than <code>maxBooks</code>, or more than <code>maxTotalBytes</code> or <code>maxTotalFiles</code> throw a <code>PhpEpub\Exception</code>; so does a DRM-protected book.</p>
+<h3 id="what-the-merged-book-looks-like">What the merged book looks like<a class="headerlink" href="#what-the-merged-book-looks-like" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Layout</strong>: every book keeps its files in its own directory (<code>EPUB/book-01/</code>, <code>EPUB/book-02/</code>, …) with the layout it had, so the references between its files (XHTML, CSS <code>url()</code> and <code>@import</code>, SVG, <code>srcset</code>, media overlays) stay valid without rewriting. Manifest ids get the same prefix (<code>b01-chapter1</code>) and are unique.</li>
+<li><strong>Reading order</strong>: book order, then each book's own order. <code>linear="no"</code> and spine item properties (page spreads, rendition overrides) are kept, and so is the first book's page-progression direction.</li>
+<li><strong>Navigation</strong>: the sources' navigation documents and NCX files are not copied (a navigation document that is also in a book's reading order stays as an ordinary document; links in the books' documents to a navigation document that is not copied become plain text). The merged book gets a new navigation document and NCX built from the books' table of contents (see <code>oneSectionPerBook</code>), and the first book's cover landmark. Page lists and the EPUB 2 <code>&lt;guide&gt;</code> are dropped. Remote resources (items with a URL instead of a file) are listed again with their new ids, <code>fallback</code> attributes follow the new ids, media overlays and their durations follow their documents, and the book's total media duration is the sum of the overlays' (left out when one overlay has no duration).</li>
+<li><strong>EPUB 2 books</strong> are upgraded as needed: the package is EPUB 3, the properties that XHTML documents need (<code>svg</code>, <code>mathml</code>, <code>scripted</code>, <code>remote-resources</code>) are set, and an XHTML 1.0 or 1.1 doctype becomes <code>&lt;!DOCTYPE html&gt;</code> (named entities such as <code>&amp;nbsp;</code> become numeric references). Other XHTML 1.1 constructs that EPUB 3 does not allow are not rewritten.</li>
+<li><strong>Metadata</strong>: from the options or the first book. The access modes, features and hazards of all books are combined (a <code>none</code> or <code>unknown</code> hazard only when no book names a real one) and the accessibility summaries follow each other.</li>
+<li><strong>Rendition</strong>: when every book is pre-paginated the merged book is too. When the books mix reflowable and pre-paginated layouts, the spine items of the pre-paginated books carry a <code>rendition:layout-pre-paginated</code> override instead.</li>
+<li><strong>Cover</strong>: the first book's cover (EPUB 3 <code>cover-image</code> and EPUB 2 <code>&lt;meta name="cover"&gt;</code>), or <code>coverImage</code>.</li>
+</ul>
+<h3 id="deduplication">Deduplication<a class="headerlink" href="#deduplication" title="Permanent link">&para;</a></h3>
+<p>Byte-identical stylesheets, fonts and raster images of different books are stored once, and the references to the copies that are left out are rewritten (so they point into the first book's directory). A stylesheet with <code>url()</code> or <code>@import</code> is never merged, because its references are relative to its own directory and identical text can mean different files. SVG images are never merged either. A file that a document mentions which cannot be rewritten (not well-formed XHTML, a script) is kept as it is.</p>
+<h3 id="fonts">Fonts<a class="headerlink" href="#fonts" title="Permanent link">&para;</a></h3>
+<p>Font obfuscation depends on the book's unique identifier, which is new in the merged book. Obfuscated fonts (IDPF or Adobe) are therefore read de-obfuscated with their own book's key and written obfuscated again with the <strong>IDPF algorithm and the merged book's key</strong>, with entries in the merged book's <code>META-INF/encryption.xml</code>. Fonts that were plain stay plain. Two books with the same font but different identifiers still share one copy, because identical fonts are compared de-obfuscated.</p>
+<h2 id="splitting">Splitting<a class="headerlink" href="#splitting" title="Permanent link">&para;</a></h2>
+<pre class="codehilite"><code class="language-php">use PhpEpub\EpubFile;
+use PhpEpub\Split\SplitPlan;
+use PhpEpub\Split\Splitter;
+
+$book = EpubFile::open('/path/to/book.epub');
+
+// One part per top-level table of contents entry.
+$paths = (new Splitter())-&gt;split($book, SplitPlan::byToc(), '/path/to/parts');
+
+// Other plans:
+$plan = SplitPlan::byToc(2);                          // entries of the second level
+$plan = SplitPlan::everySpineItems(10);               // ten reading order items per part
+$plan = SplitPlan::bySpineRanges([[0, 4], [5, 9]]);   // explicit zero-based, inclusive ranges
+$plan = SplitPlan::byMaxBytes(5_000_000);             // about 5 MB per part
+
+$plan = SplitPlan::everySpineItems(10)
+    -&gt;withTitlePattern('{title}, volume {n}/{total}')
+    -&gt;withFilePrefix('volume');
+</code></pre>
+
+<pre class="codehilite"><code class="language-php">public function split(EpubFile $book, SplitPlan $plan, string $outputDirectory): array;
+
+public static function byToc(int $level = 1): self;
+public static function everySpineItems(int $count): self;
+public static function bySpineRanges(array $ranges): self;
+public static function byMaxBytes(int $bytes): self;
+public function withTitlePattern(string $pattern): self;
+public function withFilePrefix(string $prefix): self;
+public function withClock(\Closure $clock): self;
+public function withMaxParts(int $maxParts): self;
+</code></pre>
+
+<p><code>split()</code> creates the directory when needed, writes <code>part-01.epub</code>, <code>part-02.epub</code>, … (the prefix is configurable) and returns their paths in order.</p>
+<h3 id="plans">Plans<a class="headerlink" href="#plans" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong><code>byToc($level)</code></strong>: each entry of that table of contents level starts a part, which runs to the next entry's first reading order item. Items before the first entry go with the first part. Entries that do not point into the reading order are skipped; a book without such entries cannot be split this way (<code>Exception</code>).</li>
+<li><strong><code>everySpineItems($count)</code></strong>: chunks of the reading order; the last may be shorter.</li>
+<li><strong><code>bySpineRanges($ranges)</code></strong>: <code>[first, last]</code> pairs of zero-based, inclusive positions in the reading order, in order and without overlap. Items outside every range are left out. A range beyond the reading order throws.</li>
+<li><strong><code>byMaxBytes($bytes)</code></strong>: items are added to a part while its files stay within the limit. The size counts the documents and the images, stylesheets and fonts they use (each once per part), uncompressed. An item that alone exceeds the limit gets a part of its own, so the limit is approximate.</li>
+</ul>
+<p>With <code>withMaxParts()</code> (50 by default) a plan that would produce more parts is refused before anything is written, and if writing a part fails the parts already written are deleted. A part is never empty. A book that ends up in a single part is still written, with its title unchanged.</p>
+<h3 id="what-a-part-looks-like">What a part looks like<a class="headerlink" href="#what-a-part-looks-like" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Content</strong>: the part's reading order items and what they need, found with <code>ReferenceGraph::analyzeFrom()</code>: images, stylesheets, fonts, fallbacks and media overlays, plus the navigation document, the NCX and the cover image. Everything else, including files nothing uses, is removed, together with the <code>META-INF/encryption.xml</code> entries of removed fonts.</li>
+<li><strong>Navigation</strong>: the navigation document, the NCX and the landmarks keep only the entries that point into the part. An entry whose own document is in another part stays as an unlinked heading when some of its children are in this one; otherwise it is dropped. A part without any entry gets one for its first document. Page lists are dropped, because their pages are spread over the whole book. Other navs (lists of figures or tables and the like) keep only the entries that point into the part, and a nav left empty is removed.</li>
+<li><strong>Links to other parts</strong>: an <code>&lt;a&gt;</code> or <code>&lt;area&gt;</code> that points to a document of another part is replaced by its content (the link text stays, the link goes), and a <code>&lt;link&gt;</code> element to it is removed. Links within the part, to resources and to fragments of the same document are kept. A document that is not well-formed is left as it is.</li>
+<li><strong>Metadata</strong>: cloned from the book, with a new <code>urn:uuid:</code> unique identifier for each part (other identifiers, such as an ISBN, are dropped because they identify the whole book), the title from the pattern and a new <code>dcterms:modified</code>. Obfuscated fonts are re-keyed to the part's identifier.</li>
+</ul>
+<p>The title pattern replaces <code>{title}</code> (the book's title), <code>{n}</code> (the part's number) and <code>{total}</code> (the number of parts); the default is <code>{title} (Part {n} of {total})</code>.</p>
+              
+            </div>
+          </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href="../cleanup/" class="btn btn-neutral float-left" title="Cleanup"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../converter/" class="btn btn-neutral float-right" title="Converter">Next <span class="icon icon-circle-arrow-right"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+    
+      <span><a href="../cleanup/" style="color: #fcfcfc">&laquo; Previous</a></span>
+    
+    
+      <span><a href="../converter/" style="color: #fcfcfc">Next &raquo;</a></span>
+    
+  </span>
+</div>
+    <script src="../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "..";</script>
+    <script src="../js/theme_extra.js"></script>
+    <script src="../js/theme.js"></script>
+      <script src="../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

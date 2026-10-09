@@ -3,18 +3,18 @@
 <head>
     <meta charset="utf-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="author" content="indy2kro" /><link rel="canonical" href="https://indy2kro.github.io/php-epub/xml-parser/" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="author" content="indy2kro" /><link rel="canonical" href="https://indy2kro.github.io/php-epub/kindle/" />
       <link rel="shortcut icon" href="../img/favicon.ico" />
-    <title>XmlParser - PHP EPUB</title>
+    <title>Checking for Kindle - PHP EPUB</title>
     <link rel="stylesheet" href="../css/theme.css" />
     <link rel="stylesheet" href="../css/theme_extra.css" />
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
     
       <script>
         // Current page data
-        var mkdocs_page_name = "XmlParser";
-        var mkdocs_page_input_path = "xml-parser.md";
-        var mkdocs_page_url = "/php-epub/xml-parser/";
+        var mkdocs_page_name = "Checking for Kindle";
+        var mkdocs_page_input_path = "kindle.md";
+        var mkdocs_page_url = "/php-epub/kindle/";
       </script>
     
     <!--[if lt IE 9]>
@@ -48,7 +48,7 @@
                 </li>
               </ul>
               <p class="caption"><span class="caption-text">Usage</span></p>
-              <ul>
+              <ul class="current">
                   <li class="toctree-l1"><a class="reference internal" href="../basic-usage/">Basic Usage</a>
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../advanced-usage/">Advanced Features</a>
@@ -57,7 +57,11 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../repair/">Repairing a Book</a>
                   </li>
-                  <li class="toctree-l1"><a class="reference internal" href="../kindle/">Checking for Kindle</a>
+                  <li class="toctree-l1 current"><a class="reference internal current" href="#">Checking for Kindle</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#rules-and-sources">Rules and sources</a>
+    </li>
+    </ul>
                   </li>
               </ul>
               <ul>
@@ -65,7 +69,7 @@
                 </li>
               </ul>
               <p class="caption"><span class="caption-text">Classes</span></p>
-              <ul class="current">
+              <ul>
                   <li class="toctree-l1"><a class="reference internal" href="../epub-file/">EpubFile</a>
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../epub-reader/">EpubReader and Limits</a>
@@ -82,15 +86,7 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../parser/">Parser</a>
                   </li>
-                  <li class="toctree-l1 current"><a class="reference internal current" href="#">XmlParser</a>
-    <ul class="current">
-    <li class="toctree-l2"><a class="reference internal" href="#constructor">Constructor</a>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#key-methods">Key Methods</a>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#usage-example">Usage Example</a>
-    </li>
-    </ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../xml-parser/">XmlParser</a>
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../zip-handler/">ZipHandler</a>
                   </li>
@@ -129,8 +125,8 @@
         <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
   <ul class="wy-breadcrumbs">
     <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
-          <li class="breadcrumb-item">Classes</li>
-      <li class="breadcrumb-item active">XmlParser</li>
+          <li class="breadcrumb-item">Usage</li>
+      <li class="breadcrumb-item active">Checking for Kindle</li>
     <li class="wy-breadcrumbs-aside">
     </li>
   </ul>
@@ -139,48 +135,115 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
             <div class="section" itemprop="articleBody">
               
-                <h1 id="xmlparser">XmlParser<a class="headerlink" href="#xmlparser" title="Permanent link">&para;</a></h1>
-<p>The <code>XmlParser</code> class in the PHP EPUB Processor library is responsible for handling XML file operations.
-It provides methods to load and save XML files, ensuring that the XML data is correctly parsed and stored.</p>
-<h2 id="constructor">Constructor<a class="headerlink" href="#constructor" title="Permanent link">&para;</a></h2>
-<ul>
-<li><strong><code>__construct(int $maxBytes = PHP_INT_MAX)</code></strong>: The largest document, in bytes, <code>parse()</code> and <code>parseString()</code> accept; a larger one throws an <code>XmlException</code> (<code>parse()</code> checks the file size before reading it). There is no cap by default; <code>Limits::xmlParser()</code> builds one from a <code>Limits</code> (see <a href="../epub-reader/">EpubReader and Limits</a>). Nothing passes <code>LIBXML_PARSEHUGE</code>, so libxml's own depth limit applies.</li>
-</ul>
-<h2 id="key-methods">Key Methods<a class="headerlink" href="#key-methods" title="Permanent link">&para;</a></h2>
-<ul>
-<li>
-<p><strong><code>parse(string $filePath): SimpleXMLElement</code></strong>: Loads an XML file from the specified path and returns it as a <code>SimpleXMLElement</code>. Documents with entity declarations (<code>&lt;!ENTITY</code>) are rejected, whatever their encoding, and the parser never fetches external resources, so DOCTYPE references in EPUB 2 NCX files are left alone. Throws an <code>XmlException</code> (a subclass of <code>InvalidEpubException</code>) if the file cannot be found or loaded; the message includes the first libxml error and its line.</p>
-</li>
-<li>
-<p><strong><code>save(SimpleXMLElement $xml, string $filePath): void</code></strong>: Saves a <code>SimpleXMLElement</code> to the specified file path. Throws an exception if the file cannot be saved.</p>
-</li>
-</ul>
-<h2 id="usage-example">Usage Example<a class="headerlink" href="#usage-example" title="Permanent link">&para;</a></h2>
-<pre class="codehilite"><code class="language-php">use PhpEpub\XmlParser;
+                <h1 id="checking-a-book-for-kindle">Checking a book for Kindle<a class="headerlink" href="#checking-a-book-for-kindle" title="Permanent link">&para;</a></h1>
+<p><code>ValidationProfile::kindle()</code> adds checks for sending a book to a Kindle (Send to Kindle) or publishing it with Amazon KDP. Pass it to <a href="../epub-file/#validating"><code>validate()</code></a>: the issues follow the structural ones, are ordinary <code>ValidationIssue</code> objects, and have a <code>KINDLE_</code> code and a <code>fix</code> hint.</p>
+<pre class="codehilite"><code class="language-php">use PhpEpub\EpubFile;
+use PhpEpub\ValidationProfile;
 
-$xmlParser = new XmlParser();
+$epubFile = EpubFile::open('/path/to/book.epub');
 
-try {
-    // Load an XML file
-    $xml = $xmlParser-&gt;parse('/path/to/file.xml');
-    echo &quot;XML loaded successfully.&quot;;
-
-    // Modify the XML as needed
-    $xml-&gt;addChild('newElement', 'value');
-
-    // Save the modified XML back to a file
-    $xmlParser-&gt;save($xml, '/path/to/modified_file.xml');
-    echo &quot;XML saved successfully.&quot;;
-} catch (Exception $e) {
-    echo &quot;Error handling XML: &quot; . $e-&gt;getMessage();
+foreach ($epubFile-&gt;validate(ValidationProfile::kindle()) as $issue) {
+    echo $issue, &quot;\n&quot;;
+    if ($issue-&gt;fix !== null) {
+        echo '  Fix: ', $issue-&gt;fix, &quot;\n&quot;;
+    }
 }
 </code></pre>
+
+<p><code>PhpEpub\Kindle\KindleChecker</code> does the checks: <code>(new KindleChecker($epubFile))-&gt;check()</code> returns only the Kindle issues. Amazon's documentation changes and is not a specification: treat this as a pre-flight check and use Kindle Previewer as the reference.</p>
+<h2 id="rules-and-sources">Rules and sources<a class="headerlink" href="#rules-and-sources" title="Permanent link">&para;</a></h2>
+<p>A rule is <strong>sourced</strong> when a figure or requirement comes from an Amazon page; a <strong>heuristic</strong> rule could not be tied to an Amazon page and is always a warning. The URL of each source is in a comment next to the rule in <code>src/Kindle/KindleChecker.php</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Severity</th>
+<th>Rule</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>KINDLE_FILE_TOO_LARGE</code></td>
+<td>error</td>
+<td>The packaged book is above 200 MB, the web upload limit</td>
+<td><a href="https://www.amazon.com/sendtokindle">Send to Kindle</a></td>
+</tr>
+<tr>
+<td><code>KINDLE_FILE_TOO_LARGE_FOR_EMAIL</code></td>
+<td>warning</td>
+<td>Above 50 MB, the limit for sending by email</td>
+<td><a href="https://www.amazon.com/gp/help/customer/display.html?nodeId=G7NECT4B4ZWHQ8WV">Send to Kindle by email</a></td>
+</tr>
+<tr>
+<td><code>KINDLE_COVER_TYPE</code></td>
+<td>warning</td>
+<td>The cover is not a JPEG, PNG or GIF (e.g. WebP or SVG). KDP's JPEG/TIFF rule is for its cover upload, so the in-book formats are not held to it</td>
+<td><a href="https://kdp.amazon.com/en_US/help/topic/G200645690">KDP cover guidelines</a></td>
+</tr>
+<tr>
+<td><code>KINDLE_COVER_TOO_LARGE</code></td>
+<td>warning</td>
+<td>The cover is above 10,000 pixels in height or width, or 50 MB or more</td>
+<td>KDP cover guidelines</td>
+</tr>
+<tr>
+<td><code>KINDLE_NOT_UTF8</code></td>
+<td>warning</td>
+<td>A content document is UTF-16, declares another encoding or is not valid UTF-8</td>
+<td><a href="https://kdp.amazon.com/en_US/help/topic/GH4DRT75GWWAGBTU">Kindle Publishing Guidelines</a> (characters should be UTF-8)</td>
+</tr>
+<tr>
+<td><code>KINDLE_UNSUPPORTED_SPACE</code></td>
+<td>warning</td>
+<td>A content document uses a space other than the space, no-break space and zero-width non-joiner (e.g. the thin space or the ideographic space)</td>
+<td>Kindle Publishing Guidelines, <a href="https://www.amazon.com/kindleformat">kindleformat</a></td>
+</tr>
+<tr>
+<td><code>KINDLE_COVER_TOO_SMALL</code></td>
+<td>warning</td>
+<td>The cover's shortest side is under 500 pixels. KDP's own minimum (625 x 1,000) and its 1.6:1 ratio are for the cover it takes as an upload, so they are not checked</td>
+<td>heuristic</td>
+</tr>
+<tr>
+<td><code>KINDLE_COVER_MISSING</code></td>
+<td>warning</td>
+<td>The book declares no cover</td>
+<td>heuristic</td>
+</tr>
+<tr>
+<td><code>KINDLE_AUTHOR_MISSING</code></td>
+<td>warning</td>
+<td>The book has no <code>dc:creator</code></td>
+<td>heuristic</td>
+</tr>
+<tr>
+<td><code>KINDLE_FIXED_LAYOUT</code></td>
+<td>warning</td>
+<td><code>rendition:layout</code> is <code>pre-paginated</code>; KDP accepts fixed-layout EPUB, but no Send to Kindle page says how it is handled</td>
+<td>heuristic</td>
+</tr>
+<tr>
+<td><code>KINDLE_SCRIPTED</code></td>
+<td>warning</td>
+<td>A content document contains a <code>&lt;script&gt;</code></td>
+<td>heuristic</td>
+</tr>
+<tr>
+<td><code>KINDLE_DRM</code></td>
+<td>warning</td>
+<td>The book is DRM-protected; no page says whether Send to Kindle takes it</td>
+<td>heuristic</td>
+</tr>
+</tbody>
+</table>
+<p>The cover rules are those of the cover image uploaded to KDP, which is not always the cover inside the EPUB, so they are warnings. The size is that of the book's files packed into a scratch archive that is removed again (skipped when the files are far below the limits); nothing in the book changes (unsaved package edits, a few hundred bytes, are not counted). Encrypted content is not read. Only the Send to Kindle size limits and the cover figures were checked against Amazon search results and the KDP cover page; the UTF-8 and space rules come from search summaries of the guidelines, which could not be fetched in full.</p>
               
             </div>
           </div><footer>
     <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
-        <a href="../parser/" class="btn btn-neutral float-left" title="Parser"><span class="icon icon-circle-arrow-left"></span> Previous</a>
-        <a href="../zip-handler/" class="btn btn-neutral float-right" title="ZipHandler">Next <span class="icon icon-circle-arrow-right"></span></a>
+        <a href="../repair/" class="btn btn-neutral float-left" title="Repairing a Book"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../architecture/" class="btn btn-neutral float-right" title="Architecture">Next <span class="icon icon-circle-arrow-right"></span></a>
     </div>
 
   <hr/>
@@ -203,10 +266,10 @@ try {
   <span class="rst-current-version" data-toggle="rst-current-version">
     
     
-      <span><a href="../parser/" style="color: #fcfcfc">&laquo; Previous</a></span>
+      <span><a href="../repair/" style="color: #fcfcfc">&laquo; Previous</a></span>
     
     
-      <span><a href="../zip-handler/" style="color: #fcfcfc">Next &raquo;</a></span>
+      <span><a href="../architecture/" style="color: #fcfcfc">Next &raquo;</a></span>
     
   </span>
 </div>

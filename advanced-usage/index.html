@@ -73,6 +73,10 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../epub3-features/">EPUB 3 Features</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../repair/">Repairing a Book</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../kindle/">Checking for Kindle</a>
+                  </li>
               </ul>
               <ul>
                 <li class="toctree-l1"><a class="reference internal" href="../architecture/">Architecture</a>
@@ -81,6 +85,8 @@
               <p class="caption"><span class="caption-text">Classes</span></p>
               <ul>
                   <li class="toctree-l1"><a class="reference internal" href="../epub-file/">EpubFile</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../epub-reader/">EpubReader and Limits</a>
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../content-manager/">ContentManager</a>
                   </li>
@@ -98,7 +104,15 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../zip-handler/">ZipHandler</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../cleanup/">Cleanup</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../merge-split/">Merge and Split</a>
+                  </li>
                   <li class="toctree-l1"><a class="reference internal" href="../converter/">Converter</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../exporters/">Exporters</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../book-builder/">Book builder</a>
                   </li>
                   <li class="toctree-l1"><a class="reference internal" >Converters</a>
     <ul>
@@ -209,7 +223,11 @@ $epubFile-&gt;convert(new CalibreAdapter(['extra_args' =&gt; ['--output-profile'
 </tr>
 <tr>
 <td>Zip bombs</td>
-<td><code>ZipHandler</code> limits entry count, total extracted size and per-entry compression ratio, measured on the bytes actually written</td>
+<td><code>ZipHandler</code> limits entry count, total extracted size and per-entry compression ratio, measured on the bytes actually written (<code>EpubReader</code> measures the bytes it reads)</td>
+</tr>
+<tr>
+<td>Huge or deeply nested XML and XHTML</td>
+<td><code>Limits::$maxXmlBytes</code> and <code>Limits::$maxHtmlBytes</code> refuse a document before it is read; libxml's depth limit is never lifted (<code>LIBXML_PARSEHUGE</code> is not used)</td>
 </tr>
 <tr>
 <td>XML entity expansion and external entities (XXE)</td>
@@ -229,8 +247,8 @@ $epubFile-&gt;convert(new CalibreAdapter(['extra_args' =&gt; ['--output-profile'
 </tr>
 </tbody>
 </table>
-<p>The extraction directory is created with an unpredictable name and owner-only permissions, and is removed by <code>EpubFile::cleanup()</code> or when the object is destroyed.</p>
-<p>Tighten the limits for user uploads by passing your own <code>ZipHandler</code>:</p>
+<p>The extraction directory is created with an unpredictable name and owner-only permissions, and is removed by <code>EpubFile::close()</code> (or <code>cleanup()</code>) or when the object is destroyed; a failed open removes it too. <code>EpubReader</code> creates none.</p>
+<p>Use <code>Limits::web()</code> for user uploads: it caps the entry count, the total size, the compression ratio and the size of each XML or XHTML document (see <a href="../epub-reader/">EpubReader and Limits</a>). To inspect an upload without extracting it, use <code>EpubReader</code>. For finer control, pass your own <code>ZipHandler</code>:</p>
 <pre class="codehilite"><code class="language-php">use PhpEpub\EpubFile;
 use PhpEpub\InvalidEpubException;
 use PhpEpub\ZipException;
@@ -256,6 +274,7 @@ try {
 <li><code>InvalidEpubException</code>: invalid structure or a path outside the book; <code>XmlException</code> (a subclass) for unparseable or unsafe XML.</li>
 <li><code>ZipException</code>: the archive cannot be read, extracted or written, or exceeds a limit.</li>
 <li><code>ConversionException</code>: a converter could not read the book or write its output.</li>
+<li><code>ReadOnlyException</code>: a change was asked of a book opened with <code>EpubReader</code>.</li>
 </ul>
               
             </div>

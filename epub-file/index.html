@@ -55,6 +55,10 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../epub3-features/">EPUB 3 Features</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../repair/">Repairing a Book</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../kindle/">Checking for Kindle</a>
+                  </li>
               </ul>
               <ul>
                 <li class="toctree-l1"><a class="reference internal" href="../architecture/">Architecture</a>
@@ -88,6 +92,8 @@
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#plain-text">Plain Text</a>
     </li>
+    <li class="toctree-l3"><a class="reference internal" href="#book-summary">Book Summary</a>
+    </li>
     <li class="toctree-l3"><a class="reference internal" href="#converting">Converting</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#cleanup">Cleanup</a>
@@ -103,6 +109,8 @@
     <li class="toctree-l2"><a class="reference internal" href="#file-structure">File Structure</a>
     </li>
     </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../epub-reader/">EpubReader and Limits</a>
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../content-manager/">ContentManager</a>
                   </li>
@@ -120,7 +128,15 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../zip-handler/">ZipHandler</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../cleanup/">Cleanup</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../merge-split/">Merge and Split</a>
+                  </li>
                   <li class="toctree-l1"><a class="reference internal" href="../converter/">Converter</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../exporters/">Exporters</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../book-builder/">Book builder</a>
                   </li>
                   <li class="toctree-l1"><a class="reference internal" >Converters</a>
     <ul>
@@ -172,17 +188,18 @@
 <pre class="codehilite"><code class="language-php">public function __construct(
     string $filePath,
     ?ZipHandler $zipHandler = null,
-    ?XmlParser $xmlParser = null
+    ?XmlParser $xmlParser = null,
+    ?Limits $limits = null
 )
 </code></pre>
 
-<p>Initializes the EpubFile with the path to an EPUB file. The optional <code>$zipHandler</code> and <code>$xmlParser</code> parameters allow dependency injection, e.g. a <code>ZipHandler</code> with tighter extraction limits.</p>
-<pre class="codehilite"><code class="language-php">public static function open(string $filePath, ?ZipHandler $zipHandler = null, ?XmlParser $xmlParser = null): EpubFile
+<p>Initializes the EpubFile with the path to an EPUB file. The optional <code>$zipHandler</code> and <code>$xmlParser</code> parameters allow dependency injection, e.g. a <code>ZipHandler</code> with tighter extraction limits. <code>$limits</code> is the shortcut for untrusted books: <code>Limits::web()</code> configures both, plus the size cap on content documents read by <code>getText()</code> and the cover lookup (see <a href="../epub-reader/">EpubReader and Limits</a>); a <code>ZipHandler</code> or <code>XmlParser</code> you pass replaces that part.</p>
+<pre class="codehilite"><code class="language-php">public static function open(string $filePath, ?ZipHandler $zipHandler = null, ?XmlParser $xmlParser = null, ?Limits $limits = null): EpubFile
 </code></pre>
 
-<p>Shortcut for <code>new EpubFile(...)</code> followed by <code>load()</code>.</p>
-<pre class="codehilite"><code class="language-php">public static function openString(string $data, ?ZipHandler $zipHandler = null, ?XmlParser $xmlParser = null): EpubFile
-public static function openStream($stream, ?ZipHandler $zipHandler = null, ?XmlParser $xmlParser = null): EpubFile
+<p>Shortcut for <code>new EpubFile(...)</code> followed by <code>load()</code>. A failed <code>load()</code> leaves no extraction behind. To inspect a book without extracting it at all, use <a href="../epub-reader/"><code>EpubReader</code></a>.</p>
+<pre class="codehilite"><code class="language-php">public static function openString(string $data, ?ZipHandler $zipHandler = null, ?XmlParser $xmlParser = null, ?Limits $limits = null): EpubFile
+public static function openStream($stream, ?ZipHandler $zipHandler = null, ?XmlParser $xmlParser = null, ?Limits $limits = null): EpubFile
 </code></pre>
 
 <p>Open a book held in a string (an upload, an HTTP response) or read from a stream (from its current position to the end; the stream is not rewound and stays open). <code>ZipArchive</code> needs a real file, so the data is buffered in a private temporary directory (random name, mode <code>0700</code>) that is deleted again, also on failure. The same ZIP size, entry and compression-ratio limits apply as for files, and a book that is not a valid EPUB throws as it would from <code>open()</code>.</p>
@@ -246,10 +263,11 @@ $epubFile-&gt;save();
 </code></pre>
 
 <h3 id="validating">Validating<a class="headerlink" href="#validating" title="Permanent link">&para;</a></h3>
-<pre class="codehilite"><code class="language-php">public function validate(): array
+<pre class="codehilite"><code class="language-php">public function validate(?ValidationProfile $profile = null): array
 </code></pre>
 
-<p>Checks the book, including unsaved changes, and returns a list of <code>PhpEpub\ValidationIssue</code> objects (<code>severity</code>, <code>code</code>, <code>message</code>, <code>location</code>); an empty list means no problem was found. It is a quick check before publishing, not a replacement for <a href="https://www.w3.org/publishing/epubcheck/">EPUBCheck</a>.</p>
+<p>Checks the book, including unsaved changes, and returns a list of <code>PhpEpub\ValidationIssue</code> objects (<code>severity</code>, <code>code</code>, <code>message</code>, <code>location</code>, and a <code>fix</code> hint for some; <code>ValidationProfile::kindle()</code> adds <a href="../kindle/">Kindle checks</a>, and <a href="../repair/"><code>repair()</code></a> fixes many problems); an empty list means no problem was found. It is a quick check before publishing, not a replacement for <a href="https://www.w3.org/publishing/epubcheck/">EPUBCheck</a>.</p>
+<p><em>Upgrade note:</em> <code>validate()</code> gained an optional <code>?ValidationProfile</code> parameter and <code>Manifest::guessMediaType()</code> became public; a subclass overriding either must match.</p>
 <table>
 <thead>
 <tr>
@@ -429,21 +447,88 @@ if ($epubFile-&gt;isDrmProtected()) {
 </code></pre>
 
 <p>Returns <code>path =&gt; text</code> for the XHTML and HTML documents of the reading order, in order, as <code>ContentManager::getText()</code> reads them. Auxiliary content (<code>linear="no"</code>) is skipped unless <code>$linearOnly</code> is <code>false</code>; spine items that are not XHTML or HTML, or whose file is missing, are skipped.</p>
+<h3 id="book-summary">Book Summary<a class="headerlink" href="#book-summary" title="Permanent link">&para;</a></h3>
+<pre class="codehilite"><code class="language-php">public function toArray(): array
+</code></pre>
+
+<p>Describes the whole book in one JSON-ready array, for a web page or an API, instead of calling the getters one by one. It includes unsaved edits, never returns image bytes, and does not throw for a book without a cover, table of contents or EPUB 3 features (those parts are <code>null</code> or empty). It holds only strings, ints, bools, nulls and arrays, so <code>json_encode()</code> accepts it; dates are the ISO 8601 (W3CDTF) strings written in the book. The exact shape is the <code>SummaryShape</code> type of <code>BookSummary</code>.</p>
+<pre class="codehilite"><code class="language-php">use PhpEpub\EpubFile;
+
+$epubFile = EpubFile::open('/path/to/your.epub');
+$summary = $epubFile-&gt;toArray();
+
+echo json_encode($summary, JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT);
+
+$titles = $summary['metadata']['titles'];
+$author = $summary['metadata']['creators'][0] ?? null; // ['name' =&gt; 'Jane Doe', 'role' =&gt; 'aut', 'fileAs' =&gt; 'Doe, Jane']
+$cover = $summary['cover'];                            // ['path' =&gt; 'EPUB/cover.jpg', 'mediaType' =&gt; 'image/jpeg', 'bytes' =&gt; 20480] or null
+$chapters = $summary['toc']['entries'];                // nodes with title, path, fragment and children
+$first = $summary['spine'][0] ?? null;                 // ['idref' =&gt; 'ch1', 'path' =&gt; 'EPUB/ch1.xhtml', 'linear' =&gt; true, 'title' =&gt; 'Chapter 1', 'bytes' =&gt; 1234]
+$words = $summary['stats']['wordCount'];
+$minutes = $summary['stats']['readingMinutes'];        // at 230 words per minute, rounded up
+$protected = $summary['drm']['isDrmProtected'];
+</code></pre>
+
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Content</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>version</code></td>
+<td>The package version, e.g. <code>"3.0"</code>.</td>
+</tr>
+<tr>
+<td><code>metadata</code></td>
+<td><code>titles</code>, <code>creators</code> and <code>contributors</code> (<code>name</code>, <code>role</code>, <code>fileAs</code>), <code>subjects</code>, <code>description</code>, <code>publisher</code>, <code>languages</code>, <code>rights</code>, <code>dates</code> (<code>published</code>, <code>modified</code>, <code>events</code>), <code>identifiers</code> (<code>all</code> with <code>value</code> and <code>scheme</code>, <code>unique</code>, <code>isbn</code>), <code>series</code> (<code>name</code>, <code>index</code>), <code>accessibility</code> and <code>rendition</code> (<code>layout</code>, <code>orientation</code>, <code>spread</code>, <code>flow</code>, <code>pageProgressionDirection</code>).</td>
+</tr>
+<tr>
+<td><code>cover</code></td>
+<td><code>path</code>, <code>mediaType</code> and <code>bytes</code> of the cover image, or <code>null</code>.</td>
+</tr>
+<tr>
+<td><code>toc</code></td>
+<td><code>entries</code> (a tree: every node has <code>title</code>, <code>path</code>, <code>fragment</code> and <code>children</code>, a list of nodes of the same shape), <code>landmarks</code> and <code>pageListCount</code>.</td>
+</tr>
+<tr>
+<td><code>spine</code></td>
+<td>The reading order: <code>idref</code>, <code>path</code>, <code>linear</code>, <code>title</code> (of the first table of contents entry that targets the file, else <code>null</code>) and <code>bytes</code>.</td>
+</tr>
+<tr>
+<td><code>stats</code></td>
+<td><code>groups</code> (<code>count</code> and <code>bytes</code> of the manifest items of <code>xhtml</code>, <code>css</code>, <code>images</code>, <code>fonts</code>, <code>media</code> (audio and video) and <code>other</code>), <code>totalBytes</code> (everything in the extracted book), <code>wordCount</code> and <code>readingMinutes</code>.</td>
+</tr>
+<tr>
+<td><code>drm</code></td>
+<td><code>isDrmProtected</code> and <code>encryptedPathCount</code>.</td>
+</tr>
+</tbody>
+</table>
+<p>Words are counted per run of letters and digits (an apostrophe or hyphen between letters keeps a word together). Chinese and Japanese are written without spaces, so each Han, Hiragana and Katakana character counts as one word. The reading time is an estimate. Encrypted documents of a DRM-protected book are not counted.</p>
 <h3 id="converting">Converting<a class="headerlink" href="#converting" title="Permanent link">&para;</a></h3>
 <pre class="codehilite"><code class="language-php">public function convert(ConverterInterface $converter, string $outputPath): void
 </code></pre>
 
 <p>Writes pending changes to the extracted book and converts it with the given adapter (<code>DompdfAdapter</code>, <code>TCPDFAdapter</code>, <code>CalibreAdapter</code>, …), so unsaved edits are included. Throws if called before <code>load()</code>, and a <code>ConversionException</code> if the book is <a href="#drm-protected-books">DRM-protected</a>.</p>
 <h3 id="cleanup">Cleanup<a class="headerlink" href="#cleanup" title="Permanent link">&para;</a></h3>
-<pre class="codehilite"><code class="language-php">public function cleanup(): void
+<pre class="codehilite"><code class="language-php">public function close(): void
+public function cleanup(): void
 </code></pre>
 
+<p><code>close()</code> is <code>cleanup()</code> under the name a long-running service would look for: call it in a <code>finally</code> block when you are done with a book. Both are idempotent (a second call does nothing), and neither leaks: a <code>load()</code>, <code>open()</code> or <code>create()</code> that fails removes the temporary directory it made.</p>
 <p>Manually cleans up the temporary directory. Called automatically by <code>__destruct()</code>, but can be called explicitly to release resources earlier. Throws an <code>Exception</code> when the extracted files cannot all be deleted (e.g. a file still open on Windows); the path is kept so <code>cleanup()</code> can be retried, and the destructor ignores such failures. Afterwards the book is unloaded: <code>getMetadata()</code>, <code>getSpine()</code>, <code>getManifest()</code> and <code>getContentManager()</code> throw until <code>load()</code> is called again. A <code>load()</code> that fails also cleans up, so it never leaves a half-loaded book or its extracted files behind.</p>
 <p>An <code>EpubFile</code> cannot be cloned (<code>clone</code> throws an <code>Exception</code>), because the copy would share, and later delete, the extracted book. Open the file again, or <code>save()</code> a copy and open that.</p>
 <pre class="codehilite"><code class="language-php">public function getTempDir(): ?string
 </code></pre>
 
 <p>Returns the path to the temporary directory where EPUB contents are extracted. Returns null before <code>load()</code> is called.</p>
+<pre class="codehilite"><code class="language-php">public function getXmlParser(): XmlParser
+</code></pre>
+
+<p>Returns the parser the book's XML documents are read with, bounded by the <code>Limits</code> the book was opened with. <code>Cleanup</code>, <code>ReferenceGraph::forBook()</code>, <code>Merger</code> and <code>Splitter</code> use it by default, so cleaning up, merging or splitting an untrusted book keeps the same per-document cap.</p>
 <h2 id="usage-example">Usage Example<a class="headerlink" href="#usage-example" title="Permanent link">&para;</a></h2>
 <pre class="codehilite"><code class="language-php">use PhpEpub\EpubFile;
 
@@ -506,7 +591,7 @@ $epubFile = new EpubFile('/path/to/file.epub', $mockZipHandler, $mockXmlParser);
           </div><footer>
     <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
         <a href="../architecture/" class="btn btn-neutral float-left" title="Architecture"><span class="icon icon-circle-arrow-left"></span> Previous</a>
-        <a href="../content-manager/" class="btn btn-neutral float-right" title="ContentManager">Next <span class="icon icon-circle-arrow-right"></span></a>
+        <a href="../epub-reader/" class="btn btn-neutral float-right" title="EpubReader and Limits">Next <span class="icon icon-circle-arrow-right"></span></a>
     </div>
 
   <hr/>
@@ -532,7 +617,7 @@ $epubFile = new EpubFile('/path/to/file.epub', $mockZipHandler, $mockXmlParser);
       <span><a href="../architecture/" style="color: #fcfcfc">&laquo; Previous</a></span>
     
     
-      <span><a href="../content-manager/" style="color: #fcfcfc">Next &raquo;</a></span>
+      <span><a href="../epub-reader/" style="color: #fcfcfc">Next &raquo;</a></span>
     
   </span>
 </div>

@@ -55,6 +55,10 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../epub3-features/">EPUB 3 Features</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../repair/">Repairing a Book</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../kindle/">Checking for Kindle</a>
+                  </li>
               </ul>
               <ul class="current">
                 <li class="toctree-l1 current"><a class="reference internal current" href="#">Architecture</a>
@@ -64,6 +68,10 @@
     <li class="toctree-l2"><a class="reference internal" href="#core-components">Core Components</a>
         <ul>
     <li class="toctree-l3"><a class="reference internal" href="#epubfile">EpubFile</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#epubreader">EpubReader</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#limits">Limits</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#metadata">Metadata</a>
     </li>
@@ -77,11 +85,19 @@
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#validator">Validator</a>
     </li>
+    <li class="toctree-l3"><a class="reference internal" href="#repairer-and-kindlechecker">Repairer and KindleChecker</a>
+    </li>
     <li class="toctree-l3"><a class="reference internal" href="#parser-and-xmlparser">Parser and XmlParser</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#ziphandler">ZipHandler</a>
     </li>
+    <li class="toctree-l3"><a class="reference internal" href="#cleanup">Cleanup</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#merge-and-split">Merge and Split</a>
+    </li>
     <li class="toctree-l3"><a class="reference internal" href="#converters">Converters</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#bookbuilder">BookBuilder</a>
     </li>
         </ul>
     </li>
@@ -100,6 +116,8 @@
               <ul>
                   <li class="toctree-l1"><a class="reference internal" href="../epub-file/">EpubFile</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../epub-reader/">EpubReader and Limits</a>
+                  </li>
                   <li class="toctree-l1"><a class="reference internal" href="../content-manager/">ContentManager</a>
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../metadata/">Metadata</a>
@@ -116,7 +134,15 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../zip-handler/">ZipHandler</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../cleanup/">Cleanup</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../merge-split/">Merge and Split</a>
+                  </li>
                   <li class="toctree-l1"><a class="reference internal" href="../converter/">Converter</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../exporters/">Exporters</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../book-builder/">Book builder</a>
                   </li>
                   <li class="toctree-l1"><a class="reference internal" >Converters</a>
     <ul>
@@ -155,7 +181,7 @@
                 <h1 id="architecture">Architecture<a class="headerlink" href="#architecture" title="Permanent link">&para;</a></h1>
 <p>This page gives an overview of how php-epub is put together.</p>
 <h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
-<p><code>EpubFile</code> is the entry point. It extracts the book into a private temporary directory, parses the package document (OPF) once, and hands the same in-memory document to the objects that read and edit it. <code>save()</code> writes the OPF back and packs the directory into a new archive.</p>
+<p><code>EpubFile</code> is the entry point for reading, editing and converting. It extracts the book into a private temporary directory, parses the package document (OPF) once, and hands the same in-memory document to the objects that read and edit it. <code>save()</code> writes the OPF back and packs the directory into a new archive.</p>
 <pre class="codehilite"><code>                     ┌──────────────────────────────┐
                      │      EpubFile (facade)       │
                      │  open/load · save · convert  │
@@ -178,9 +204,14 @@
                      └────────────────┘
 </code></pre>
 
+<p><code>EpubReader</code> is the alternative entry point for inspecting a book: it reads the archive on demand and never extracts it (see <a href="../epub-reader/">EpubReader and Limits</a>).</p>
 <h2 id="core-components">Core Components<a class="headerlink" href="#core-components" title="Permanent link">&para;</a></h2>
 <h3 id="epubfile">EpubFile<a class="headerlink" href="#epubfile" title="Permanent link">&para;</a></h3>
 <p>The facade. <code>open()</code>/<code>load()</code> extract and parse the book, <code>create()</code> starts a new one (with <code>addChapter()</code> to fill it), <code>save()</code> writes pending package edits and creates the archive, <code>convert()</code> runs a converter on the book including unsaved edits. It also handles the cover image (<code>getCoverImage()</code>, <code>setCoverImage()</code>). <code>cleanup()</code> (called by the destructor) deletes the extraction and unloads the book.</p>
+<h3 id="epubreader">EpubReader<a class="headerlink" href="#epubreader" title="Permanent link">&para;</a></h3>
+<p>A read-only facade for untrusted uploads: it opens the archive with <code>ZipArchive</code>, checks the entry names and limits up front, and reads entries when <code>getMetadata()</code>, <code>getTableOfContents()</code>, <code>getCoverImage()</code>, <code>getText()</code> or <code>getContent()</code> ask for them, each streamed with the limits applied to the bytes actually read. It reuses <code>Parser</code>, <code>Metadata</code>, <code>Manifest</code>, <code>Spine</code>, <code>TableOfContents</code>, <code>Util\CoverLocator</code> and <code>Util\SpineText</code>, so its results match <code>EpubFile</code>'s. The trade-off: <code>Metadata</code>, <code>Manifest</code>, <code>Spine</code> and <code>ContentManager</code> all work on an extraction directory, so retrofitting a lazy mode into <code>EpubFile</code> would have meant guarding every mutating method and the file-based collaborators (<code>Validator</code>, <code>Encryption</code>, converters). A separate facade keeps the editing path untouched and the read-only guarantee structural: there is no <code>save()</code>, content manager or conversion to misuse, <code>Metadata::save()</code> and <code>TableOfContents</code> changes throw <code>ReadOnlyException</code>, and in-memory edits are never persisted. The price is that <code>validate()</code>, <code>isDrmProtected()</code> and conversion are only available on <code>EpubFile</code>.</p>
+<h3 id="limits">Limits<a class="headerlink" href="#limits" title="Permanent link">&para;</a></h3>
+<p>An immutable value object (<code>Limits::default()</code>, <code>Limits::web()</code>) that builds the <code>ZipHandler</code> and <code>XmlParser</code> for <code>EpubFile</code> and <code>EpubReader</code> and carries the size cap for content documents.</p>
 <h3 id="metadata">Metadata<a class="headerlink" href="#metadata" title="Permanent link">&para;</a></h3>
 <p>Reads and edits the <code>&lt;metadata&gt;</code> element. Each Dublin Core field has a trait in <code>src/Traits/</code> (title, authors and creators, contributors, description, publisher, date, language, subject, identifier); <code>getMeta()</code>/<code>setMeta()</code> and <code>getProperty()</code>/<code>setProperty()</code> cover other <code>&lt;meta&gt;</code> elements. Values are checked with <code>Util\XmlText</code> before they are written.</p>
 <h3 id="manifest">Manifest<a class="headerlink" href="#manifest" title="Permanent link">&para;</a></h3>
@@ -193,16 +224,24 @@
 <p>Reads and edits the EPUB 3 navigation document's <code>toc</code> nav and the EPUB 2 NCX as <code>TocEntry</code> trees, writing both when a book has both. It also reads and writes the landmarks (<code>Landmark</code> objects: the nav <code>landmarks</code> and the EPUB 2 <code>&lt;guide&gt;</code>) and reads the page list.</p>
 <h3 id="validator">Validator<a class="headerlink" href="#validator" title="Permanent link">&para;</a></h3>
 <p><code>EpubFile::validate()</code> runs it to report common structural problems as <code>ValidationIssue</code>s: required metadata, duplicate ids, manifest and spine consistency, media types and manifest properties, navigation, accessibility metadata.</p>
+<h3 id="repairer-and-kindlechecker">Repairer and KindleChecker<a class="headerlink" href="#repairer-and-kindlechecker" title="Permanent link">&para;</a></h3>
+<p><code>RepairRepairer</code> (behind <code>EpubFile::repair()</code>) applies the safe fixes for what <code>Validator</code> reports through the same <code>EpubFile</code> API and returns <code>AppliedFix</code>es; <code>KindleKindleChecker</code> (selected with <code>ValidationProfile::kindle()</code>) adds Send to Kindle and KDP checks as <code>ValidationIssue</code>s. See <a href="../repair/">Repairing a Book</a> and <a href="../kindle/">Checking for Kindle</a>.</p>
 <h3 id="parser-and-xmlparser">Parser and XmlParser<a class="headerlink" href="#parser-and-xmlparser" title="Permanent link">&para;</a></h3>
 <p><code>Parser</code> reads <code>META-INF/container.xml</code> and locates and checks the OPF; problems reading systems tolerate (a wrong <code>mimetype</code>, a broken NCX) are left to <code>Validator</code>. <code>XmlParser</code> loads XML without network access and rejects entity declarations.</p>
 <h3 id="ziphandler">ZipHandler<a class="headerlink" href="#ziphandler" title="Permanent link">&para;</a></h3>
-<p>Extracts archives with limits (entry count, total size, compression ratio) and writes OCF-valid archives (<code>mimetype</code> first and uncompressed, <code>/</code> separators).</p>
+<p>Extracts archives with limits (entry count, total size, compression ratio; <code>Limits</code> builds one) and writes OCF-valid archives (<code>mimetype</code> first and uncompressed, <code>/</code> separators).</p>
+<h3 id="cleanup">Cleanup<a class="headerlink" href="#cleanup" title="Permanent link">&para;</a></h3>
+<p><code>EpubFile::compress()</code> runs <code>Cleanup\Cleanup</code>, which applies the actions of a <code>CleanupOptions</code> (unreferenced and stray files, scripts, remote references, unused fonts, image recompression) to the loaded book and returns a <code>CleanupReport</code>. <code>Cleanup\ReferenceGraph</code> decides which manifest files are reachable from the spine, navigation, NCX and cover by following references through XHTML, SVG, SMIL and CSS; unreadable content is treated conservatively. See <a href="../cleanup/">Cleanup and Compression</a>.</p>
+<h3 id="merge-and-split">Merge and Split<a class="headerlink" href="#merge-and-split" title="Permanent link">&para;</a></h3>
+<p><code>Merge\Merger</code> combines several books into one EPUB 3 book: each book's files go into their own directory (so their relative references stay valid), manifest ids are prefixed, byte-identical stylesheets, fonts and images can be shared, obfuscated fonts are re-keyed for the new identifier, and the navigation document and NCX are generated. <code>Split\Splitter</code> cuts a book into parts (<code>Split\SplitPlan</code>: by table of contents, item count, ranges or size), pruning each part to the files <code>ReferenceGraph</code> finds reachable from its reading order items. See <a href="../merge-split/">Merging and Splitting Books</a>.</p>
 <h3 id="converters">Converters<a class="headerlink" href="#converters" title="Permanent link">&para;</a></h3>
-<p><code>ConverterInterface</code> has three adapters: <code>TCPDFAdapter</code> and <code>DompdfAdapter</code> (PDF, via <code>EpubDocumentLoader</code>, which reads the spine documents and makes their HTML safe to render), and <code>CalibreAdapter</code> (any format Calibre's <code>ebook-convert</code> supports). <code>Converter</code> maps formats to adapters.</p>
+<p><code>ConverterInterface</code> has three adapters: <code>TCPDFAdapter</code> and <code>DompdfAdapter</code> (PDF, via <code>EpubDocumentLoader</code>, which reads the spine documents and makes their HTML safe to render), and <code>CalibreAdapter</code> (any format Calibre's <code>ebook-convert</code> supports). <code>Converter</code> maps formats to adapters. <code>TextAdapter</code>, <code>HtmlAdapter</code> and <code>MarkdownAdapter</code> export text, one sanitised HTML file and Markdown from the same loader output (see <a href="../exporters/">Exporters</a>).</p>
+<h3 id="bookbuilder">BookBuilder<a class="headerlink" href="#bookbuilder" title="Permanent link">&para;</a></h3>
+<p>Builds a new book from Markdown, text, HTML or images (see <a href="../book-builder/">Book builder</a>): <code>MarkdownParser</code> turns Markdown into HTML (raw HTML is escaped), <code>Util\HtmlSanitizer</code> reduces any HTML to an allowlist and resolves images against the supplied map only, <code>BookBuilder</code> splits the result into chapters, and <code>BookPackage</code> writes the package, navigation document and NCX as an OCF archive through <code>ZipHandler</code>. <code>BuildLimits</code> bounds chapters, bytes and images.</p>
 <h2 id="untrusted-input">Untrusted input<a class="headerlink" href="#untrusted-input" title="Permanent link">&para;</a></h2>
-<p>Every byte of a book is treated as hostile: <code>PathResolver</code> keeps every path from the book (and from callers) inside the extraction directory, <code>ZipHandler</code> limits extraction, <code>XmlParser</code> refuses entity declarations, and <code>EpubDocumentLoader</code> confines everything the PDF renderers could load to the book. See <a href="../advanced-usage/#handling-untrusted-epubs">Handling Untrusted EPUBs</a>.</p>
+<p>Every byte of a book is treated as hostile: <code>PathResolver</code> keeps every path from the book (and from callers) inside the extraction directory, <code>ZipHandler</code> limits extraction, <code>XmlParser</code> refuses entity declarations and documents over <code>Limits::$maxXmlBytes</code> (libxml's depth limit stays in force), and <code>EpubDocumentLoader</code> confines everything the PDF renderers could load to the book. See <a href="../advanced-usage/#handling-untrusted-epubs">Handling Untrusted EPUBs</a>.</p>
 <h2 id="exceptions">Exceptions<a class="headerlink" href="#exceptions" title="Permanent link">&para;</a></h2>
-<p>All exceptions extend <code>PhpEpub\Exception</code>: <code>ZipException</code> (archive problems and extraction limits), <code>InvalidEpubException</code> (invalid structure or paths outside the book) with its subclass <code>XmlException</code> (unreadable or unsafe XML), and <code>ConversionException</code> (PDF conversion failures).</p>
+<p>All exceptions extend <code>PhpEpub\Exception</code>: <code>ZipException</code> (archive problems and extraction limits), <code>InvalidEpubException</code> (invalid structure or paths outside the book) with its subclass <code>XmlException</code> (unreadable or unsafe XML), <code>ConversionException</code> (conversion failures), <code>ReadOnlyException</code> (a change asked of an <code>EpubReader</code>) and <code>BuildException</code> (invalid options, no content or a limit exceeded when building a book).</p>
 <h2 id="design-patterns">Design Patterns<a class="headerlink" href="#design-patterns" title="Permanent link">&para;</a></h2>
 <ol>
 <li><strong>Facade</strong>: <code>EpubFile</code> provides a simple interface over the components.</li>
@@ -220,7 +259,7 @@
             </div>
           </div><footer>
     <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
-        <a href="../epub3-features/" class="btn btn-neutral float-left" title="EPUB 3 Features"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../kindle/" class="btn btn-neutral float-left" title="Checking for Kindle"><span class="icon icon-circle-arrow-left"></span> Previous</a>
         <a href="../epub-file/" class="btn btn-neutral float-right" title="EpubFile">Next <span class="icon icon-circle-arrow-right"></span></a>
     </div>
 
@@ -244,7 +283,7 @@
   <span class="rst-current-version" data-toggle="rst-current-version">
     
     
-      <span><a href="../epub3-features/" style="color: #fcfcfc">&laquo; Previous</a></span>
+      <span><a href="../kindle/" style="color: #fcfcfc">&laquo; Previous</a></span>
     
     
       <span><a href="../epub-file/" style="color: #fcfcfc">Next &raquo;</a></span>

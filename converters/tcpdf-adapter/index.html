@@ -55,6 +55,10 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../../epub3-features/">EPUB 3 Features</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../repair/">Repairing a Book</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../kindle/">Checking for Kindle</a>
+                  </li>
               </ul>
               <ul>
                 <li class="toctree-l1"><a class="reference internal" href="../../architecture/">Architecture</a>
@@ -63,6 +67,8 @@
               <p class="caption"><span class="caption-text">Classes</span></p>
               <ul class="current">
                   <li class="toctree-l1"><a class="reference internal" href="../../epub-file/">EpubFile</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../epub-reader/">EpubReader and Limits</a>
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../../content-manager/">ContentManager</a>
                   </li>
@@ -80,7 +86,15 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../../zip-handler/">ZipHandler</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../cleanup/">Cleanup</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../merge-split/">Merge and Split</a>
+                  </li>
                   <li class="toctree-l1"><a class="reference internal" href="../../converter/">Converter</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../exporters/">Exporters</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../book-builder/">Book builder</a>
                   </li>
                   <li class="toctree-l1 current"><a class="reference internal current" >Converters</a>
     <ul class="current">
@@ -131,7 +145,7 @@ It provides a flexible interface to customize the PDF output through various sty
 <h2 id="key-methods">Key Methods<a class="headerlink" href="#key-methods" title="Permanent link">&para;</a></h2>
 <ul>
 <li>
-<p><strong><code>__construct(array $styles = [])</code></strong>: Optional styling parameters:</p>
+<p><strong><code>__construct(array $styles = [], EpubDocumentLoader $loader = new EpubDocumentLoader(), ?PdfConversionOptions $options = null)</code></strong>: Optional styling parameters (the options, such as limits, a contents page and a custom page size, are described in <a href="../../converter/#limits-and-options-for-untrusted-books">Converter</a>; without options the adapter behaves as before, and with options fixed-layout books are refused unless <code>allowFixedLayout</code> is set):</p>
 <table>
 <thead>
 <tr>

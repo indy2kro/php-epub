@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="author" content="indy2kro" /><link rel="canonical" href="https://indy2kro.github.io/php-epub/cleanup/" />
+      <link rel="shortcut icon" href="../img/favicon.ico" />
+    <title>Cleanup - PHP EPUB</title>
+    <link rel="stylesheet" href="../css/theme.css" />
+    <link rel="stylesheet" href="../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Cleanup";
+        var mkdocs_page_input_path = "cleanup.md";
+        var mkdocs_page_url = "/php-epub/cleanup/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href=".." class="icon icon-home"> PHP EPUB
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="..">Index</a>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../installation/">Installation</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Usage</span></p>
+              <ul>
+                  <li class="toctree-l1"><a class="reference internal" href="../basic-usage/">Basic Usage</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../advanced-usage/">Advanced Features</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../epub3-features/">EPUB 3 Features</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../repair/">Repairing a Book</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../kindle/">Checking for Kindle</a>
+                  </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../architecture/">Architecture</a>
+                </li>
+              </ul>
+              <p class="caption"><span class="caption-text">Classes</span></p>
+              <ul class="current">
+                  <li class="toctree-l1"><a class="reference internal" href="../epub-file/">EpubFile</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../epub-reader/">EpubReader and Limits</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../content-manager/">ContentManager</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../metadata/">Metadata</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../manifest/">Manifest</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../spine/">Spine</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../table-of-contents/">TableOfContents</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../parser/">Parser</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../xml-parser/">XmlParser</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../zip-handler/">ZipHandler</a>
+                  </li>
+                  <li class="toctree-l1 current"><a class="reference internal current" href="#">Cleanup</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#quick-start">Quick start</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#presets">Presets</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#options">Options</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#the-report">The report</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#using-cleanup-directly">Using Cleanup directly</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#referencegraph">ReferenceGraph</a>
+    </li>
+    </ul>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../merge-split/">Merge and Split</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../converter/">Converter</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../exporters/">Exporters</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../book-builder/">Book builder</a>
+                  </li>
+                  <li class="toctree-l1"><a class="reference internal" >Converters</a>
+    <ul>
+                <li class="toctree-l2"><a class="reference internal" href="../converters/calibre-adapter/">Calibre Adapter</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../converters/dompdf-adapter/">Dompdf Adapter</a>
+                </li>
+                <li class="toctree-l2"><a class="reference internal" href="../converters/tcpdf-adapter/">TCPDF Adapter</a>
+                </li>
+    </ul>
+                  </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="..">PHP EPUB</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
+          <li class="breadcrumb-item">Classes</li>
+      <li class="breadcrumb-item active">Cleanup</li>
+    <li class="wy-breadcrumbs-aside">
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="cleanup-and-compression">Cleanup and Compression<a class="headerlink" href="#cleanup-and-compression" title="Permanent link">&para;</a></h1>
+<p><code>EpubFile::compress()</code> makes a book smaller and tidier: it removes files nothing uses, can strip scripts and remote references, drops unused fonts, recompresses images and repacks the archive at maximum deflate level. It is built from two reusable parts: <code>Cleanup</code> (the actions) and <code>ReferenceGraph</code> (which files a book really uses).</p>
+<h2 id="quick-start">Quick start<a class="headerlink" href="#quick-start" title="Permanent link">&para;</a></h2>
+<pre class="codehilite"><code class="language-php">use PhpEpub\Cleanup\CleanupPreset;
+use PhpEpub\EpubFile;
+
+$epubFile = EpubFile::open('/path/to/book.epub');
+
+// Overwrites the file; pass a second argument to write somewhere else.
+$report = $epubFile-&gt;compress(CleanupPreset::Balanced, '/path/to/smaller.epub');
+
+echo $report-&gt;archiveBytesBefore . ' -&gt; ' . $report-&gt;archiveBytesAfter . &quot; bytes\n&quot;;
+foreach ($report-&gt;actions as $action) {
+    echo $action-&gt;name . ': ' . count($action-&gt;files) . ' files, ' . $action-&gt;bytesSaved() . &quot; bytes saved\n&quot;;
+}
+</code></pre>
+
+<h2 id="presets">Presets<a class="headerlink" href="#presets" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Preset</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Light</code></td>
+<td>Removes unreferenced and stray files; repacks at maximum deflate level.</td>
+</tr>
+<tr>
+<td><code>Balanced</code></td>
+<td>Light, plus JPEG and PNG images scaled down to at most 1600 px and re-encoded at JPEG quality 80.</td>
+</tr>
+<tr>
+<td><code>Strong</code></td>
+<td>Light, plus images at most 1200 px at JPEG quality 65, and PNGs without transparency converted to JPEG when that is smaller.</td>
+</tr>
+</tbody>
+</table>
+<p>Image recompression needs the GD extension (<code>ext-gd</code>, listed under <code>suggest</code>); without it the images action is reported as skipped and everything else still runs.</p>
+<h2 id="options">Options<a class="headerlink" href="#options" title="Permanent link">&para;</a></h2>
+<p><code>CleanupOptions::preset()</code> gives the combinations above; build your own with named arguments. Every action is off unless enabled.</p>
+<pre class="codehilite"><code class="language-php">use PhpEpub\Cleanup\CleanupOptions;
+
+$options = new CleanupOptions(
+    removeUnreferenced: true,
+    removeStrayFiles: true,
+    stripScripts: true,
+    removeRemoteReferences: true,
+    removeUnusedFonts: true,
+    recompressImages: true,
+    maxImageWidth: 1600,
+    maxImageHeight: 1600,
+    jpegQuality: 75,
+    convertOpaquePngToJpeg: false,
+    maxDeflate: true,
+);
+</code></pre>
+
+<ul>
+<li><strong><code>removeUnreferenced</code></strong>: removes manifest items (and their files) that nothing reachable refers to. The spine items, the navigation document, the NCX and the cover are never removed.</li>
+<li><strong><code>removeStrayFiles</code></strong>: removes files that are not in the manifest and not needed. <code>mimetype</code>, <code>META-INF/</code>, the package document and files a reachable document refers to are kept; a book with several rootfiles (renditions) is left alone.</li>
+<li><strong><code>stripScripts</code></strong>: removes <code>&lt;script&gt;</code> elements, inline event-handler attributes (<code>onclick</code>, ...) and <code>javascript:</code> URLs from XHTML and SVG documents, and updates the <code>scripted</code> manifest properties.</li>
+<li><strong><code>removeRemoteReferences</code></strong>: removes images, media, stylesheets and other resources loaded from <code>http(s)</code> URLs (and CSS <code>@import</code> rules and <code>url()</code> declarations that point there), and updates the <code>remote-resources</code> properties. Links (<code>&lt;a href&gt;</code>) are kept.</li>
+<li><strong><code>removeUnusedFonts</code></strong>: removes font files no reachable document or stylesheet refers to (and their <code>encryption.xml</code> entries).</li>
+<li><strong><code>recompressImages</code></strong> with <code>maxImageWidth</code>, <code>maxImageHeight</code>, <code>jpegQuality</code> and <code>convertOpaquePngToJpeg</code>: images are never scaled up, and the original is kept when the result is not smaller. Animated PNG, GIF, SVG, CMYK JPEG and JPEG with an EXIF orientation are left alone. Converting a PNG renames the file and updates the manifest and every reference (<code>src</code>, <code>href</code>, <code>srcset</code>, CSS <code>url()</code>); it is not done when a document cannot be parsed, since its references could not be rewritten. The displayed size of an image is set by the document, so scaling an image down does not change the layout.</li>
+<li><strong><code>maxDeflate</code></strong>: <code>compress()</code> writes the archive at deflate level 9 without directory entries.</li>
+<li><strong><code>dryRun</code></strong>: nothing is changed or written; the report says what would happen.</li>
+</ul>
+<p>The actions run in this order: scripts, remote references, unused fonts, unreferenced files, stray files, images.</p>
+<h2 id="the-report">The report<a class="headerlink" href="#the-report" title="Permanent link">&para;</a></h2>
+<p><code>compress()</code> and <code>Cleanup::run()</code> return a <code>CleanupReport</code>:</p>
+<pre class="codehilite"><code class="language-php">public function getAction(string $name): ?CleanupAction;
+public function getFiles(): array;
+public function bytesSaved(): int;
+</code></pre>
+
+<p>It has one <code>CleanupAction</code> per enabled action (<code>name</code> is one of the <code>CleanupAction</code> constants), with the <code>files</code> removed or changed, <code>bytesBefore</code> and <code>bytesAfter</code> (0 for removed files), and <code>skipped</code> with a <code>note</code>. <code>bytesBefore</code> and <code>bytesAfter</code> of the report are the size of all files of the book; <code>archiveBytesBefore</code> and <code>archiveBytesAfter</code> are the sizes of the <code>.epub</code> file (set by <code>compress()</code>).</p>
+<h2 id="using-cleanup-directly">Using Cleanup directly<a class="headerlink" href="#using-cleanup-directly" title="Permanent link">&para;</a></h2>
+<p><code>Cleanup</code> works on the loaded book and leaves saving to you:</p>
+<pre class="codehilite"><code class="language-php">use PhpEpub\Cleanup\Cleanup;
+use PhpEpub\Cleanup\CleanupOptions;
+use PhpEpub\EpubFile;
+
+$epubFile = EpubFile::open('/path/to/book.epub');
+
+$dryRun = (new Cleanup($epubFile))-&gt;run(new CleanupOptions(removeUnreferenced: true, dryRun: true));
+echo count($dryRun-&gt;getFiles()) . &quot; files would be removed\n&quot;;
+
+(new Cleanup($epubFile))-&gt;run(new CleanupOptions(removeUnreferenced: true, stripScripts: true));
+$epubFile-&gt;save('/path/to/cleaned.epub');
+</code></pre>
+
+<p><code>Cleanup</code> refuses DRM-protected books (their content cannot be read) with an <code>Exception</code>.</p>
+<h2 id="referencegraph">ReferenceGraph<a class="headerlink" href="#referencegraph" title="Permanent link">&para;</a></h2>
+<p><code>ReferenceGraph</code> answers "which files does this book use?". It starts from the roots (the spine, navigation document, NCX, cover and guide references) and follows <code>href</code>, <code>src</code>, <code>srcset</code>, <code>poster</code>, <code>data</code> and <code>xlink:href</code> attributes of XHTML, SVG and SMIL documents, and <code>url()</code>, <code>@import</code> and <code>image-set()</code> in stylesheets, <code>&lt;style&gt;</code> elements and <code>style</code> attributes. The fallback and media overlay of a reachable item are reachable too. References are resolved relative to the referring document, percent-decoded, and stripped of query strings and fragments; remote and out-of-book references are ignored.</p>
+<p>Content it cannot read reliably (a document that is not well-formed, a script) is searched for the names of manifest files instead, so everything it might refer to counts as reachable. It never throws on bad content.</p>
+<pre class="codehilite"><code class="language-php">use PhpEpub\Cleanup\ReferenceGraph;
+use PhpEpub\EpubFile;
+
+$epubFile = EpubFile::open('/path/to/book.epub');
+$graph = ReferenceGraph::forBook($epubFile);
+
+$analysis = $graph-&gt;analyze();
+foreach ($analysis-&gt;unreachable as $path) {
+    echo &quot;Not used: {$path}\n&quot;;
+}
+
+// Start from any files, e.g. the chapters kept when splitting a book.
+$part = $graph-&gt;analyzeFrom(['EPUB/text/ch1.xhtml', 'EPUB/text/ch2.xhtml']);
+$files = $part-&gt;reachable;
+
+// What one file refers to.
+$images = $graph-&gt;referencesOf('EPUB/text/ch1.xhtml');
+</code></pre>
+
+<pre class="codehilite"><code class="language-php">public static function forBook(EpubFile $book): self;
+public function defaultRoots(): array;
+public function analyze(): ReferenceAnalysis;
+public function analyzeFrom(array $roots): ReferenceAnalysis;
+public function referencesOf(string $path): array;
+</code></pre>
+
+<p><code>ReferenceAnalysis</code> has the sorted <code>reachable</code> and <code>unreachable</code> manifest paths, <code>references</code> (each reachable file's direct references), <code>unparsable</code> (reachable documents it had to search by name), <code>unmanifested</code> (files that exist and are referenced but are not in the manifest) and <code>isReachable()</code>.</p>
+              
+            </div>
+          </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href="../zip-handler/" class="btn btn-neutral float-left" title="ZipHandler"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../merge-split/" class="btn btn-neutral float-right" title="Merge and Split">Next <span class="icon icon-circle-arrow-right"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+    
+      <span><a href="../zip-handler/" style="color: #fcfcfc">&laquo; Previous</a></span>
+    
+    
+      <span><a href="../merge-split/" style="color: #fcfcfc">Next &raquo;</a></span>
+    
+  </span>
+</div>
+    <script src="../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "..";</script>
+    <script src="../js/theme_extra.js"></script>
+    <script src="../js/theme.js"></script>
+      <script src="../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>
