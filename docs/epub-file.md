@@ -19,21 +19,22 @@ EpubFile handles the complete lifecycle of working with EPUB files:
 public function __construct(
     string $filePath,
     ?ZipHandler $zipHandler = null,
-    ?XmlParser $xmlParser = null
+    ?XmlParser $xmlParser = null,
+    ?Limits $limits = null
 )
 ```
 
-Initializes the EpubFile with the path to an EPUB file. The optional `$zipHandler` and `$xmlParser` parameters allow dependency injection, e.g. a `ZipHandler` with tighter extraction limits.
+Initializes the EpubFile with the path to an EPUB file. The optional `$zipHandler` and `$xmlParser` parameters allow dependency injection, e.g. a `ZipHandler` with tighter extraction limits. `$limits` is the shortcut for untrusted books: `Limits::web()` configures both, plus the size cap on content documents read by `getText()` and the cover lookup (see [EpubReader and Limits](epub-reader.md)); a `ZipHandler` or `XmlParser` you pass replaces that part.
 
 ```php
-public static function open(string $filePath, ?ZipHandler $zipHandler = null, ?XmlParser $xmlParser = null): EpubFile
+public static function open(string $filePath, ?ZipHandler $zipHandler = null, ?XmlParser $xmlParser = null, ?Limits $limits = null): EpubFile
 ```
 
-Shortcut for `new EpubFile(...)` followed by `load()`.
+Shortcut for `new EpubFile(...)` followed by `load()`. A failed `load()` leaves no extraction behind. To inspect a book without extracting it at all, use [`EpubReader`](epub-reader.md).
 
 ```php
-public static function openString(string $data, ?ZipHandler $zipHandler = null, ?XmlParser $xmlParser = null): EpubFile
-public static function openStream($stream, ?ZipHandler $zipHandler = null, ?XmlParser $xmlParser = null): EpubFile
+public static function openString(string $data, ?ZipHandler $zipHandler = null, ?XmlParser $xmlParser = null, ?Limits $limits = null): EpubFile
+public static function openStream($stream, ?ZipHandler $zipHandler = null, ?XmlParser $xmlParser = null, ?Limits $limits = null): EpubFile
 ```
 
 Open a book held in a string (an upload, an HTTP response) or read from a stream (from its current position to the end; the stream is not rewound and stays open). `ZipArchive` needs a real file, so the data is buffered in a private temporary directory (random name, mode `0700`) that is deleted again, also on failure. The same ZIP size, entry and compression-ratio limits apply as for files, and a book that is not a valid EPUB throws as it would from `open()`.
@@ -240,8 +241,11 @@ Writes pending changes to the extracted book and converts it with the given adap
 ### Cleanup
 
 ```php
+public function close(): void
 public function cleanup(): void
 ```
+
+`close()` is `cleanup()` under the name a long-running service would look for: call it in a `finally` block when you are done with a book. Both are idempotent (a second call does nothing), and neither leaks: a `load()`, `open()` or `create()` that fails removes the temporary directory it made.
 
 Manually cleans up the temporary directory. Called automatically by `__destruct()`, but can be called explicitly to release resources earlier. Throws an `Exception` when the extracted files cannot all be deleted (e.g. a file still open on Windows); the path is kept so `cleanup()` can be retried, and the destructor ignores such failures. Afterwards the book is unloaded: `getMetadata()`, `getSpine()`, `getManifest()` and `getContentManager()` throw until `load()` is called again. A `load()` that fails also cleans up, so it never leaves a half-loaded book or its extracted files behind.
 

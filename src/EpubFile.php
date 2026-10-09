@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace PhpEpub;
 
-use DOMDocument;
 use PhpEpub\Converters\ConverterInterface;
+use PhpEpub\Util\CoverLocator;
 use PhpEpub\Util\FileSystemHelper;
 use PhpEpub\Util\PathResolver;
-use PhpEpub\Util\TextEncoding;
+use PhpEpub\Util\SpineText;
 use PhpEpub\Util\XhtmlFragment;
 use PhpEpub\Util\XmlText;
 use SimpleXMLElement;
@@ -40,6 +40,7 @@ class EpubFile
     private ?Manifest $manifest = null;
     private ?SimpleXMLElement $opfXml = null;
     private ?ContentManager $contentManager = null;
+    private readonly int $maxHtmlBytes;
 
     /**
      * The unique identifier the book's obfuscated fonts are keyed with (as loaded or last saved).
@@ -49,38 +50,45 @@ class EpubFile
     public function __construct(
         private readonly string $filePath,
         ?ZipHandler $zipHandler = null,
-        ?XmlParser $xmlParser = null
+        ?XmlParser $xmlParser = null,
+        ?Limits $limits = null
     ) {
-        $this->zipHandler = $zipHandler ?? new ZipHandler();
-        $this->xmlParser = $xmlParser ?? new XmlParser();
+        $limits ??= Limits::default();
+        $this->maxHtmlBytes = $limits->maxHtmlBytes;
+        $this->zipHandler = $zipHandler ?? $limits->zipHandler();
+        $this->xmlParser = $xmlParser ?? $limits->xmlParser();
         $this->parser = new Parser($this->xmlParser);
     }
 
     /**
      * Creates an EpubFile and loads it.
      *
+     * @param Limits|null $limits The limits for an untrusted book (Limits::web() for uploads); Limits::default() when null.
+     *                            A ZipHandler or XmlParser passed as well replaces that part of the limits.
+     *
      * @throws Exception If the file cannot be extracted or is not a valid EPUB.
      */
-    public static function open(string $filePath, ?ZipHandler $zipHandler = null, ?XmlParser $xmlParser = null): self
+    public static function open(string $filePath, ?ZipHandler $zipHandler = null, ?XmlParser $xmlParser = null, ?Limits $limits = null): self
     {
-        $epubFile = new self($filePath, $zipHandler, $xmlParser);
+        $epubFile = new self($filePath, $zipHandler, $xmlParser, $limits);
         $epubFile->load();
 
         return $epubFile;
     }
 
     /**
-     * Opens a book held in a string, e.g. an upload or an HTTP download. The ZIP limits apply as for files.
+     * Opens a book held in a string, e.g. an upload or an HTTP download. The limits apply as for files.
      * Such a book has no file: save() needs a path, or use saveToString() or saveToStream().
      *
      * @throws Exception If the data is not a valid EPUB or a limit is exceeded.
      */
-    public static function openString(string $data, ?ZipHandler $zipHandler = null, ?XmlParser $xmlParser = null): self
+    public static function openString(string $data, ?ZipHandler $zipHandler = null, ?XmlParser $xmlParser = null, ?Limits $limits = null): self
     {
         return self::openArchive(
             static fn (string $archive): bool => @file_put_contents($archive, $data) !== false || throw new Exception('Failed to buffer the EPUB data'),
             $zipHandler,
-            $xmlParser
+            $xmlParser,
+            $limits
         );
     }
 
@@ -92,7 +100,7 @@ class EpubFile
      *
      * @throws Exception If the stream cannot be read, the data is not a valid EPUB or a limit is exceeded.
      */
-    public static function openStream($stream, ?ZipHandler $zipHandler = null, ?XmlParser $xmlParser = null): self
+    public static function openStream($stream, ?ZipHandler $zipHandler = null, ?XmlParser $xmlParser = null, ?Limits $limits = null): self
     {
         self::assertStream($stream);
 
@@ -104,16 +112,17 @@ class EpubFile
                 $copied === false && throw new Exception('Failed to read the EPUB stream');
             },
             $zipHandler,
-            $xmlParser
+            $xmlParser,
+            $limits
         );
     }
 
     /**
      * @param \Closure(string): mixed $write Writes the archive to the given path.
      */
-    private static function openArchive(\Closure $write, ?ZipHandler $zipHandler, ?XmlParser $xmlParser): self
+    private static function openArchive(\Closure $write, ?ZipHandler $zipHandler, ?XmlParser $xmlParser, ?Limits $limits): self
     {
-        $epubFile = new self('', $zipHandler, $xmlParser);
+        $epubFile = new self('', $zipHandler, $xmlParser, $limits);
         $epubFile->hasFile = false;
 
         self::withScratchArchive(static function (string $archive) use ($write, $epubFile): void {
@@ -175,7 +184,19 @@ class EpubFile
     }
 
     /**
+     * Deletes the extracted book and unloads the EpubFile (call load() before using it again). The same as
+     * cleanup(); safe to call more than once, and the destructor does it too.
+     *
+     * @throws Exception If the extraction cannot be deleted; a later call retries.
+     */
+    public function close(): void
+    {
+        $this->cleanup();
+    }
+
+    /**
      * Deletes the extracted book. The EpubFile is then unloaded: call load() before using it again.
+     * Idempotent; see close().
      */
     public function cleanup(): void
     {
@@ -327,8 +348,8 @@ class EpubFile
 
         // Unpredictable name and owner-only permissions: the extracted book may be private.
         $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'epub_' . bin2hex(random_bytes(16));
-        $this->tempDir = $directory;
         @mkdir($directory, 0700) || throw new Exception("Failed to create temporary directory: {$directory}");
+        $this->tempDir = $directory;
 
         try {
             $fill($directory);
@@ -343,7 +364,7 @@ class EpubFile
             $this->manifest = new Manifest($this->opfXml, $opfFilePath);
             $this->spine = new Spine($this->opfXml, $this->manifest);
             // Fonts are keyed with the identifier of the last load or save, which rekeyObfuscatedFonts() keeps current.
-            $this->contentManager = new ContentManager($directory, $this->manifest, $this->spine, new PathResolver(), fn (): ?string => $this->fontKeyIdentifier);
+            $this->contentManager = new ContentManager($directory, $this->manifest, $this->spine, new PathResolver(), fn (): ?string => $this->fontKeyIdentifier, $this->maxHtmlBytes, $this->xmlParser);
         } catch (Throwable $throwable) {
             // Do not leave a half-loaded book (or its extracted files) behind,
             // and report why loading failed rather than a cleanup problem.
@@ -439,29 +460,9 @@ class EpubFile
      */
     public function getCoverImage(): ?ManifestItem
     {
-        $manifest = $this->getManifest();
+        $contentManager = $this->getContentManager();
 
-        foreach ($manifest->getItems() as $item) {
-            if (in_array(self::COVER_PROPERTY, explode(' ', $item->properties), true)) {
-                return $item;
-            }
-        }
-
-        $cover = $this->getMetadata()->getMeta('cover');
-        if ($cover !== null) {
-            $item = $manifest->get($cover) ?? $manifest->findByHref($cover);
-            if ($item instanceof ManifestItem) {
-                return $item;
-            }
-        }
-
-        $guidePath = $manifest->getGuidePath('cover');
-        $item = $guidePath === null ? null : $manifest->findByPath($guidePath);
-        if (! $item instanceof ManifestItem) {
-            return null;
-        }
-
-        return str_starts_with($item->mediaType, 'image/') ? $item : $this->firstImageOf($item);
+        return CoverLocator::find($this->getManifest(), $this->getMetadata(), $contentManager->getMarkup(...));
     }
 
     /**
@@ -593,26 +594,15 @@ class EpubFile
      *
      * @return array<string, string>
      *
-     * @throws Exception If the book is not loaded or a document cannot be read.
+     * @throws Exception If the book is not loaded or a document cannot be read, or an InvalidEpubException if a
+     *                   document is larger than the limit (Limits::$maxHtmlBytes).
      */
     public function getText(bool $linearOnly = true): array
     {
         $contentManager = $this->getContentManager();
         $existing = array_flip($contentManager->getContentPaths());
 
-        $texts = [];
-        foreach ($this->getSpine()->getItems() as $spineItem) {
-            $item = $spineItem->item;
-            if (! $item instanceof ManifestItem || ! in_array($item->mediaType, ['application/xhtml+xml', 'text/html'], true)) {
-                continue;
-            }
-
-            if (($spineItem->linear || ! $linearOnly) && isset($existing[$item->path])) {
-                $texts[$item->path] = $contentManager->getText($item->path);
-            }
-        }
-
-        return $texts;
+        return SpineText::collect($this->getSpine(), $linearOnly, static fn (string $path): bool => isset($existing[$path]), $contentManager->getText(...));
     }
 
     /**
@@ -644,52 +634,6 @@ class EpubFile
         if (in_array($mediaType, $detectable, true) && $detected !== $mediaType) {
             throw new Exception("The cover data is not a valid {$mediaType} image");
         }
-    }
-
-    /**
-     * The manifest item of the first image (<img src>, or SVG <image href>) in an XHTML page.
-     */
-    private function firstImageOf(ManifestItem $page): ?ManifestItem
-    {
-        if (! in_array($page->mediaType, ['application/xhtml+xml', 'text/html'], true)) {
-            return null;
-        }
-
-        $document = new DOMDocument();
-        $useInternalErrors = libxml_use_internal_errors(true);
-
-        try {
-            $document->loadHTML('<?xml encoding="UTF-8">' . TextEncoding::toUtf8($this->getContentManager()->getContent($page->path)), LIBXML_NONET);
-        } catch (Exception) {
-            return null;
-        } finally {
-            libxml_clear_errors();
-            libxml_use_internal_errors($useInternalErrors);
-        }
-
-        $sources = [];
-        foreach ($document->getElementsByTagName('img') as $image) {
-            $sources[] = $image->getAttribute('src');
-        }
-        foreach ($document->getElementsByTagName('image') as $image) {
-            $sources[] = $image->getAttribute('xlink:href') ?: $image->getAttribute('href');
-        }
-
-        $manifest = $this->getManifest();
-        $directory = dirname($page->path) === '.' ? '' : dirname($page->path) . '/';
-        foreach ($sources as $source) {
-            try {
-                $item = $manifest->findByPath($directory . rawurldecode(explode('#', $source, 2)[0]));
-            } catch (InvalidEpubException) {
-                continue;
-            }
-
-            if ($item instanceof ManifestItem && str_starts_with($item->mediaType, 'image/')) {
-                return $item;
-            }
-        }
-
-        return null;
     }
 
     /**
@@ -823,7 +767,7 @@ class EpubFile
             throw new Exception('EPUB file must be loaded before validating.');
         }
 
-        return (new Validator($this->tempDir, $this->opfXml, $this->metadata, $this->manifest, $this->spine, $this->getTableOfContents()))->validate();
+        return (new Validator($this->tempDir, $this->opfXml, $this->metadata, $this->manifest, $this->spine, $this->getTableOfContents(), new PathResolver(), $this->xmlParser))->validate();
     }
 
     /**

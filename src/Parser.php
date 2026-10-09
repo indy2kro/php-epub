@@ -36,19 +36,48 @@ class Parser
     {
         $containerPath = $directory . DIRECTORY_SEPARATOR . 'META-INF' . DIRECTORY_SEPARATOR . 'container.xml';
 
-        $opfPath = $this->paths->normalize($this->extractOpfPath($containerPath));
+        $opfPath = $this->locatePackage($this->xmlParser->parse($containerPath));
 
-        $this->validateOpf($directory, $opfPath);
+        $this->assertPackage($this->xmlParser->parse($this->paths->resolve($directory, $opfPath)));
 
         return $opfPath;
     }
 
     /**
+     * The path of the package document named by a parsed META-INF/container.xml, normalized with "/" separators.
+     *
+     * @throws InvalidEpubException If the container names no package document or a path outside the book.
+     */
+    public function locatePackage(SimpleXMLElement $container): string
+    {
+        return $this->paths->normalize($this->extractOpfPath($container));
+    }
+
+    /**
+     * Checks that a parsed package document has the OPF namespace and a manifest.
+     *
+     * @throws InvalidEpubException If it has not.
+     */
+    public function assertPackage(SimpleXMLElement $xml): void
+    {
+        if (! $this->usesNamespace($xml, Metadata::OPF_NAMESPACE)) {
+            throw new InvalidEpubException('No OPF namespace found in OPF file');
+        }
+
+        $xml->registerXPathNamespace('opf', Metadata::OPF_NAMESPACE);
+
+        $manifest = $xml->xpath('/opf:package/opf:manifest');
+
+        if ($manifest === false || $manifest === null || $manifest === []) {
+            throw new InvalidEpubException('Missing manifest in OPF file');
+        }
+    }
+
+    /**
      * Extract the OPF path from container
      */
-    private function extractOpfPath(string $containerPath): string
+    private function extractOpfPath(SimpleXMLElement $xml): string
     {
-        $xml = $this->xmlParser->parse($containerPath);
 
         $containerNamespace = $this->namespaceFor($xml, self::CONTAINER_NAMESPACE);
         if ($containerNamespace === null) {
@@ -80,26 +109,6 @@ class Parser
         }
 
         return $opfPath;
-    }
-
-    /**
-     * Checks that the OPF file is a package document with a manifest.
-     */
-    private function validateOpf(string $directory, string $opfPath): void
-    {
-        $xml = $this->xmlParser->parse($this->paths->resolve($directory, $opfPath));
-
-        if (! $this->usesNamespace($xml, Metadata::OPF_NAMESPACE)) {
-            throw new InvalidEpubException('No OPF namespace found in OPF file');
-        }
-
-        $xml->registerXPathNamespace('opf', Metadata::OPF_NAMESPACE);
-
-        $manifest = $xml->xpath('/opf:package/opf:manifest');
-
-        if ($manifest === false || $manifest === null || $manifest === []) {
-            throw new InvalidEpubException('Missing manifest in OPF file');
-        }
     }
 
     /**

@@ -37,10 +37,10 @@ final class ContentDocumentProperties
      *
      * @return list<string>|null
      */
-    public static function detect(string $xhtml): ?array
+    public static function detect(string $xhtml, ?XmlParser $xmlParser = null): ?array
     {
         try {
-            $root = dom_import_simplexml((new XmlParser())->parseString($xhtml, 'XHTML content document'));
+            $root = dom_import_simplexml(($xmlParser ?? new XmlParser())->parseString($xhtml, 'XHTML content document'));
         } catch (XmlException) {
             return null;
         }

@@ -119,9 +119,30 @@ $epubFile->convert(new TCPDFAdapter(), '/path/to/book.pdf');
 $epubFile->convert(new CalibreAdapter(['calibre_path' => '/usr/bin/ebook-convert']), '/path/to/book.mobi');
 ```
 
+### Untrusted uploads
+
+`Limits::web()` bounds a book's entries, size, compression ratio and the size of each XML or XHTML document. `EpubReader` reads a book without extracting it to disk, which suits inspecting an upload per request:
+
+```php
+use PhpEpub\EpubFile;
+use PhpEpub\EpubReader;
+use PhpEpub\Limits;
+
+// Metadata, table of contents, cover and text, read from the archive on demand
+$reader = EpubReader::open($uploadedPath, Limits::web());
+echo $reader->getMetadata()->getTitle();
+$reader->close();
+
+// The full, editable book with the same limits
+$epubFile = EpubFile::open($uploadedPath, limits: Limits::web());
+$epubFile->close();
+```
+
+See [EpubReader and Limits](docs/epub-reader.md).
+
 ### Errors
 
-All exceptions extend `PhpEpub\Exception`: `ZipException` for archive problems and extraction limits, `InvalidEpubException` (and its subclass `XmlException`) for invalid or unsafe books, and `ConversionException` for PDF conversion failures.
+All exceptions extend `PhpEpub\Exception`: `ZipException` for archive problems and extraction limits, `InvalidEpubException` (and its subclass `XmlException`) for invalid or unsafe books, `ConversionException` for PDF conversion failures and `ReadOnlyException` for a change asked of an `EpubReader`.
 
 ```php
 use PhpEpub\EpubFile;

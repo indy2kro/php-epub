@@ -44,7 +44,10 @@ See `docs/architecture.md` for the full overview.
 `EpubFile` is the facade: `open()`/`load()` extract the archive into a private temp directory and parse the OPF
 **once**; `Metadata`, `Manifest` and `Spine` all edit that same in-memory OPF document, and `save()` writes it back
 once and repacks. `create()` starts a new book, `convert()` runs a converter on the book including unsaved edits, and
-`cleanup()` (also called from the destructor) removes the extraction.
+`close()`/`cleanup()` (also called from the destructor) remove the extraction. `EpubReader` is the read-only alternative that
+never extracts: it reads archive entries on demand (same `Limits`, measured on the bytes read) and reuses `Parser`,
+`Metadata`, `Manifest`, `Spine` and `TableOfContents`; changes throw `ReadOnlyException`. `Limits` (`default()`, `web()`)
+bundles the `ZipHandler` and `XmlParser` limits and the content-document size cap.
 
 - `Metadata` composes one trait per field from `src/Traits/` (`InteractsWithTitle`, `InteractsWithAuthors`, …, plus
   `UpgradesToEpub3`). A new metadata field gets a new trait.
@@ -74,10 +77,13 @@ Every byte of a book is treated as hostile. Preserve these invariants:
 - `Util\PathResolver` keeps every path (from the book and from callers) inside the extraction directory.
 - `ZipHandler` enforces extraction limits (entry count, total size, compression ratio) and writes OCF-valid archives
   (`mimetype` first and stored uncompressed, `/` separators).
-- `XmlParser` loads XML without network access and rejects entity declarations.
+- `XmlParser` loads XML without network access, rejects entity declarations and documents over the size cap, and nothing
+  passes `LIBXML_PARSEHUGE`. Every `loadHTML` caller on book content (`ContentManager::getMarkup()`, `EpubDocumentLoader`,
+  `CoverLocator`) checks `Limits::$maxHtmlBytes` before reading: it throws, except the best-effort cover lookup, which skips.
+- `EpubReader` applies the entry, size and ratio limits to the bytes it actually streams, never to declared sizes.
 - `EpubDocumentLoader` (with `ConfinedTcpdf`) confines everything the PDF renderers could load to the book.
 - Only `PhpEpub\Exception` subclasses may escape: `ZipException`, `InvalidEpubException` (and its subclass
-  `XmlException`) and `ConversionException`. Methods also throw when used incorrectly (e.g. `getMetadata()` before
+  `XmlException`), `ConversionException` and `ReadOnlyException`. Methods also throw when used incorrectly (e.g. `getMetadata()` before
   `load()`).
 
 ## Testing
@@ -100,7 +106,7 @@ Every byte of a book is treated as hostile. Preserve these invariants:
   examples that pass this test.
 - `tests/FuzzTest.php` (group `fuzz`) mutates valid books (truncation, byte flips, odd or duplicated entry names,
   corrupted container/OPF/NCX/nav/XHTML) and feeds them to `ZipHandler::extract()`, `EpubFile::open()` +
-  `validate()`, `XmlParser::parseString()` and `EpubDocumentLoader::load()`. Only `PhpEpub\Exception` subclasses
+  `validate()`, `EpubReader::open()`, `XmlParser::parseString()` and `EpubDocumentLoader::load()`. Only `PhpEpub\Exception` subclasses
   are allowed; warnings, notices and deprecations fail. `EPUB_FUZZ_SEED` (fixed by default), `EPUB_FUZZ_ITERATIONS`
   (default 40) and `EPUB_FUZZ_FIRST` control it, and a failure prints the seed and the command to reproduce it. The
   `fuzz` CI job runs it with 5000 iterations on the weekly schedule and on `workflow_dispatch`.

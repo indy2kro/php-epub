@@ -118,9 +118,14 @@ final class EpubDocumentLoader
      */
     private array $fontUris = [];
 
+    /**
+     * @param int $maxHtmlBytes Largest chapter (XHTML or HTML) or stylesheet, in bytes, that is read: a larger
+     *                         chapter fails the conversion, a larger stylesheet is left out (see Limits::$maxHtmlBytes).
+     */
     public function __construct(
         private readonly XmlParser $xmlParser = new XmlParser(),
-        private readonly PathResolver $paths = new PathResolver()
+        private readonly PathResolver $paths = new PathResolver(),
+        private readonly int $maxHtmlBytes = PHP_INT_MAX
     ) {
     }
 
@@ -291,6 +296,11 @@ final class EpubDocumentLoader
         $title = '';
 
         $file = $this->paths->resolve($root, $path);
+        $size = @filesize($file);
+        if ($size !== false && $size > $this->maxHtmlBytes) {
+            throw new ConversionException("Document is larger than the limit of {$this->maxHtmlBytes} bytes: {$path}");
+        }
+
         $content = FileSystemHelper::readFile($file) ?? throw new ConversionException("Failed to read content from: {$path}");
 
         $document = new DOMDocument();
@@ -495,7 +505,8 @@ final class EpubDocumentLoader
             // url() in a stylesheet is relative to the stylesheet, not to the chapter.
             $relative = substr($file, strlen(str_replace('\\', '/', $root)) + 1);
             $cssDirectory = dirname($relative) === '.' ? '' : dirname($relative) . '/';
-            $css = FileSystemHelper::readFile($file);
+            $cssSize = @filesize($file);
+            $css = $cssSize !== false && $cssSize > $this->maxHtmlBytes ? null : FileSystemHelper::readFile($file);
             if ($css !== null) {
                 $styles[$file] = $this->sanitizeCss($css, $root, $cssDirectory);
             }
