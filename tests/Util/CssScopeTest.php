@@ -31,8 +31,8 @@ final class CssScopeTest extends TestCase
         $scoped = CssScope::scope($css, '.book');
 
         $this->assertStringContainsString('@media (min-width: 10px){.book p{ color: red }', $scoped);
-        $this->assertStringContainsString('@font-face{ font-family: F; src: url("x") }', $scoped);
-        $this->assertStringContainsString('@keyframes k{ from { top: 0 } to { top: 1px } }', $scoped);
+        $this->assertMatchesRegularExpression('/@font-face\{ font-family: "epub-[0-9a-f]{6}-F"; src: url\("x"\) \}/', $scoped);
+        $this->assertMatchesRegularExpression('/@keyframes epub-[0-9a-f]{6}-k\{ from \{ top: 0 \} to \{ top: 1px \} \}/', $scoped);
         $this->assertStringContainsString('.book a[title="}"]{ color: green }', $scoped);
         $this->assertStringNotContainsString('@import', $scoped);
         $this->assertStringNotContainsString('@unknown', $scoped);
@@ -129,5 +129,72 @@ final class CssScopeTest extends TestCase
         $this->assertStringContainsString('position:absolute', CssSanitizer::sanitize('p{position:absolute}', $resolve));
         // Escapes cannot hide the keyword.
         $this->assertStringNotContainsString('fixed', CssSanitizer::sanitize('p{position:\66 ixed}', $resolve));
+    }
+    public function testUnbalancedBracketsInASelectorCannotHideCommas(): void
+    {
+        $payload = ':is(]), .epub-host, .epub-book { contain:none!important; overflow:visible!important; position:static!important; isolation:auto!important } :is(]), #host { color:red!important }';
+
+        $this->assertSame('', CssScope::scope($payload, '.epub-book'));
+
+        $preludes = [
+            ':is(])', ':is(]), #host', ':is([)), #host', ':not(a, #host', 'a), #host', '])(, #host', ')(, #host', ':is(\)), #host',
+            ':is(a), :is(b)', '[a="x,y"], #host', ':is(a,b), #host', 'a:is(,), #host', 'a[b=")"], #host', ':is((]), #host', ':is([)], #host',
+            ':is(a]), :where(b, #host', '@media (a]) , (b', 'a:has(b, c]), #host',
+        ];
+        foreach ($preludes as $prelude) {
+            $scoped = CssScope::scope($prelude . '{color:red}', '.book');
+            if ($scoped === '') {
+                continue;
+            }
+
+            // Kept rules are balanced, so splitting at the commas outside brackets finds the selectors a browser does.
+            $list = substr($scoped, 0, (int) strpos($scoped, '{'));
+            foreach (preg_split('/,(?![^(\[]*[)\]])/', $list) ?: [] as $selector) {
+                $this->assertStringStartsWith('.book', ltrim($selector), "{$prelude} => {$list}");
+            }
+        }
+    }
+
+    public function testDeclaredNamesAreRenamedSoTheBookCannotReachTheHostPage(): void
+    {
+        $css = '@font-face{font-family:"HostFont";src:local(x)} p{font-family:HostFont, serif; font: 12px "HostFont"} @keyframes spin{from{top:0}} .a{animation:spin 1s; animation-name: spin; content:"spin" counter(c, fancy)}'
+            . ' @counter-style fancy{system:cyclic;symbols:"*"} ol{list-style:fancy;list-style-type:fancy} @property --x{syntax:"*";inherits:false} @layer base{p{color:red}} @layer a,b;'
+            . ' @font-palette-values --p{font-family:HostFont} @font-face{font-family:Two Words;src:local(y)} q{font-family:Two Words, serif}';
+
+        $scoped = CssScope::scope($css, '.book');
+
+        $this->assertDoesNotMatchRegularExpression('/(?<![\w-])HostFont/', $scoped);
+        $this->assertDoesNotMatchRegularExpression('/@keyframes spin|animation:\s*spin|(?<![\w-])fancy|Two Words/', $scoped);
+        $this->assertStringNotContainsString('@property', $scoped);
+        $this->assertStringNotContainsString('font-palette-values', $scoped);
+        $this->assertStringContainsString('@layer{.book p{color:red}', $scoped);
+        $this->assertStringNotContainsString('base', $scoped);
+        $this->assertMatchesRegularExpression('/\.book p\{font-family:"epub-[0-9a-f]{6}-HostFont", serif; font: 12px "epub-[0-9a-f]{6}-HostFont"\}/', $scoped);
+        $this->assertMatchesRegularExpression('/animation:epub-[0-9a-f]{6}-spin 1s; animation-name: epub-[0-9a-f]{6}-spin; content:"spin" counter\(c, epub-[0-9a-f]{6}-fancy\)/', $scoped);
+        $this->assertMatchesRegularExpression('/list-style:epub-[0-9a-f]{6}-fancy;list-style-type:epub-[0-9a-f]{6}-fancy/', $scoped);
+        $this->assertMatchesRegularExpression('/q\{font-family:"epub-[0-9a-f]{6}-Two-Words", serif\}/', str_replace('.book ', '', $scoped));
+    }
+
+    public function testRenamesAreConsistentAcrossSheets(): void
+    {
+        $scoped = CssScope::scopeAll(['@font-face{font-family:F;src:local(x)}', 'p{font-family:F}', 'x{{'], '.book');
+
+        preg_match_all('/epub-[0-9a-f]{6}-F/', $scoped, $names);
+        $this->assertCount(2, $names[0]);
+        $this->assertSame($names[0][0], $names[0][1]);
+        // The sheet that cannot be read is left out, the others stay.
+        $this->assertStringContainsString('.book p{', $scoped);
+    }
+
+    public function testPositionIsKeptOnlyWithALiteralSafeValue(): void
+    {
+        $resolve = static fn (string $url): ?string => null;
+        foreach (['var(--p)', 'env(x)', 'attr(x)', 'inherit', 'fixed', 'sticky', '-webkit-sticky', 'FIXED', 'var( --p ) !important', "\66 ixed"] as $value) {
+            $this->assertSame('p{}', CssSanitizer::sanitize("p{position:{$value}}", $resolve), $value);
+        }
+
+        foreach (['static', 'relative', 'absolute', 'ABSOLUTE', 'relative !important'] as $value) {
+            $this->assertSame("p{position:{$value}}", CssSanitizer::sanitize("p{position:{$value}}", $resolve), $value);
+        }
     }
 }

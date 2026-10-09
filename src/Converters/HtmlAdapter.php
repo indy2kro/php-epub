@@ -140,9 +140,12 @@ final readonly class HtmlAdapter implements ConverterInterface
         }
 
         $css = self::BASE_CSS;
+        $sheets = [];
         foreach ([...$document->styles, ...$styles] as $sheet) {
-            $css .= "\n" . CssScope::scope(CssSanitizer::sanitize($sheet, $cssUrl), '.' . self::CONTAINER_CLASS);
+            $sheets[] = CssSanitizer::sanitize($sheet, $cssUrl);
         }
+
+        $css .= "\n" . CssScope::scopeAll($sheets, '.' . self::CONTAINER_CLASS);
 
         return $this->page($document, $included, $sections, $css);
     }

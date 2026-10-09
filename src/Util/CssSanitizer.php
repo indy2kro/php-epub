@@ -11,7 +11,7 @@ use Closure;
  * @charset, @namespace and legacy script hooks (expression(), behavior, -moz-binding) are removed, every url() is
  * handed to a callback that decides what it may point to, and declarations that could load a resource in another
  * way (image-set(), image(), cross-fade(), element(), src(), a url() that is not a plain string or URL) or that
- * pull an element out of its box (position: fixed or sticky) are dropped.
+ * set position to anything but a literal static, relative or absolute are dropped.
  *
  * The CSS is read with CssTokenizer, so strings, urls and brackets are understood as a browser reads them. CSS
  * with a string that is not closed on its line, or a malformed or unclosed url(), is dropped entirely (the result
@@ -116,12 +116,13 @@ final class CssSanitizer
     }
 
     /**
-     * Whether a declaration is "position: fixed" or "position: sticky", which would take an element out of the box
-     * the book is shown in.
+     * Whether a declaration sets "position" to anything but a literal static, relative or absolute (fixed and sticky
+     * would take an element out of the box the book is shown in; var(), env() and attr() hide the value).
      */
     private static function isPositionOut(string $declaration): bool
     {
-        return preg_match('/^\s*position\s*:\s*(?:fixed|sticky)\b/i', $declaration) === 1;
+        return preg_match('/^\s*position\s*:/i', $declaration) === 1
+            && preg_match('/^\s*position\s*:\s*(?:static|relative|absolute)\s*(?:!\s*important)?\s*$/i', $declaration) !== 1;
     }
 
     private static function urlFunction(string $url): string
