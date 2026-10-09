@@ -31,6 +31,9 @@ final readonly class TableOfContents
      * @param EpubFile|null $book The book these files belong to: holding it keeps its extracted
      *                            files alive while this object is used (e.g. EpubFile::open($path)->getTableOfContents()).
      * @param Spine|null $spine The reading order generateFromHeadings() follows.
+     * @param \Closure(string): string|null $reader Reads a book-relative path (throwing XmlException when it is missing
+     *                                            or too large) instead of the files in $rootDirectory. The table of
+     *                                            contents is then read-only: every change throws ReadOnlyException.
      */
     public function __construct(
         private string $rootDirectory,
@@ -38,8 +41,17 @@ final readonly class TableOfContents
         private XmlParser $xmlParser = new XmlParser(),
         private PathResolver $paths = new PathResolver(),
         private ?EpubFile $book = null,
-        private ?Spine $spine = null
+        private ?Spine $spine = null,
+        private ?\Closure $reader = null
     ) {
+    }
+
+    /**
+     * @throws ReadOnlyException If the book is only read.
+     */
+    private function assertWritable(): void
+    {
+        $this->reader === null || throw new ReadOnlyException('The book is opened read-only; its table of contents cannot be changed.');
     }
 
     /**
@@ -119,6 +131,7 @@ final readonly class TableOfContents
      */
     public function writeEntries(array $entries): void
     {
+        $this->assertWritable();
         $navPath = $this->navPath();
         $ncxPath = $this->ncxPath();
         if ($navPath === null && $ncxPath === null) {
@@ -148,6 +161,7 @@ final readonly class TableOfContents
      */
     public function createNavigation(string $title, string $language): void
     {
+        $this->assertWritable();
         if ($this->navPath() !== null) {
             return;
         }
@@ -262,6 +276,7 @@ final readonly class TableOfContents
      */
     public function setLandmarks(array $landmarks): void
     {
+        $this->assertWritable();
         foreach ($landmarks as $landmark) {
             if (trim($landmark->type) === '' || trim($landmark->title) === '' || $landmark->path === '') {
                 throw new Exception('A landmark needs a type, a title and a path');
@@ -476,6 +491,7 @@ final readonly class TableOfContents
      */
     public function syncNcx(string $title, ?string $uniqueIdentifier): void
     {
+        $this->assertWritable();
         $ncxPath = $this->ncxPath();
         if ($ncxPath === null) {
             return;
@@ -555,7 +571,10 @@ final readonly class TableOfContents
      */
     private function load(string $path): DOMElement
     {
-        $root = dom_import_simplexml($this->xmlParser->parse($this->paths->resolve($this->rootDirectory, $path)));
+        $xml = $this->reader instanceof \Closure
+            ? $this->xmlParser->parseString(($this->reader)($this->paths->normalize($path)), $path)
+            : $this->xmlParser->parse($this->paths->resolve($this->rootDirectory, $path));
+        $root = dom_import_simplexml($xml);
 
         return $root instanceof DOMElement ? $root : throw new Exception("Failed to load: {$path}");
     }
@@ -565,6 +584,7 @@ final readonly class TableOfContents
      */
     private function save(DOMElement $root, string $path): void
     {
+        $this->assertWritable();
         if (@$root->ownerDocument?->save($this->paths->resolve($this->rootDirectory, $path)) === false) {
             throw new Exception("Failed to write the table of contents to: {$path}");
         }

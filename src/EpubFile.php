@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace PhpEpub;
 
-use DOMDocument;
 use PhpEpub\Converters\ConverterInterface;
+use PhpEpub\Util\CoverLocator;
 use PhpEpub\Util\FileSystemHelper;
 use PhpEpub\Util\PathResolver;
-use PhpEpub\Util\TextEncoding;
+use PhpEpub\Util\SpineText;
 use PhpEpub\Util\XhtmlFragment;
 use PhpEpub\Util\XmlText;
 use SimpleXMLElement;
@@ -460,29 +460,9 @@ class EpubFile
      */
     public function getCoverImage(): ?ManifestItem
     {
-        $manifest = $this->getManifest();
+        $contentManager = $this->getContentManager();
 
-        foreach ($manifest->getItems() as $item) {
-            if (in_array(self::COVER_PROPERTY, explode(' ', $item->properties), true)) {
-                return $item;
-            }
-        }
-
-        $cover = $this->getMetadata()->getMeta('cover');
-        if ($cover !== null) {
-            $item = $manifest->get($cover) ?? $manifest->findByHref($cover);
-            if ($item instanceof ManifestItem) {
-                return $item;
-            }
-        }
-
-        $guidePath = $manifest->getGuidePath('cover');
-        $item = $guidePath === null ? null : $manifest->findByPath($guidePath);
-        if (! $item instanceof ManifestItem) {
-            return null;
-        }
-
-        return str_starts_with($item->mediaType, 'image/') ? $item : $this->firstImageOf($item);
+        return CoverLocator::find($this->getManifest(), $this->getMetadata(), $contentManager->getMarkup(...));
     }
 
     /**
@@ -622,19 +602,7 @@ class EpubFile
         $contentManager = $this->getContentManager();
         $existing = array_flip($contentManager->getContentPaths());
 
-        $texts = [];
-        foreach ($this->getSpine()->getItems() as $spineItem) {
-            $item = $spineItem->item;
-            if (! $item instanceof ManifestItem || ! in_array($item->mediaType, ['application/xhtml+xml', 'text/html'], true)) {
-                continue;
-            }
-
-            if (($spineItem->linear || ! $linearOnly) && isset($existing[$item->path])) {
-                $texts[$item->path] = $contentManager->getText($item->path);
-            }
-        }
-
-        return $texts;
+        return SpineText::collect($this->getSpine(), $linearOnly, static fn (string $path): bool => isset($existing[$path]), $contentManager->getText(...));
     }
 
     /**
@@ -666,52 +634,6 @@ class EpubFile
         if (in_array($mediaType, $detectable, true) && $detected !== $mediaType) {
             throw new Exception("The cover data is not a valid {$mediaType} image");
         }
-    }
-
-    /**
-     * The manifest item of the first image (<img src>, or SVG <image href>) in an XHTML page.
-     */
-    private function firstImageOf(ManifestItem $page): ?ManifestItem
-    {
-        if (! in_array($page->mediaType, ['application/xhtml+xml', 'text/html'], true)) {
-            return null;
-        }
-
-        $document = new DOMDocument();
-        $useInternalErrors = libxml_use_internal_errors(true);
-
-        try {
-            $document->loadHTML('<?xml encoding="UTF-8">' . TextEncoding::toUtf8($this->getContentManager()->getMarkup($page->path)), LIBXML_NONET);
-        } catch (Exception) {
-            return null;
-        } finally {
-            libxml_clear_errors();
-            libxml_use_internal_errors($useInternalErrors);
-        }
-
-        $sources = [];
-        foreach ($document->getElementsByTagName('img') as $image) {
-            $sources[] = $image->getAttribute('src');
-        }
-        foreach ($document->getElementsByTagName('image') as $image) {
-            $sources[] = $image->getAttribute('xlink:href') ?: $image->getAttribute('href');
-        }
-
-        $manifest = $this->getManifest();
-        $directory = dirname($page->path) === '.' ? '' : dirname($page->path) . '/';
-        foreach ($sources as $source) {
-            try {
-                $item = $manifest->findByPath($directory . rawurldecode(explode('#', $source, 2)[0]));
-            } catch (InvalidEpubException) {
-                continue;
-            }
-
-            if ($item instanceof ManifestItem && str_starts_with($item->mediaType, 'image/')) {
-                return $item;
-            }
-        }
-
-        return null;
     }
 
     /**
