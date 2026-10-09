@@ -123,7 +123,7 @@ final class CssScopeTest extends TestCase
         $resolve = static fn (string $url): ?string => null;
 
         $this->assertSame('p{color:red;}', CssSanitizer::sanitize('p{position:fixed;color:red;}', $resolve));
-        $this->assertSame('p{color:red}',CssSanitizer::sanitize('p{ POSITION : Sticky !important;color:red}', $resolve));
+        $this->assertSame('p{color:red}', CssSanitizer::sanitize('p{ POSITION : Sticky !important;color:red}', $resolve));
         $this->assertSame('', CssSanitizer::sanitize('position:fixed', $resolve));
         $this->assertSame('inset:0;z-index:99999', CssSanitizer::sanitize('position:fixed; inset:0;z-index:99999', $resolve));
         $this->assertStringContainsString('position:absolute', CssSanitizer::sanitize('p{position:absolute}', $resolve));

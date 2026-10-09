@@ -60,7 +60,8 @@ public function toString(string $epubDirectory): string;
 public function convert(string $epubDirectory, string $outputPath): void;
 ```
 
-- **CSS** from the book (linked stylesheets and `<style>` blocks) is concatenated into one `<style>` element after a small default. Every selector is scoped to the container `.epub-book`, so the book cannot restyle the page around it; `body`, `html` and `:root` rules style the container itself. `@font-face`, `@keyframes` and `@page` blocks are kept, and other at-rules are dropped.
+- **CSS** from the book (linked stylesheets and `<style>` blocks) is concatenated into one `<style>` element after a small default. The CSS is read with a tokenizer, and every selector is scoped to the container `.epub-book`, so the book cannot restyle the page around it; `body`, `html` and `:root` rules style the container itself, and selectors that would reach the container's siblings (`body ~ div`, `html + *`) are dropped. `@font-face`, `@keyframes` and `@page` blocks are kept, and other at-rules are dropped. A stylesheet with a string that is not closed on its line, a malformed or unclosed `url()` or unbalanced brackets is dropped as a whole, because parsers disagree on where its rules end.
+- **Containment**: the book sits in a wrapper that is clipped, isolated and the containing block of everything it positions (`contain: layout paint; isolation: isolate; position: relative; overflow: hidden`), and `position: fixed` and `position: sticky` declarations are removed, so a book cannot overlay the page that embeds it.
 - **Images and fonts** of the book are inlined as `data:` URIs (JPEG, PNG, GIF, WebP and sanitised SVG), up to `maxInlinedBytes` in total. An image past the budget is replaced by its alt text in brackets.
 - **Links** between chapters, and to footnotes, point at anchors inside the document. A link whose target is not in the document (for example a note that was left out with `includeNonLinear: false`) loses its `href`. `includeNonLinear` defaults to `true` here so links to notes keep working.
 
@@ -72,7 +73,7 @@ The output is meant to be shown on a page, so it is reduced to an allowlist:
 - `script`, `style` (in the body, whose rules move into the scoped stylesheet), `link`, `meta`, `base`, `iframe`, `object`, `embed`, `form` controls, `audio`, `video`, `source`, `svg` (an SVG that only shows an `<image>`, the usual cover page, becomes an `<img>`), `math` and `canvas` are removed together with their content.
 - No event-handler attribute (`on*`), `srcset` or `epub:*` attribute survives.
 - Links keep only `http`, `https`, `mailto` and in-document (`#`) targets, so `javascript:`, `data:`, `file:`, relative and protocol-relative links lose their `href`. External links get `rel="noopener noreferrer"`.
-- Nothing loads from a remote URL: images must be files of the book (anything else becomes alt text), and in CSS every `url()` is either an inlined image or font or becomes `none`; `@import`, `image-set()`, `expression()`, `behavior` and `-moz-binding` are removed, and CSS escapes are decoded first so nothing hides behind them.
+- Nothing loads from a remote URL: images must be files of the book (anything else becomes alt text), and in CSS every `url()` is either an inlined image or font or becomes `none`; `@import`, `expression()`, `behavior` and `-moz-binding` are removed, declarations using `image-set()`, `image()`, `cross-fade()`, `element()` or `src()` are dropped, and CSS escapes are decoded first so nothing hides behind them.
 - A `Content-Security-Policy` `<meta>` (`default-src 'none'; img-src data:; style-src 'unsafe-inline'; font-src data:`) repeats this for browsers.
 
 ## Markdown
@@ -106,7 +107,7 @@ public function convert(string $epubDirectory, string $outputPath): void;
 ```
 
 ```php
-public function __construct(string $markdown, array $images = []);
+public function __construct(string $markdown, array $images = [], array $warnings = []);
 public function writeTo(string $directory, string $fileName = 'book.md'): void;
 ```
 
@@ -114,7 +115,7 @@ What is converted:
 
 - Headings, paragraphs, emphasis, strong text, strikethrough, inline code and code blocks (fenced, with the language of a `language-xxx` class), block quotes, nested lists (ordered lists keep their start number), links, hard line breaks and images.
 - Tables become GFM tables when they are simple: no `colspan`/`rowspan`, no lists, quotes or nested tables in cells, and the same number of cells in every row (the first row is the header). Other tables become plain text, one row per line with the cells separated by ` | `.
-- Images are written with a relative path (`images/<name>`, named after the source file, numbered when a name repeats). Only JPEG, PNG, GIF, WebP and sanitised SVG files of the book are exported, up to `maxImageSize` each and `maxImageBytes` in total; any other image is replaced by its alt text.
+- Images are written with a relative path (`images/<name>`, named after the source file, numbered when a name repeats). Only JPEG, PNG, GIF and WebP files of the book are exported, up to `maxImageSize` each and `maxImageBytes` in total; any other image, SVG included (it can carry script and animations), is replaced by its alt text, and `MarkdownExport::` says when an SVG was left out. The HTML export may still inline an SVG in an `<img>`, after the loader removed its scripts, `foreignObject`, animation elements (`set`, `animate`, ...) and script URLs.
 - A chapter without a heading of its own gets one from its table-of-contents title.
 
 What it never contains: raw HTML (text is escaped so it cannot form markup, which also means characters such as `*`, `_` and `<` appear with a backslash), `javascript:` or other non-`http(s)`/`mailto` links, and remote images. Links inside the book become plain text, because Markdown has no portable anchors.

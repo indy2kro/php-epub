@@ -307,7 +307,7 @@ final class MarkdownParser
         $row = str_starts_with($row, '|') ? substr($row, 1) : $row;
         $row = str_ends_with($row, '|') && ! str_ends_with($row, '\\|') ? substr($row, 0, -1) : $row;
 
-        return array_map(static fn (string $cell): string => trim(str_replace('\\|', '|', $cell)), preg_split('/(?<!\\\\)\|/', $row) ?: []);
+        return array_map(static fn (string $cell): string => trim(str_replace('\\|', '|', $cell)), preg_split('/(?<!\\\\)\|/', $row) ?: [$row]);
     }
 
     /**
@@ -352,7 +352,7 @@ final class MarkdownParser
         if (preg_match('/^(.*?)\s*\{#([A-Za-z][A-Za-z0-9_.-]*)\}\s*$/', $text, $match) === 1) {
             [$text, $id] = [$match[1], $match[2]];
         } else {
-            $slug = trim((string) preg_replace('/[\s_-]+/', '-', strtolower((string) preg_replace('/[^A-Za-z0-9\s_-]+/', '', $text))), '-');
+            $slug = trim(self::replace('/[\s_-]+/', '-', strtolower(self::replace('/[^A-Za-z0-9\s_-]+/', '', $text))), '-');
             if ($slug !== '') {
                 $slug = preg_match('/^[A-Za-z]/', $slug) === 1 ? $slug : 'section-' . $slug;
                 $count = $this->slugs[$slug] = ($this->slugs[$slug] ?? 0) + 1;
@@ -377,7 +377,7 @@ final class MarkdownParser
     private function release(string $text, bool $plain): string
     {
         for ($round = 0; $round < self::MAX_DEPTH && str_contains($text, self::HOLD); $round++) {
-            $text = (string) preg_replace_callback(
+            $text = self::replaceCallback(
                 '/' . self::HOLD . '(\d+)' . self::HOLD . '/',
                 function (array $match) use ($plain): string {
                     $piece = $this->held[(int) $match[1]] ?? '';
@@ -394,10 +394,10 @@ final class MarkdownParser
     private function inlineText(string $text): string
     {
         // Code spans first: nothing inside them is Markdown.
-        $text = (string) preg_replace_callback(
+        $text = self::replaceCallback(
             '/(?<!`)(`+)(?!`)(.{1,2000}?)(?<!`)\1(?!`)/s',
             function (array $match): string {
-                $code = (string) preg_replace('/\s+/', ' ', $match[2]);
+                $code = self::replace('/\s+/', ' ', $match[2]);
                 $code = strlen($code) > 2 && $code[0] === ' ' && str_ends_with($code, ' ') ? substr($code, 1, -1) : $code;
 
                 return $this->hold('<code>' . $this->escape($code) . '</code>');
@@ -406,8 +406,8 @@ final class MarkdownParser
         );
 
         // Hard line breaks and backslash escapes.
-        $text = (string) preg_replace_callback('/\\\\\n|\\\\([!-\/:-@\[-`{-~])/', fn (array $match): string => $this->hold(isset($match[1]) ? $this->escape($match[1]) : "<br/>\n"), $text);
-        $text = (string) preg_replace_callback('/ {2,}\n/', fn (): string => $this->hold("<br/>\n"), $text);
+        $text = self::replaceCallback('/\\\\\n|\\\\([!-\/:-@\[-`{-~])/', fn (array $match): string => $this->hold(isset($match[1]) ? $this->escape($match[1]) : "<br/>\n"), $text);
+        $text = self::replaceCallback('/ {2,}\n/', fn (): string => $this->hold("<br/>\n"), $text);
 
         return $this->spans($this->escape($text));
     }
@@ -418,19 +418,21 @@ final class MarkdownParser
     private function spans(string $text): string
     {
         // The bracketed text of a link is read as inline Markdown itself.
-        $target = '((?:[^\s()]|\([^\s()]*\))+)(?:\s+&quot;(.*?)&quot;|\s+&#039;(.*?)&#039;)?';
-        $text = (string) preg_replace_callback(
-            '/!\[([^\]]*)\]\(\s*' . $target . '\s*\)/',
+        // Possessive quantifiers and bounded titles: a very long target must neither exhaust the regex engine's stack
+        // (which would make the match fail) nor make it backtrack.
+        $target = '((?:[^\s()]++|\([^\s()]*+\))++)(?:\s++&quot;(.{0,1000}?)&quot;|\s++&#039;(.{0,1000}?)&#039;)?';
+        $text = self::replaceCallback(
+            '/!\[([^\]]*+)\]\(\s*+' . $target . '\s*+\)/',
             fn (array $match): string => $this->hold('<img src="' . $match[2] . '" alt="' . $this->plain($match[1]) . '"' . $this->title($match) . '/>'),
             $text
         );
-        $text = (string) preg_replace_callback(
-            '/\[((?:[^\[\]]|\[[^\[\]]*\])+)\]\(\s*' . $target . '\s*\)/',
+        $text = self::replaceCallback(
+            '/\[((?:[^\[\]]++|\[[^\[\]]*+\])++)\]\(\s*+' . $target . '\s*+\)/',
             fn (array $match): string => $this->hold('<a href="' . $match[2] . '"' . $this->title($match) . '>' . $this->spans($match[1]) . '</a>'),
             $text
         );
-        $text = (string) preg_replace_callback(
-            '/&lt;((?:https?:\/\/|mailto:)[^\s&]+)&gt;/i',
+        $text = self::replaceCallback(
+            '/&lt;((?:https?:\/\/|mailto:)[^\s&]++)&gt;/i',
             fn (array $match): string => $this->hold('<a href="' . $match[1] . '">' . $match[1] . '</a>'),
             $text
         );
@@ -446,7 +448,7 @@ final class MarkdownParser
             '/~~(?=\S)(.{1,1000}?)(?<=\S)~~/s' => '<del>$1</del>',
         ];
 
-        return (string) preg_replace(array_keys($rules), array_values($rules), $text);
+        return self::replace(array_keys($rules), array_values($rules), $text);
     }
 
     /**
@@ -454,11 +456,11 @@ final class MarkdownParser
      */
     private function plain(string $text): string
     {
-        return (string) preg_replace('/[*_~]+/', '', $this->release($text, true));
+        return self::replace('/[*_~]+/', '', $this->release($text, true));
     }
 
     /**
-     * @param array<int, string> $match
+     * @param array<int|string, string> $match
      */
     private function title(array $match): string
     {
@@ -472,6 +474,28 @@ final class MarkdownParser
         $this->held[] = $html;
 
         return self::HOLD . (count($this->held) - 1) . self::HOLD;
+    }
+
+    /**
+     * preg_replace() that keeps the text when the engine fails (a limit was hit): content is never dropped, the
+     * markup in it is just left as literal text.
+     *
+     * @param string|list<string> $pattern
+     * @param string|list<string> $replacement
+     */
+    private static function replace(string|array $pattern, string|array $replacement, string $subject): string
+    {
+        return preg_replace($pattern, $replacement, $subject) ?? $subject;
+    }
+
+    /**
+     * preg_replace_callback() that keeps the text when the engine fails, like replace().
+     *
+     * @param \Closure(array<int|string, string>): string $callback
+     */
+    private static function replaceCallback(string $pattern, \Closure $callback, string $subject): string
+    {
+        return preg_replace_callback($pattern, $callback, $subject) ?? $subject;
     }
 
     private function escape(string $text): string

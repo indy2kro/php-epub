@@ -290,6 +290,13 @@ final readonly class BookBuilder
     {
         $options = $this->options;
 
+        // Declared as strings, but they come from callers (and from decoded requests): a wrong type is an error to
+        // report, not a TypeError.
+        self::assertStrings($options->authors, 'An author name');
+        self::assertStrings($options->images, 'An image');
+
+
+
         try {
             XmlText::assertValid($options->title, $options->language, $options->description, $options->publisher, ...$options->authors);
             XmlText::assertValid($options->identifier ?? '');
@@ -324,6 +331,20 @@ final readonly class BookBuilder
         }
 
         $this->normalizedDate();
+    }
+
+    /**
+     * @param array<mixed> $values
+     *
+     * @throws BuildException If a value is not a string.
+     */
+    private static function assertStrings(array $values, string $what): void
+    {
+        foreach ($values as $value) {
+            if (! is_string($value)) {
+                throw new BuildException($what . ' must be a string, ' . get_debug_type($value) . ' given');
+            }
+        }
     }
 
     /**
@@ -370,7 +391,12 @@ final readonly class BookBuilder
     {
         // Invalid bytes become U+FFFD (the same trick as htmlspecialchars' ENT_SUBSTITUTE, undone for the markup).
         $content = htmlspecialchars_decode(htmlspecialchars($content, ENT_SUBSTITUTE, 'UTF-8'), ENT_NOQUOTES);
-        $content = (string) preg_replace('/[^\x{9}\x{A}\x{D}\x{20}-\x{D7FF}\x{E000}-\x{FFFD}\x{10000}-\x{10FFFF}]/u', '', $content);
+        $cleaned = preg_replace('/[^\x{9}\x{A}\x{D}\x{20}-\x{D7FF}\x{E000}-\x{FFFD}\x{10000}-\x{10FFFF}]/u', '', $content);
+        if ($cleaned === null) {
+            throw new BuildException('The content could not be read: ' . preg_last_error_msg());
+        }
+
+        $content = $cleaned;
 
         return str_starts_with($content, "\u{FEFF}") ? substr($content, 3) : $content;
     }
@@ -604,7 +630,7 @@ final readonly class BookBuilder
 
     private static function title(string $text): string
     {
-        $text = trim((string) preg_replace('/\s+/u', ' ', $text));
+        $text = trim(preg_replace('/\s+/u', ' ', $text) ?? $text);
 
         return preg_match('/^.{0,' . self::MAX_TITLE_LENGTH . '}/su', $text, $match) === 1 ? $match[0] : $text;
     }

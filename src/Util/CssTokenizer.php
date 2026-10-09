@@ -17,6 +17,8 @@ namespace PhpEpub\Util;
  */
 final class CssTokenizer
 {
+    private static ?string $high = null;
+
     /**
      * @return list<array{string, string}>|null The tokens; null when the CSS holds a string that is not closed on
      *                                          its line or a url() that is malformed or not closed (a browser would
@@ -108,9 +110,9 @@ final class CssTokenizer
      */
     private static function highBytes(): string
     {
-        static $bytes = null;
+        self::$high ??= implode('', array_map(chr(...), range(0x80, 0xFF)));
 
-        return $bytes ??= implode('', array_map(chr(...), range(0x80, 0xFF)));
+        return self::$high;
     }
 
     /**

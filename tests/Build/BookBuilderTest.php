@@ -319,6 +319,54 @@ MD;
         yield 'svg cover' => [static fn (): BookOptions => new BookOptions(coverImage: '<svg xmlns="http://www.w3.org/2000/svg"/>')];
     }
 
+    public function testWrongTypesInImagesAndAuthorsAreReportedNotTypeErrors(): void
+    {
+        // Decoded from JSON, as a request would be.
+        $invalid = ['{"images":{"a.png":12}}', '{"images":{"a.png":null}}', '{"images":{"a.png":["x"]}}', '{"authors":[5]}', '{"authors":[null]}'];
+        foreach ($invalid as $json) {
+            $options = (new \ReflectionClass(BookOptions::class))->newInstanceArgs((array) json_decode($json, true));
+            $this->assertInstanceOf(BookOptions::class, $options);
+            try {
+                (new BookBuilder($options))->fromMarkdown('# x');
+                $this->fail('Accepted a value that is not a string');
+            } catch (BuildException $exception) {
+                $this->assertStringContainsString('must be a string', $exception->getMessage());
+            }
+        }
+    }
+
+    public function testVeryLongLinkAndImageTargetsDoNotDropTheParagraph(): void
+    {
+        foreach ([10_000, 100_000, 1_000_000] as $length) {
+            $target = str_repeat('a', $length);
+            $built = (new BookBuilder(new BookOptions(images: ['a.png' => self::png()])))
+                ->fromMarkdown("# Long\n\nBefore [a link](http://example.com/{$target}) and ![pic]({$target}) after, with *emphasis*.\n\nNext paragraph.");
+
+            $html = $this->chapterHtml($built, 1);
+            $this->assertStringContainsString('Before ', $html, "length {$length}");
+            $this->assertStringContainsString(' after, with <em>emphasis</em>.', $html, "length {$length}");
+            $this->assertStringContainsString('Next paragraph.', $html);
+            $this->assertStringContainsString('a link', $html);
+        }
+    }
+
+    public function testParagraphsSurviveWhenTheRegexEngineFails(): void
+    {
+        // The backtrack limit makes preg_* fail; the text must stay (as literal Markdown), never vanish.
+        $previous = ini_set('pcre.backtrack_limit', '10');
+        $previousJit = ini_set('pcre.jit', '0');
+
+        try {
+            $built = (new BookBuilder())->fromMarkdown("# T\n\nSome *emphasised* text with a [link](http://example.com/x) in it and `code`.\n");
+            $html = $this->chapterHtml($built, 1);
+        } finally {
+            ini_set('pcre.backtrack_limit', (string) $previous);
+            ini_set('pcre.jit', (string) $previousJit);
+        }
+
+        $this->assertStringContainsString('emphasised', $html);
+        $this->assertStringContainsString('link', $html);
+    }
     public function testDatesAndIdentifier(): void
     {
         $date = (new BookBuilder(new BookOptions(date: new DateTimeImmutable('2020-03-04 10:00'), identifier: 'urn:isbn:9780000000002')))->fromMarkdown('# x')->open();

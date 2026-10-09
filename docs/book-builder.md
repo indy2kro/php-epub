@@ -133,7 +133,7 @@ $book->save('/path/to/manga.epub');
 | `maxImageBytes` | 20 MiB | the image is skipped with a warning |
 | `maxPixels` | 100 million | the image is skipped with a warning, so a small file cannot expand into a huge bitmap |
 
-A web tool should set `maxTotalBytes` to what it accepts as an upload. The Markdown parser bounds emphasis and code spans (1000 and 2000 characters) so that adversarial text takes linear time.
+A web tool should set `maxTotalBytes` to what it accepts as an upload. The Markdown parser bounds emphasis and code spans (1000 and 2000 characters) so that adversarial text takes linear time, and a regular expression that fails on pathological text leaves the text as it is instead of dropping it. Values of the wrong type in `authors` or `images` are refused with a `BuildException`.
 
 ## The book
 

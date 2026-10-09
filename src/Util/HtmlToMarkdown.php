@@ -108,9 +108,9 @@ final class HtmlToMarkdown
             case 'h4':
             case 'h5':
             case 'h6':
-                $text = trim((string) preg_replace('/\s*\n\s*/', ' ', $this->inlineChildren($element, $depth)));
+                $text = trim(self::replace('/\s*\n\s*/', ' ', $this->inlineChildren($element, $depth)));
 
-                return $text === '' ? [] : [str_repeat('#', (int) $tag[1]) . ' ' . (string) preg_replace('/(#+)$/', '\\\\$1', $text)];
+                return $text === '' ? [] : [str_repeat('#', (int) $tag[1]) . ' ' . self::replace('/(#+)$/', '\\\\$1', $text)];
             case 'hr':
                 return ['---'];
             case 'pre':
@@ -213,7 +213,7 @@ final class HtmlToMarkdown
                     }
 
                     $simple = $simple && ! $this->isComplexCell($cell);
-                    $cells[] = trim((string) preg_replace('/\s*\n\s*/', ' ', $this->cellText($cell, $depth)));
+                    $cells[] = trim(self::replace('/\s*\n\s*/', ' ', $this->cellText($cell, $depth)));
                 }
 
                 $cells === [] || $rows[] = $cells;
@@ -250,7 +250,7 @@ final class HtmlToMarkdown
     {
         // Pipes that text() has not already escaped (in code spans) must not end the cell.
         return '| ' . implode(' | ', array_map(
-            static fn (string $cell): string => (string) preg_replace('/(?<!\\\\)\|/', '\\\\|', $cell),
+            static fn (string $cell): string => self::replace('/(?<!\\\\)\|/', '\\\\|', $cell),
             $cells
         )) . ' |';
     }
@@ -367,7 +367,7 @@ final class HtmlToMarkdown
 
     private static function codeSpan(string $text): string
     {
-        $text = trim((string) preg_replace('/\s+/', ' ', $text));
+        $text = trim(self::replace('/\s+/', ' ', $text));
         if ($text === '') {
             return '';
         }
@@ -384,9 +384,9 @@ final class HtmlToMarkdown
      */
     private static function text(string $text): string
     {
-        $text = (string) preg_replace('/[\s\x{00A0}]+/u', ' ', $text);
+        $text = self::replace('/[\s\x{00A0}]+/u', ' ', $text);
 
-        return (string) preg_replace('/[\\\\`*_\[\]<>&~|]/', '\\\\$0', $text);
+        return self::replace('/[\\\\`*_\[\]<>&~|]/', '\\\\$0', $text);
     }
 
     /**
@@ -394,9 +394,9 @@ final class HtmlToMarkdown
      */
     private static function escapeLineStarts(string $text): string
     {
-        $text = (string) preg_replace('/^( {0,3})(\d{1,9})([.)])(?=\s|$)/m', '$1$2\\\\$3', $text);
+        $text = self::replace('/^( {0,3})(\d{1,9})([.)])(?=\s|$)/m', '$1$2\\\\$3', $text);
 
-        return (string) preg_replace('/^( {0,3})(#{1,6}(?=\s|$)|[-+](?=\s|$)|[-=](?=[-=]*\s*$))/m', '$1\\\\$2', $text);
+        return self::replace('/^( {0,3})(#{1,6}(?=\s|$)|[-+](?=\s|$)|[-=](?=[-=]*\s*$))/m', '$1\\\\$2', $text);
     }
 
     /**
@@ -404,11 +404,29 @@ final class HtmlToMarkdown
      */
     private static function destination(string $url): string
     {
-        return (string) preg_replace_callback(
+        return self::replaceCallback(
             '/[\x00-\x20\x7f()<>\\\\]/',
             static fn (array $match): string => sprintf('%%%02X', ord($match[0])),
             trim($url)
         );
+    }
+
+    /**
+     * preg_replace() that keeps the text when the engine fails (a limit was hit): content is never dropped.
+     */
+    private static function replace(string $pattern, string $replacement, string $subject): string
+    {
+        return preg_replace($pattern, $replacement, $subject) ?? $subject;
+    }
+
+    /**
+     * preg_replace_callback() that keeps the text when the engine fails, like replace().
+     *
+     * @param \Closure(array<int|string, string>): string $callback
+     */
+    private static function replaceCallback(string $pattern, \Closure $callback, string $subject): string
+    {
+        return preg_replace_callback($pattern, $callback, $subject) ?? $subject;
     }
 
     private static function tag(DOMElement $element): string
