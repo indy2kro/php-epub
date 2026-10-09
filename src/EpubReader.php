@@ -167,6 +167,8 @@ final class EpubReader
         if (! $buffer) {
             // ZipArchive::openString() is an instance method that only newer ext-zip builds have (the minimum PHP
             // version does not); openString() checks for it. Whatever it throws is reported as a ZipException.
+            // Not covered where ext-zip has no openString(); its tests run where it exists.
+            // @codeCoverageIgnoreStart
             $zip = new ZipArchive();
             try {
                 $opened = $zip->openString($data, ZipArchive::RDONLY); // @phpstan-ignore method.notFound
@@ -177,6 +179,7 @@ final class EpubReader
             $opened === true || throw new ZipException('Failed to open the EPUB data as a ZIP archive');
 
             return new self($zip, $limits, $xmlParser);
+            // @codeCoverageIgnoreEnd
         }
 
         [$directory, $archive] = self::scratchArchive();
@@ -395,9 +398,12 @@ final class EpubReader
         $declared = 0;
         for ($index = 0; $index < $zip->numFiles; $index++) {
             $stat = $zip->statIndex($index);
+            // libzip can stat every index below numFiles; this is defensive.
+            // @codeCoverageIgnoreStart
             if ($stat === false) {
                 throw new ZipException("Failed to read entry {$index} of the ZIP file");
             }
+            // @codeCoverageIgnoreEnd
 
             $name = $stat['name'];
             try {
@@ -534,8 +540,11 @@ final class EpubReader
         $this->charged[$index] = $read;
         $this->total += $extra;
 
+        // libzip bounds every read to the declared size, which open() already summed against this limit: defence in depth.
+        // @codeCoverageIgnoreStart
         if ($this->total > $this->limits->maxUncompressedBytes) {
             throw new ZipException("ZIP file exceeds the maximum uncompressed size of {$this->limits->maxUncompressedBytes} bytes (reading {$name})");
         }
+        // @codeCoverageIgnoreEnd
     }
 }

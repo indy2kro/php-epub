@@ -100,9 +100,12 @@ class ZipHandler
             $files = [];
             for ($index = 0; $index < $zip->numFiles; $index++) {
                 $stat = $zip->statIndex($index);
+                // libzip can stat every index below numFiles; this is defensive.
+                // @codeCoverageIgnoreStart
                 if ($stat === false) {
                     throw new ZipException("Failed to read entry {$index} of ZIP file: {$zipFilePath}");
                 }
+                // @codeCoverageIgnoreEnd
 
                 $extractedBytes += $this->extractEntry($zip, $index, $stat['name'], $stat['comp_size'], $destination, $extractedBytes, $files);
             }
@@ -187,9 +190,12 @@ class ZipHandler
                     );
                 }
 
+                // A full disk or a closed handle; cannot be provoked portably.
+                // @codeCoverageIgnoreStart
                 if (fwrite($output, $chunk) === false) {
                     throw new ZipException("Failed to write ZIP entry: {$name}");
                 }
+                // @codeCoverageIgnoreEnd
             }
         } finally {
             fclose($input);
@@ -318,8 +324,11 @@ class ZipHandler
                 try {
                     $zip->unchangeAll();
                     @$zip->close();
+                // @codeCoverageIgnoreStart
                 } catch (\ValueError) {
+                    // Only when a failed close() already released the archive, which depends on the OS.
                 }
+                // @codeCoverageIgnoreEnd
             }
             @unlink($temporary);
 

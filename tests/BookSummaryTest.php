@@ -8,6 +8,7 @@ use PhpEpub\BookSummary;
 use PhpEpub\Contributor;
 use PhpEpub\EpubFile;
 use PhpEpub\Exception;
+use PhpEpub\Limits;
 use PhpEpub\Test\Support\EpubBuilder;
 use PhpEpub\Util\FileSystemHelper;
 use PhpEpub\Util\WordCount;
@@ -229,6 +230,33 @@ final class BookSummaryTest extends TestCase
         $summary = $this->open(EpubBuilder::epub3()->withFile('EPUB/package.opf', $opf))->toArray();
 
         $this->assertSame(2, $summary['stats']['wordCount']);
+        $this->assertSame(0, $summary['spine'][0]['bytes']);
+    }
+
+    public function testADocumentOverTheSizeLimitIsSkippedInTheWordCount(): void
+    {
+        $path = EpubBuilder::epub3()->buildEpub($this->tmpDir . '/limited.epub');
+        $summary = EpubFile::open($path, limits: new Limits(maxHtmlBytes: 10))->toArray();
+
+        $this->assertSame(0, $summary['stats']['wordCount']);
+    }
+
+    public function testAnUnparsableNavigationDocumentCountsAsMissing(): void
+    {
+        $summary = $this->open(EpubBuilder::epub3()->withFile('EPUB/nav.xhtml', '<nav epub:type="toc"><ol><li>'))->toArray();
+
+        $this->assertSame([], $summary['toc']['entries']);
+        $this->assertSame([], $summary['toc']['landmarks']);
+        $this->assertSame(0, $summary['toc']['pageListCount']);
+    }
+
+    public function testASpineEntryWithoutAManifestItemHasNoSize(): void
+    {
+        $opf = str_replace('<itemref idref="chapter"/>', '<itemref idref="nowhere"/><itemref idref="chapter"/>', (string) EpubBuilder::epub3()->getFile('EPUB/package.opf'));
+
+        $summary = $this->open(EpubBuilder::epub3()->withFile('EPUB/package.opf', $opf))->toArray();
+
+        $this->assertSame('', $summary['spine'][0]['path']);
         $this->assertSame(0, $summary['spine'][0]['bytes']);
     }
 
