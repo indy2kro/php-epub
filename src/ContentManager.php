@@ -28,13 +28,15 @@ class ContentManager
      * @param string $contentDirectory The directory containing the extracted EPUB.
      * @param \Closure(): ?string|null $fontKeyIdentifier Gives the unique identifier the book's obfuscated fonts
      *                                                    are keyed with; without it, fonts can only be handled plain.
+     * @param int $maxHtmlBytes Largest XHTML or HTML document getMarkup() and getText() read (no cap by default).
      */
     public function __construct(
         string $contentDirectory,
         private readonly ?Manifest $manifest = null,
         private readonly ?Spine $spine = null,
         private readonly PathResolver $paths = new PathResolver(),
-        private readonly ?\Closure $fontKeyIdentifier = null
+        private readonly ?\Closure $fontKeyIdentifier = null,
+        private readonly int $maxHtmlBytes = PHP_INT_MAX
     ) {
         if (! is_dir($contentDirectory)) {
             throw new Exception("Content directory does not exist: {$contentDirectory}");
@@ -285,6 +287,25 @@ class ContentManager
     }
 
     /**
+     * Retrieves an XHTML or HTML document that is about to be parsed as markup, refusing one larger than the
+     * size limit (see Limits::$maxHtmlBytes) before it is read.
+     *
+     * @param string $filePath The path of the document relative to the book root.
+     *
+     * @throws InvalidEpubException If the document is larger than the limit.
+     * @throws Exception If the file cannot be read.
+     */
+    public function getMarkup(string $filePath): string
+    {
+        $size = @filesize($this->paths->resolve($this->contentDirectory, $filePath));
+        if ($size !== false && $size > $this->maxHtmlBytes) {
+            throw new InvalidEpubException("Document is larger than the limit of {$this->maxHtmlBytes} bytes: {$filePath}");
+        }
+
+        return $this->getContent($filePath);
+    }
+
+    /**
      * Adds (or overwrites) an embedded font and, with a manifest, lists it there. By default the font is
      * obfuscated with the IDPF algorithm (OCF "Font Obfuscation") and listed in META-INF/encryption.xml
      * (created when missing), which publishers do to keep the font from being reused as a file.
@@ -357,11 +378,12 @@ class ContentManager
      *
      * @param string $filePath The path of the document relative to the book root.
      *
+     * @throws InvalidEpubException If the document is larger than the size limit.
      * @throws Exception If the file cannot be read.
      */
     public function getText(string $filePath): string
     {
-        return HtmlText::extract($this->getContent($filePath));
+        return HtmlText::extract($this->getMarkup($filePath));
     }
 
     /**

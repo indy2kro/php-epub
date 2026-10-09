@@ -1,0 +1,206 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PhpEpub\Test;
+
+use PhpEpub\ConversionException;
+use PhpEpub\Converters\EpubDocumentLoader;
+use PhpEpub\EpubFile;
+use PhpEpub\Exception;
+use PhpEpub\InvalidEpubException;
+use PhpEpub\Limits;
+use PhpEpub\Test\Support\EpubBuilder;
+use PhpEpub\Util\FileSystemHelper;
+use PhpEpub\XmlException;
+use PhpEpub\XmlParser;
+use PhpEpub\ZipException;
+use PhpEpub\ZipHandler;
+use PHPUnit\Framework\TestCase;
+use ZipArchive;
+
+final class LimitsTest extends TestCase
+{
+    private string $workDir;
+
+    protected function setUp(): void
+    {
+        $this->workDir = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'epub_limits_' . bin2hex(random_bytes(8));
+        mkdir($this->workDir, 0700, true);
+    }
+
+    protected function tearDown(): void
+    {
+        (new FileSystemHelper())->deleteDirectory($this->workDir);
+    }
+
+    public function testDefaultAndWebPresets(): void
+    {
+        $default = Limits::default();
+        $this->assertSame(
+            [10_000, 1024 ** 3, 100, PHP_INT_MAX, PHP_INT_MAX],
+            [$default->maxEntries, $default->maxUncompressedBytes, $default->maxCompressionRatio, $default->maxXmlBytes, $default->maxHtmlBytes]
+        );
+
+        $web = Limits::web();
+        $this->assertSame(
+            [2_000, 200 * 1024 * 1024, 100, 8 * 1024 * 1024, 8 * 1024 * 1024],
+            [$web->maxEntries, $web->maxUncompressedBytes, $web->maxCompressionRatio, $web->maxXmlBytes, $web->maxHtmlBytes]
+        );
+    }
+
+    public function testALimitMustBePositive(): void
+    {
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('maxXmlBytes');
+
+        new Limits(maxXmlBytes: 0);
+    }
+
+    public function testWebLimitsOpenTheFixtures(): void
+    {
+        foreach (glob(__DIR__ . '/fixtures/valid*.epub') ?: [] as $fixture) {
+            $epubFile = EpubFile::open($fixture, limits: Limits::web());
+            $this->assertNotSame('', $epubFile->getMetadata()->getTitle());
+            $epubFile->close();
+        }
+    }
+
+    public function testEntryCountBoundary(): void
+    {
+        $path = $this->book(EpubBuilder::epub3());
+        $entries = $this->zipValue($path, static fn (ZipArchive $zip): int => $zip->numFiles);
+
+        EpubFile::open($path, limits: new Limits(maxEntries: $entries))->close();
+
+        $this->expectException(ZipException::class);
+        EpubFile::open($path, limits: new Limits(maxEntries: $entries - 1));
+    }
+
+    public function testUncompressedSizeBoundary(): void
+    {
+        $path = $this->book(EpubBuilder::epub3());
+        $total = $this->zipValue($path, static function (ZipArchive $zip): int {
+            $sum = 0;
+            for ($index = 0; $index < $zip->numFiles; $index++) {
+                $sum += (int) ($zip->statIndex($index)['size'] ?? 0);
+            }
+
+            return $sum;
+        });
+
+        EpubFile::open($path, limits: new Limits(maxUncompressedBytes: $total))->close();
+
+        $this->expectException(ZipException::class);
+        EpubFile::open($path, limits: new Limits(maxUncompressedBytes: $total - 1));
+    }
+
+    public function testCompressionRatioBoundary(): void
+    {
+        $path = $this->book(EpubBuilder::epub3()->withFile('EPUB/big.bin', str_repeat("\0", 2 * 1024 * 1024)));
+        $compressed = $this->zipValue($path, static fn (ZipArchive $zip): int => (int) ($zip->statName('EPUB/big.bin')['comp_size'] ?? 1));
+        $ratio = (int) ceil(2 * 1024 * 1024 / $compressed);
+
+        EpubFile::open($path, limits: new Limits(maxCompressionRatio: $ratio))->close();
+
+        $this->expectException(ZipException::class);
+        EpubFile::open($path, limits: new Limits(maxCompressionRatio: $ratio - 1));
+    }
+
+    public function testXmlSizeBoundary(): void
+    {
+        $builder = EpubBuilder::epub3();
+        $opf = str_replace('</package>', '<!--' . str_repeat('x', 3000) . '--></package>', (string) $builder->getFile('EPUB/package.opf'));
+        $path = $this->book($builder->withFile('EPUB/package.opf', $opf));
+
+        EpubFile::open($path, limits: new Limits(maxXmlBytes: strlen($opf)))->close();
+
+        $this->expectException(XmlException::class);
+        EpubFile::open($path, limits: new Limits(maxXmlBytes: strlen($opf) - 1));
+    }
+
+    public function testExplicitCollaboratorsWinOverLimits(): void
+    {
+        $path = $this->book(EpubBuilder::epub3());
+
+        $epubFile = EpubFile::open($path, new ZipHandler(), limits: new Limits(maxEntries: 1));
+        $this->assertSame('Valid Book', $epubFile->getMetadata()->getTitle());
+        $epubFile->close();
+    }
+
+    public function testXmlParserCapsFilesAndStrings(): void
+    {
+        $xml = '<a>' . str_repeat('b', 100) . '</a>';
+        $file = $this->workDir . '/doc.xml';
+        file_put_contents($file, $xml);
+
+        $parser = new XmlParser(strlen($xml));
+        $this->assertSame(100, strlen((string) $parser->parse($file)));
+        $this->assertSame(100, strlen((string) $parser->parseString($xml)));
+
+        $strict = new XmlParser(strlen($xml) - 1);
+        foreach ([static fn () => $strict->parse($file), static fn () => $strict->parseString($xml)] as $parse) {
+            try {
+                $parse();
+                $this->fail('Expected an XmlException.');
+            } catch (XmlException $exception) {
+                $this->assertStringContainsString('larger than the limit', $exception->getMessage());
+            }
+        }
+    }
+
+    public function testDeeplyNestedXmlIsRefused(): void
+    {
+        $xml = str_repeat('<a>', 5000) . str_repeat('</a>', 5000);
+
+        $this->expectException(XmlException::class);
+        (new XmlParser())->parseString($xml);
+    }
+
+    public function testHtmlSizeBoundaryForText(): void
+    {
+        $chapter = EpubBuilder::xhtml('Chapter', '<p>' . str_repeat('word ', 200) . '</p>');
+        $path = $this->book(EpubBuilder::epub3()->withFile('EPUB/text/chapter.xhtml', $chapter));
+
+        $epubFile = EpubFile::open($path, limits: new Limits(maxHtmlBytes: strlen($chapter)));
+        $this->assertStringContainsString('word', $epubFile->getText()['EPUB/text/chapter.xhtml']);
+        $epubFile->close();
+
+        $epubFile = EpubFile::open($path, limits: new Limits(maxHtmlBytes: strlen($chapter) - 1));
+        try {
+            $this->expectException(InvalidEpubException::class);
+            $epubFile->getText();
+        } finally {
+            $epubFile->close();
+        }
+    }
+
+    public function testHtmlSizeBoundaryForConversion(): void
+    {
+        $chapter = EpubBuilder::xhtml('Chapter', '<p>Text.</p>');
+        $directory = EpubBuilder::epub3()->withFile('EPUB/text/chapter.xhtml', $chapter)->writeTo($this->workDir . '/book');
+
+        $this->assertNotEmpty((new EpubDocumentLoader(maxHtmlBytes: strlen($chapter)))->load($directory)->chapters);
+
+        $this->expectException(ConversionException::class);
+        (new EpubDocumentLoader(maxHtmlBytes: strlen($chapter) - 1))->load($directory);
+    }
+
+    private function book(EpubBuilder $builder): string
+    {
+        return $builder->buildEpub($this->workDir . '/book-' . bin2hex(random_bytes(4)) . '.epub');
+    }
+
+    /**
+     * @param \Closure(ZipArchive): int $read
+     */
+    private function zipValue(string $path, \Closure $read): int
+    {
+        $zip = new ZipArchive();
+        $zip->open($path);
+        $value = $read($zip);
+        $zip->close();
+
+        return $value;
+    }
+}
