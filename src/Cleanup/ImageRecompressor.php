@@ -69,7 +69,8 @@ final readonly class ImageRecompressor
     public function recompress(string $data, ?int $maxWidth, ?int $maxHeight, int $jpegQuality, bool $convertOpaquePngToJpeg): ?array
     {
         if (! self::isAvailable()) {
-            return null;
+            // Only reachable without the GD extension.
+            return null; // @codeCoverageIgnore
         }
 
         $info = @getimagesizefromstring($data);
@@ -104,7 +105,8 @@ final readonly class ImageRecompressor
             // The decoded original is not needed any more: free it before encoding.
             unset($source);
             if ($image === null) {
-                return null;
+                // imagecreatetruecolor() and imagecopyresampled() fail only when GD runs out of memory.
+                return null; // @codeCoverageIgnore
             }
         }
 
@@ -183,7 +185,8 @@ final readonly class ImageRecompressor
     {
         $target = imagecreatetruecolor($width, $height);
         if ($target === false) {
-            return null;
+            // imagecreatetruecolor() fails only when GD runs out of memory.
+            return null; // @codeCoverageIgnore
         }
 
         if ($keepAlpha) {
@@ -196,7 +199,8 @@ final readonly class ImageRecompressor
         }
 
         if (! imagecopyresampled($target, $source, 0, 0, 0, 0, $width, $height, imagesx($source), imagesy($source))) {
-            return null;
+            // imagecopyresampled() fails only when GD runs out of memory.
+            return null; // @codeCoverageIgnore
         }
 
         // An indexed image stays indexed: a truecolor copy would be much larger.
@@ -256,7 +260,8 @@ final readonly class ImageRecompressor
             for ($x = 0; $x < $width; $x++) {
                 $colour = imagecolorat($image, $x, $y);
                 if ($colour !== false && (($colour >> 24) & 0x7F) !== 0) {
-                    return false;
+                    // The 1x1 average above already rounds any transparent pixel up to a non-zero alpha with the bundled GD; this scan is a safety net for builds that round differently.
+                    return false; // @codeCoverageIgnore
                 }
             }
         }

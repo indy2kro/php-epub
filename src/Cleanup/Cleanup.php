@@ -181,7 +181,8 @@ final readonly class Cleanup
             $file = $this->paths->resolve($directory, $path);
             $size = is_file($file) ? (int) filesize($file) : 0;
             if (is_file($file) && ! @unlink($file)) {
-                throw new Exception("Failed to delete: {$path}");
+                // The file vanished or is locked between the check and the delete.
+                throw new Exception("Failed to delete: {$path}"); // @codeCoverageIgnore
             }
 
             foreach ($manifest->getItems() as $item) {
@@ -224,7 +225,8 @@ final readonly class Cleanup
             $file = $this->paths->resolve($directory, $path);
             $size = (int) filesize($file);
             if (! @unlink($file)) {
-                throw new Exception("Failed to delete: {$path}");
+                // The file vanished or is locked between the check and the delete.
+                throw new Exception("Failed to delete: {$path}"); // @codeCoverageIgnore
             }
 
             $files[] = $path;
@@ -237,7 +239,8 @@ final readonly class Cleanup
     private function recompressImages(CleanupOptions $options, ?ReferenceAnalysis $analysis): CleanupAction
     {
         if (! ImageRecompressor::isAvailable()) {
-            return new CleanupAction(CleanupAction::IMAGES, [], 0, 0, true, 'Neither the GD nor the Imagick extension is available.');
+            // Only reachable without the GD extension.
+            return new CleanupAction(CleanupAction::IMAGES, [], 0, 0, true, 'Neither the GD nor the Imagick extension is available.'); // @codeCoverageIgnore
         }
 
         $directory = $this->directory();
@@ -290,7 +293,8 @@ final readonly class Cleanup
             }
 
             if (@file_put_contents($this->paths->resolve($directory, $path), $result['data']) === false) {
-                throw new Exception("Failed to write: {$path}");
+                // The file cannot be written although it was just read.
+                throw new Exception("Failed to write: {$path}"); // @codeCoverageIgnore
             }
 
             $files[] = $path;
