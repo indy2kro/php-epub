@@ -14,6 +14,7 @@ use PhpEpub\ManifestItem;
 use PhpEpub\Test\Support\CleanupBook;
 use PhpEpub\Test\Support\EpubBuilder;
 use PhpEpub\Util\FileSystemHelper;
+use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -325,5 +326,30 @@ final class ImageCleanupTest extends TestCase
         $this->assertSame('EPUB/img.d/bar-2.jpg', $book->getManifest()->get('b')?->path);
         $this->assertStringContainsString('src="img.d/foo.jpg"', $this->read('EPUB/chapter.xhtml'));
         $this->assertStringContainsString('src="img.d/bar-2.jpg"', $this->read('EPUB/chapter.xhtml'));
+    }
+
+    /**
+     * Under a tight memory limit the image is skipped; decoding it would be a fatal, uncatchable error.
+     */
+    #[RunInSeparateProcess]
+    public function testRecompressionUnderATightMemoryLimitSkipsInsteadOfExhaustingMemory(): void
+    {
+        $png = $this->image(1800, 1800, 'png');
+        $builder = CleanupBook::builder('<item id="p" href="p.png" media-type="image/png"/>', ['EPUB/p.png' => $png], chapterBody: '<img src="p.png" alt=""/>');
+        $book = $this->open($builder);
+        $this->assertGreaterThan(0, strlen($png));
+
+        $limit = ini_get('memory_limit');
+        ini_set('memory_limit', (string) (memory_get_usage() + 40 * 1024 * 1024));
+
+        try {
+            $action = (new Cleanup($book))->run(CleanupOptions::preset(CleanupPreset::Strong))->getAction(CleanupAction::IMAGES);
+        } finally {
+            ini_set('memory_limit', (string) $limit);
+        }
+
+        $this->assertInstanceOf(CleanupAction::class, $action);
+        $this->assertTrue($action->skipped);
+        $this->assertSame($png, $this->read('EPUB/p.png'));
     }
 }
