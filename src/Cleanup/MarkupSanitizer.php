@@ -35,12 +35,23 @@ final readonly class MarkupSanitizer
     {
     }
 
+    public function isWellFormed(string $xml, string $source): bool
+    {
+        try {
+            $this->xmlParser->parseString($xml, $source);
+
+            return true;
+        } catch (XmlException) {
+            return false;
+        }
+    }
+
     public function stripScripts(string $xml, string $source): ?string
     {
         return $this->transform($xml, $source, function (DOMDocument $document): bool {
             $changed = false;
             foreach ($this->elements($document) as $element) {
-                if (strtolower($element->localName ?? '') === 'script') {
+                if (strtolower($element->localName ?? '') === 'script' || $this->isScriptingAnimation($element)) {
                     $element->parentNode?->removeChild($element);
                     $changed = true;
                     continue;
@@ -129,6 +140,11 @@ final readonly class MarkupSanitizer
             return true;
         }
 
+        // An iframe's srcdoc is a whole document, scripts included.
+        if ($name === 'srcdoc') {
+            return true;
+        }
+
         if (! in_array($name, self::URL_ATTRIBUTES, true)) {
             return false;
         }
@@ -137,6 +153,25 @@ final readonly class MarkupSanitizer
         $value = strtolower((string) preg_replace('/[\x00-\x20]+/', '', $attribute->value));
 
         return str_starts_with($value, 'javascript:') || str_starts_with($value, 'vbscript:');
+    }
+
+    /**
+     * An SVG animation (animate, set, ...) that sets a link to a javascript: URL.
+     */
+    private function isScriptingAnimation(DOMElement $element): bool
+    {
+        if (! in_array(strtolower($element->localName ?? ''), ['animate', 'set', 'animatetransform', 'animatemotion'], true)) {
+            return false;
+        }
+
+        foreach (['to', 'values', 'from', 'by'] as $name) {
+            $value = strtolower((string) preg_replace('/[\x00-\x20]+/', '', $element->getAttribute($name)));
+            if (str_contains($value, 'javascript:') || str_contains($value, 'vbscript:')) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

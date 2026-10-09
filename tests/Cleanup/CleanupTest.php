@@ -370,4 +370,30 @@ XML,
         $this->assertSame(['EPUB/orphan.txt'], $report->getFiles());
         $this->assertSame($hash, md5_file($path));
     }
+
+    public function testStripsSrcdocAndScriptingAnimationsAndReportsUnparsableDocuments(): void
+    {
+        $body = '<iframe srcdoc="&lt;script&gt;alert(1)&lt;/script&gt;" title="t"></iframe>'
+            . '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><a id="l" xlink:href="#"><text>x</text>'
+            . '<animate attributeName="xlink:href" values="javascript:alert(1)"/><set attributeName="href" to=" java&#10;script:alert(2)"/><animate attributeName="x" values="0;1"/></a></svg>';
+        $builder = CleanupBook::builder(
+            '<item id="broken" href="broken.xhtml" media-type="application/xhtml+xml"/>',
+            ['EPUB/broken.xhtml' => '<html><script>x'],
+            '<itemref idref="broken"/>',
+            $body
+        );
+        $book = $this->open($builder);
+
+        $report = (new Cleanup($book))->run(new CleanupOptions(stripScripts: true));
+
+        $chapter = $this->read('EPUB/chapter.xhtml');
+        $this->assertStringNotContainsString('srcdoc', $chapter);
+        $this->assertStringNotContainsString('javascript', strtolower($chapter));
+        $this->assertStringNotContainsString('script:', strtolower($chapter));
+        $this->assertStringContainsString('values="0;1"', $chapter);
+        $action = $report->getAction(CleanupAction::SCRIPTS);
+        $this->assertInstanceOf(\PhpEpub\Cleanup\CleanupAction::class, $action);
+        $this->assertSame(['EPUB/chapter.xhtml'], $action->files);
+        $this->assertStringContainsString('EPUB/broken.xhtml', $action->note);
+    }
 }

@@ -30,6 +30,11 @@ final readonly class Cleanup
 
     private const array FONT_EXTENSIONS = ['ttf', 'otf', 'woff', 'woff2', 'eot'];
 
+    /**
+     * The most pixels one run decodes; the images left after that are skipped.
+     */
+    private const int MAX_PIXELS_PER_RUN = 120_000_000;
+
     private PathResolver $paths;
 
     private MarkupSanitizer $sanitizer;
@@ -93,7 +98,7 @@ final readonly class Cleanup
         }
 
         if ($options->recompressImages) {
-            $actions[] = $this->recompressImages($options, $analysis instanceof ReferenceAnalysis && $analysis->unparsable === []);
+            $actions[] = $this->recompressImages($options, $analysis);
         }
 
         $this->pruneEmptyDirectories($directory);
@@ -127,6 +132,7 @@ final readonly class Cleanup
         $files = [];
         $before = 0;
         $after = 0;
+        $unparsable = [];
         foreach ($this->book->getManifest()->getItems() as $item) {
             if ($item->path === '' || ! in_array($item->mediaType, $mediaTypes, true)) {
                 continue;
@@ -135,6 +141,10 @@ final readonly class Cleanup
             $content = FileSystemHelper::readFile($this->paths->resolve($directory, $item->path));
             $new = $content === null ? null : $rewrite($content, $item->path);
             if ($content === null || $new === null) {
+                if ($content !== null && $item->mediaType !== 'text/css' && ! $this->sanitizer->isWellFormed($content, $item->path)) {
+                    $unparsable[] = $item->path;
+                }
+
                 continue;
             }
 
@@ -146,8 +156,9 @@ final readonly class Cleanup
         }
 
         sort($files, SORT_STRING);
+        $note = $unparsable === [] ? '' : count($unparsable) . ' document(s) could not be parsed and were left unchanged: ' . implode(', ', array_slice($unparsable, 0, 10)) . (count($unparsable) > 10 ? ', ...' : '');
 
-        return new CleanupAction($name, $files, $before, $after);
+        return new CleanupAction($name, $files, $before, $after, false, $note);
     }
 
     /**
@@ -216,7 +227,7 @@ final readonly class Cleanup
         return new CleanupAction(CleanupAction::STRAY_FILES, $files, $before, 0);
     }
 
-    private function recompressImages(CleanupOptions $options, bool $canRewriteReferences): CleanupAction
+    private function recompressImages(CleanupOptions $options, ?ReferenceAnalysis $analysis): CleanupAction
     {
         if (! ImageRecompressor::isAvailable()) {
             return new CleanupAction(CleanupAction::IMAGES, [], 0, 0, true, 'Neither the GD nor the Imagick extension is available.');
@@ -227,6 +238,8 @@ final readonly class Cleanup
         $files = [];
         $before = 0;
         $after = 0;
+        $skipped = [];
+        $budget = self::MAX_PIXELS_PER_RUN;
         foreach ($manifest->getItems() as $item) {
             if (! in_array($item->mediaType, ['image/jpeg', 'image/png'], true) || $item->path === '') {
                 continue;
@@ -238,12 +251,25 @@ final readonly class Cleanup
                 continue;
             }
 
+            // Decoding a huge image could exhaust memory (a fatal error), so it is skipped; so are the images
+            // left once the run has decoded as many pixels as it may.
+            $pixels = $this->images->pixels($data);
+            if ($this->images->exceedsLimits($data, $options->maxImageWidth, $options->maxImageHeight) || $pixels > $budget) {
+                $skipped[] = $item->path;
+                continue;
+            }
+
+            $budget -= $pixels;
+
+            // A PNG that code or CSS escapes name, or that a document we cannot parse may use, keeps its name:
+            // those references cannot be rewritten.
+            $canRename = $analysis instanceof ReferenceAnalysis && $analysis->unparsable === [] && ! in_array($item->path, $analysis->mentioned, true);
             $result = $this->images->recompress(
                 $data,
                 $options->maxImageWidth,
                 $options->maxImageHeight,
                 $options->jpegQuality,
-                $options->convertOpaquePngToJpeg && $canRewriteReferences
+                $options->convertOpaquePngToJpeg && $canRename
             );
             if ($result === null) {
                 continue;
@@ -266,8 +292,9 @@ final readonly class Cleanup
         }
 
         sort($files, SORT_STRING);
+        $note = $skipped === [] ? '' : count($skipped) . ' image(s) skipped as too large to decode safely: ' . implode(', ', array_slice($skipped, 0, 10)) . (count($skipped) > 10 ? ', ...' : '');
 
-        return new CleanupAction(CleanupAction::IMAGES, $files, $before, $after);
+        return new CleanupAction(CleanupAction::IMAGES, $files, $before, $after, $skipped !== [] && $files === [], $note);
     }
 
     /**
@@ -275,10 +302,14 @@ final readonly class Cleanup
      */
     private function convertedPath(string $path): string
     {
-        $base = substr($path, 0, (int) strrpos($path, '.'));
-        $candidate = $base . '.jpg';
-        for ($i = 2; is_file($this->paths->resolve($this->directory(), $candidate)); $i++) {
-            $candidate = "{$base}-{$i}.jpg";
+        // Only the file name changes: a dot in a directory name, or none in the file name, is not an extension.
+        $directory = dirname($path) === '.' ? '' : dirname($path) . '/';
+        $name = basename($path);
+        $dot = strrpos($name, '.');
+        $stem = $dot === false || $dot === 0 ? $name : substr($name, 0, $dot);
+        $candidate = $directory . $stem . '.jpg';
+        for ($i = 2; is_file($this->paths->resolve($this->directory(), $candidate)) || $this->book->getManifest()->findByPath($candidate) instanceof ManifestItem; $i++) {
+            $candidate = "{$directory}{$stem}-{$i}.jpg";
         }
 
         return $candidate;

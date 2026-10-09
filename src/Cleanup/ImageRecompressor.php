@@ -17,11 +17,43 @@ final readonly class ImageRecompressor
     /**
      * Images with more pixels than this are not decoded (GD needs about 5 bytes per pixel).
      */
-    private const int MAX_PIXELS = 40_000_000;
+    private const int MAX_PIXELS = 16_000_000;
+
+    /**
+     * PNG images with more pixels than this are not scanned for transparency (the scan is per pixel).
+     */
+    private const int MAX_OPACITY_SCAN_PIXELS = 4_000_000;
 
     public static function isAvailable(): bool
     {
         return extension_loaded('gd') && function_exists('imagecreatefromstring') && function_exists('imagejpeg') && function_exists('imagepng');
+    }
+
+    /**
+     * The number of pixels of a JPEG or PNG image, from its header (0 for anything else).
+     */
+    public function pixels(string $data): int
+    {
+        $info = @getimagesizefromstring($data);
+
+        return $info !== false && in_array($info[2], [IMAGETYPE_JPEG, IMAGETYPE_PNG], true) ? max(0, $info[0]) * max(0, $info[1]) : 0;
+    }
+
+    /**
+     * Whether decoding the image (and scaling it) would need more pixels or memory than allowed; such
+     * an image is skipped rather than risking a fatal out-of-memory error.
+     */
+    public function exceedsLimits(string $data, ?int $maxWidth, ?int $maxHeight): bool
+    {
+        $info = @getimagesizefromstring($data);
+        if ($info === false || ! in_array($info[2], [IMAGETYPE_JPEG, IMAGETYPE_PNG], true)) {
+            return false;
+        }
+
+        [$width, $height] = $info;
+        [$newWidth, $newHeight] = $this->targetSize($width, $height, $maxWidth, $maxHeight);
+
+        return $width * $height > self::MAX_PIXELS || $this->estimatedMemory($width, $height, $newWidth, $newHeight, strlen($data)) > $this->availableMemory();
     }
 
     /**
@@ -42,7 +74,7 @@ final readonly class ImageRecompressor
 
         [$width, $height] = $info;
         $isJpeg = $info[2] === IMAGETYPE_JPEG;
-        if ($width < 1 || $height < 1 || $width * $height > self::MAX_PIXELS) {
+        if ($width < 1 || $height < 1 || $this->exceedsLimits($data, $maxWidth, $maxHeight)) {
             return null;
         }
 
@@ -51,9 +83,7 @@ final readonly class ImageRecompressor
             return null;
         }
 
-        $scale = min(1.0, $maxWidth === null ? 1.0 : $maxWidth / $width, $maxHeight === null ? 1.0 : $maxHeight / $height);
-        $newWidth = max(1, (int) round($width * $scale));
-        $newHeight = max(1, (int) round($height * $scale));
+        [$newWidth, $newHeight] = $this->targetSize($width, $height, $maxWidth, $maxHeight);
 
         $source = @imagecreatefromstring($data);
         if ($source === false) {
@@ -86,6 +116,47 @@ final readonly class ImageRecompressor
         }
 
         return $best;
+    }
+
+    /**
+     * The size an image gets: scaled down to fit the limits, never up.
+     *
+     * @return array{int<1, max>, int<1, max>}
+     */
+    private function targetSize(int $width, int $height, ?int $maxWidth, ?int $maxHeight): array
+    {
+        $scale = min(1.0, $maxWidth === null ? 1.0 : $maxWidth / max(1, $width), $maxHeight === null ? 1.0 : $maxHeight / max(1, $height));
+
+        return [max(1, (int) round($width * $scale)), max(1, (int) round($height * $scale))];
+    }
+
+    /**
+     * About 5 bytes per pixel for the decoded image and again for its scaled copy, plus the data and the result.
+     */
+    private function estimatedMemory(int $width, int $height, int $newWidth, int $newHeight, int $dataLength): int
+    {
+        return 5 * $width * $height + ($newWidth === $width && $newHeight === $height ? 0 : 5 * $newWidth * $newHeight) + 3 * $dataLength;
+    }
+
+    /**
+     * The memory the script may still allocate, with a margin (PHP_INT_MAX without a memory limit).
+     */
+    private function availableMemory(): int
+    {
+        $limit = trim((string) ini_get('memory_limit'));
+        if ($limit === '' || $limit === '-1') {
+            return PHP_INT_MAX;
+        }
+
+        $bytes = (int) $limit;
+        $bytes *= match (strtolower(substr($limit, -1))) {
+            'g' => 1024 ** 3,
+            'm' => 1024 ** 2,
+            'k' => 1024,
+            default => 1,
+        };
+
+        return (int) (max(0, $bytes - memory_get_usage()) * 0.7);
     }
 
     /**
@@ -154,6 +225,17 @@ final readonly class ImageRecompressor
 
         $width = imagesx($image);
         $height = imagesy($image);
+        if ($width * $height > self::MAX_OPACITY_SCAN_PIXELS) {
+            // Too slow to prove: treated as not opaque, so the PNG stays a PNG.
+            return false;
+        }
+
+        // The average alpha of the image is 0 only when it is opaque (or nearly so): a cheap way out for most images.
+        $average = imagescale($image, 1, 1, IMG_BILINEAR_FIXED);
+        if ($average !== false && ((imagecolorat($average, 0, 0) >> 24) & 0x7F) > 0) {
+            return false;
+        }
+
         for ($y = 0; $y < $height; $y++) {
             for ($x = 0; $x < $width; $x++) {
                 $colour = imagecolorat($image, $x, $y);

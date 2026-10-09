@@ -247,4 +247,83 @@ final class ImageCleanupTest extends TestCase
         $this->assertNull($recompressor->recompress('not an image', 100, 100, 50, false));
         $this->assertNull($recompressor->recompress(substr($jpeg, 0, 300), 100, 100, 50, false));
     }
+
+    /**
+     * A PNG header for an image of this size without any pixel data: enough for getimagesizefromstring().
+     */
+    private function hugePngHeader(int $width, int $height): string
+    {
+        return "\x89PNG\r\n\x1a\n" . pack('N', 13) . 'IHDR' . pack('NNCCCCC', $width, $height, 8, 2, 0, 0, 0) . pack('N', 0);
+    }
+
+    public function testHugeImagesAreSkippedInsteadOfBeingDecoded(): void
+    {
+        $recompressor = new ImageRecompressor();
+        $huge = $this->hugePngHeader(6300, 6300);
+
+        $this->assertTrue($recompressor->exceedsLimits($huge, 1600, 1600));
+        $this->assertNull($recompressor->recompress($huge, 1600, 1600, 80, false));
+
+        $builder = CleanupBook::builder('<item id="h" href="h.png" media-type="image/png"/>', ['EPUB/h.png' => $huge], chapterBody: '<img src="h.png" alt=""/>');
+        $book = $this->open($builder);
+
+        $action = (new Cleanup($book))->run(CleanupOptions::preset(CleanupPreset::Balanced))->getAction(CleanupAction::IMAGES);
+
+        $this->assertInstanceOf(\PhpEpub\Cleanup\CleanupAction::class, $action);
+        $this->assertTrue($action->skipped);
+        $this->assertStringContainsString('EPUB/h.png', $action->note);
+        $this->assertSame($huge, $this->read('EPUB/h.png'));
+    }
+
+    public function testImagesThatDoNotFitTheMemoryLimitAreSkipped(): void
+    {
+        $recompressor = new ImageRecompressor();
+        $image = $this->hugePngHeader(3000, 3000);
+        $limit = ini_get('memory_limit');
+
+        try {
+            ini_set('memory_limit', '-1');
+            $this->assertFalse($recompressor->exceedsLimits($image, null, null));
+            ini_set('memory_limit', (string) (memory_get_usage() + 20 * 1024 * 1024));
+            $this->assertTrue($recompressor->exceedsLimits($image, null, null));
+        } finally {
+            ini_set('memory_limit', (string) $limit);
+        }
+    }
+
+    public function testPngNamedInCodeKeepsItsNameAndFormat(): void
+    {
+        $png = $this->image(300, 200, 'png');
+        $builder = CleanupBook::builder(
+            '<item id="p" href="p.png" media-type="image/png"/>',
+            ['EPUB/p.png' => $png],
+            chapterBody: '<img src="p.png" alt=""/><button onclick="show(\'p.png\')">b</button>'
+        );
+        $book = $this->open($builder);
+
+        (new Cleanup($book))->run(CleanupOptions::preset(CleanupPreset::Strong));
+
+        $item = $book->getManifest()->get('p');
+        $this->assertInstanceOf(ManifestItem::class, $item);
+        $this->assertSame('EPUB/p.png', $item->path);
+        $this->assertSame('image/png', $item->mediaType);
+    }
+
+    public function testConvertedNamesKeepDirectoriesAndAvoidCollisions(): void
+    {
+        $png = $this->image(300, 200, 'png');
+        $builder = CleanupBook::builder(
+            '<item id="a" href="img.d/foo" media-type="image/png"/><item id="b" href="img.d/bar.png" media-type="image/png"/><item id="c" href="img.d/bar.jpg" media-type="image/jpeg"/>',
+            ['EPUB/img.d/foo' => $png, 'EPUB/img.d/bar.png' => $png, 'EPUB/img.d/bar.jpg' => (string) base64_decode(EpubBuilder::JPEG, true)],
+            chapterBody: '<img src="img.d/foo" alt=""/><img src="img.d/bar.png" alt=""/><img src="img.d/bar.jpg" alt=""/>'
+        );
+        $book = $this->open($builder);
+
+        (new Cleanup($book))->run(CleanupOptions::preset(CleanupPreset::Strong));
+
+        $this->assertSame('EPUB/img.d/foo.jpg', $book->getManifest()->get('a')?->path);
+        $this->assertSame('EPUB/img.d/bar-2.jpg', $book->getManifest()->get('b')?->path);
+        $this->assertStringContainsString('src="img.d/foo.jpg"', $this->read('EPUB/chapter.xhtml'));
+        $this->assertStringContainsString('src="img.d/bar-2.jpg"', $this->read('EPUB/chapter.xhtml'));
+    }
 }
