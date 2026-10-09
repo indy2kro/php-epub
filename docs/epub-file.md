@@ -297,6 +297,12 @@ public function getTempDir(): ?string
 
 Returns the path to the temporary directory where EPUB contents are extracted. Returns null before `load()` is called.
 
+```php
+public function getXmlParser(): XmlParser
+```
+
+Returns the parser the book's XML documents are read with, bounded by the `Limits` the book was opened with. `Cleanup` and `ReferenceGraph::forBook()` use it by default, so cleaning up an untrusted book keeps the same per-document cap.
+
 ## Usage Example
 
 ```php

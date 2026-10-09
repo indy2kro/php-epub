@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace PhpEpub\Test;
 
+use PhpEpub\Cleanup\Cleanup;
+use PhpEpub\Cleanup\CleanupOptions;
+use PhpEpub\Cleanup\ReferenceGraph;
 use PhpEpub\ConversionException;
 use PhpEpub\Converters\EpubDocumentLoader;
 use PhpEpub\EpubFile;
@@ -201,6 +204,25 @@ final class LimitsTest extends TestCase
             $this->expectException(Exception::class);
             $this->expectExceptionMessage('larger than the limit');
             $epubFile->getContentManager()->updateContent('EPUB/text/chapter.xhtml', $chapter);
+        } finally {
+            $epubFile->close();
+        }
+    }
+
+    public function testCleanupAndReferenceGraphApplyTheBooksXmlCap(): void
+    {
+        $chapter = EpubBuilder::xhtml('Chapter', '<p>x</p><script>1</script><!--' . str_repeat('x', 3000) . '-->');
+        $path = $this->book(EpubBuilder::epub3()->withFile('EPUB/text/chapter.xhtml', $chapter));
+
+        $epubFile = EpubFile::open($path, limits: new Limits(maxXmlBytes: strlen($chapter) - 1));
+
+        try {
+            $this->assertSame($epubFile->getXmlParser(), (new \ReflectionProperty(ReferenceGraph::class, 'xmlParser'))->getValue(ReferenceGraph::forBook($epubFile)));
+            $this->assertContains('EPUB/text/chapter.xhtml', ReferenceGraph::forBook($epubFile)->analyze()->unparsable);
+
+            $report = (new Cleanup($epubFile))->run(new CleanupOptions(stripScripts: true));
+            $this->assertStringContainsString('<script>', (string) file_get_contents($epubFile->getTempDir() . '/EPUB/text/chapter.xhtml'));
+            $this->assertStringContainsString('could not be parsed', $report->actions[0]->note);
         } finally {
             $epubFile->close();
         }

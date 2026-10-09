@@ -39,11 +39,18 @@ final readonly class Cleanup
 
     private MarkupSanitizer $sanitizer;
 
+    private XmlParser $xmlParser;
+
+    /**
+     * @param XmlParser|null $xmlParser The parser for the book's documents; by default the book's own, which keeps
+     *                                  the Limits it was opened with.
+     */
     public function __construct(
         private EpubFile $book,
         private ImageRecompressor $images = new ImageRecompressor(),
-        private XmlParser $xmlParser = new XmlParser()
+        ?XmlParser $xmlParser = null
     ) {
+        $this->xmlParser = $xmlParser ?? $book->getXmlParser();
         $this->paths = new PathResolver();
         $this->sanitizer = new MarkupSanitizer($this->xmlParser);
     }
@@ -82,7 +89,7 @@ final readonly class Cleanup
 
         $analysis = null;
         if ($options->removeUnusedFonts || $options->removeUnreferenced || $options->removeStrayFiles || ($options->recompressImages && $options->convertOpaquePngToJpeg)) {
-            $analysis = ReferenceGraph::forBook($this->book)->analyze();
+            $analysis = ReferenceGraph::forBook($this->book, $this->xmlParser)->analyze();
         }
 
         if ($analysis instanceof ReferenceAnalysis && $options->removeUnusedFonts) {

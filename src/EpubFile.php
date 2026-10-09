@@ -775,6 +775,15 @@ class EpubFile
         return $this->spine;
     }
 
+    /**
+     * The parser the book's XML documents are read with, bounded by the Limits the book was opened with; tools that
+     * parse the book's documents themselves (Cleanup, ReferenceGraph::forBook()) use it to keep that bound.
+     */
+    public function getXmlParser(): XmlParser
+    {
+        return $this->xmlParser;
+    }
+
     public function getManifest(): Manifest
     {
         if ($this->manifest === null) {

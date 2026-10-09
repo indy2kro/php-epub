@@ -64,13 +64,16 @@ final readonly class ReferenceGraph
     /**
      * A graph over a loaded book (including its unsaved edits).
      *
+     * @param XmlParser|null $xmlParser The parser for the book's documents; by default the book's own, which keeps
+     *                                  the Limits it was opened with.
+     *
      * @throws Exception If the book is not loaded.
      */
-    public static function forBook(EpubFile $book): self
+    public static function forBook(EpubFile $book, ?XmlParser $xmlParser = null): self
     {
         $directory = $book->getTempDir() ?? throw new Exception('EPUB file must be loaded before analyzing references.');
 
-        return new self($directory, $book->getManifest(), $book->getSpine(), $book->getMetadata());
+        return new self($directory, $book->getManifest(), $book->getSpine(), $book->getMetadata(), new PathResolver(), $xmlParser ?? $book->getXmlParser());
     }
 
     /**
