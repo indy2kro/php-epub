@@ -133,4 +133,19 @@ final class BatchEditTest extends TestCase
             }
         }
     }
+
+    public function testSetTocPointsTheSpineAtAnItemOfTheManifest(): void
+    {
+        $this->book->getManifest()->addMany([['id' => 'ncx', 'path' => 'EPUB/toc.ncx', 'mediaType' => 'application/x-dtbncx+xml']]);
+        $spine = $this->book->getSpine();
+
+        $spine->setToc('ncx');
+        $this->assertSame('ncx', $spine->getToc());
+
+        $spine->setToc(null);
+        $this->assertNull($spine->getToc());
+
+        $this->expectException(Exception::class);
+        $spine->setToc('missing');
+    }
 }

@@ -485,4 +485,145 @@ final class SplitterTest extends TestCase
 
         $this->assertSame([], glob($directory . '/*.epub'));
     }
+
+    /**
+     * Every hyperlink of every document of a part points to a document of the part's reading order.
+     */
+    private function assertLinksStayInTheReadingOrder(EpubFile $part, string $label): void
+    {
+        $manifest = $part->getManifest();
+        $spine = [];
+        foreach ($part->getSpine()->get() as $idref) {
+            $spine[$manifest->get($idref)->path ?? ''] = true;
+        }
+
+        foreach ($manifest->getItems() as $item) {
+            if ($item->mediaType !== 'application/xhtml+xml' || $item->path === '') {
+                continue;
+            }
+
+            $content = (string) file_get_contents($part->getTempDir() . '/' . $item->path);
+            preg_match_all('/<a\b[^>]*\bhref="([^"#]+)/', $content, $matches);
+            foreach ($matches[1] as $href) {
+                if (preg_match('#^[a-z][a-z0-9+.-]*:#i', $href) === 1) {
+                    continue;
+                }
+
+                $directory = dirname($item->path);
+                $path = (string) preg_replace('#[^/]+/\.\./#', '', ($directory === '.' ? '' : $directory . '/') . rawurldecode($href));
+                $this->assertArrayHasKey($path, $spine, "{$label}: {$item->path} links to {$href}, which is not in the reading order");
+            }
+        }
+    }
+
+    public function testNoPartLinksToADocumentOutsideItsReadingOrder(): void
+    {
+        foreach (['valid.epub', 'valid_2.epub', 'valid_4.epub', 'valid_6.epub'] as $name) {
+            $book = $this->opened[] = EpubFile::open(dirname(__DIR__) . '/fixtures/' . $name);
+
+            foreach ([SplitPlan::everySpineItems(4), SplitPlan::byToc()] as $plan) {
+                foreach ($this->split($book, $plan) as $number => $part) {
+                    $this->assertLinksStayInTheReadingOrder($part, $name . ' part ' . ($number + 1));
+                }
+            }
+        }
+    }
+
+    public function testASelfLinkOfTheNavigationDocumentBecomesTextInPartsThatDoNotListIt(): void
+    {
+        $nav = EpubBuilder::xhtml('Contents', '<nav epub:type="toc"><h1>Contents</h1><ol><li><a href="text/chapter-1.xhtml">One</a></li><li><a href="text/chapter-2.xhtml">Two</a></li></ol></nav>'
+            . '<p>See <a href="nav.xhtml">this page</a> and <a href="text/chapter-2.xhtml">chapter two</a>.</p>');
+        $book = $this->open(MergeBook::builder(self::UID, 'Book', 2, files: ['EPUB/nav.xhtml' => $nav]));
+
+        $parts = $this->split($book, SplitPlan::everySpineItems(1));
+
+        $navigation = $parts[0]->getContentManager()->getContent('EPUB/nav.xhtml');
+        $this->assertStringNotContainsString('href="nav.xhtml"', $navigation);
+        $this->assertStringContainsString('this page', $navigation);
+        $this->assertStringNotContainsString('chapter-2', $navigation);
+        foreach ($parts as $number => $part) {
+            $this->assertLinksStayInTheReadingOrder($part, 'part ' . ($number + 1));
+        }
+    }
+
+    public function testHeadingsWithoutPagesStartPartsAtTheirFirstLinkedChild(): void
+    {
+        $book = $this->open(MergeBook::builder(self::UID, 'Book', 4));
+        $chapter = static fn (int $number): string => "EPUB/text/chapter-{$number}.xhtml";
+        $book->getTableOfContents()->setEntries([
+            new TocEntry('Only a heading', ''),
+            new TocEntry('Part A', $chapter(1), null, [new TocEntry('Chapter 2', $chapter(2))]),
+            new TocEntry('Part B', '', null, [new TocEntry('Chapter 3', $chapter(3))]),
+        ]);
+
+        $parts = $this->split($book, SplitPlan::byToc());
+
+        $this->assertSame([['chapter-1', 'chapter-2'], ['chapter-3', 'chapter-4']], array_map($this->chapters(...), $parts));
+    }
+
+    public function testBooksWithAnUnreadableNavigationCannotBeSplit(): void
+    {
+        $book = $this->open(MergeBook::builder(self::UID, 'Book', 2, files: ['EPUB/nav.xhtml' => '<html><body><nav epub:type="toc"><ol><li>']));
+
+        $this->expectException(Exception::class);
+        $this->split($book, SplitPlan::everySpineItems(1));
+    }
+
+    public function testBooksWithoutNavigationAndGuideAreSplitWithoutLandmarks(): void
+    {
+        $book = $this->opened[] = EpubFile::open(EpubBuilder::minimal()->buildEpub($this->tmpDir . '/minimal.epub'));
+
+        $parts = $this->split($book, SplitPlan::everySpineItems(1));
+
+        $this->assertCount(1, $parts);
+        $this->assertSame(['chapter'], $this->chapters($parts[0]));
+    }
+
+    public function testPartsPointTheSpineAtTheNcx(): void
+    {
+        $ncx = '<?xml version="1.0" encoding="UTF-8"?><ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1"><head><meta name="dtb:uid" content="x"/></head>'
+            . '<docTitle><text>Book</text></docTitle><navMap><navPoint id="n1" playOrder="1"><navLabel><text>One</text></navLabel><content src="text/chapter-1.xhtml"/></navPoint></navMap></ncx>';
+        $items = '<item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>';
+        $book = $this->open(MergeBook::builder(self::UID, 'Book', 2, $items, ['EPUB/toc.ncx' => $ncx]));
+        $this->assertNull($book->getSpine()->getToc());
+
+        $parts = $this->split($book, SplitPlan::everySpineItems(1));
+
+        $this->assertSame('ncx', $parts[0]->getSpine()->getToc());
+        $this->assertSame('ncx', $parts[1]->getSpine()->getToc());
+    }
+
+    public function testUnreadableEncryptionInfoIsReportedWhenAPartIsSaved(): void
+    {
+        $book = $this->open(MergeBook::builder(self::UID, 'Book', 2, files: ['META-INF/encryption.xml' => 'this is not xml']));
+        $directory = $this->tmpDir . '/broken-encryption';
+
+        try {
+            (new Splitter())->split($book, SplitPlan::everySpineItems(1), $directory);
+            $this->fail('Saving a part with a new identifier needs a readable encryption.xml');
+        } catch (Exception) {
+            $this->assertSame([], glob($directory . '/*.epub'));
+        }
+    }
+
+    public function testNavEntriesWhoseParentsLeaveThePartKeepTheirChildren(): void
+    {
+        $nav = EpubBuilder::xhtml('Contents', '<nav epub:type="toc"><h1>Contents</h1><ol><li><a href="text/chapter-1.xhtml">One</a></li><li><a href="text/chapter-2.xhtml">Two</a></li></ol></nav>'
+            . '<nav epub:type="loi"><ol>'
+            . '<li><a href="text/chapter-2.xhtml">Parent elsewhere</a><ol><li><a href="text/chapter-1.xhtml">Child here</a></li></ol></li>'
+            . '<li><a href="text/chapter-1.xhtml">Parent here</a><ol><li><a href="text/chapter-2.xhtml">Child elsewhere</a></li></ol></li>'
+            . '</ol></nav>');
+        $book = $this->open(MergeBook::builder(self::UID, 'Book', 2, files: ['EPUB/nav.xhtml' => $nav]));
+
+        $parts = $this->split($book, SplitPlan::everySpineItems(1));
+
+        $first = $parts[0]->getContentManager()->getContent('EPUB/nav.xhtml');
+        $this->assertStringContainsString('<span>Parent elsewhere</span>', $first);
+        $this->assertStringContainsString('<a href="text/chapter-1.xhtml">Child here</a>', $first);
+        $this->assertStringContainsString('<a href="text/chapter-1.xhtml">Parent here</a>', $first);
+        $this->assertStringNotContainsString('Child elsewhere', $first);
+        foreach ($parts as $part) {
+            $this->assertSame([], $this->errors($part));
+        }
+    }
 }

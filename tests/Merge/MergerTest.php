@@ -9,6 +9,7 @@ use PhpEpub\Exception;
 use PhpEpub\FontObfuscation;
 use PhpEpub\Merge\MergeOptions;
 use PhpEpub\Merge\Merger;
+use PhpEpub\Test\NcxPlayOrderTest;
 use PhpEpub\Test\Support\EpubBuilder;
 use PhpEpub\Test\Support\MergeBook;
 use PhpEpub\TocEntry;
@@ -572,5 +573,183 @@ final class MergerTest extends TestCase
 
         $this->assertCount(1400, $merged->getSpine()->get());
         $this->assertLessThan(8.0, $seconds, 'Merging 2800 files took too long: something is quadratic again.');
+    }
+
+    public function testMergedNcxFollowsThePlayOrderRule(): void
+    {
+        $merged = $this->merge([$this->open(MergeBook::builder(self::UID_ONE, 'One')), $this->open(MergeBook::builder(self::UID_TWO, 'Two', 3))]);
+
+        $points = NcxPlayOrderTest::navPoints((string) file_get_contents($merged->getTempDir() . '/EPUB/toc.ncx'));
+
+        $this->assertCount(7, $points);
+        // The parent of each book points at its first chapter and shares its playOrder.
+        $this->assertSame($points[0][1], $points[1][1]);
+        $this->assertSame([1, 1, 2, 3, 3, 4, 5], array_column($points, 1));
+        NcxPlayOrderTest::assertPlayOrderRule($points);
+    }
+
+    public function testBooksWithFilesOutsideThePackageDirectoryKeepTheirLayout(): void
+    {
+        $items = '<item id="shared" href="../shared/pic.png" media-type="image/png"/>';
+        $one = $this->open(MergeBook::builder(self::UID_ONE, 'One', 1, $items, ['shared/pic.png' => 'shared-picture']));
+
+        $merged = $this->merge([$one, $this->open(MergeBook::builder(self::UID_TWO, 'Two'))]);
+
+        $this->assertInstanceOf(\PhpEpub\ManifestItem::class, $merged->getManifest()->findByPath('EPUB/book-01/EPUB/text/chapter-1.xhtml'));
+        $this->assertSame('shared-picture', $merged->getContentManager()->getContent('EPUB/book-01/shared/pic.png'));
+        $this->assertInstanceOf(\PhpEpub\ManifestItem::class, $merged->getManifest()->findByPath('EPUB/book-02/text/chapter-1.xhtml'));
+    }
+
+    public function testMissingFilesAndUnreadableEncryptionInfoDoNotStopTheMerge(): void
+    {
+        $items = '<item id="ghost" href="images/ghost.png" media-type="image/png"/>';
+        $one = $this->open(MergeBook::builder(self::UID_ONE, 'One', 1, $items, ['META-INF/encryption.xml' => 'this is not xml']));
+
+        $merged = $this->merge([$one, $this->open(MergeBook::builder(self::UID_TWO, 'Two'))]);
+
+        $this->assertNull($merged->getManifest()->get('b01-ghost'));
+        $this->assertInstanceOf(\PhpEpub\ManifestItem::class, $merged->getManifest()->get('b01-chapter1'));
+    }
+
+    public function testAFontThatCannotBeDeobfuscatedIsCopiedAsItIs(): void
+    {
+        $font = random_bytes(2000);
+        $encryption = '<?xml version="1.0"?><encryption xmlns="urn:oasis:names:tc:opendocument:xmlns:container" xmlns:enc="http://www.w3.org/2001/04/xmlenc#">'
+            . '<enc:EncryptedData><enc:EncryptionMethod Algorithm="' . FontObfuscation::ADOBE . '"/><enc:CipherData><enc:CipherReference URI="EPUB/fonts/a.otf"/></enc:CipherData></enc:EncryptedData></encryption>';
+        $items = '<item id="font" href="fonts/a.otf" media-type="font/otf"/>';
+        // Adobe's algorithm needs a urn:uuid identifier, and this book has none.
+        $one = $this->open(MergeBook::builder('urn:isbn:9780000000002', 'One', 1, $items, ['EPUB/fonts/a.otf' => $font, 'META-INF/encryption.xml' => $encryption]));
+
+        $merged = $this->merge([$one, $this->open(MergeBook::builder(self::UID_TWO, 'Two'))]);
+
+        $this->assertSame($font, $merged->getContentManager()->getContent('EPUB/book-01/fonts/a.otf'));
+    }
+
+    public function testLegacyDoctypeKeepsXmlEntities(): void
+    {
+        $chapter = '<?xml version="1.0" encoding="UTF-8"?>' . "\n"
+            . '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">'
+            . '<html xmlns="http://www.w3.org/1999/xhtml"><head><title>T</title></head><body><p>a &amp; b &lt; c&nbsp;d</p></body></html>';
+        $one = $this->open(MergeBook::builder(self::UID_ONE, 'One', 1, files: ['EPUB/text/chapter-1.xhtml' => $chapter]));
+
+        $merged = $this->merge([$one, $this->open(MergeBook::builder(self::UID_TWO, 'Two'))]);
+
+        $content = $merged->getContentManager()->getContent('EPUB/book-01/text/chapter-1.xhtml');
+        $this->assertStringContainsString('<!DOCTYPE html>', $content);
+        $this->assertStringContainsString('a &amp; b &lt; c&#160;d', $content);
+    }
+
+    public function testStylesheetsFollowDeduplicatedImages(): void
+    {
+        $css = 'p { background: url(bg.png) }';
+        $items = '<item id="bg" href="css/bg.png" media-type="image/png"/>';
+        $files = ['EPUB/css/bg.png' => 'same-background'];
+        $one = $this->open(MergeBook::builder(self::UID_ONE, 'One', 1, $items, $files, $css));
+        $two = $this->open(MergeBook::builder(self::UID_TWO, 'Two', 1, $items, $files, $css));
+
+        $merged = $this->merge([$one, $two]);
+
+        $this->assertNull($merged->getManifest()->findByPath('EPUB/book-02/css/bg.png'));
+        $this->assertStringContainsString('url(../../book-01/css/bg.png)', $merged->getContentManager()->getContent('EPUB/book-02/css/style.css'));
+        $this->assertStringContainsString('url(bg.png)', $merged->getContentManager()->getContent('EPUB/book-01/css/style.css'));
+    }
+
+    public function testIdsThatCollideAfterCleaningGetANumber(): void
+    {
+        $items = '<item id="a:b" href="images/one.png" media-type="image/png"/><item id="a_b" href="images/two.png" media-type="image/png"/>';
+        $one = $this->open(MergeBook::builder(self::UID_ONE, 'One', 1, $items, ['EPUB/images/one.png' => 'one', 'EPUB/images/two.png' => 'two']));
+
+        $merged = $this->merge([$one, $this->open(MergeBook::builder(self::UID_TWO, 'Two'))]);
+
+        $this->assertSame('EPUB/book-01/images/one.png', $merged->getManifest()->get('b01-a_b')?->path);
+        $this->assertSame('EPUB/book-01/images/two.png', $merged->getManifest()->get('b01-a_b-2')?->path);
+    }
+
+    public function testLanguagesAndPublisherAreCarriedOver(): void
+    {
+        $one = $this->open(MergeBook::builder(self::UID_ONE, 'One', 1, metadata: '<dc:publisher>Press</dc:publisher>'));
+        $two = $this->open(MergeBook::builder(self::UID_TWO, 'Two', 1, metadata: '<dc:language>fr</dc:language>'));
+        $three = $this->open(MergeBook::builder(self::UID_THREE, 'Three', 1, metadata: '<dc:language>not a language tag</dc:language>'));
+
+        $metadata = $this->merge([$one, $two])->getMetadata();
+        $this->assertSame(['en', 'fr'], $metadata->getLanguages());
+        $this->assertSame('Press', $metadata->getPublisher());
+
+        // A language that is not a tag is left out; the main one stays.
+        $this->assertSame(['en'], $this->merge([$one, $three])->getMetadata()->getLanguages());
+    }
+
+    public function testSpineEntriesWithoutItemsAreSkippedAndTheDirectionIsKept(): void
+    {
+        $one = $this->open(MergeBook::builder(self::UID_ONE, 'One', 1, spineAttributes: ' page-progression-direction="rtl"', spineItems: '<itemref idref="ghost"/><itemref idref="chapter1"/>'));
+
+        $merged = $this->merge([$one, $this->open(MergeBook::builder(self::UID_TWO, 'Two', 1))]);
+
+        $this->assertSame(['b01-chapter1', 'b02-chapter1'], $merged->getSpine()->get());
+        $this->assertSame('rtl', $merged->getSpine()->getPageProgressionDirection());
+    }
+
+    public function testDurationUnitsAreAddedUp(): void
+    {
+        $smil = '<?xml version="1.0" encoding="UTF-8"?><smil xmlns="http://www.w3.org/ns/SMIL" version="3.0"><body><par id="p1"><text src="text/chapter-1.xhtml"/></par></body></smil>';
+        $items = '<item id="overlay" href="text/chapter-1.smil" media-type="application/smil+xml"/>';
+        $books = [];
+        foreach ([[self::UID_ONE, '1h'], [self::UID_TWO, '2min'], [self::UID_THREE, '500ms']] as [$uid, $duration]) {
+            $book = $this->open(MergeBook::builder($uid, 'Book ' . $duration, 1, $items, ['EPUB/text/chapter-1.smil' => $smil], metadata: '<meta property="media:duration" refines="#overlay">' . $duration . '</meta>'));
+            $book->getManifest()->setMediaOverlay('chapter1', 'overlay');
+            $books[] = $book;
+        }
+
+        $this->assertSame('3720.500s', $this->merge($books)->getMetadata()->getMediaDuration());
+    }
+
+    public function testNoTotalDurationWhenAnOverlayDurationIsNotAClockValue(): void
+    {
+        $smil = '<?xml version="1.0" encoding="UTF-8"?><smil xmlns="http://www.w3.org/ns/SMIL" version="3.0"><body><par id="p1"><text src="text/chapter-1.xhtml"/></par></body></smil>';
+        $items = '<item id="overlay" href="text/chapter-1.smil" media-type="application/smil+xml"/>';
+        $one = $this->open(MergeBook::builder(self::UID_ONE, 'One', 1, $items, ['EPUB/text/chapter-1.smil' => $smil], metadata: '<meta property="media:duration" refines="#overlay">a long time</meta>'));
+        $one->getManifest()->setMediaOverlay('chapter1', 'overlay');
+
+        $merged = $this->merge([$one, $this->open(MergeBook::builder(self::UID_TWO, 'Two'))]);
+
+        $this->assertSame('b01-overlay', $merged->getManifest()->getMediaOverlay('b01-chapter1'));
+        $this->assertNull($merged->getMetadata()->getMediaDuration());
+        $this->assertNull($merged->getMetadata()->getMediaDurationOf('b01-overlay'));
+    }
+
+    public function testBooksWithAnUnreadableNavigationStillMerge(): void
+    {
+        $broken = ['EPUB/nav.xhtml' => '<html><body><nav epub:type="toc"><ol><li>'];
+        $one = $this->open(MergeBook::builder(self::UID_ONE, 'One', 1, files: $broken));
+        $two = $this->open(MergeBook::builder(self::UID_TWO, 'Two', 1, files: $broken));
+
+        $sections = $this->merge([$one, $two]);
+        $this->assertSame(['One', 'Two'], array_map(static fn (TocEntry $entry): string => $entry->title, $sections->getTableOfContents()->getEntries()));
+
+        // Without sections, a book without entries still gets one.
+        $flat = $this->merge([$one, $two], new MergeOptions(oneSectionPerBook: false));
+        $this->assertSame(['One', 'Two'], array_map(static fn (TocEntry $entry): string => $entry->title, $flat->getTableOfContents()->getEntries()));
+        $this->assertSame('EPUB/book-01/text/chapter-1.xhtml', $flat->getTableOfContents()->getEntries()[0]->path);
+    }
+
+    public function testTheCoverLandmarkOfTheFirstBookIsKept(): void
+    {
+        $nav = EpubBuilder::xhtml('Contents', '<nav epub:type="toc"><h1>Contents</h1><ol><li><a href="text/chapter-1.xhtml">One</a></li>'
+            . '<li><a href="text/missing.xhtml">Lost part</a><ol><li><a href="text/chapter-2.xhtml">Two</a></li></ol></li></ol></nav>'
+            . '<nav epub:type="landmarks"><ol><li><a epub:type="cover" href="text/chapter-1.xhtml">Cover</a></li><li><a epub:type="bodymatter" href="text/chapter-2.xhtml">Start</a></li></ol></nav>');
+        $one = $this->open(MergeBook::builder(self::UID_ONE, 'One', 2, files: ['EPUB/nav.xhtml' => $nav]));
+
+        $merged = $this->merge([$one, $this->open(MergeBook::builder(self::UID_TWO, 'Two'))]);
+
+        $landmarks = $merged->getTableOfContents()->getLandmarks();
+        $this->assertCount(1, $landmarks);
+        $this->assertSame('cover', $landmarks[0]->type);
+        $this->assertSame('EPUB/book-01/text/chapter-1.xhtml', $landmarks[0]->path);
+
+        // The entry whose own page is not in the book stays as a heading above its child.
+        $children = $merged->getTableOfContents()->getEntries()[0]->children;
+        $this->assertSame('Lost part', $children[1]->title);
+        $this->assertSame('', $children[1]->path);
+        $this->assertSame('EPUB/book-01/text/chapter-2.xhtml', $children[1]->children[0]->path);
     }
 }
