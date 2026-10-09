@@ -14,6 +14,9 @@ use PhpEpub\Util\XmlText;
 use SimpleXMLElement;
 use Throwable;
 
+/**
+ * @phpstan-import-type SummaryShape from BookSummary
+ */
 class EpubFile
 {
     private const string COVER_PROPERTY = 'cover-image';
@@ -613,6 +616,23 @@ class EpubFile
         }
 
         return $texts;
+    }
+
+    /**
+     * A JSON-ready description of the book, including unsaved edits: metadata, cover, table of contents,
+     * reading order, statistics (file counts and sizes per media group, word count, reading time at
+     * BookSummary::WORDS_PER_MINUTE) and DRM state. Only strings, ints, bools, nulls and arrays, so
+     * json_encode() accepts it; the exact shape is BookSummary's SummaryShape. Missing optional parts
+     * (cover, navigation) are null or empty. The word count covers the linear spine documents; Chinese
+     * and Japanese count one word per character (see Util\WordCount).
+     *
+     * @return SummaryShape
+     *
+     * @throws Exception If the book is not loaded.
+     */
+    public function toArray(): array
+    {
+        return BookSummary::of($this);
     }
 
     /**

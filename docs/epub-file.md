@@ -229,6 +229,44 @@ public function getText(bool $linearOnly = true): array
 
 Returns `path => text` for the XHTML and HTML documents of the reading order, in order, as `ContentManager::getText()` reads them. Auxiliary content (`linear="no"`) is skipped unless `$linearOnly` is `false`; spine items that are not XHTML or HTML, or whose file is missing, are skipped.
 
+### Book Summary
+
+```php
+public function toArray(): array
+```
+
+Describes the whole book in one JSON-ready array, for a web page or an API, instead of calling the getters one by one. It includes unsaved edits, never returns image bytes, and does not throw for a book without a cover, table of contents or EPUB 3 features (those parts are `null` or empty). It holds only strings, ints, bools, nulls and arrays, so `json_encode()` accepts it; dates are the ISO 8601 (W3CDTF) strings written in the book. The exact shape is the `SummaryShape` type of `BookSummary`.
+
+```php
+use PhpEpub\EpubFile;
+
+$epubFile = EpubFile::open('/path/to/your.epub');
+$summary = $epubFile->toArray();
+
+echo json_encode($summary, JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT);
+
+$titles = $summary['metadata']['titles'];
+$author = $summary['metadata']['creators'][0] ?? null; // ['name' => 'Jane Doe', 'role' => 'aut', 'fileAs' => 'Doe, Jane']
+$cover = $summary['cover'];                            // ['path' => 'EPUB/cover.jpg', 'mediaType' => 'image/jpeg', 'bytes' => 20480] or null
+$chapters = $summary['toc']['entries'];                // nodes with title, path, fragment and children
+$first = $summary['spine'][0] ?? null;                 // ['idref' => 'ch1', 'path' => 'EPUB/ch1.xhtml', 'linear' => true, 'title' => 'Chapter 1', 'bytes' => 1234]
+$words = $summary['stats']['wordCount'];
+$minutes = $summary['stats']['readingMinutes'];        // at 230 words per minute, rounded up
+$protected = $summary['drm']['isDrmProtected'];
+```
+
+| Key | Content |
+|---|---|
+| `version` | The package version, e.g. `"3.0"`. |
+| `metadata` | `titles`, `creators` and `contributors` (`name`, `role`, `fileAs`), `subjects`, `description`, `publisher`, `languages`, `rights`, `dates` (`published`, `modified`, `events`), `identifiers` (`all` with `value` and `scheme`, `unique`, `isbn`), `series` (`name`, `index`), `accessibility` and `rendition` (`layout`, `orientation`, `spread`, `flow`, `pageProgressionDirection`). |
+| `cover` | `path`, `mediaType` and `bytes` of the cover image, or `null`. |
+| `toc` | `entries` (a tree: every node has `title`, `path`, `fragment` and `children`, a list of nodes of the same shape), `landmarks` and `pageListCount`. |
+| `spine` | The reading order: `idref`, `path`, `linear`, `title` (of the first table of contents entry that targets the file, else `null`) and `bytes`. |
+| `stats` | `groups` (`count` and `bytes` of the manifest items of `xhtml`, `css`, `images`, `fonts`, `media` (audio and video) and `other`), `totalBytes` (everything in the extracted book), `wordCount` and `readingMinutes`. |
+| `drm` | `isDrmProtected` and `encryptedPathCount`. |
+
+Words are counted per run of letters and digits (an apostrophe or hyphen between letters keeps a word together). Chinese and Japanese are written without spaces, so each Han, Hiragana and Katakana character counts as one word. The reading time is an estimate. Encrypted documents of a DRM-protected book are not counted.
+
 ### Converting
 
 ```php
