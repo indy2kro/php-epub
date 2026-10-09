@@ -163,6 +163,40 @@ final class ExportAdaptersTest extends TestCase
         $this->assertMatchesRegularExpression('/\.epub-book\s*\{\s*background:/', $html);
     }
 
+    public function testHtmlBookCssCannotEscapeItsContainer(): void
+    {
+        $css = "p{x:\"\n} body{background:red} q{y:\"}\n";
+        $directory = self::cssBook($css)->writeTo($this->tmpDir . '/book');
+
+        $html = (new HtmlAdapter())->toString($directory);
+
+        // The sheet with a string that runs past its line is dropped as a whole.
+        $this->assertStringNotContainsString('background:red', $html);
+
+        $css = "body ~ div{color:red} :root ~ *{color:red} html + *{color:red} body > h1{color:blue} .a{position:fixed;inset:0;z-index:99999;color:green}\n"
+            . "p{background:url(http://evil.example/x.png} .b{color:teal}\n";
+        $directory = self::cssBook($css)->writeTo($this->tmpDir . '/book2');
+
+        $html = (new HtmlAdapter())->toString($directory);
+
+        $this->assertStringNotContainsString('~', $html);
+        $this->assertStringNotContainsString('evil.example', $html);
+        $this->assertStringNotContainsString('position:fixed', str_replace(' ', '', $html));
+        $this->assertStringNotContainsString('sticky', $html);
+        $this->assertSame(2, substr_count($html, 'contain:layout paint'));
+        $this->assertStringContainsString('overflow:hidden', $html);
+    }
+
+    public function testHtmlStyleAttributesCannotPositionAnElementOverThePage(): void
+    {
+        $css = ".a{color:green}\n";
+        $directory = self::cssBook($css)->writeTo($this->tmpDir . '/book');
+
+        $html = (new HtmlAdapter())->toString($directory);
+
+        $this->assertStringContainsString('color:green', $html);
+        $this->assertDoesNotMatchRegularExpression('/position:\s*(?:fixed|sticky)/i', $html);
+    }
     public function testMarkdownConvertsStructure(): void
     {
         $directory = self::markdownBook()->writeTo($this->tmpDir . '/book');
@@ -431,6 +465,13 @@ MD;
             ->withFile('EPUB/dot.png', (string) base64_decode(EpubBuilder::PNG, true));
     }
 
+    private static function cssBook(string $css): EpubBuilder
+    {
+        return EpubBuilder::minimal()
+            ->withFile('EPUB/package.opf', EpubBuilder::opf('<item id="css" href="style.css" media-type="text/css"/>'))
+            ->withFile('EPUB/chapter.xhtml', self::chapter('Css', '<h1>T</h1><p class="a" style="position:fixed;inset:0;z-index:99999;color:green">x</p><p style="position: STICKY !important">y</p>', '<link rel="stylesheet" href="style.css"/>'))
+            ->withFile('EPUB/style.css', $css);
+    }
     private static function hostileBook(): EpubBuilder
     {
         $head = '<link rel="stylesheet" href="http://evil.example/x.css"/><link rel="stylesheet" href="style.css"/>'

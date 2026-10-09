@@ -49,7 +49,7 @@ final class CssScopeTest extends TestCase
     public function testSanitizerDecodesEscapesAndRewritesUrls(): void
     {
         $css = '@import url(http://evil.example/a.css); p { background: u\\72l(http://evil.example/b.png); width: expression(alert(1)); behavior: url(x.htc); -moz-binding: url(y) }'
-            . ' q { background: image-set("a.png" 1x), url( "ok.png" ) }';
+            . ' q { background: image-set("a.png" 1x); border-image: url( "ok.png" ) }';
 
         $sanitized = CssSanitizer::sanitize($css, static fn (string $url): ?string => $url === 'ok.png' ? 'data:,ok' : null);
 
@@ -60,5 +60,74 @@ final class CssScopeTest extends TestCase
         $this->assertStringNotContainsString('-moz-binding', $sanitized);
         $this->assertStringContainsString('url("data:,ok")', $sanitized);
         $this->assertStringContainsString('background: none', $sanitized);
+    }
+    public function testAStringEndsAtANewlineSoItCannotHideARuleBoundary(): void
+    {
+        $css = "p{x:\"\n} body{background:red} q{y:\"}";
+
+        $this->assertSame('', CssScope::scope($css, '.book'));
+        $this->assertSame('', CssSanitizer::sanitize($css, static fn (string $url): ?string => null));
+        foreach (["p{x:'\n} body{background:red}", "p{x:\"a\r} body{background:red}", "p{x:\"a\f} body{background:red}", 'p{x:"abc} body{background:red}'] as $other) {
+            $this->assertSame('', CssScope::scope($other, '.book'));
+        }
+    }
+
+    public function testBracketsKeepABlockOpen(): void
+    {
+        $scoped = CssScope::scope('p{x:( } body{background:red} )} q{color:blue}', '.book');
+
+        $this->assertSame(".book p{x:( } body{background:red} )}\n.book q{color:blue}\n", $scoped);
+        $this->assertSame('', CssScope::scope('p{x:( } body{background:red}', '.book'));
+        $this->assertSame('', CssScope::scope('p{color:red}} body{background:red}', '.book'));
+        $this->assertSame('', CssScope::scope('p)}', '.book'));
+    }
+
+    public function testSelectorsThatReachTheSiblingsOfTheScopeAreDropped(): void
+    {
+        $css = 'body ~ div{a:b} :root ~ *{a:b} html + *{a:b} html body ~ p{a:b} ~ q{a:b} + r{a:b} body > p{c:d} body p{e:f} body, body ~ div{g:h}';
+
+        $scoped = CssScope::scope($css, '.book');
+
+        $this->assertSame(".book > p{c:d}\n.book p{e:f}\n.book{g:h}\n", $scoped);
+    }
+
+    public function testRemoteLoadsAreNeutralised(): void
+    {
+        $resolve = static fn (string $url): ?string => $url === 'ok.png' ? 'data:,ok' : null;
+        $payloads = [
+            'p{background:url(http://evil.example/x.png',
+            'p{background:url(http://evil.example/x.png}',
+            'p{background:url( http://evil.example/x.png a)}',
+            'p{background:image-set(url(a.png) 1x, (x) 2x)}',
+            'p{background:image-set("http://evil.example/a.png" 1x)}',
+            'p{background:-webkit-image-set(url(http://evil.example/a.png) 1x)}',
+            'p{background:image(http://evil.example/a.png)}',
+            'p{background:cross-fade(url(http://evil.example/a.png), url(b.png), 50%)}',
+            'p{background:element(#x)}',
+            'p{background:src("http://evil.example/a.png")}',
+            'p{background:url(\'http://evil.example/x.png\' foo)}',
+        ];
+
+        foreach ($payloads as $payload) {
+            $sanitized = CssSanitizer::sanitize($payload . ' q{color:red}', $resolve);
+            $this->assertStringNotContainsString('evil.example', $sanitized, $payload);
+            $this->assertDoesNotMatchRegularExpression('/image-set|cross-fade|element\(|src\(|image\(/i', $sanitized, $payload);
+        }
+
+        $this->assertSame('p{border-image:url("data:,ok")}', CssSanitizer::sanitize('p{border-image:url(ok.png)}', $resolve));
+        $this->assertSame('p{} q{color:red;}', CssSanitizer::sanitize('p{background:image-set(url(a.png) 1x, (x) 2x)} q{color:red;}', $resolve));
+    }
+
+    public function testElementsCannotLeaveTheirBox(): void
+    {
+        $resolve = static fn (string $url): ?string => null;
+
+        $this->assertSame('p{color:red;}', CssSanitizer::sanitize('p{position:fixed;color:red;}', $resolve));
+        $this->assertSame('p{color:red}',CssSanitizer::sanitize('p{ POSITION : Sticky !important;color:red}', $resolve));
+        $this->assertSame('', CssSanitizer::sanitize('position:fixed', $resolve));
+        $this->assertSame('inset:0;z-index:99999', CssSanitizer::sanitize('position:fixed; inset:0;z-index:99999', $resolve));
+        $this->assertStringContainsString('position:absolute', CssSanitizer::sanitize('p{position:absolute}', $resolve));
+        // Escapes cannot hide the keyword.
+        $this->assertStringNotContainsString('fixed', CssSanitizer::sanitize('p{position:\66 ixed}', $resolve));
     }
 }

@@ -33,9 +33,15 @@ final readonly class HtmlAdapter implements ConverterInterface
 
     private const string CONTENT_SECURITY_POLICY = "default-src 'none'; img-src data:; style-src 'unsafe-inline'; font-src data:; base-uri 'none'; form-action 'none'";
 
-    private const string BASE_CSS = '.epub-book{max-width:48em;margin:0 auto;padding:1em;line-height:1.5;overflow-wrap:break-word}'
+    private const string BASE_CSS = '.epub-book{contain:layout paint;isolation:isolate;position:relative;overflow:hidden;max-width:48em;margin:0 auto;padding:1em;line-height:1.5;overflow-wrap:break-word}'
         . '.epub-book img{max-width:100%;height:auto}.epub-book .epub-chapter{margin:0 0 3em}'
         . '.epub-book table{border-collapse:collapse}.epub-book td,.epub-book th{border:1px solid #8885;padding:.2em .5em}';
+
+    /**
+     * On a wrapper the book's CSS cannot reach (its rules are scoped to the container inside): the book is clipped to
+     * its box, stays below the page's own layers, and is the containing block of anything it positions.
+     */
+    private const string HOST_STYLE = 'contain:layout paint;isolation:isolate;position:relative;overflow:hidden';
 
     private const int MAX_FONT_BYTES = 8 * 1024 * 1024;
 
@@ -165,7 +171,7 @@ final readonly class HtmlAdapter implements ConverterInterface
             . implode("\n", $sections);
 
         return "<!DOCTYPE html>\n<html{$language}{$direction}><head>{$head}</head>"
-            . '<body><div class="' . self::CONTAINER_CLASS . '"' . $direction . '>' . $body . "</div></body></html>\n";
+            . '<body><div class="epub-host" style="' . self::HOST_STYLE . '"><div class="' . self::CONTAINER_CLASS . '"' . $direction . '>' . $body . "</div></div></body></html>\n";
     }
 
     /**
