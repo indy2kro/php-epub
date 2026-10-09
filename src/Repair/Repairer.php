@@ -190,12 +190,7 @@ final class Repairer
             }
 
             $mediaType = $this->sniffImage($root, $path) ?? $manifest->guessMediaType($path);
-            try {
-                $manifest->add($path, $mediaType);
-            } catch (Exception) {
-                // A file name the package cannot hold (see FILE_NAME_INVALID) stays unlisted.
-                continue;
-            }
+            $manifest->add($path, $mediaType);
 
             $note = $mediaType === self::XHTML_MEDIA_TYPE ? ' It is not in the spine: add it there to make it part of the reading order.' : '';
             $this->fixed('FILE_NOT_IN_MANIFEST', "Added the file to the manifest as {$mediaType}.{$note}", $path);
@@ -388,9 +383,12 @@ final class Repairer
 
         $shell = '<?xml version="1.0" encoding="UTF-8"?>' . "\n"
             . '<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1"><head/><docTitle><text/></docTitle><navMap/></ncx>' . "\n";
+        // A disk write failure cannot be made in a test.
+        // @codeCoverageIgnoreStart
         if (@file_put_contents($this->paths->resolve($root, $path), $shell) === false) {
             throw new Exception("Failed to write the NCX: {$path}");
         }
+        // @codeCoverageIgnoreEnd
 
         $item = $manifest->add($path, self::NCX_MEDIA_TYPE);
         $this->epub->getSpine()->setToc($item->id);

@@ -122,15 +122,21 @@ final readonly class KindleChecker
         }
 
         $archive = tempnam(sys_get_temp_dir(), 'epub-size-');
+        // No scratch file can be refused in a test.
+        // @codeCoverageIgnoreStart
         if ($archive === false) {
             return [];
         }
+        // @codeCoverageIgnoreEnd
 
         try {
             (new ZipHandler())->compress($root, $archive);
             $size = (int) @filesize($archive);
+        // The directory was just read: a failure here is a disk error.
+        // @codeCoverageIgnoreStart
         } catch (Exception) {
             return [];
+        // @codeCoverageIgnoreEnd
         } finally {
             @unlink($archive);
         }
