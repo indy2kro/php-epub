@@ -13,6 +13,7 @@ use PhpEpub\ManifestItem;
 use PhpEpub\Metadata;
 use PhpEpub\TocEntry;
 use PhpEpub\Util\FileSystemHelper;
+use PhpEpub\Util\LinkRemover;
 use PhpEpub\Util\ModifiedDate;
 use PhpEpub\Util\PathResolver;
 use PhpEpub\Util\ReferenceRewriter;
@@ -98,30 +99,39 @@ final readonly class Merger
         count($books) <= $options->maxBooks || throw new Exception("Too many books to merge: {$options->maxBooks} at most, got " . count($books));
 
         $bytes = 0;
+        $files = 0;
         foreach ($books as $number => $book) {
             $directory = $book->getTempDir() ?? throw new Exception('EPUB file must be loaded before merging.');
             if ($book->isDrmProtected()) {
                 throw new Exception('Book ' . ($number + 1) . ' is DRM-protected, so its content cannot be merged.');
             }
 
-            $bytes += $this->directorySize($directory);
+            [$directoryBytes, $directoryFiles] = $this->measure($directory);
+            $bytes += $directoryBytes;
+            $files += $directoryFiles;
             $bytes <= $options->maxTotalBytes || throw new Exception("The books are too large to merge: {$options->maxTotalBytes} bytes at most");
+            $files <= $options->maxTotalFiles || throw new Exception("The books have too many files to merge: {$options->maxTotalFiles} at most");
         }
 
         return $bytes;
     }
 
-    private function directorySize(string $directory): int
+    /**
+     * @return array{int, int} The size and the number of the files in a directory.
+     */
+    private function measure(string $directory): array
     {
         $bytes = 0;
+        $count = 0;
         $files = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($directory, \FilesystemIterator::SKIP_DOTS));
         foreach ($files as $file) {
             if ($file instanceof \SplFileInfo && $file->isFile()) {
                 $bytes += (int) $file->getSize();
+                ++$count;
             }
         }
 
-        return $bytes;
+        return [$bytes, $count];
     }
 
     /**
@@ -184,31 +194,38 @@ final readonly class Merger
     {
         $directory = (string) $book->getTempDir();
         $manifest = $book->getManifest();
-        $spine = $book->getSpine();
+        $inSpine = array_flip($book->getSpine()->get());
         $opfDirectory = dirname($manifest->getOpfPath());
         $opfDirectory = $opfDirectory === '.' ? '' : $opfDirectory;
 
         // One translation for the whole book keeps its relative references valid: the files below the package
         // document move together, and a book with files outside that directory moves from its root instead.
         $base = $opfDirectory;
+        $dropped = [];
         foreach ($manifest->getItems() as $item) {
             if ($item->path !== '' && $opfDirectory !== '' && ! str_starts_with($item->path, $opfDirectory . '/')) {
                 $base = '';
-                break;
+            }
+
+            if ($item->path !== '' && $this->isDropped($item, $inSpine)) {
+                $dropped[$item->path] = true;
             }
         }
 
         $prefix = ($outputDirectory === '' ? '' : $outputDirectory . '/') . sprintf('book-%02d/', $index + 1);
         $obfuscated = $this->obfuscatedFonts($directory);
+        $links = new LinkRemover($this->paths, $this->xmlParser);
 
         foreach ($manifest->getItems() as $item) {
-            if ($item->path === '' || $item->mediaType === self::NCX_TYPE) {
+            $fallback = $manifest->getFallback($item->id);
+            if ($item->path === '' && preg_match('#^[a-z][a-z0-9+.-]*:#i', $item->href) === 1) {
+                // A remote resource has no file; it is listed again with its new id.
+                $files[] = new MergeFile($index, $item->id, '', '', $item->mediaType, $this->keptProperties($item), '', false, $item->href, $fallback);
+
                 continue;
             }
 
-            $properties = explode(' ', $item->properties);
-            // A navigation document stays only as the content document it also is, when it is in the reading order.
-            if (in_array('nav', $properties, true) && ! $spine->contains($item->id)) {
+            if ($item->path === '' || isset($dropped[$item->path])) {
                 continue;
             }
 
@@ -229,12 +246,29 @@ final readonly class Merger
 
             if ($item->mediaType === 'application/xhtml+xml') {
                 $content = $this->withHtml5Doctype($content);
+                // The navigation document of the book is not copied, so links to it would break.
+                $content = $dropped === [] ? $content : ($links->remove($item->path, $content, $dropped) ?? $content);
             }
 
             $relative = $base === '' ? $item->path : substr($item->path, strlen($base) + 1);
-            $properties = array_values(array_diff($properties, ['', 'nav', 'cover-image']));
-            $files[] = new MergeFile($index, $item->id, $item->path, $prefix . $relative, $item->mediaType, implode(' ', $properties), $content, $isFont);
+            $files[] = new MergeFile($index, $item->id, $item->path, $prefix . $relative, $item->mediaType, $this->keptProperties($item), $content, $isFont, '', $fallback);
         }
+    }
+
+    /**
+     * The NCX and a navigation document that is not in the reading order are replaced by the merged book's own.
+     *
+     * @param array<string, int> $inSpine
+     */
+    private function isDropped(ManifestItem $item, array $inSpine): bool
+    {
+        return $item->mediaType === self::NCX_TYPE
+            || (in_array('nav', explode(' ', $item->properties), true) && ! isset($inSpine[$item->id]));
+    }
+
+    private function keptProperties(ManifestItem $item): string
+    {
+        return implode(' ', array_values(array_diff(explode(' ', $item->properties), ['', 'nav', 'cover-image'])));
     }
 
     /**
@@ -283,7 +317,7 @@ final readonly class Merger
     {
         $kept = [];
         foreach ($files as $position => $file) {
-            if (! $this->isDeduplicable($file)) {
+            if ($file->url !== '' || ! $this->isDeduplicable($file)) {
                 continue;
             }
 
@@ -297,7 +331,7 @@ final readonly class Merger
         }
 
         foreach ($files as $document) {
-            if ($this->isBinary($document) || $this->isRewritable($document)) {
+            if ($document->url !== '' || $this->isBinary($document) || $this->isRewritable($document)) {
                 continue;
             }
 
@@ -320,7 +354,7 @@ final readonly class Merger
         }
 
         foreach ($files as $document) {
-            if ($document->aliasOf === null && ! $this->isBinary($document) && $this->isRewritable($document)) {
+            if ($document->url === '' && $document->aliasOf === null && ! $this->isBinary($document) && $this->isRewritable($document)) {
                 $document->content = $this->rewrite($document, $rewrites);
             }
         }
@@ -413,9 +447,18 @@ final readonly class Merger
         $pathMaps = array_fill(0, count($books), []);
         $idMaps = array_fill(0, count($books), []);
         $usedIds = [];
+        $specs = [];
 
         foreach ($files as $file) {
             if ($file->aliasOf !== null) {
+                continue;
+            }
+
+            $file->newId = $this->uniqueId($file, $usedIds);
+            $spec = ['id' => $file->newId, 'mediaType' => $file->mediaType === '' ? null : $file->mediaType, 'properties' => $file->properties];
+            if ($file->url !== '') {
+                $specs[] = $spec + ['url' => $file->url];
+
                 continue;
             }
 
@@ -424,21 +467,28 @@ final readonly class Merger
             (is_dir(dirname($target)) || @mkdir(dirname($target), 0700, true) || is_dir(dirname($target)))
                 && @file_put_contents($target, $stored) !== false || throw new Exception("Failed to write: {$file->newPath}");
 
-            $file->newId = $this->uniqueId($file, $usedIds);
-            $item = $manifest->add($file->newPath, $file->mediaType === '' ? null : $file->mediaType, $file->newId);
-            foreach (array_filter(explode(' ', $file->properties)) as $property) {
-                $manifest->addProperty($item->id, $property);
-            }
-
+            $specs[] = $spec + ['path' => $file->newPath];
             if ($file->obfuscated) {
                 $obfuscation->setAlgorithm($file->newPath, FontObfuscation::IDPF);
             }
         }
 
+        $manifest->addMany($specs);
+
         foreach ($files as $file) {
             $kept = $file->aliasOf === null ? $file : $files[$file->aliasOf];
-            $pathMaps[$file->book][$file->oldPath] = $kept->newPath;
+            if ($file->url === '') {
+                $pathMaps[$file->book][$file->oldPath] = $kept->newPath;
+            }
+
             $idMaps[$file->book][$file->oldId] = $kept->newId;
+        }
+
+        foreach ($files as $file) {
+            $fallback = $file->aliasOf === null && $file->fallback !== null ? ($idMaps[$file->book][$file->fallback] ?? null) : null;
+            if ($fallback !== null && $fallback !== $file->newId) {
+                $manifest->setFallback($file->newId, $fallback);
+            }
         }
 
         return [$pathMaps, $idMaps];
@@ -556,39 +606,42 @@ final readonly class Merger
      */
     private function copyReadingOrder(EpubFile $merged, array $books, array $idMaps): void
     {
-        $spine = $merged->getSpine();
         $layouts = $this->layouts($books);
         $mixed = count(array_unique($layouts)) > 1;
 
+        $entries = [];
+        $seen = [];
         foreach ($books as $index => $book) {
             foreach ($book->getSpine()->getItems() as $entry) {
                 $id = $idMaps[$index][$entry->idref] ?? null;
-                if ($id === null || $spine->contains($id)) {
+                if ($id === null || isset($seen[$id])) {
                     continue;
                 }
 
-                $spine->add($id, null, $entry->linear);
-                $properties = $book->getSpine()->getItemProperties($entry->idref);
-                if ($properties !== []) {
-                    $spine->setItemProperties($id, $properties);
+                $seen[$id] = true;
+                $properties = $entry->properties;
+                $hasLayout = array_filter($properties, static fn (string $property): bool => str_starts_with($property, 'rendition:layout-')) !== [];
+                if ($mixed && $layouts[$index] === 'pre-paginated' && ! $hasLayout) {
+                    $properties[] = 'rendition:layout-pre-paginated';
                 }
 
-                if ($mixed && $layouts[$index] === 'pre-paginated' && $spine->getItemRendition($id, 'layout') === null) {
-                    $spine->setItemRendition($id, 'layout', 'pre-paginated');
-                }
+                $entries[] = ['idref' => $id, 'linear' => $entry->linear, 'properties' => $properties];
             }
         }
+
+        $entries !== [] || throw new Exception('The books have no content to merge');
+        $spine = $merged->getSpine();
+        $spine->addMany($entries);
 
         $direction = $books[0]->getSpine()->getPageProgressionDirection();
         if ($direction !== null) {
             $spine->setPageProgressionDirection($direction);
         }
-
-        $spine->get() !== [] || throw new Exception('The books have no content to merge');
     }
 
     /**
-     * Media overlays and their durations follow their documents.
+     * Media overlays and their durations follow their documents; the book's total duration is the sum of the overlays'
+     * (left out when one of them has none, or one is not a clock value this can add up).
      *
      * @param list<EpubFile> $books
      * @param list<MergeFile> $files
@@ -598,9 +651,10 @@ final readonly class Merger
      */
     private function copyOverlays(EpubFile $merged, array $books, array $files, array $idMaps): void
     {
+        $seconds = [];
         foreach ($files as $file) {
             $book = $books[$file->book];
-            if ($file->aliasOf !== null || $file->mediaType !== 'application/xhtml+xml' || ! str_starts_with($book->getMetadata()->getVersion(), '3')) {
+            if ($file->aliasOf !== null || $file->url !== '' || $file->mediaType !== 'application/xhtml+xml' || ! str_starts_with($book->getMetadata()->getVersion(), '3')) {
                 continue;
             }
 
@@ -615,7 +669,35 @@ final readonly class Merger
             if ($duration !== null) {
                 $merged->getMetadata()->setMediaDurationOf($overlayId, $duration);
             }
+
+            $seconds[$overlayId] = $duration === null ? null : $this->clockSeconds($duration);
         }
+
+        if ($seconds !== [] && ! in_array(null, $seconds, true)) {
+            $merged->getMetadata()->setMediaDuration(sprintf('%.3Fs', array_sum($seconds)));
+        }
+    }
+
+    /**
+     * A SMIL clock value in seconds, or null when it is not one this understands.
+     */
+    private function clockSeconds(string $clock): ?float
+    {
+        $clock = trim($clock);
+        if (preg_match('/^(\d+(?:\.\d+)?)(h|min|s|ms)?$/', $clock, $match) === 1) {
+            return (float) $match[1] * match ($match[2] ?? 's') {
+                'h' => 3600.0,
+                'min' => 60.0,
+                'ms' => 0.001,
+                default => 1.0,
+            };
+        }
+
+        if (preg_match('/^(?:(\d+):)?(\d{1,2}):(\d{2}(?:\.\d+)?)$/', $clock, $match) === 1) {
+            return (float) $match[1] * 3600 + (float) $match[2] * 60 + (float) $match[3];
+        }
+
+        return null;
     }
 
     /**

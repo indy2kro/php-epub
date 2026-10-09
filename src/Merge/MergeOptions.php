@@ -15,6 +15,8 @@ final readonly class MergeOptions
 
     public const int DEFAULT_MAX_TOTAL_BYTES = 24 * 1024 * 1024;
 
+    public const int DEFAULT_MAX_TOTAL_FILES = 5000;
+
     /**
      * @param string|null $title The merged book's title; the first book's when null.
      * @param list<string>|null $authors The authors; the first book's when null.
@@ -27,6 +29,7 @@ final readonly class MergeOptions
      * @param bool $deduplicate Keep one copy of byte-identical stylesheets (without url() or @import), fonts and raster images.
      * @param int $maxBooks The most books Merger accepts.
      * @param int $maxTotalBytes The most bytes Merger accepts: the size of the books' extracted files together.
+     * @param int $maxTotalFiles The most files accepted: the number of files in the books' extracted directories together.
      * @param \Closure(): \DateTimeInterface|null $clock Gives the time recorded as dcterms:modified; now when null.
      *
      * @throws Exception If a limit is below its minimum or the cover is not an image.
@@ -42,9 +45,11 @@ final readonly class MergeOptions
         public bool $deduplicate = true,
         public int $maxBooks = self::DEFAULT_MAX_BOOKS,
         public int $maxTotalBytes = self::DEFAULT_MAX_TOTAL_BYTES,
-        public ?\Closure $clock = null
+        public ?\Closure $clock = null,
+        public int $maxTotalFiles = self::DEFAULT_MAX_TOTAL_FILES
     ) {
         $maxBooks >= 2 || throw new Exception('The book limit must be at least 2');
+        $maxTotalFiles >= 1 || throw new Exception('The file limit must be at least 1');
         $maxTotalBytes >= 1 || throw new Exception('The size limit must be at least 1 byte');
         $coverImage === null || str_starts_with($coverMediaType, 'image/') || throw new Exception("The cover must be an image, got: {$coverMediaType}");
     }

@@ -45,6 +45,7 @@ final class MergerTest extends TestCase
             $book->cleanup();
         }
 
+        $this->opened = [];
         (new FileSystemHelper())->deleteDirectory($this->tmpDir);
     }
 
@@ -487,5 +488,89 @@ final class MergerTest extends TestCase
 
         $this->assertSame('b01-overlay', $merged->getManifest()->getMediaOverlay('b01-chapter1'));
         $this->assertSame('0:00:10', $merged->getMetadata()->getMediaDurationOf('b01-overlay'));
+    }
+
+    public function testLinksToTheDroppedNavigationDocumentBecomePlainText(): void
+    {
+        $bodies = [1 => '<p>Back to <a href="../nav.xhtml#toc"><em>the contents</em></a> or <a href="chapter-2.xhtml">on</a>.</p>'];
+        $one = $this->open(MergeBook::builder(self::UID_ONE, 'One', 2, chapterBodies: $bodies));
+
+        $merged = $this->merge([$one, $this->open(MergeBook::builder(self::UID_TWO, 'Two'))]);
+
+        $content = $merged->getContentManager()->getContent('EPUB/book-01/text/chapter-1.xhtml');
+        $this->assertStringNotContainsString('nav.xhtml', $content);
+        $this->assertStringContainsString('<em>the contents</em>', $content);
+        $this->assertStringContainsString('<a href="chapter-2.xhtml">on</a>', $content);
+        $this->assertSame([], $this->errors($merged));
+    }
+
+    public function testRemoteItemsAndFallbacksAreCopied(): void
+    {
+        $items = '<item id="audio" href="https://example.com/a.mp3" media-type="audio/mpeg" properties="remote-resources"/>'
+            . '<item id="odd" href="odd.xyz" media-type="application/x-odd" fallback="chapter1"/>';
+        $one = $this->open(MergeBook::builder(self::UID_ONE, 'One', 1, $items, ['EPUB/odd.xyz' => 'odd']));
+
+        $merged = $this->merge([$one, $this->open(MergeBook::builder(self::UID_TWO, 'Two'))]);
+
+        $audio = $merged->getManifest()->get('b01-audio');
+        $this->assertSame('https://example.com/a.mp3', $audio?->href);
+        $this->assertSame('', $audio->path);
+        $this->assertSame('audio/mpeg', $audio->mediaType);
+        $this->assertSame('b01-chapter1', $merged->getManifest()->getFallback('b01-odd'));
+    }
+
+    public function testTheTotalDurationOfMediaOverlaysIsTheSumOfTheOverlays(): void
+    {
+        $smil = '<?xml version="1.0" encoding="UTF-8"?><smil xmlns="http://www.w3.org/ns/SMIL" version="3.0"><body><par id="p1"><text src="text/chapter-1.xhtml"/></par></body></smil>';
+        $items = '<item id="overlay" href="text/chapter-1.smil" media-type="application/smil+xml"/>';
+        $books = [];
+        foreach ([[self::UID_ONE, '0:00:10'], [self::UID_TWO, '5.5s']] as [$uid, $duration]) {
+            $book = $this->open(MergeBook::builder($uid, 'Book ' . $duration, 1, $items, ['EPUB/text/chapter-1.smil' => $smil], metadata: '<meta property="media:duration" refines="#overlay">' . $duration . '</meta>'));
+            $book->getManifest()->setMediaOverlay('chapter1', 'overlay');
+            $books[] = $book;
+        }
+
+        $merged = $this->merge($books);
+
+        $this->assertSame('15.500s', $merged->getMetadata()->getMediaDuration());
+        $this->assertSame('5.5s', $merged->getMetadata()->getMediaDurationOf('b02-overlay'));
+    }
+
+    public function testFileLimitBoundary(): void
+    {
+        $one = $this->open(MergeBook::builder(self::UID_ONE, 'One'));
+        $two = $this->open(MergeBook::builder(self::UID_TWO, 'Two'));
+        $files = 0;
+        foreach ([$one, $two] as $book) {
+            $files += iterator_count(new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator((string) $book->getTempDir(), \FilesystemIterator::SKIP_DOTS)));
+        }
+
+        $this->assertCount(4, $this->merge([$one, $two], new MergeOptions(maxTotalFiles: $files))->getSpine()->get());
+
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('too many files');
+        $this->merge([$one, $two], new MergeOptions(maxTotalFiles: $files - 1));
+    }
+
+    public function testMergingThousandsOfFilesStaysFast(): void
+    {
+        $books = [];
+        foreach ([self::UID_ONE, self::UID_TWO] as $uid) {
+            $items = '';
+            $files = [];
+            for ($number = 0; $number < 700; ++$number) {
+                $items .= "<item id=\"img{$number}\" href=\"img/p{$number}.png\" media-type=\"image/png\"/>";
+                $files["EPUB/img/p{$number}.png"] = $uid . $number;
+            }
+
+            $books[] = $this->open(MergeBook::builder($uid, 'Big ' . substr($uid, 9, 1), 700, $items, $files));
+        }
+
+        $start = microtime(true);
+        $merged = $this->merge($books);
+        $seconds = microtime(true) - $start;
+
+        $this->assertCount(1400, $merged->getSpine()->get());
+        $this->assertLessThan(8.0, $seconds, 'Merging 2800 files took too long: something is quadratic again.');
     }
 }

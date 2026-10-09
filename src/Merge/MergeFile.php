@@ -23,7 +23,9 @@ final class MergeFile
         public readonly string $mediaType,
         public readonly string $properties,
         public string $content,
-        public readonly bool $obfuscated
+        public readonly bool $obfuscated,
+        public readonly string $url = '',
+        public readonly ?string $fallback = null
     ) {
     }
 }
