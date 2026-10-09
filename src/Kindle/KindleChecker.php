@@ -10,6 +10,7 @@ use PhpEpub\ManifestItem;
 use PhpEpub\Util\FileSystemHelper;
 use PhpEpub\Util\PathResolver;
 use PhpEpub\ValidationIssue;
+use PhpEpub\ZipHandler;
 
 /**
  * Checks a book against what Amazon documents for Send to Kindle and KDP. Every rule names its source in a comment;
@@ -89,7 +90,7 @@ final readonly class KindleChecker
         $root = $this->epub->getTempDir() ?? throw new Exception('EPUB file must be loaded before checking it for Kindle.');
 
         return [
-            ...$this->checkSize(),
+            ...$this->checkSize($root),
             ...$this->checkDrm(),
             ...$this->checkMetadata(),
             ...$this->checkLayout(),
@@ -100,22 +101,25 @@ final readonly class KindleChecker
 
     /**
      * Error above the 200 MB web upload limit; a warning above the 50 MB email limit. The size is that of the
-     * packaged book, as save() would write it.
+     * book's files packed into a scratch archive, which is removed again: nothing in the book changes, so package
+     * edits not yet saved (a few hundred bytes of the OPF) are not counted.
      *
      * @return list<ValidationIssue>
      */
-    private function checkSize(): array
+    private function checkSize(string $root): array
     {
-        $stream = fopen('php://temp/maxmemory:8388608', 'w+b');
-        if ($stream === false) {
+        $archive = tempnam(sys_get_temp_dir(), 'epub-size-');
+        if ($archive === false) {
             return [];
         }
 
         try {
-            $this->epub->saveToStream($stream);
-            $size = (int) (fstat($stream)['size'] ?? 0);
+            (new ZipHandler())->compress($root, $archive);
+            $size = (int) @filesize($archive);
+        } catch (Exception) {
+            return [];
         } finally {
-            fclose($stream);
+            @unlink($archive);
         }
 
         $megabytes = round($size / 1048576, 1);

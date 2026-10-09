@@ -195,6 +195,52 @@ final class KindleCheckerTest extends TestCase
         $this->assertSame(['KINDLE_SCRIPTED'], $this->codes($epub->validate(ValidationProfile::kindle())));
     }
 
+    public function testValidatingChangesNothing(): void
+    {
+        $epub = $this->open($this->goodBook());
+        $epub->getMetadata()->setTitle('Edited, not saved');
+        $opf = $epub->getTempDir() . '/EPUB/package.opf';
+        $before = (string) file_get_contents($opf);
+        $files = $this->files((string) $epub->getTempDir());
+
+        $epub->validate(ValidationProfile::kindle());
+
+        $this->assertSame($before, (string) file_get_contents($opf), 'The extraction is untouched.');
+        $this->assertSame($files, $this->files((string) $epub->getTempDir()));
+        $this->assertTrue($epub->getMetadata()->isModified(), 'The unsaved edit is still pending.');
+    }
+
+    public function testACoverOf50MbOrMoreIsTooLarge(): void
+    {
+        $epub = $this->open($this->goodBook());
+        $handle = fopen($epub->getTempDir() . '/EPUB/images/cover.jpg', 'ab');
+        $this->assertNotFalse($handle);
+        // Zeros after the image: its header stays readable and they pack to almost nothing.
+        for ($megabyte = 0; $megabyte < 50; $megabyte++) {
+            fwrite($handle, str_repeat("\0", 1048576));
+        }
+
+        fclose($handle);
+
+        $this->assertSame(['KINDLE_COVER_TOO_LARGE'], $this->codes($epub->validate(ValidationProfile::kindle())));
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    private function files(string $root): array
+    {
+        $files = [];
+        foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($root, \FilesystemIterator::SKIP_DOTS)) as $file) {
+            if ($file instanceof \SplFileInfo && $file->isFile()) {
+                $files[$file->getPathname()] = $file->getSize();
+            }
+        }
+
+        ksort($files);
+
+        return $files;
+    }
     public function testCheckingAnUnloadedBookIsRefused(): void
     {
         $epub = $this->open($this->goodBook());
