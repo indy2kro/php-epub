@@ -13,7 +13,7 @@ A PHP library for reading and editing EPUB 2 and EPUB 3 books: metadata, cover, 
 - **Cover**: read and replace the cover image (EPUB 3 `cover-image` and EPUB 2 conventions).
 - **Package editing**: manifest items, reading order (spine) and table of contents (EPUB 3 nav and EPUB 2 NCX); adding or deleting content keeps them in sync, moving a file rewrites the references to it, and the table of contents can be generated from the chapters' headings.
 - **EPUB 3 features**: `upgradeToEpub3()` converts an EPUB 2 book (navigation document, refinements, cover and manifest properties); landmarks (nav and guide) and the page list; fixed-layout rendition metadata and spine properties; media overlays and `media:*` metadata; plain-text extraction per document and per book.
-- **New books**: `EpubFile::create()` and `addChapter()` build a valid EPUB 3 from scratch.
+- **New books**: `EpubFile::create()` and `addChapter()` build a valid EPUB 3 from scratch, and `BookBuilder` makes one from Markdown, plain text, HTML or a list of images (fixed-layout comics, left-to-right or right-to-left), with sanitised content, limits for untrusted input and an NCX for EPUB 2 readers; see [Book builder](https://indy2kro.github.io/php-epub/book-builder/).
 - **Checks**: loading rejects a book without a readable `container.xml` or package document but, like reading systems, accepts a wrong `mimetype` or a broken NCX; `validate()` reports common problems (a wrong `mimetype`, missing metadata, invalid language tags and dates, manifest and spine inconsistencies, media types that contradict the content, missing manifest properties, missing or broken navigation, missing accessibility metadata). This is not a full validator like EPUBCheck.
 - **Conversion**: PDF with TCPDF or Dompdf, and any format Calibre's `ebook-convert` supports.
 - **Export**: plain text, one self-contained sanitised HTML file (scoped CSS, inlined images) and Markdown with its images, safe to show for hostile books; see [Exporters](https://indy2kro.github.io/php-epub/exporters/).
@@ -120,9 +120,42 @@ $epubFile->convert(new TCPDFAdapter(), '/path/to/book.pdf');
 $epubFile->convert(new CalibreAdapter(['calibre_path' => '/usr/bin/ebook-convert']), '/path/to/book.mobi');
 ```
 
+### Export to text, HTML and Markdown
+
+```php
+use PhpEpub\Converters\HtmlAdapter;
+use PhpEpub\Converters\MarkdownAdapter;
+use PhpEpub\Converters\TextAdapter;
+
+$epubFile->convert(new TextAdapter(), '/path/to/book.txt');
+$epubFile->convert(new HtmlAdapter(), '/path/to/book.html');   // one self-contained, sanitised file
+
+$export = (new MarkdownAdapter())->export($epubFile->getTempDir());
+$export->writeTo('/path/to/output');                            // book.md and images/
+```
+
+See [Exporters](https://indy2kro.github.io/php-epub/exporters/).
+
+### Build a book from Markdown, text, HTML or images
+
+```php
+use PhpEpub\Build\BookBuilder;
+use PhpEpub\Build\BookOptions;
+
+$book = (new BookBuilder(new BookOptions(title: 'My Book', authors: ['Jane Doe'], splitLevel: 2)))
+    ->fromMarkdown("# One\n\nIt begins.\n\n# Two\n\nIt goes on.\n");
+$book->save('/path/to/book.epub');
+
+// A right-to-left, fixed-layout comic with one image per page.
+$comic = (new BookBuilder(new BookOptions(title: 'My Manga', direction: 'rtl')))
+    ->fromImages([['name' => '1.jpg', 'bytes' => $firstPage], ['name' => '2.jpg', 'bytes' => $secondPage]]);
+```
+
+See [Book builder](https://indy2kro.github.io/php-epub/book-builder/).
+
 ### Errors
 
-All exceptions extend `PhpEpub\Exception`: `ZipException` for archive problems and extraction limits, `InvalidEpubException` (and its subclass `XmlException`) for invalid or unsafe books, and `ConversionException` for PDF conversion failures.
+All exceptions extend `PhpEpub\Exception`: `ZipException` for archive problems and extraction limits, `InvalidEpubException` (and its subclass `XmlException`) for invalid or unsafe books, and `ConversionException` for conversion failures and `BuildException` for invalid options, empty content or exceeded limits when building a book.
 
 ```php
 use PhpEpub\EpubFile;

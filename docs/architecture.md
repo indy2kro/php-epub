@@ -61,13 +61,16 @@ Extracts archives with limits (entry count, total size, compression ratio) and w
 ### Converters
 `ConverterInterface` has three adapters: `TCPDFAdapter` and `DompdfAdapter` (PDF, via `EpubDocumentLoader`, which reads the spine documents and makes their HTML safe to render), and `CalibreAdapter` (any format Calibre's `ebook-convert` supports). `Converter` maps formats to adapters. `TextAdapter`, `HtmlAdapter` and `MarkdownAdapter` export text, one sanitised HTML file and Markdown from the same loader output (see [Exporters](exporters.md)).
 
+### BookBuilder
+Builds a new book from Markdown, text, HTML or images (see [Book builder](book-builder.md)): `MarkdownParser` turns Markdown into HTML (raw HTML is escaped), `Util\HtmlSanitizer` reduces any HTML to an allowlist and resolves images against the supplied map only, `BookBuilder` splits the result into chapters, and `BookPackage` writes the package, navigation document and NCX as an OCF archive through `ZipHandler`. `BuildLimits` bounds chapters, bytes and images.
+
 ## Untrusted input
 
 Every byte of a book is treated as hostile: `PathResolver` keeps every path from the book (and from callers) inside the extraction directory, `ZipHandler` limits extraction, `XmlParser` refuses entity declarations, and `EpubDocumentLoader` confines everything the PDF renderers could load to the book. See [Handling Untrusted EPUBs](advanced-usage.md#handling-untrusted-epubs).
 
 ## Exceptions
 
-All exceptions extend `PhpEpub\Exception`: `ZipException` (archive problems and extraction limits), `InvalidEpubException` (invalid structure or paths outside the book) with its subclass `XmlException` (unreadable or unsafe XML), and `ConversionException` (PDF conversion failures).
+All exceptions extend `PhpEpub\Exception`: `ZipException` (archive problems and extraction limits), `InvalidEpubException` (invalid structure or paths outside the book) with its subclass `XmlException` (unreadable or unsafe XML), `ConversionException` (conversion failures) and `BuildException` (invalid options, no content or a limit exceeded when building a book).
 
 ## Design Patterns
 

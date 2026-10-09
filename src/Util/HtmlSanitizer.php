@@ -75,8 +75,9 @@ final readonly class HtmlSanitizer
      * @param Closure(string): ?string $resolveImage Maps an image's src to the value to write instead, or null to
      *                                               drop the image (its alt text stays as plain text).
      * @param Closure(string): string|null $filterStyle Rewrites style attributes; null removes them.
+     * @param bool $markExternalLinks Add rel="noopener noreferrer" to links that leave the document.
      */
-    public function __construct(private Closure $resolveImage, private ?Closure $filterStyle = null)
+    public function __construct(private Closure $resolveImage, private ?Closure $filterStyle = null, private bool $markExternalLinks = true)
     {
     }
 
@@ -202,7 +203,7 @@ final readonly class HtmlSanitizer
             } elseif ($name === 'href' && $tag === 'a') {
                 if (self::isSafeLink($attribute->value)) {
                     $element->setAttribute('href', trim($attribute->value));
-                    str_starts_with(trim($attribute->value), '#') || $element->setAttribute('rel', 'noopener noreferrer');
+                    $this->markExternalLinks && ! str_starts_with(trim($attribute->value), '#') && $element->setAttribute('rel', 'noopener noreferrer');
                 }
             } elseif ($name === 'dir') {
                 in_array(strtolower($attribute->value), ['ltr', 'rtl', 'auto'], true) && $element->setAttribute('dir', strtolower($attribute->value));

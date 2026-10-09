@@ -218,7 +218,7 @@ final readonly class BookBuilder
         };
 
         $body = HtmlSanitizer::parseBody($html);
-        (new HtmlSanitizer($resolve))->sanitize($body);
+        (new HtmlSanitizer($resolve, null, false))->sanitize($body);
 
         $chapters = $this->split($body, $splitLevel);
         if ($chapters === []) {

@@ -133,7 +133,7 @@ MD;
         foreach (
             [
             '<em>em</em>', '<strong>strong</strong>', '<del>gone</del>', '<code>co&lt;de</code>',
-            '<a href="http://example.com/x_y_z" rel="noopener noreferrer" title="T">link</a>', '<a href="http://auto.example" rel="noopener noreferrer">http://auto.example</a>',
+            '<a href="http://example.com/x_y_z" title="T">link</a>', '<a href="http://auto.example">http://auto.example</a>',
             '<h1 id="setext">Setext</h1>', '<ul>', '<li>a</li>', '<ol>', '<blockquote>', '<pre><code class="language-php">echo "&lt;b&gt;";</code></pre>',
             '<pre><code>indented</code></pre>', '<hr/>', '<th>h1</th>', '<td>b | c</td>', '<br/>', '*literal*', '&lt;b&gt;raw&lt;/b&gt;', '&amp;',
             ] as $expected

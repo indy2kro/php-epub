@@ -57,6 +57,8 @@ once and repacks. `create()` starts a new book, `convert()` runs a converter on 
 - `Parser` locates and checks the OPF via `META-INF/container.xml`. Problems that reading systems tolerate (a wrong
   `mimetype`, a broken NCX) are not thrown but reported by `Validator` through `EpubFile::validate()` as
   `ValidationIssue`s.
+- `Build\BookBuilder` makes a new book from Markdown, text, HTML or images; its input is untrusted, so HTML goes through
+  `Util\HtmlSanitizer` (allowlist, images only from the supplied map, no SVG) and `Build\BuildLimits` bounds the work.
 - `Encryption` and `FontObfuscation` handle `META-INF/encryption.xml` and IDPF/Adobe font obfuscation.
 - Converters (`src/Converters/`): `TCPDFAdapter` and `DompdfAdapter` render through `EpubDocumentLoader`, which reads
   the spine documents and makes their HTML safe to render; `CalibreAdapter` runs `ebook-convert`; `TextAdapter`, `HtmlAdapter`
@@ -78,7 +80,7 @@ Every byte of a book is treated as hostile. Preserve these invariants:
 - `XmlParser` loads XML without network access and rejects entity declarations.
 - `EpubDocumentLoader` (with `ConfinedTcpdf`) confines everything the PDF renderers could load to the book.
 - Only `PhpEpub\Exception` subclasses may escape: `ZipException`, `InvalidEpubException` (and its subclass
-  `XmlException`) and `ConversionException`. Methods also throw when used incorrectly (e.g. `getMetadata()` before
+  `XmlException`), `ConversionException` and `BuildException`. Methods also throw when used incorrectly (e.g. `getMetadata()` before
   `load()`).
 
 ## Testing
