@@ -68,8 +68,8 @@ final class MarkdownParser
                 $i++;
             } elseif (preg_match('/^ {0,3}>/', $line) === 1) {
                 $html .= $this->blockQuote($lines, $i, $depth);
-            } elseif ($this->listMarker($line) !== null) {
-                $html .= $this->list($lines, $i, $depth);
+            } elseif (($marker = $this->listMarker($line)) !== null) {
+                $html .= $this->list($lines, $i, $depth, $marker);
             } elseif (preg_match('/^ {4}/', $line) === 1) {
                 $html .= $this->indentedCode($lines, $i);
             } elseif ($this->startsTable($lines, $i)) {
@@ -173,14 +173,10 @@ final class MarkdownParser
 
     /**
      * @param list<string> $lines
+     * @param array{indent: int, ordered: bool, number: int, delimiter: string, width: int, content: string} $first The marker of the first item.
      */
-    private function list(array $lines, int &$i, int $depth): string
+    private function list(array $lines, int &$i, int $depth, array $first): string
     {
-        $first = $this->listMarker($lines[$i]);
-        if ($first === null) {
-            return '';
-        }
-
         $count = count($lines);
         $items = [];
         $loose = false;

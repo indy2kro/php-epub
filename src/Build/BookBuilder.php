@@ -393,7 +393,10 @@ final readonly class BookBuilder
         $content = htmlspecialchars_decode(htmlspecialchars($content, ENT_SUBSTITUTE, 'UTF-8'), ENT_NOQUOTES);
         $cleaned = preg_replace('/[^\x{9}\x{A}\x{D}\x{20}-\x{D7FF}\x{E000}-\x{FFFD}\x{10000}-\x{10FFFF}]/u', '', $content);
         if ($cleaned === null) {
+            // the input is valid UTF-8 here and the pattern is a single class: it cannot fail
+            // @codeCoverageIgnoreStart
             throw new BuildException('The content could not be read: ' . preg_last_error_msg());
+            // @codeCoverageIgnoreEnd
         }
 
         $content = $cleaned;
@@ -647,11 +650,7 @@ final readonly class BookBuilder
     {
         $containers = [];
         foreach ($chapters as $chapter) {
-            $first = $chapter['nodes'][0] ?? null;
-            $document = $first?->ownerDocument;
-            if (! $document instanceof DOMDocument) {
-                $document = new DOMDocument();
-            }
+            $document = $chapter['nodes'][0]->ownerDocument ?? new DOMDocument();
 
             $container = $document->createElement('div');
             foreach ($chapter['nodes'] as $node) {

@@ -205,7 +205,7 @@ final readonly class HtmlAdapter implements ConverterInterface
     }
 
     /**
-     * Empties the loader's link anchors (they hold a zero-width space for Dompdf's sake) and records every id.
+     * Records every id (HtmlSanitizer has already emptied the loader's link anchors, which hold a zero-width space).
      *
      * @param array<string, true> $ids
      */
@@ -218,9 +218,6 @@ final readonly class HtmlAdapter implements ConverterInterface
             }
 
             $ids[$id] = true;
-            if (strtolower($element->localName ?? '') === 'a' && $element->textContent === "\u{200B}" && str_starts_with($id, 'epub-c')) {
-                $element->textContent = '';
-            }
         }
     }
 

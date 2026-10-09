@@ -150,8 +150,11 @@ final class BookPackage
             $archive = $directory . DIRECTORY_SEPARATOR . 'book.epub';
             try {
                 (new ZipHandler())->compress($directory . DIRECTORY_SEPARATOR . 'book', $archive);
+                // ZipHandler::compress() only fails on a full or unwritable temporary directory
+                // @codeCoverageIgnoreStart
             } catch (ZipException $exception) {
                 throw new BuildException('Failed to package the book: ' . $exception->getMessage(), 0, $exception);
+                // @codeCoverageIgnoreEnd
             }
 
             return FileSystemHelper::readFile($archive) ?? throw new BuildException('Failed to read the packaged book');

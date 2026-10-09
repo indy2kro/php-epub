@@ -147,7 +147,8 @@ final readonly class HtmlSanitizer
         $tag = strtolower($element->localName ?? $element->nodeName);
         $parent = $element->parentNode;
         if (! $parent instanceof DOMNode) {
-            return;
+            // Every element walked here has a parent; this narrows the type.
+            return; // @codeCoverageIgnore
         }
 
         if ($depth > self::MAX_DEPTH || in_array($tag, self::REMOVED, true)) {
@@ -191,7 +192,8 @@ final readonly class HtmlSanitizer
     private function cleanAttributes(DOMElement $element, string $tag): void
     {
         $allowed = [...self::GLOBAL_ATTRIBUTES, ...(self::ELEMENT_ATTRIBUTES[$tag] ?? [])];
-        $language = $element->getAttribute('xml:lang');
+        // getAttribute('xml:lang') does not find it on an element of an HTML document: read it from the list.
+        $language = '';
 
         foreach (iterator_to_array($element->attributes ?? []) as $attribute) {
             $name = strtolower($attribute->nodeName);
@@ -205,6 +207,8 @@ final readonly class HtmlSanitizer
                     $element->setAttribute('href', trim($attribute->value));
                     $this->markExternalLinks && ! str_starts_with(trim($attribute->value), '#') && $element->setAttribute('rel', 'noopener noreferrer');
                 }
+            } elseif ($name === 'xml:lang') {
+                $language = $attribute->value;
             } elseif ($name === 'dir') {
                 in_array(strtolower($attribute->value), ['ltr', 'rtl', 'auto'], true) && $element->setAttribute('dir', strtolower($attribute->value));
             } elseif (in_array($name, $allowed, true) && $this->hasPlainValue($attribute->value)) {
@@ -230,10 +234,6 @@ final readonly class HtmlSanitizer
         $source = trim($image->getAttribute('src'));
         $alt = $image->getAttribute('alt');
         $resolved = $source === '' ? null : ($this->resolveImage)($source);
-        $parent = $image->parentNode;
-        if (! $parent instanceof DOMNode) {
-            return;
-        }
 
         if ($resolved === null) {
             $this->replaceWithText($image, $alt);
@@ -263,7 +263,8 @@ final readonly class HtmlSanitizer
     {
         $parent = $svg->parentNode;
         if (! $parent instanceof DOMNode) {
-            return;
+            // Every element walked here has a parent; this narrows the type.
+            return; // @codeCoverageIgnore
         }
 
         $source = '';
