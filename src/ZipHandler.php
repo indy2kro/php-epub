@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PhpEpub;
 
 use Normalizer;
+use PhpEpub\Util\FileSystemHelper;
 use PhpEpub\Util\PathResolver;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
@@ -21,11 +22,21 @@ class ZipHandler
     private const int CHUNK_SIZE = 65536;
 
     /**
+     * Formats that are already compressed: a compact archive stores them unless deflate shrinks them.
+     */
+    private const array COMPRESSED_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'woff', 'woff2', 'mp3', 'mp4', 'm4a', 'm4v', 'ogg', 'oga', 'ogv', 'opus', 'aac', 'webm', 'zip'];
+
+    /**
      * Modification time of every saved entry, so archives do not depend on when the book was
      * extracted or edited. 1980-01-02 UTC: ZIP stores local time and cannot go before 1980-01-01,
      * so this stays valid in every time zone.
      */
     private const int FIXED_MTIME = 315619200;
+
+    /**
+     * The deflate level of a compact archive (see withCompressionLevel()), or null.
+     */
+    private ?int $compressionLevel = null;
 
     /**
      * @param int $maxEntries Maximum number of entries an archive may contain.
@@ -38,6 +49,21 @@ class ZipHandler
         private readonly int $maxCompressionRatio = 100,
         private readonly PathResolver $paths = new PathResolver()
     ) {
+    }
+
+    /**
+     * A copy of this handler whose compress() packs a compact archive: entries are deflated at the
+     * given level and no directory entries are written. Entries of formats that are already compressed
+     * (images, fonts, audio, video) are stored when deflate would not shrink them.
+     *
+     * @param int|null $level 1 (fastest) to 9 (smallest); null for libzip's default and directory entries.
+     */
+    public function withCompressionLevel(?int $level): static
+    {
+        $copy = clone $this;
+        $copy->compressionLevel = $level === null ? null : max(1, min(9, $level));
+
+        return $copy;
     }
 
     /**
@@ -74,9 +100,12 @@ class ZipHandler
             $files = [];
             for ($index = 0; $index < $zip->numFiles; $index++) {
                 $stat = $zip->statIndex($index);
+                // libzip can stat every index below numFiles; this is defensive.
+                // @codeCoverageIgnoreStart
                 if ($stat === false) {
                     throw new ZipException("Failed to read entry {$index} of ZIP file: {$zipFilePath}");
                 }
+                // @codeCoverageIgnoreEnd
 
                 $extractedBytes += $this->extractEntry($zip, $index, $stat['name'], $stat['comp_size'], $destination, $extractedBytes, $files);
             }
@@ -117,7 +146,7 @@ class ZipHandler
 
         // OCF requires names that are unique after case folding: on case-insensitive file systems
         // (Windows, macOS) one entry would silently replace the other.
-        $folded = $this->fold($target);
+        $folded = self::foldName($target);
         if (isset($files[$folded])) {
             throw new ZipException("ZIP entries differ only in case: {$files[$folded]} and {$name}");
         }
@@ -161,9 +190,12 @@ class ZipHandler
                     );
                 }
 
+                // A full disk or a closed handle; cannot be provoked portably.
+                // @codeCoverageIgnoreStart
                 if (fwrite($output, $chunk) === false) {
                     throw new ZipException("Failed to write ZIP entry: {$name}");
                 }
+                // @codeCoverageIgnoreEnd
             }
         } finally {
             fclose($input);
@@ -177,8 +209,10 @@ class ZipHandler
      * Folds a path the way case-insensitive file systems compare names: Unicode case folding and
      * NFC normalization when mbstring and intl are available, ASCII lower-casing otherwise
      * (and for names that are not valid UTF-8).
+     *
+     * @internal Shared with EpubReader, which applies the same rule to entry names.
      */
-    private function fold(string $path): string
+    public static function foldName(string $path): string
     {
         $path = class_exists(Normalizer::class) ? (Normalizer::normalize($path) ?: $path) : $path;
 
@@ -290,8 +324,11 @@ class ZipHandler
                 try {
                     $zip->unchangeAll();
                     @$zip->close();
+                // @codeCoverageIgnoreStart
                 } catch (\ValueError) {
+                    // Only when a failed close() already released the archive, which depends on the OS.
                 }
+                // @codeCoverageIgnoreEnd
             }
             @unlink($temporary);
 
@@ -305,6 +342,23 @@ class ZipHandler
     protected function createArchive(): ZipArchive
     {
         return new ZipArchive();
+    }
+
+    /**
+     * @throws ZipException If a ZipArchive call failed.
+     */
+    private function compressEntry(ZipArchive $zip, string $name, string $filePath, int $level): void
+    {
+        $method = ZipArchive::CM_DEFLATE;
+        if (in_array(strtolower(pathinfo($name, PATHINFO_EXTENSION)), self::COMPRESSED_EXTENSIONS, true)) {
+            $data = FileSystemHelper::readFile($filePath);
+            $deflated = $data === null ? false : gzdeflate($data, $level);
+            if ($data === null || $deflated === false || strlen($deflated) >= strlen($data)) {
+                $method = ZipArchive::CM_STORE;
+            }
+        }
+
+        $this->assertDone($zip->setCompressionName($name, $method, $level), $zip, 'compress', $name);
     }
 
     /**
@@ -324,8 +378,16 @@ class ZipHandler
         // the same book twice (on any OS) produces the same bytes.
         foreach ($this->entries($realSource) as $relativePath => $filePath) {
             $isDirectory = is_dir($filePath);
+            if ($isDirectory && $this->compressionLevel !== null) {
+                // Readers do not need directory entries; a compact archive leaves them out.
+                continue;
+            }
+
             $added = $isDirectory ? $zip->addEmptyDir($relativePath) : $zip->addFile($filePath, $relativePath);
             $this->assertDone($added, $zip, 'add', $relativePath);
+            if ($this->compressionLevel !== null && ! $isDirectory) {
+                $this->compressEntry($zip, $relativePath, $filePath, $this->compressionLevel);
+            }
 
             $this->normalizeEntry($zip, $isDirectory ? $relativePath . '/' : $relativePath, $isDirectory);
         }

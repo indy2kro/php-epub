@@ -50,7 +50,7 @@ class Metadata
      *
      * @throws InvalidEpubException If the package has no metadata element.
      */
-    public function __construct(private readonly SimpleXMLElement $opfXml, private string $opfFilePath)
+    public function __construct(private readonly SimpleXMLElement $opfXml, private string $opfFilePath, private readonly bool $readOnly = false)
     {
         $metadataNodes = $this->query($this->opfXml, '/opf:package/opf:metadata');
 
@@ -67,10 +67,13 @@ class Metadata
      * When metadata was changed, the modification date is updated: dcterms:modified for EPUB 3
      * packages, and an existing dc:date with opf:event="modification" for EPUB 2 ones.
      *
+     * @throws ReadOnlyException If the metadata belongs to a book that is only read (see EpubReader).
      * @throws Exception If the OPF file cannot be saved.
      */
     public function save(): void
     {
+        $this->readOnly && throw new ReadOnlyException('The book is opened read-only; its package document cannot be saved.');
+
         if ($this->modified) {
             $this->isEpub3() ? $this->updateModifiedDate() : $this->updateModificationEvent();
         }

@@ -6,8 +6,13 @@ namespace PhpEpub\Test;
 
 use ErrorException;
 use PhpEpub\Converters\EpubDocumentLoader;
+use PhpEpub\Converters\HtmlAdapter;
+use PhpEpub\Converters\MarkdownAdapter;
+use PhpEpub\Converters\TextAdapter;
 use PhpEpub\EpubFile;
+use PhpEpub\EpubReader;
 use PhpEpub\Exception;
+use PhpEpub\Limits;
 use PhpEpub\Test\Support\EpubBuilder;
 use PhpEpub\Util\FileSystemHelper;
 use PhpEpub\XmlParser;
@@ -222,6 +227,9 @@ final class FuzzTest extends TestCase
             $this->guard(function () use ($book, $extracted): void {
                 (new ZipHandler())->extract($book, $extracted);
                 (new EpubDocumentLoader())->load($extracted);
+                (new TextAdapter())->toString($extracted);
+                (new HtmlAdapter())->toString($extracted);
+                (new MarkdownAdapter())->export($extracted);
             });
 
             $this->guard(function () use ($book): void {
@@ -233,6 +241,20 @@ final class FuzzTest extends TestCase
                     $epubFile->getTableOfContents()->getEntries();
                 } finally {
                     $epubFile->cleanup();
+                }
+            });
+
+            // The read-only reader reads entries lazily, so it is the entry point that meets damaged entries mid-read.
+            $this->guard(function () use ($book): void {
+                $reader = EpubReader::open($book, Limits::web());
+                try {
+                    $reader->getMetadata()->getTitle();
+                    $reader->getSpine()->getItems();
+                    $reader->getTableOfContents()->getEntries();
+                    $reader->getCoverImage();
+                    $reader->getText(false);
+                } finally {
+                    $reader->close();
                 }
             });
         } finally {

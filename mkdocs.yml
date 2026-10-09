@@ -25,9 +25,12 @@ nav:
     - Basic Usage: basic-usage.md
     - Advanced Features: advanced-usage.md
     - EPUB 3 Features: epub3-features.md
+    - Repairing a Book: repair.md
+    - Checking for Kindle: kindle.md
   - Architecture: architecture.md
   - Classes:
     - EpubFile: epub-file.md
+    - EpubReader and Limits: epub-reader.md
     - ContentManager: content-manager.md
     - Metadata: metadata.md
     - Manifest: manifest.md
@@ -36,7 +39,11 @@ nav:
     - Parser: parser.md
     - XmlParser: xml-parser.md
     - ZipHandler: zip-handler.md
+    - Cleanup: cleanup.md
+    - Merge and Split: merge-split.md
     - Converter: converter.md
+    - Exporters: exporters.md
+    - Book builder: book-builder.md
     - Converters:
       - Calibre Adapter: converters/calibre-adapter.md
       - Dompdf Adapter: converters/dompdf-adapter.md

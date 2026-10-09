@@ -10,6 +10,13 @@ use SimpleXMLElement;
 class XmlParser
 {
     /**
+     * @param int $maxBytes Largest document, in bytes, parse() and parseString() accept (no cap by default).
+     */
+    public function __construct(private readonly int $maxBytes = PHP_INT_MAX)
+    {
+    }
+
+    /**
      * Loads an XML file and returns a SimpleXMLElement.
      *
      * Documents come from untrusted books, so entity declarations are rejected
@@ -17,12 +24,18 @@ class XmlParser
      *
      * @param string $filePath The path to the XML file.
      *
-     * @throws XmlException If the XML file cannot be loaded.
+     * @throws XmlException If the XML file cannot be loaded or is larger than the size limit.
      */
     public function parse(string $filePath): SimpleXMLElement
     {
         if (! file_exists($filePath)) {
             throw new XmlException("XML file not found: {$filePath}");
+        }
+
+        // Checked before reading, so an oversized document never gets into memory.
+        $size = @filesize($filePath);
+        if ($size !== false && $size > $this->maxBytes) {
+            throw new XmlException("XML file is larger than the limit of {$this->maxBytes} bytes: {$filePath}");
         }
 
         $content = FileSystemHelper::readFile($filePath) ?? throw new XmlException("Failed to read XML file: {$filePath}");
@@ -39,6 +52,10 @@ class XmlParser
      */
     public function parseString(string $content, string $source = 'string'): SimpleXMLElement
     {
+        if (strlen($content) > $this->maxBytes) {
+            throw new XmlException("XML document is larger than the limit of {$this->maxBytes} bytes: {$source}");
+        }
+
         // Entity declarations enable expansion attacks; EPUB container, package and NCX files never need them.
         if (preg_match('/<!ENTITY/i', $content) === 1) {
             throw new XmlException("XML entity declarations are not allowed: {$source}");

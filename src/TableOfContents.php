@@ -31,6 +31,9 @@ final readonly class TableOfContents
      * @param EpubFile|null $book The book these files belong to: holding it keeps its extracted
      *                            files alive while this object is used (e.g. EpubFile::open($path)->getTableOfContents()).
      * @param Spine|null $spine The reading order generateFromHeadings() follows.
+     * @param \Closure(string): string|null $reader Reads a book-relative path (throwing XmlException when it is missing
+     *                                            or too large) instead of the files in $rootDirectory. The table of
+     *                                            contents is then read-only: every change throws ReadOnlyException.
      */
     public function __construct(
         private string $rootDirectory,
@@ -38,8 +41,17 @@ final readonly class TableOfContents
         private XmlParser $xmlParser = new XmlParser(),
         private PathResolver $paths = new PathResolver(),
         private ?EpubFile $book = null,
-        private ?Spine $spine = null
+        private ?Spine $spine = null,
+        private ?\Closure $reader = null
     ) {
+    }
+
+    /**
+     * @throws ReadOnlyException If the book is only read.
+     */
+    private function assertWritable(): void
+    {
+        $this->reader === null || throw new ReadOnlyException('The book is opened read-only; its table of contents cannot be changed.');
     }
 
     /**
@@ -119,6 +131,7 @@ final readonly class TableOfContents
      */
     public function writeEntries(array $entries): void
     {
+        $this->assertWritable();
         $navPath = $this->navPath();
         $ncxPath = $this->ncxPath();
         if ($navPath === null && $ncxPath === null) {
@@ -148,6 +161,7 @@ final readonly class TableOfContents
      */
     public function createNavigation(string $title, string $language): void
     {
+        $this->assertWritable();
         if ($this->navPath() !== null) {
             return;
         }
@@ -262,6 +276,7 @@ final readonly class TableOfContents
      */
     public function setLandmarks(array $landmarks): void
     {
+        $this->assertWritable();
         foreach ($landmarks as $landmark) {
             if (trim($landmark->type) === '' || trim($landmark->title) === '' || $landmark->path === '') {
                 throw new Exception('A landmark needs a type, a title and a path');
@@ -476,6 +491,7 @@ final readonly class TableOfContents
      */
     public function syncNcx(string $title, ?string $uniqueIdentifier): void
     {
+        $this->assertWritable();
         $ncxPath = $this->ncxPath();
         if ($ncxPath === null) {
             return;
@@ -555,7 +571,10 @@ final readonly class TableOfContents
      */
     private function load(string $path): DOMElement
     {
-        $root = dom_import_simplexml($this->xmlParser->parse($this->paths->resolve($this->rootDirectory, $path)));
+        $xml = $this->reader instanceof \Closure
+            ? $this->xmlParser->parseString(($this->reader)($this->paths->normalize($path)), $path)
+            : $this->xmlParser->parse($this->paths->resolve($this->rootDirectory, $path));
+        $root = dom_import_simplexml($xml);
 
         return $root instanceof DOMElement ? $root : throw new Exception("Failed to load: {$path}");
     }
@@ -565,6 +584,7 @@ final readonly class TableOfContents
      */
     private function save(DOMElement $root, string $path): void
     {
+        $this->assertWritable();
         if (@$root->ownerDocument?->save($this->paths->resolve($this->rootDirectory, $path)) === false) {
             throw new Exception("Failed to write the table of contents to: {$path}");
         }
@@ -797,8 +817,8 @@ final readonly class TableOfContents
             $navMap->removeChild($point);
         }
 
-        $playOrder = 0;
-        $this->appendNavPoints($document, $namespace, $navMap, $entries, $ncxPath, $playOrder);
+        $state = ['order' => 0, 'count' => 0, 'seen' => []];
+        $this->appendNavPoints($document, $namespace, $navMap, $entries, $ncxPath, $state);
 
         $this->updateDepth($root);
         $this->save($root, $ncxPath);
@@ -841,29 +861,34 @@ final readonly class TableOfContents
 
     /**
      * @param list<TocEntry> $entries
+     * @param array{order: int, count: int, seen: array<string, int>} $state The last playOrder, the number of navPoints
+     *                                                                       and the playOrder of every content src so far.
      */
-    private function appendNavPoints(DOMDocument $document, string $namespace, DOMElement $parent, array $entries, string $ncxPath, int &$playOrder): void
+    private function appendNavPoints(DOMDocument $document, string $namespace, DOMElement $parent, array $entries, string $ncxPath, array &$state): void
     {
         foreach ($entries as $entry) {
             if ($entry->path === '') {
                 // The NCX has no unlinked entries: the children take this entry's place.
-                $this->appendNavPoints($document, $namespace, $parent, $entry->children, $ncxPath, $playOrder);
+                $this->appendNavPoints($document, $namespace, $parent, $entry->children, $ncxPath, $state);
                 continue;
             }
 
-            $playOrder++;
+            // navPoints with the same content src must have the same playOrder (EPUBCheck RSC-005).
+            $src = $this->href($ncxPath, $entry);
+            $state['count']++;
+            $state['seen'][$src] ??= ++$state['order'];
             $point = $document->createElementNS($namespace, 'navPoint');
-            $point->setAttribute('id', 'navPoint-' . $playOrder);
-            $point->setAttribute('playOrder', (string) $playOrder);
+            $point->setAttribute('id', 'navPoint-' . $state['count']);
+            $point->setAttribute('playOrder', (string) $state['seen'][$src]);
 
             $label = $point->appendChild($document->createElementNS($namespace, 'navLabel'));
             $label->appendChild($document->createElementNS($namespace, 'text'))->appendChild($document->createTextNode($entry->title));
 
             $content = $point->appendChild($document->createElementNS($namespace, 'content'));
-            $content->setAttribute('src', $this->href($ncxPath, $entry));
+            $content->setAttribute('src', $src);
 
             $parent->appendChild($point);
-            $this->appendNavPoints($document, $namespace, $point, $entry->children, $ncxPath, $playOrder);
+            $this->appendNavPoints($document, $namespace, $point, $entry->children, $ncxPath, $state);
         }
     }
 

@@ -40,6 +40,16 @@ final class ReferenceRewriterTest extends TestCase
         $this->assertStringContainsString('url(y.png)', $rewritten);
     }
 
+    public function testSrcsetCandidatesAreRewritten(): void
+    {
+        $xhtml = '<html xmlns="http://www.w3.org/1999/xhtml"><body><img srcset="x.png 1x, x.png?v=1 2x, other.png 3x" src="other.png"/></body></html>';
+
+        $rewritten = (new ReferenceRewriter())->rewriteXml($xhtml, 'EPUB/a.xhtml', 'EPUB/a.xhtml', 'EPUB/x.png', 'EPUB/y/x.jpg');
+
+        $this->assertNotNull($rewritten);
+        $this->assertStringContainsString('srcset="y/x.jpg 1x, y/x.jpg?v=1 2x, other.png 3x"', $rewritten);
+    }
+
     public function testMalformedAndUnaffectedDocumentsAreNotRewritten(): void
     {
         $rewriter = new ReferenceRewriter();

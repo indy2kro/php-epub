@@ -19,21 +19,22 @@ EpubFile handles the complete lifecycle of working with EPUB files:
 public function __construct(
     string $filePath,
     ?ZipHandler $zipHandler = null,
-    ?XmlParser $xmlParser = null
+    ?XmlParser $xmlParser = null,
+    ?Limits $limits = null
 )
 ```
 
-Initializes the EpubFile with the path to an EPUB file. The optional `$zipHandler` and `$xmlParser` parameters allow dependency injection, e.g. a `ZipHandler` with tighter extraction limits.
+Initializes the EpubFile with the path to an EPUB file. The optional `$zipHandler` and `$xmlParser` parameters allow dependency injection, e.g. a `ZipHandler` with tighter extraction limits. `$limits` is the shortcut for untrusted books: `Limits::web()` configures both, plus the size cap on content documents read by `getText()` and the cover lookup (see [EpubReader and Limits](epub-reader.md)); a `ZipHandler` or `XmlParser` you pass replaces that part.
 
 ```php
-public static function open(string $filePath, ?ZipHandler $zipHandler = null, ?XmlParser $xmlParser = null): EpubFile
+public static function open(string $filePath, ?ZipHandler $zipHandler = null, ?XmlParser $xmlParser = null, ?Limits $limits = null): EpubFile
 ```
 
-Shortcut for `new EpubFile(...)` followed by `load()`.
+Shortcut for `new EpubFile(...)` followed by `load()`. A failed `load()` leaves no extraction behind. To inspect a book without extracting it at all, use [`EpubReader`](epub-reader.md).
 
 ```php
-public static function openString(string $data, ?ZipHandler $zipHandler = null, ?XmlParser $xmlParser = null): EpubFile
-public static function openStream($stream, ?ZipHandler $zipHandler = null, ?XmlParser $xmlParser = null): EpubFile
+public static function openString(string $data, ?ZipHandler $zipHandler = null, ?XmlParser $xmlParser = null, ?Limits $limits = null): EpubFile
+public static function openStream($stream, ?ZipHandler $zipHandler = null, ?XmlParser $xmlParser = null, ?Limits $limits = null): EpubFile
 ```
 
 Open a book held in a string (an upload, an HTTP response) or read from a stream (from its current position to the end; the stream is not rewound and stays open). `ZipArchive` needs a real file, so the data is buffered in a private temporary directory (random name, mode `0700`) that is deleted again, also on failure. The same ZIP size, entry and compression-ratio limits apply as for files, and a book that is not a valid EPUB throws as it would from `open()`.
@@ -126,10 +127,12 @@ $epubFile->save();
 ### Validating
 
 ```php
-public function validate(): array
+public function validate(?ValidationProfile $profile = null): array
 ```
 
-Checks the book, including unsaved changes, and returns a list of `PhpEpub\ValidationIssue` objects (`severity`, `code`, `message`, `location`); an empty list means no problem was found. It is a quick check before publishing, not a replacement for [EPUBCheck](https://www.w3.org/publishing/epubcheck/).
+Checks the book, including unsaved changes, and returns a list of `PhpEpub\ValidationIssue` objects (`severity`, `code`, `message`, `location`, and a `fix` hint for some; `ValidationProfile::kindle()` adds [Kindle checks](kindle.md), and [`repair()`](repair.md) fixes many problems); an empty list means no problem was found. It is a quick check before publishing, not a replacement for [EPUBCheck](https://www.w3.org/publishing/epubcheck/).
+
+*Upgrade note:* `validate()` gained an optional `?ValidationProfile` parameter and `Manifest::guessMediaType()` became public; a subclass overriding either must match.
 
 | Code | Severity | Problem |
 |---|---|---|
@@ -229,6 +232,44 @@ public function getText(bool $linearOnly = true): array
 
 Returns `path => text` for the XHTML and HTML documents of the reading order, in order, as `ContentManager::getText()` reads them. Auxiliary content (`linear="no"`) is skipped unless `$linearOnly` is `false`; spine items that are not XHTML or HTML, or whose file is missing, are skipped.
 
+### Book Summary
+
+```php
+public function toArray(): array
+```
+
+Describes the whole book in one JSON-ready array, for a web page or an API, instead of calling the getters one by one. It includes unsaved edits, never returns image bytes, and does not throw for a book without a cover, table of contents or EPUB 3 features (those parts are `null` or empty). It holds only strings, ints, bools, nulls and arrays, so `json_encode()` accepts it; dates are the ISO 8601 (W3CDTF) strings written in the book. The exact shape is the `SummaryShape` type of `BookSummary`.
+
+```php
+use PhpEpub\EpubFile;
+
+$epubFile = EpubFile::open('/path/to/your.epub');
+$summary = $epubFile->toArray();
+
+echo json_encode($summary, JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT);
+
+$titles = $summary['metadata']['titles'];
+$author = $summary['metadata']['creators'][0] ?? null; // ['name' => 'Jane Doe', 'role' => 'aut', 'fileAs' => 'Doe, Jane']
+$cover = $summary['cover'];                            // ['path' => 'EPUB/cover.jpg', 'mediaType' => 'image/jpeg', 'bytes' => 20480] or null
+$chapters = $summary['toc']['entries'];                // nodes with title, path, fragment and children
+$first = $summary['spine'][0] ?? null;                 // ['idref' => 'ch1', 'path' => 'EPUB/ch1.xhtml', 'linear' => true, 'title' => 'Chapter 1', 'bytes' => 1234]
+$words = $summary['stats']['wordCount'];
+$minutes = $summary['stats']['readingMinutes'];        // at 230 words per minute, rounded up
+$protected = $summary['drm']['isDrmProtected'];
+```
+
+| Key | Content |
+|---|---|
+| `version` | The package version, e.g. `"3.0"`. |
+| `metadata` | `titles`, `creators` and `contributors` (`name`, `role`, `fileAs`), `subjects`, `description`, `publisher`, `languages`, `rights`, `dates` (`published`, `modified`, `events`), `identifiers` (`all` with `value` and `scheme`, `unique`, `isbn`), `series` (`name`, `index`), `accessibility` and `rendition` (`layout`, `orientation`, `spread`, `flow`, `pageProgressionDirection`). |
+| `cover` | `path`, `mediaType` and `bytes` of the cover image, or `null`. |
+| `toc` | `entries` (a tree: every node has `title`, `path`, `fragment` and `children`, a list of nodes of the same shape), `landmarks` and `pageListCount`. |
+| `spine` | The reading order: `idref`, `path`, `linear`, `title` (of the first table of contents entry that targets the file, else `null`) and `bytes`. |
+| `stats` | `groups` (`count` and `bytes` of the manifest items of `xhtml`, `css`, `images`, `fonts`, `media` (audio and video) and `other`), `totalBytes` (everything in the extracted book), `wordCount` and `readingMinutes`. |
+| `drm` | `isDrmProtected` and `encryptedPathCount`. |
+
+Words are counted per run of letters and digits (an apostrophe or hyphen between letters keeps a word together). Chinese and Japanese are written without spaces, so each Han, Hiragana and Katakana character counts as one word. The reading time is an estimate. Encrypted documents of a DRM-protected book are not counted.
+
 ### Converting
 
 ```php
@@ -240,8 +281,11 @@ Writes pending changes to the extracted book and converts it with the given adap
 ### Cleanup
 
 ```php
+public function close(): void
 public function cleanup(): void
 ```
+
+`close()` is `cleanup()` under the name a long-running service would look for: call it in a `finally` block when you are done with a book. Both are idempotent (a second call does nothing), and neither leaks: a `load()`, `open()` or `create()` that fails removes the temporary directory it made.
 
 Manually cleans up the temporary directory. Called automatically by `__destruct()`, but can be called explicitly to release resources earlier. Throws an `Exception` when the extracted files cannot all be deleted (e.g. a file still open on Windows); the path is kept so `cleanup()` can be retried, and the destructor ignores such failures. Afterwards the book is unloaded: `getMetadata()`, `getSpine()`, `getManifest()` and `getContentManager()` throw until `load()` is called again. A `load()` that fails also cleans up, so it never leaves a half-loaded book or its extracted files behind.
 
@@ -252,6 +296,12 @@ public function getTempDir(): ?string
 ```
 
 Returns the path to the temporary directory where EPUB contents are extracted. Returns null before `load()` is called.
+
+```php
+public function getXmlParser(): XmlParser
+```
+
+Returns the parser the book's XML documents are read with, bounded by the `Limits` the book was opened with. `Cleanup`, `ReferenceGraph::forBook()`, `Merger` and `Splitter` use it by default, so cleaning up, merging or splitting an untrusted book keeps the same per-document cap.
 
 ## Usage Example
 
