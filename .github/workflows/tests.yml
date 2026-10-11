@@ -54,25 +54,16 @@ jobs:
           run: |
             echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
 
+        # One small download cache per OS, shared by every PHP version. No lock file is committed
+        # and "composer update" runs below, so caching vendor/ or keying on **/composer.lock (which
+        # also matches vendor/**/composer.lock) only produced a new ~100-800 MB cache on every run.
         - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
           id: actions-cache
           with:
             path: ${{ steps.composer-cache.outputs.dir }}
-            key: ${{ runner.os }}-composer-${{ matrix.php-version }}-${{ hashFiles('**/composer.lock') }}
+            key: ${{ runner.os }}-composer-${{ hashFiles('composer.json') }}
             restore-keys: |
-              ${{ runner.os }}-composer-${{ matrix.php-version }}-
-
-        - name: Cache PHP dependencies
-          uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-          id: vendor-cache
-          with:
-            path: |
-              vendor
-              .phpcs-cache
-              .phpunit.result.cache
-              .rector.cache
-              .phpstan.cache
-            key: ${{ runner.os }}-build-${{ matrix.php-version }}-${{ hashFiles('**/composer.lock') }}
+              ${{ runner.os }}-composer-
 
         - name: Validate composer.json
           run: composer validate --strict
