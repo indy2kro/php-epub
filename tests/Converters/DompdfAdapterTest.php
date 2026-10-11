@@ -8,6 +8,8 @@ use Dompdf\Dompdf;
 use Iterator;
 use PhpEpub\ConversionException;
 use PhpEpub\Converters\DompdfAdapter;
+use PhpEpub\Converters\EpubDocumentLoader;
+use PhpEpub\Converters\PdfConversionOptions;
 use PhpEpub\Exception;
 use PhpEpub\Test\Support\EpubBuilder;
 use PhpEpub\Test\Support\ExposedDompdfAdapter;
@@ -116,6 +118,52 @@ final class DompdfAdapterTest extends TestCase
         }
     }
 
+    public function testChapterAnchorsDrawNothingInACorePdfFontAndStillResolve(): void
+    {
+        $directory = EpubBuilder::epub3()
+            ->withFile('EPUB/text/chapter.xhtml', EpubBuilder::xhtml('Chapter', '<h1 id="top">Chapter</h1><p>Text <a href="#top">Up</a></p>', '../css/style.css'))
+            ->withFile('EPUB/css/style.css', 'body { font-family: serif; }')
+            ->writeTo($this->epubDirectory . '-core-font');
+
+        try {
+            $options = new PdfConversionOptions(includeToc: true);
+            $html = (new DompdfAdapter([], new EpubDocumentLoader(), $options))->buildHtml($directory);
+            $dompdf = (new ExposedDompdfAdapter([], new EpubDocumentLoader(), $options))->createDompdfFor($directory);
+            $dompdf->loadHtml($html);
+            $dompdf->render();
+            $pdf = (string) $dompdf->output(['compress' => 0]);
+
+            $this->assertStringNotContainsString("\u{200B}", $html);
+            $this->assertStringContainsString('<a id="epub-c0" style="display: inline-block; width: 0; height: 0;"></a>', $html);
+            // The zero-width space of the anchors was drawn as "?" in Times, which has no glyph for it.
+            $this->assertStringNotContainsString('(?)', $pdf);
+            // The contents page entry and the link in the chapter: each link annotation jumps to a destination.
+            $links = substr_count($pdf, '/Subtype /Link');
+            $this->assertSame(2, $links);
+            $this->assertSame($links, substr_count($pdf, '/S /GoTo'));
+        } finally {
+            $this->fileSystemHelper->deleteDirectory($directory);
+        }
+    }
+
+    public function testLinksWithAScriptSchemeAreNotWrittenAsPdfActions(): void
+    {
+        $directory = EpubBuilder::minimal()
+            ->withFile('EPUB/chapter.xhtml', '<html><body><p><a href="javascript:alert(1)">Script</a> <a href="JaVa&#9;ScRiPt:alert(2)">Mixed</a> '
+                . '<a href="data:text/html,x">Data</a> <a href="https://example.com/ok">Web</a></p></body></html>')
+            ->writeTo($this->epubDirectory . '-script-links');
+
+        try {
+            (new DompdfAdapter())->convert($directory, $this->outputPdfPath);
+            $pdf = (string) file_get_contents($this->outputPdfPath);
+
+            $this->assertStringContainsString('/URI (https://example.com/ok)', $pdf);
+            $this->assertSame(1, substr_count($pdf, '/URI ('));
+            $this->assertStringNotContainsString('javascript', strtolower($pdf));
+        } finally {
+            $this->fileSystemHelper->deleteDirectory($directory);
+        }
+    }
     public function testACoverOutsideTheSpineBecomesTheFirstPage(): void
     {
         $directory = TCPDFAdapterTest::coverBook()->writeTo($this->epubDirectory . '-cover');
