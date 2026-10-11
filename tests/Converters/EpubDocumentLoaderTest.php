@@ -317,6 +317,56 @@ final class EpubDocumentLoaderTest extends TestCase
         $this->assertSame(2, substr_count($chapters[0], 'epub-c0-n_c3_b6te_201'));
     }
 
+    #[DataProvider('unsafeLinks')]
+    public function testLinksWithSchemesOtherThanHttpHttpsAndMailtoLoseTheirHref(string $href): void
+    {
+        $directory = EpubBuilder::minimal()
+            ->withFile('EPUB/chapter.xhtml', '<html><body><p><a href="' . $href . '">Link text</a><area href="' . $href . '"/></p></body></html>')
+            ->writeTo($this->tmpDir . '/book');
+
+        $chapter = (new EpubDocumentLoader())->load($directory)->chapters[0];
+
+        $this->assertStringContainsString('Link text', $chapter);
+        // A control character the HTML parser drops can leave an empty href behind; no value may survive.
+        $this->assertDoesNotMatchRegularExpression('/href="[^"]/', $chapter);
+        $this->assertStringNotContainsString('alert', $chapter);
+    }
+
+    /**
+     * @return Iterator<string, array{string}>
+     */
+    public static function unsafeLinks(): Iterator
+    {
+        yield 'plain' => ['javascript:alert(1)'];
+        yield 'mixed case' => ['JaVaScRiPt:alert(1)'];
+        yield 'tab inside' => ['JaVa&#9;ScRiPt:alert(1)'];
+        yield 'newline inside' => ['java&#10;script:alert(1)'];
+        yield 'leading whitespace' => ['&#32; &#13;javascript:alert(1)'];
+        yield 'control character' => ['&#1;javascript:alert(1)'];
+        yield 'entity encoded letters' => ['&#106;&#97;vascript&#58;alert(1)'];
+        yield 'vbscript' => ['vbscript:msgbox(1)'];
+        yield 'data' => ['data:text/html,alert(1)'];
+        yield 'file' => ['file:///etc/alert'];
+    }
+
+    public function testSafeLinkSchemesAndRelativeTargetsKeepTheirHref(): void
+    {
+        $directory = self::twoChapterBook()
+            ->withFile('EPUB/chapter.xhtml', '<html><body><a href="https://example.com/">Web</a><a href="HTTP://example.com/">Upper</a>'
+                . '<a href="mailto:a@example.com">Mail</a><a href="#top">Fragment</a><a href="text/two.xhtml#sec">Chapter</a>'
+                . '<a href="notes.xhtml">Relative</a></body></html>')
+            ->withFile('EPUB/text/two.xhtml', '<html><body><h2 id="sec">Section</h2></body></html>')
+            ->writeTo($this->tmpDir . '/book');
+
+        $chapter = (new EpubDocumentLoader())->load($directory)->chapters[1];
+
+        $this->assertStringContainsString('href="https://example.com/"', $chapter);
+        $this->assertStringContainsString('href="HTTP://example.com/"', $chapter);
+        $this->assertStringContainsString('href="mailto:a@example.com"', $chapter);
+        $this->assertStringContainsString('href="#epub-c1-top"', $chapter);
+        $this->assertStringContainsString('href="#epub-c0-sec"', $chapter);
+        $this->assertStringContainsString('href="notes.xhtml"', $chapter);
+    }
     #[DataProvider('covers')]
     public function testOffersACoverImageThatNoChapterShows(string $manifestItem, string $metadata, string $chapter, bool $offered): void
     {

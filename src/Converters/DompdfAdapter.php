@@ -210,7 +210,21 @@ class DompdfAdapter implements ConverterInterface
             $front[] = '<div>' . $document->contents . '</div>';
         }
 
-        return [...$front, ...$document->chapters];
+        return [...$front, ...array_map(self::invisibleAnchors(...), $document->chapters)];
+    }
+
+    /**
+     * The loader's link targets hold a zero-width space because Dompdf drops the destination of an empty anchor, but the
+     * core PDF fonts (Times, Helvetica, Courier) have no glyph for it and Dompdf prints a "?". A zero-size inline-block
+     * anchor is kept as a destination and draws nothing in any font.
+     */
+    private static function invisibleAnchors(string $chapter): string
+    {
+        return (string) preg_replace(
+            '/(<a id="epub-c[^"]*")>\x{200B}<\/a>/u',
+            '$1 style="display: inline-block; width: 0; height: 0;"></a>',
+            $chapter
+        );
     }
 
     /**

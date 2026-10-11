@@ -23,6 +23,7 @@ use PhpEpub\Spine;
 use PhpEpub\TableOfContents;
 use PhpEpub\TocEntry;
 use PhpEpub\Util\FileSystemHelper;
+use PhpEpub\Util\HtmlSanitizer;
 use PhpEpub\Util\PathResolver;
 use PhpEpub\Util\TextEncoding;
 use PhpEpub\XmlException;
@@ -604,6 +605,12 @@ final class EpubDocumentLoader
             }
 
             if (in_array($tag, ['a', 'area'], true) && $element->hasAttribute('href')) {
+                if (self::hasUnsafeScheme($element->getAttribute('href'))) {
+                    $element->removeAttribute('href');
+
+                    continue;
+                }
+
                 $target = $this->internalTarget($element->getAttribute('href'), $directory, $index, $chapterIndexes);
                 if ($target !== null) {
                     $element->setAttribute('href', $target);
@@ -614,6 +621,17 @@ final class EpubDocumentLoader
         $body->insertBefore($this->anchor($document, self::anchorId($index)), $body->firstChild);
     }
 
+    /**
+     * Whether a link has a URL scheme other than http, https or mailto (javascript:, data:, vbscript:, file:, ...).
+     * Whitespace and control characters are ignored when reading the scheme, as browsers do, so "Java<TAB>Script:" counts.
+     * Links without a scheme (fragments, paths) are not affected.
+     */
+    private static function hasUnsafeScheme(string $href): bool
+    {
+        $compact = (string) preg_replace('/[\x00-\x20\x7f]+/', '', $href);
+
+        return preg_match('/^[a-z][a-z0-9+.-]*:/i', $compact) === 1 && ! HtmlSanitizer::isSafeLink($compact);
+    }
     /**
      * An empty-looking link target: a zero-width space, since Dompdf ignores empty anchors.
      */
