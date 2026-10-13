@@ -71,6 +71,8 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../kindle/">Checking for Kindle</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../cli/">Command Line</a>
+                  </li>
               </ul>
               <ul>
                 <li class="toctree-l1"><a class="reference internal" href="../architecture/">Architecture</a>
@@ -237,8 +239,8 @@ foreach ($epubFile-&gt;getText() as $path =&gt; $text) {   // the whole book, in
 </code></pre>
 
 <ul>
-<li><code>ContentManager::getText($path)</code> returns the text of one XHTML or HTML document: one line per paragraph, heading, list item, table row and <code>&lt;br&gt;</code>, white space collapsed, entities decoded, with scripts, styles and the document head left out. The document is read in its declared encoding (UTF-8 or UTF-16, as for conversion) and does not have to be well-formed. It throws an <code>Exception</code> if the file cannot be read.</li>
-<li><code>EpubFile::getText(bool $linearOnly = true)</code> returns <code>path =&gt; text</code> for the XHTML and HTML documents of the spine, in reading order. Auxiliary content (<code>linear="no"</code>, such as notes) is skipped unless <code>$linearOnly</code> is <code>false</code>; spine items that are not XHTML or HTML, or whose file is missing, are skipped.</li>
+<li><code>ContentManager::getText($path)</code> returns the text of one XHTML or HTML document: one line per paragraph, heading, list item, table row and <code>&lt;br&gt;</code>, white space collapsed, entities decoded, with scripts, styles and the document head left out. The document is read in its declared encoding (UTF-8 or UTF-16, as for conversion) and does not have to be well-formed. It throws an <code>Exception</code> if the file cannot be read or is encrypted (DRM).</li>
+<li><code>EpubFile::getText(bool $linearOnly = true)</code> returns <code>path =&gt; text</code> for the XHTML and HTML documents of the spine, in reading order. Auxiliary content (<code>linear="no"</code>, such as notes) is skipped unless <code>$linearOnly</code> is <code>false</code>; spine items that are not XHTML or HTML, whose file is missing, or that are encrypted (DRM) are skipped. <code>EpubReader::getText()</code> skips the same.</li>
 </ul>
               
             </div>

@@ -59,6 +59,8 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../kindle/">Checking for Kindle</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../cli/">Command Line</a>
+                  </li>
               </ul>
               <ul>
                 <li class="toctree-l1"><a class="reference internal" href="../architecture/">Architecture</a>
@@ -159,7 +161,7 @@
 <p><strong><code>add(string $path, ?string $mediaType = null, ?string $id = null): ManifestItem</code></strong>: Adds a file. The media type is guessed from the extension (XHTML, CSS, JavaScript, NCX, SMIL, PLS, XML, JSON, text, WebVTT, the common image, font, audio and video formats; <code>application/octet-stream</code> otherwise) and the id is derived from the file name when not given. Throws if the path is already listed, the id is already used anywhere in the package, or the media type or id is not valid UTF-8 XML text.</p>
 </li>
 <li>
-<p><strong><code>remove(string $id): void</code></strong>: Removes an item and the package references to it (EPUB 2 cover meta, refinements, <code>spine@toc</code>, <code>fallback</code>/<code>media-overlay</code> of other items, <code>&lt;guide&gt;</code> references to its file). Spine entries are not touched; use <code>Spine::remove()</code> (or <code>ContentManager::deleteContent()</code>, which does both).</p>
+<p><strong><code>remove(string $id): void</code></strong>: Removes an item and the package references to it (EPUB 2 cover meta, refinements, <code>spine@toc</code>, <code>fallback</code>/<code>media-overlay</code> of other items, <code>&lt;guide&gt;</code> references to its file). Throws while the item is in the spine (its itemref would point at nothing): remove it with <code>Spine::remove()</code> first, or use <code>ContentManager::deleteContent()</code>, which does both.</p>
 </li>
 <li>
 <p><strong><code>pathToHref(string $path): string</code></strong> and <strong><code>hrefToPath(string $href): string</code></strong>: Convert between the two forms.</p>
@@ -193,6 +195,18 @@
 </li>
 <li>
 <p><strong><code>getOpfPath(): string</code></strong>: The OPF location relative to the book root.</p>
+</li>
+<li>
+<p><strong><code>addMany(array $specs): array</code></strong>: Adds many items at once (each spec has an <code>id</code> and a <code>path</code> or a remote <code>url</code>, optionally <code>mediaType</code> and <code>properties</code>); <code>add()</code> rewrites the manifest every time, which is slow for thousands of items. Returns the added <code>ManifestItem</code>s. Throws if a path is already listed, an id is taken, a spec has neither a path nor a url, or a value is not valid XML text; items before the failing one stay added.</p>
+</li>
+<li>
+<p><strong><code>getFallback(string $id): ?string</code></strong> and <strong><code>setFallback(string $id, ?string $fallbackId): void</code></strong>: The id of the fallback item (the item a reading system uses when it cannot render this one), or <code>null</code>; setting <code>null</code> removes it. Setting throws if an item is unknown.</p>
+</li>
+<li>
+<p><strong><code>getPackageReferences(): array</code></strong>: The files (paths relative to the book root) the package document refers to besides the manifest items: the spine's toc and page-map items, the handlers of <code>&lt;bindings&gt;</code>, and the <code>href</code> of <code>&lt;link&gt;</code> and other elements (<code>&lt;guide&gt;</code> references, collections). The paths are not checked against the manifest.</p>
+</li>
+<li>
+<p><strong><code>renameDuplicateIds(): array</code></strong>: Gives every item whose id is already used by an earlier item a new, unique id (<code>id-2</code>, <code>id-3</code>, ...); the first item keeps its id. Returns <code>[old id, new id, path]</code> for each renamed item.</p>
 </li>
 </ul>
 <p>Lookups (<code>get()</code>, <code>findByPath()</code>, <code>getItems()</code>) use an index built on first use, so adding thousands of files to a large book stays fast.</p>

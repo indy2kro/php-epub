@@ -59,6 +59,8 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../kindle/">Checking for Kindle</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../cli/">Command Line</a>
+                  </li>
               </ul>
               <ul>
                 <li class="toctree-l1"><a class="reference internal" href="../architecture/">Architecture</a>
@@ -73,6 +75,8 @@
     <li class="toctree-l2"><a class="reference internal" href="#key-methods">Key Methods</a>
         <ul>
     <li class="toctree-l3"><a class="reference internal" href="#constructor">Constructor</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#expanded-unzipped-books">Expanded (unzipped) books</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#loading-and-saving">Loading and Saving</a>
     </li>
@@ -203,7 +207,24 @@ public static function openStream($stream, ?ZipHandler $zipHandler = null, ?XmlP
 </code></pre>
 
 <p>Open a book held in a string (an upload, an HTTP response) or read from a stream (from its current position to the end; the stream is not rewound and stays open). <code>ZipArchive</code> needs a real file, so the data is buffered in a private temporary directory (random name, mode <code>0700</code>) that is deleted again, also on failure. The same ZIP size, entry and compression-ratio limits apply as for files, and a book that is not a valid EPUB throws as it would from <code>open()</code>.</p>
-<p>Such a book has no file: <code>save()</code> without a path throws an exception (pass a path, or use <code>saveToString()</code> / <code>saveToStream()</code>), and <code>load()</code> throws as well, because there is nothing to reload from; open the data again instead.</p>
+<p>Such a book has no file: <code>save()</code> without a path throws an exception (pass a path, or use <code>saveToString()</code> / <code>saveToStream()</code>; <code>compress()</code> without a path does the same, before it changes the book), and <code>load()</code> throws as well, because there is nothing to reload from; open the data again instead.</p>
+<h3 id="expanded-unzipped-books">Expanded (unzipped) books<a class="headerlink" href="#expanded-unzipped-books" title="Permanent link">&para;</a></h3>
+<pre class="codehilite"><code class="language-php">public static function openDirectory(string $directory, ?ZipHandler $zipHandler = null, ?XmlParser $xmlParser = null, ?Limits $limits = null): EpubFile
+public function saveToDirectory(string $directory): void
+</code></pre>
+
+<p><code>openDirectory()</code> opens a book that is a directory (<code>mimetype</code>, <code>META-INF/container.xml</code>, ...), as publishing workflows and EPUBCheck's expanded mode use. The files are copied into the private extraction, so the directory is never changed, and the copy is bound by the same entry-count and total-size limits as an archive (<code>ZipHandler::import()</code>); a symbolic link in the directory is refused with a <code>ZipException</code>. Like a book from <code>openString()</code>, it has no file: <code>save()</code> needs a path and <code>load()</code> throws.</p>
+<p><code>saveToDirectory()</code> writes the book (with its pending changes and an exact <code>mimetype</code> file) as an expanded directory. The directory is created when missing; an existing one must be empty, otherwise an exception is thrown and nothing is written.</p>
+<pre class="codehilite"><code class="language-php">use PhpEpub\EpubFile;
+use PhpEpub\Limits;
+
+$epubFile = EpubFile::openDirectory('/path/to/expanded-book', limits: Limits::web());
+$epubFile-&gt;getMetadata()-&gt;setTitle('Edited');
+$epubFile-&gt;saveToDirectory('/path/to/edited-book');
+$epubFile-&gt;save('/path/to/edited.epub');
+$epubFile-&gt;close();
+</code></pre>
+
 <h3 id="loading-and-saving">Loading and Saving<a class="headerlink" href="#loading-and-saving" title="Permanent link">&para;</a></h3>
 <pre class="codehilite"><code class="language-php">public function load(): void
 </code></pre>
@@ -218,7 +239,7 @@ public static function openStream($stream, ?ZipHandler $zipHandler = null, ?XmlP
 <pre class="codehilite"><code class="language-php">public function save(?string $filePath = null): void
 </code></pre>
 
-<p>Saves the modified EPUB back to disk. If <code>$filePath</code> is null, overwrites the original file. Pending metadata, manifest and spine changes are written to the OPF first. Throws an exception if called before <code>load()</code>, or, for a book opened with <code>openString()</code> / <code>openStream()</code>, when <code>$filePath</code> is null.</p>
+<p>Saves the modified EPUB back to disk. If <code>$filePath</code> is null, overwrites the original file. Pending metadata, manifest and spine changes are written to the OPF first. Throws an exception if called before <code>load()</code>, or, for a book opened with <code>openString()</code> / <code>openStream()</code>, when <code>$filePath</code> is null, and when <code>$filePath</code> is an empty string.</p>
 <pre class="codehilite"><code class="language-php">public function saveToString(): string
 public function saveToStream($stream): void
 </code></pre>
@@ -228,6 +249,16 @@ public function saveToStream($stream): void
 $epubFile-&gt;getMetadata()-&gt;setTitle('Edited');
 header('Content-Type: application/epub+zip');
 $epubFile-&gt;saveToStream(fopen('php://output', 'wb'));
+</code></pre>
+
+<pre class="codehilite"><code class="language-php">public function copy(?XmlParser $xmlParser = null): self
+</code></pre>
+
+<p>Makes an independent copy of the loaded book, including unsaved changes, by copying the extracted files (cheaper than <code>saveToString()</code> followed by <code>openString()</code>, which packs and unpacks the whole book). The copy has the same limits and <code>ZipHandler</code>, no file of its own (like a book from <code>openString()</code>) and its own extraction, so call <code>cleanup()</code> on it when you are done; changing it leaves the original alone. Throws an exception if the book is not loaded.</p>
+<pre class="codehilite"><code class="language-php">$copy = $epubFile-&gt;copy();
+$copy-&gt;getMetadata()-&gt;setTitle('A variant');
+$copy-&gt;save('/path/to/variant.epub');
+$copy-&gt;cleanup();
 </code></pre>
 
 <h3 id="accessing-components">Accessing Components<a class="headerlink" href="#accessing-components" title="Permanent link">&para;</a></h3>
@@ -298,6 +329,16 @@ $epubFile-&gt;save();
 <td>An EPUB 3 package has no <code>dcterms:modified</code></td>
 </tr>
 <tr>
+<td><code>METADATA_MODIFIED_INVALID</code></td>
+<td>error</td>
+<td><code>dcterms:modified</code> is not of the form <code>CCYY-MM-DDThh:mm:ssZ</code> (UTC, no fractions)</td>
+</tr>
+<tr>
+<td><code>OPF_PREFIX_UNDECLARED</code></td>
+<td>error</td>
+<td>A property (<code>meta@property</code>, <code>properties</code>, <code>link@rel</code>, <code>meta@scheme</code>) uses a prefix that is neither reserved (<code>dcterms</code>, <code>marc</code>, <code>media</code>, <code>onix</code>, <code>rendition</code>, <code>schema</code>, <code>xsd</code>, <code>a11y</code>) nor declared in <code>package@prefix</code></td>
+</tr>
+<tr>
 <td><code>METADATA_LANGUAGE_INVALID</code></td>
 <td>error</td>
 <td>A <code>dc:language</code> is not a well-formed BCP 47 tag (e.g. <code>English</code>)</td>
@@ -343,6 +384,11 @@ $epubFile-&gt;save();
 <td>The book is DRM-protected (see <a href="#drm-protected-books">DRM-protected books</a>). This is the only issue reported for its encrypted resources: they are not checked for well-formedness, media type or manifest properties</td>
 </tr>
 <tr>
+<td><code>ENCRYPTION_ENTRY_MISSING</code></td>
+<td>error</td>
+<td><code>META-INF/encryption.xml</code> lists a resource (an obfuscated font) that is not in the book; not reported for a DRM-protected book</td>
+</tr>
+<tr>
 <td><code>CONTENT_NOT_WELL_FORMED</code></td>
 <td>error</td>
 <td>An XHTML content document is not well-formed XML</td>
@@ -370,12 +416,22 @@ $epubFile-&gt;save();
 <tr>
 <td><code>CONTENT_REFERENCE_MISSING</code>, <code>CONTENT_REFERENCE_NOT_IN_MANIFEST</code></td>
 <td>error</td>
-<td>A content document refers (<code>src</code>, <code>href</code>, <code>data</code>, <code>poster</code>) to a local file that is missing or outside the book, or that is not in the manifest; remote URLs, <code>data:</code> URIs and links within the document are not checked</td>
+<td>A content document refers (<code>src</code>, <code>href</code>, <code>data</code>, <code>poster</code>) to a local file that is missing or outside the book, or that is not in the manifest; remote URLs and <code>data:</code> URIs are not checked</td>
+</tr>
+<tr>
+<td><code>CONTENT_FRAGMENT_MISSING</code></td>
+<td>error</td>
+<td>A link (<code>a</code>, <code>area</code>, SVG <code>use</code> or <code>image</code>) names a <code>#fragment</code> that is not an element id of its target XHTML or SVG document, or of the document itself (<code>#top</code> and <code>#epubcfi(…)</code> are not judged)</td>
 </tr>
 <tr>
 <td><code>NAV_MISSING</code> / <code>NCX_MISSING</code></td>
 <td>error</td>
 <td>An EPUB 3 book has no navigation document / an EPUB 2 book has no NCX</td>
+</tr>
+<tr>
+<td><code>NCX_UID_MISMATCH</code></td>
+<td>error</td>
+<td>The NCX <code>dtb:uid</code> differs from the package's unique identifier (<code>save()</code> corrects it)</td>
 </tr>
 <tr>
 <td><code>NAV_INVALID</code> / <code>NCX_INVALID</code></td>
@@ -397,6 +453,16 @@ $epubFile-&gt;save();
 <td>warning</td>
 <td>An EPUB 3 book has no <code>schema:accessMode</code>, <code>schema:accessibilityFeature</code>, <code>schema:accessibilityHazard</code> or <code>schema:accessibilitySummary</code> metadata (see <a href="../metadata/#accessibility">accessibility metadata</a>); a new book from <code>create()</code> starts without them</td>
 </tr>
+<tr>
+<td><code>ACCESSIBILITY_LANG_MISSING</code>, <code>ACCESSIBILITY_IMAGE_ALT_MISSING</code>, <code>ACCESSIBILITY_HEADING_SKIPPED</code>, <code>ACCESSIBILITY_TABLE_HEADERS_MISSING</code></td>
+<td>warning</td>
+<td>An EPUB 3 XHTML document has no <code>lang</code>/<code>xml:lang</code> on <code>html</code>, has <code>img</code> elements without <code>alt</code> (<code>alt=""</code> marks a decorative image), skips a heading level (<code>h1</code> then <code>h3</code>) or has data tables without <code>th</code> cells (<code>role="presentation"</code> marks a layout table). Reported once per document, with a count</td>
+</tr>
+<tr>
+<td><code>ACCESSIBILITY_PAGE_LIST_MISSING</code></td>
+<td>warning</td>
+<td>An EPUB 3 book with a print source (<code>dc:source</code>, or the <code>printPageNumbers</code>/<code>pageBreakMarkers</code> features) has no <code>page-list</code> nav or NCX <code>pageList</code></td>
+</tr>
 </tbody>
 </table>
 <pre class="codehilite"><code class="language-php">foreach ($epubFile-&gt;validate() as $issue) {
@@ -410,7 +476,7 @@ public function getEncryptedPaths(): array
 </code></pre>
 
 <p>A book is DRM-protected when <code>META-INF/encryption.xml</code> lists a resource encrypted with an algorithm that is not a font obfuscation (the IDPF and Adobe font obfuscations are not DRM), or when the book has <code>META-INF/rights.xml</code> (Adobe ADEPT) or <code>META-INF/license.lcpl</code> (Readium LCP). <code>getEncryptedPaths()</code> returns the sorted, book-relative paths of the encrypted resources (empty when only <code>rights.xml</code> or <code>license.lcpl</code> marks the book). Both methods throw an <code>Exception</code> before <code>load()</code>.</p>
-<p>The library only detects DRM; it never decrypts. Such a book still opens, and its package (metadata, manifest, spine) can be read, but <code>getContent()</code> returns ciphertext for the encrypted files. <code>validate()</code> reports one <code>CONTENT_ENCRYPTED</code> error instead of an error per encrypted document, and <code>convert()</code> (and <code>TCPDFAdapter</code>, <code>DompdfAdapter</code> called on a directory) throws a <code>ConversionException</code> saying the book is DRM-protected. A damaged <code>encryption.xml</code> never stops a book from loading; it counts as listing nothing.</p>
+<p>The library only detects DRM; it never decrypts. Such a book still opens, and its package (metadata, manifest, spine) can be read, but <code>getContent()</code> returns ciphertext for the encrypted files. <code>validate()</code> reports one <code>CONTENT_ENCRYPTED</code> error instead of an error per encrypted document, and <code>convert()</code> (and <code>TCPDFAdapter</code>, <code>DompdfAdapter</code> called on a directory) throws a <code>ConversionException</code> saying the book is DRM-protected. A damaged <code>encryption.xml</code> (malformed, with an entity declaration, or larger than <code>Limits::$maxXmlBytes</code>) never stops a book from loading, but what it lists is unknown, so the book counts as possibly DRM-protected: <code>isDrmProtected()</code> returns true, <code>validate()</code> reports a <code>CONTENT_ENCRYPTED</code> error naming the file, and <code>convert()</code>, merging, splitting and cleanup refuse it.</p>
 <pre class="codehilite"><code class="language-php">$epubFile = EpubFile::open('/path/to/book.epub');
 
 if ($epubFile-&gt;isDrmProtected()) {
@@ -446,7 +512,7 @@ if ($epubFile-&gt;isDrmProtected()) {
 <pre class="codehilite"><code class="language-php">public function getText(bool $linearOnly = true): array
 </code></pre>
 
-<p>Returns <code>path =&gt; text</code> for the XHTML and HTML documents of the reading order, in order, as <code>ContentManager::getText()</code> reads them. Auxiliary content (<code>linear="no"</code>) is skipped unless <code>$linearOnly</code> is <code>false</code>; spine items that are not XHTML or HTML, or whose file is missing, are skipped.</p>
+<p>Returns <code>path =&gt; text</code> for the XHTML and HTML documents of the reading order, in order, as <code>ContentManager::getText()</code> reads them. Auxiliary content (<code>linear="no"</code>) is skipped unless <code>$linearOnly</code> is <code>false</code>; spine items that are not XHTML or HTML, whose file is missing, or that are encrypted (DRM: their text would be ciphertext, see <code>getEncryptedPaths()</code>) are skipped.</p>
 <h3 id="book-summary">Book Summary<a class="headerlink" href="#book-summary" title="Permanent link">&para;</a></h3>
 <pre class="codehilite"><code class="language-php">public function toArray(): array
 </code></pre>

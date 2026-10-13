@@ -65,6 +65,8 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../kindle/">Checking for Kindle</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../cli/">Command Line</a>
+                  </li>
               </ul>
               <ul>
                 <li class="toctree-l1"><a class="reference internal" href="../architecture/">Architecture</a>
@@ -167,8 +169,8 @@ $epubFile-&gt;save('/path/to/repaired.epub');
 <tbody>
 <tr>
 <td><code>ModifiedDate</code></td>
-<td><code>METADATA_MODIFIED_MISSING</code></td>
-<td>Sets <code>dcterms:modified</code> to the current time (UTC)</td>
+<td><code>METADATA_MODIFIED_MISSING</code>, <code>METADATA_MODIFIED_INVALID</code></td>
+<td>Sets <code>dcterms:modified</code> to the current time (UTC), also to replace a value that is not <code>CCYY-MM-DDThh:mm:ssZ</code></td>
 </tr>
 <tr>
 <td><code>Language</code></td>
@@ -224,6 +226,21 @@ $epubFile-&gt;save('/path/to/repaired.epub');
 <td><code>ManifestProperties</code></td>
 <td><code>MANIFEST_PROPERTY_MISSING</code>, <code>MANIFEST_PROPERTY_UNNEEDED</code></td>
 <td>Recomputes the <code>scripted</code>, <code>svg</code>, <code>remote-resources</code> and <code>mathml</code> properties of the XHTML documents</td>
+</tr>
+<tr>
+<td><code>EncryptionEntries</code></td>
+<td><code>ENCRYPTION_ENTRY_MISSING</code></td>
+<td>Drops the <code>META-INF/encryption.xml</code> entries (font obfuscation) of files that are not in the book. A DRM-protected book and an entry that points outside the book are left alone</td>
+</tr>
+<tr>
+<td><code>FragmentLinks</code></td>
+<td><code>CONTENT_FRAGMENT_MISSING</code></td>
+<td>A link to a missing element of another document loses its <code>#fragment</code> and keeps pointing at the document; a link to a missing element of its own document is unlinked (its content stays as text; an anchor that is itself a target only loses its <code>href</code>)</td>
+</tr>
+<tr>
+<td><code>Prefixes</code></td>
+<td><code>OPF_PREFIX_UNDECLARED</code></td>
+<td>Declares the <code>ibooks</code> and <code>prism</code> prefixes when the package uses them undeclared; any other prefix has no known vocabulary URI and stays reported</td>
 </tr>
 <tr>
 <td><code>UpgradeToEpub3</code></td>

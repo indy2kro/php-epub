@@ -77,6 +77,8 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../kindle/">Checking for Kindle</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../cli/">Command Line</a>
+                  </li>
               </ul>
               <ul>
                 <li class="toctree-l1"><a class="reference internal" href="../architecture/">Architecture</a>
@@ -172,7 +174,7 @@ $contentManager-&gt;updateContent($contentFile, $modifiedContent);
 <h3 id="saving-changes">Saving Changes<a class="headerlink" href="#saving-changes" title="Permanent link">&para;</a></h3>
 <p><code>EpubFile::save()</code> writes everything that changed since <code>load()</code>:</p>
 <ol>
-<li>Pending metadata, manifest and spine changes are written to the OPF file (the modification date is refreshed, and the NCX <code>docTitle</code> follows the title). Calling <code>Metadata::save()</code> yourself first is optional.</li>
+<li>Pending metadata, manifest and spine changes are written to the OPF file (the modification date is refreshed, and the NCX <code>docTitle</code> follows the title; the navigation document's <code>&lt;title&gt;</code> and <code>xml:lang</code> follow the title and the main language when they still had the previous values). Calling <code>Metadata::save()</code> yourself first is optional.</li>
 <li>The extracted directory is packaged as an OCF-valid archive: <code>mimetype</code> first, uncompressed and exactly <code>application/epub+zip</code> (a wrong one is corrected), <code>/</code> separators on every OS.</li>
 </ol>
 <p>Changes are only in the temporary directory until <code>save()</code> is called; <code>load()</code> again or <code>cleanup()</code> discards them.</p>
@@ -248,7 +250,7 @@ $epubFile-&gt;convert(new CalibreAdapter(['extra_args' =&gt; ['--output-profile'
 </tbody>
 </table>
 <p>The extraction directory is created with an unpredictable name and owner-only permissions, and is removed by <code>EpubFile::close()</code> (or <code>cleanup()</code>) or when the object is destroyed; a failed open removes it too. <code>EpubReader</code> creates none.</p>
-<p>Use <code>Limits::web()</code> for user uploads: it caps the entry count, the total size, the compression ratio and the size of each XML or XHTML document (see <a href="../epub-reader/">EpubReader and Limits</a>). To inspect an upload without extracting it, use <code>EpubReader</code>. For finer control, pass your own <code>ZipHandler</code>:</p>
+<p>Use <code>Limits::web()</code> for user uploads: it caps the archive size when buffered from a string or stream, the entry count, the total size, the compression ratio and the size of each XML or XHTML document (see <a href="../epub-reader/">EpubReader and Limits</a>). To inspect an upload without extracting it, use <code>EpubReader</code>. For finer control, pass your own <code>ZipHandler</code>:</p>
 <pre class="codehilite"><code class="language-php">use PhpEpub\EpubFile;
 use PhpEpub\InvalidEpubException;
 use PhpEpub\ZipException;

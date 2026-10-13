@@ -59,6 +59,8 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../kindle/">Checking for Kindle</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../cli/">Command Line</a>
+                  </li>
               </ul>
               <ul>
                 <li class="toctree-l1"><a class="reference internal" href="../architecture/">Architecture</a>
@@ -150,13 +152,14 @@
     int $maxUncompressedBytes = 1024 * 1024 * 1024,
     int $maxCompressionRatio = 100,
     int $maxXmlBytes = PHP_INT_MAX,
-    int $maxHtmlBytes = PHP_INT_MAX
+    int $maxHtmlBytes = PHP_INT_MAX,
+    int $maxArchiveBytes = PHP_INT_MAX
 )
 </code></pre>
 
 <ul>
-<li><code>Limits::default()</code>: what the library does without any configuration (10,000 entries, 1 GiB, ratio 100, no cap on single documents).</li>
-<li><code>Limits::web()</code>: for a public service processing uploads per request: 2,000 entries, 200 MiB, ratio 100, and 8 MiB per XML or XHTML document.</li>
+<li><code>Limits::default()</code>: what the library does without any configuration (10,000 entries, 1 GiB, ratio 100, no cap on single documents or the archive).</li>
+<li><code>Limits::web()</code>: for a public service processing uploads per request: 2,000 entries, 200 MiB, ratio 100, 8 MiB per XML or XHTML document, and a 100 MiB archive.</li>
 </ul>
 <table>
 <thead>
@@ -171,12 +174,16 @@
 <td>The archive, as <code>ZipHandler</code> limits an extraction: measured on the bytes actually read, not on the sizes the archive declares</td>
 </tr>
 <tr>
+<td><code>maxArchiveBytes</code></td>
+<td>The compressed archive that <code>openString()</code> and <code>openStream()</code> accept: a string is checked up front and a stream is copied to its scratch file only up to one byte past the cap, so an oversized upload cannot fill the temp disk; both throw a <code>ZipException</code>. A book opened from a path is already on disk</td>
+</tr>
+<tr>
 <td><code>maxXmlBytes</code></td>
 <td>Every XML document the library parses (container, package, navigation, NCX, <code>encryption.xml</code>): <code>XmlParser</code> checks the size before reading and throws an <code>XmlException</code></td>
 </tr>
 <tr>
 <td><code>maxHtmlBytes</code></td>
-<td>Every XHTML or HTML content document the library parses as markup: <code>getText()</code> throws an <code>InvalidEpubException</code>, <code>EpubDocumentLoader</code> (PDF conversion) a <code>ConversionException</code>; the lookup of a cover page's first image is best effort and treats a too large page as having no image</td>
+<td>Every XHTML or HTML content document the library parses as markup: <code>getText()</code> throws an <code>InvalidEpubException</code>, <code>EpubDocumentLoader</code> (conversion) a <code>ConversionException</code>; the lookup of a cover page's first image is best effort and treats a too large page as having no image</td>
 </tr>
 </tbody>
 </table>
@@ -193,7 +200,7 @@ $epubFile = EpubFile::openString($uploadedBytes, limits: $limits);
 $epubFile-&gt;close();
 </code></pre>
 
-<p>A <code>ZipHandler</code> or <code>XmlParser</code> passed to <code>open()</code> replaces that part of the limits. A PDF conversion reads the book through an <code>EpubDocumentLoader</code>, which has its own <code>maxHtmlBytes</code> argument: <code>new DompdfAdapter([], new EpubDocumentLoader(maxHtmlBytes: Limits::web()-&gt;maxHtmlBytes))</code>.</p>
+<p>A <code>ZipHandler</code> or <code>XmlParser</code> passed to <code>open()</code> replaces that part of the limits. <code>EpubFile::convert()</code> carries the book's <code>maxXmlBytes</code> and <code>maxHtmlBytes</code> into the adapter's <code>EpubDocumentLoader</code> (every adapter except Calibre implements <code>LimitsAwareConverter::withLimits()</code>): the smaller of the loader's own cap and the book's applies, so a book opened with <code>Limits::web()</code> is converted under the same caps with a plain <code>new HtmlAdapter()</code>. An adapter used directly on a directory, outside <code>convert()</code>, takes its caps from its loader: <code>new DompdfAdapter([], new EpubDocumentLoader(maxHtmlBytes: Limits::web()-&gt;maxHtmlBytes))</code>. A <code>Merger</code> parses and rewrites each book's documents with that book's <code>XmlParser</code>, or with the one passed to it.</p>
 <h2 id="opening">Opening<a class="headerlink" href="#opening" title="Permanent link">&para;</a></h2>
 <pre class="codehilite"><code class="language-php">public static function open(string $filePath, ?Limits $limits = null, ?XmlParser $xmlParser = null): EpubReader
 public static function openString(string $data, ?Limits $limits = null, ?XmlParser $xmlParser = null): EpubReader
@@ -212,10 +219,14 @@ public function getText(bool $linearOnly = true): array
 public function getContentPaths(): array
 public function hasContent(string $path): bool
 public function getContent(string $path, ?int $maxBytes = null): string
+public function getContentSize(string $path): int
+public function isDrmProtected(): bool
+public function getEncryptedPaths(): array
+public function toArray(): array
 public function close(): void
 </code></pre>
 
-<p>They return the same results as the <code>EpubFile</code> methods of the same name (the tests compare them on the fixture books). <code>getContent()</code> holds the whole file in memory: pass <code>$maxBytes</code> (or keep the limits within your <code>memory_limit</code>) when you read files you do not know.</p>
+<p>They return the same results as the <code>EpubFile</code> methods of the same name (the tests compare them on the fixture books). <code>toArray()</code> is the JSON-ready summary of <a href="../epub-file/"><code>EpubFile::toArray()</code></a>, <code>isDrmProtected()</code> and <code>getEncryptedPaths()</code> the DRM check, all without extracting; <code>getContentSize()</code> is the uncompressed size the archive declares for a file. <code>toArray()</code> reads each linear document once to count its words (documents that are encrypted, unreadable or over <code>maxHtmlBytes</code> add nothing). <code>getContent()</code> holds the whole file in memory: pass <code>$maxBytes</code> (or keep the limits within your <code>memory_limit</code>) when you read files you do not know.</p>
 <p>Every entry read counts once towards <code>maxUncompressedBytes</code>, however often it is read again, and is checked against the compression ratio while it is streamed.</p>
 <pre class="codehilite"><code class="language-php">use PhpEpub\EpubReader;
 use PhpEpub\Exception;
@@ -242,7 +253,7 @@ try {
 
 <h2 id="read-only">Read-only<a class="headerlink" href="#read-only" title="Permanent link">&para;</a></h2>
 <p>There is no <code>save()</code>, content manager, validator or conversion. The <code>Metadata</code> and <code>TableOfContents</code> objects are the ones <code>EpubFile</code> uses, so they have setters; in a reader, <code>Metadata::save()</code> and every table of contents change throw a <code>ReadOnlyException</code> (a <code>PhpEpub\Exception</code>), and edits made to the metadata, manifest or spine in memory are never written anywhere. To edit, validate or convert a book, open it with <code>EpubFile</code>.</p>
-<p><code>close()</code> is optional (the destructor closes the reader) and safe to call twice; a closed reader throws on use. DRM detection (<code>EpubFile::isDrmProtected()</code>) is not available: check <code>hasContent('META-INF/rights.xml')</code> and <code>hasContent('META-INF/license.lcpl')</code> if you need to know.</p>
+<p><code>close()</code> is optional (the destructor closes the reader) and safe to call twice; a closed reader throws on use.</p>
               
             </div>
           </div><footer>

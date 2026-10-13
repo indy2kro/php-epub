@@ -59,6 +59,8 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../../kindle/">Checking for Kindle</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../cli/">Command Line</a>
+                  </li>
               </ul>
               <ul>
                 <li class="toctree-l1"><a class="reference internal" href="../../architecture/">Architecture</a>
@@ -196,7 +198,7 @@ It provides a flexible interface to customize the PDF output through various sty
 <td><code>bookmarks</code></td>
 <td>bool</td>
 <td><code>true</code></td>
-<td>A PDF outline entry per chapter, titled with the chapter's first <code>h1</code>–<code>h3</code> heading, else its <code>&lt;title&gt;</code>, else "Chapter N".</td>
+<td>A PDF outline that follows the book's table of contents, nested as the book nests it (a section points to the page its chapter starts on). A chapter the table of contents does not list gets an entry titled with its first <code>h1</code>–<code>h3</code> heading, else its <code>&lt;title&gt;</code>, else "Chapter N".</td>
 </tr>
 </tbody>
 </table>

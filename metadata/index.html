@@ -59,6 +59,8 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../kindle/">Checking for Kindle</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../cli/">Command Line</a>
+                  </li>
               </ul>
               <ul>
                 <li class="toctree-l1"><a class="reference internal" href="../architecture/">Architecture</a>
@@ -285,7 +287,7 @@ public function getLanguages(): array&lt;int, string&gt;
 public function setLanguages(array&lt;int, string&gt; $languages): void
 </code></pre>
 
-<p>The language of the resource (dc:language). Use BCP 47 language tags (e.g., "en", "pt-BR", "zh-Hant"). <code>setLanguage()</code> and <code>setLanguages()</code> throw an <code>Exception</code> for a value that is not a well-formed tag (<code>"English"</code> or <code>"en_US"</code>); only the syntax is checked, not whether the language is registered. <code>getLanguage()</code>/<code>setLanguage()</code> work on the main (first) language; <code>getLanguages()</code>/<code>setLanguages()</code> on all of them, for multilingual books. At least one language is required.</p>
+<p>The language of the resource (dc:language). Use BCP 47 language tags (e.g., "en", "pt-BR", "zh-Hant"). <code>setLanguage()</code> and <code>setLanguages()</code> throw an <code>Exception</code> for a value that is not a well-formed tag (<code>"English"</code> or <code>"en_US"</code>); only the syntax is checked, not whether the language is registered. <code>getLanguage()</code>/<code>setLanguage()</code> work on the main (first) language; <code>getLanguages()</code>/<code>setLanguages()</code> on all of them, for multilingual books. At least one language is required. A <code>xml:lang</code> on the package element that declared the previous main language follows the new one; <code>save()</code> does the same for the navigation document, together with its <code>&lt;title&gt;</code> when it equalled the previous book title.</p>
 <h3 id="accessibility">Accessibility<a class="headerlink" href="#accessibility" title="Permanent link">&para;</a></h3>
 <pre class="codehilite"><code class="language-php">public function getAccessModes(): array&lt;int, string&gt;
 public function setAccessModes(array&lt;int, string&gt; $modes): void
@@ -455,6 +457,14 @@ public function getVersion(): string
 </ul>
 <pre class="codehilite"><code class="language-php">$metadata-&gt;setMeta('calibre:title_sort', 'Expanse, The');
 $metadata-&gt;setProperty('schema:accessMode', 'textual');
+</code></pre>
+
+<p>A prefixed property needs its prefix reserved (<code>schema</code>, <code>dcterms</code>, <code>rendition</code>, <code>media</code>, <code>marc</code>, <code>onix</code>, <code>xsd</code>, <code>a11y</code>) or declared in the package's <code>prefix</code> attribute, because EPUBCheck rejects an undeclared one. <code>setProperty()</code>/<code>setPropertyValues()</code> declare <code>ibooks</code> and <code>prism</code> themselves and throw an <code>Exception</code> for any other undeclared prefix; declare it first with <code>declarePrefix()</code>. Removing a property never needs a declaration.</p>
+<pre class="codehilite"><code class="language-php">public function declarePrefix(string $prefix, string $uri): void
+</code></pre>
+
+<pre class="codehilite"><code class="language-php">$metadata-&gt;declarePrefix('foo', 'http://example.com/vocab/foo#');
+$metadata-&gt;setProperty('foo:bar', 'value');
 </code></pre>
 
 <h2 id="usage-example">Usage Example<a class="headerlink" href="#usage-example" title="Permanent link">&para;</a></h2>

@@ -59,6 +59,8 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../../kindle/">Checking for Kindle</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../cli/">Command Line</a>
+                  </li>
               </ul>
               <ul>
                 <li class="toctree-l1"><a class="reference internal" href="../../architecture/">Architecture</a>
@@ -153,7 +155,7 @@
 </ul>
 </li>
 <li>
-<p><strong><code>convert(string $inputFile, string $outputPath): void</code></strong>: Converts an <code>.epub</code> file, or a directory with an extracted EPUB (packaged into a temporary <code>.epub</code> first, which is removed afterwards). The output extension selects the format. Calibre is started directly, without a shell, so no argument is ever interpreted; its output (including stderr) is included in the exception message when the conversion fails. A conversion that runs longer than <code>timeout</code> is stopped (the <code>ebook-convert</code> process is killed) and reported with an exception. Throws an exception if Calibre or the input is missing, or if the conversion fails.</p>
+<p><strong><code>convert(string $inputFile, string $outputPath): void</code></strong>: Converts an <code>.epub</code> file, or a directory with an extracted EPUB (packaged into a temporary <code>.epub</code> first, which is removed afterwards). The output extension selects the format. Calibre is started directly, without a shell, so no argument is ever interpreted; its output (including stderr) is included in the exception message when the conversion fails. A conversion that runs longer than <code>timeout</code> is stopped (the <code>ebook-convert</code> process is killed) and reported with a <code>ConversionException</code> whose code is <code>ConversionException::CODE_TIME_BUDGET_EXCEEDED</code>. Every failure is a <code>ConversionException</code> (<code>catch (ConversionException)</code> is enough): Calibre or the input is missing, Calibre exits with an error or produces no output.</p>
 </li>
 </ul>
 <p>A relative input or output path that starts with <code>-</code> is passed to Calibre as <code>./-name</code> (<code>.\-name</code> on Windows), so Calibre never reads it as an option.</p>

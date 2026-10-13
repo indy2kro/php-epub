@@ -59,6 +59,8 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../kindle/">Checking for Kindle</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../cli/">Command Line</a>
+                  </li>
               </ul>
               <ul class="current">
                 <li class="toctree-l1 current"><a class="reference internal current" href="#">Architecture</a>
@@ -98,6 +100,8 @@
     <li class="toctree-l3"><a class="reference internal" href="#converters">Converters</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#bookbuilder">BookBuilder</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#command-line">Command line</a>
     </li>
         </ul>
     </li>
@@ -211,7 +215,7 @@
 <h3 id="epubreader">EpubReader<a class="headerlink" href="#epubreader" title="Permanent link">&para;</a></h3>
 <p>A read-only facade for untrusted uploads: it opens the archive with <code>ZipArchive</code>, checks the entry names and limits up front, and reads entries when <code>getMetadata()</code>, <code>getTableOfContents()</code>, <code>getCoverImage()</code>, <code>getText()</code> or <code>getContent()</code> ask for them, each streamed with the limits applied to the bytes actually read. It reuses <code>Parser</code>, <code>Metadata</code>, <code>Manifest</code>, <code>Spine</code>, <code>TableOfContents</code>, <code>Util\CoverLocator</code> and <code>Util\SpineText</code>, so its results match <code>EpubFile</code>'s. The trade-off: <code>Metadata</code>, <code>Manifest</code>, <code>Spine</code> and <code>ContentManager</code> all work on an extraction directory, so retrofitting a lazy mode into <code>EpubFile</code> would have meant guarding every mutating method and the file-based collaborators (<code>Validator</code>, <code>Encryption</code>, converters). A separate facade keeps the editing path untouched and the read-only guarantee structural: there is no <code>save()</code>, content manager or conversion to misuse, <code>Metadata::save()</code> and <code>TableOfContents</code> changes throw <code>ReadOnlyException</code>, and in-memory edits are never persisted. The price is that <code>validate()</code>, <code>isDrmProtected()</code> and conversion are only available on <code>EpubFile</code>.</p>
 <h3 id="limits">Limits<a class="headerlink" href="#limits" title="Permanent link">&para;</a></h3>
-<p>An immutable value object (<code>Limits::default()</code>, <code>Limits::web()</code>) that builds the <code>ZipHandler</code> and <code>XmlParser</code> for <code>EpubFile</code> and <code>EpubReader</code> and carries the size cap for content documents.</p>
+<p>An immutable value object (<code>Limits::default()</code>, <code>Limits::web()</code>) that builds the <code>ZipHandler</code> and <code>XmlParser</code> for <code>EpubFile</code> and <code>EpubReader</code> and carries the size cap for content documents. <code>EpubFile::convert()</code> applies it to adapters that implement <code>Converters\LimitsAwareConverter</code>.</p>
 <h3 id="metadata">Metadata<a class="headerlink" href="#metadata" title="Permanent link">&para;</a></h3>
 <p>Reads and edits the <code>&lt;metadata&gt;</code> element. Each Dublin Core field has a trait in <code>src/Traits/</code> (title, authors and creators, contributors, description, publisher, date, language, subject, identifier); <code>getMeta()</code>/<code>setMeta()</code> and <code>getProperty()</code>/<code>setProperty()</code> cover other <code>&lt;meta&gt;</code> elements. Values are checked with <code>Util\XmlText</code> before they are written.</p>
 <h3 id="manifest">Manifest<a class="headerlink" href="#manifest" title="Permanent link">&para;</a></h3>
@@ -238,6 +242,8 @@
 <p><code>ConverterInterface</code> has three adapters: <code>TCPDFAdapter</code> and <code>DompdfAdapter</code> (PDF, via <code>EpubDocumentLoader</code>, which reads the spine documents and makes their HTML safe to render), and <code>CalibreAdapter</code> (any format Calibre's <code>ebook-convert</code> supports). <code>Converter</code> maps formats to adapters. <code>TextAdapter</code>, <code>HtmlAdapter</code> and <code>MarkdownAdapter</code> export text, one sanitised HTML file and Markdown from the same loader output (see <a href="../exporters/">Exporters</a>).</p>
 <h3 id="bookbuilder">BookBuilder<a class="headerlink" href="#bookbuilder" title="Permanent link">&para;</a></h3>
 <p>Builds a new book from Markdown, text, HTML or images (see <a href="../book-builder/">Book builder</a>): <code>MarkdownParser</code> turns Markdown into HTML (raw HTML is escaped), <code>Util\HtmlSanitizer</code> reduces any HTML to an allowlist and resolves images against the supplied map only, <code>BookBuilder</code> splits the result into chapters, and <code>BookPackage</code> writes the package, navigation document and NCX as an OCF archive through <code>ZipHandler</code>. <code>BuildLimits</code> bounds chapters, bytes and images.</p>
+<h3 id="command-line">Command line<a class="headerlink" href="#command-line" title="Permanent link">&para;</a></h3>
+<p>The <code>php-epub</code> command (<code>bin/php-epub</code>, <code>Cli\Application</code>) is a thin layer over <code>EpubReader</code>, <code>EpubFile</code>, <code>Merger</code> and <code>Splitter</code> (see <a href="../cli/">Command line</a>). It opens every book with <code>Limits::web()</code> unless told <code>--trusted</code>.</p>
 <h2 id="untrusted-input">Untrusted input<a class="headerlink" href="#untrusted-input" title="Permanent link">&para;</a></h2>
 <p>Every byte of a book is treated as hostile: <code>PathResolver</code> keeps every path from the book (and from callers) inside the extraction directory, <code>ZipHandler</code> limits extraction, <code>XmlParser</code> refuses entity declarations and documents over <code>Limits::$maxXmlBytes</code> (libxml's depth limit stays in force), and <code>EpubDocumentLoader</code> confines everything the PDF renderers could load to the book. See <a href="../advanced-usage/#handling-untrusted-epubs">Handling Untrusted EPUBs</a>.</p>
 <h2 id="exceptions">Exceptions<a class="headerlink" href="#exceptions" title="Permanent link">&para;</a></h2>
@@ -259,7 +265,7 @@
             </div>
           </div><footer>
     <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
-        <a href="../kindle/" class="btn btn-neutral float-left" title="Checking for Kindle"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../cli/" class="btn btn-neutral float-left" title="Command Line"><span class="icon icon-circle-arrow-left"></span> Previous</a>
         <a href="../epub-file/" class="btn btn-neutral float-right" title="EpubFile">Next <span class="icon icon-circle-arrow-right"></span></a>
     </div>
 
@@ -283,7 +289,7 @@
   <span class="rst-current-version" data-toggle="rst-current-version">
     
     
-      <span><a href="../kindle/" style="color: #fcfcfc">&laquo; Previous</a></span>
+      <span><a href="../cli/" style="color: #fcfcfc">&laquo; Previous</a></span>
     
     
       <span><a href="../epub-file/" style="color: #fcfcfc">Next &raquo;</a></span>

@@ -59,6 +59,8 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../kindle/">Checking for Kindle</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../cli/">Command Line</a>
+                  </li>
               </ul>
               <ul>
                 <li class="toctree-l1"><a class="reference internal" href="../architecture/">Architecture</a>
@@ -158,6 +160,15 @@
 </li>
 <li>
 <p><strong><code>remove(string $idref): void</code></strong>: Removes an item from the reading order (the manifest is not touched). Throws if it is not in the spine.</p>
+</li>
+<li>
+<p><strong><code>addMany(array $entries): void</code></strong>: Appends many manifest items to the reading order at once (each entry has an <code>idref</code>, optionally <code>linear</code> and <code>properties</code>); <code>add()</code> rewrites the whole spine each time, which is slow for thousands of items. Throws if an item is unknown or already in the spine (or listed twice), a property is invalid, or properties are given for a package that is not EPUB 3. Nothing is added then.</p>
+</li>
+<li>
+<p><strong><code>removeAt(int $position): void</code></strong>: Removes the itemref at a zero-based position, e.g. a duplicate that is not the first (<code>remove()</code> takes the first). Throws if the position is outside the spine.</p>
+</li>
+<li>
+<p><strong><code>getToc(): ?string</code></strong> and <strong><code>setToc(?string $id): void</code></strong>: The id of the NCX manifest item the spine names (<code>&lt;spine toc="..."&gt;</code>), or <code>null</code>. EPUB 2 reading systems find the NCX this way; <code>null</code> removes the attribute. Setting throws if the item is not in the manifest.</p>
 </li>
 <li>
 <p><strong><code>move(string $idref, int $position): void</code></strong>: Moves an item to a new zero-based position (0 to the spine length - 1). Throws if it is not in the spine or the position is out of range.</p>

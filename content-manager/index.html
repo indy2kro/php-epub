@@ -59,6 +59,8 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../kindle/">Checking for Kindle</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../cli/">Command Line</a>
+                  </li>
               </ul>
               <ul>
                 <li class="toctree-l1"><a class="reference internal" href="../architecture/">Architecture</a>
@@ -159,7 +161,7 @@
 <ul>
 <li><code>addContent()</code> adds new files to the manifest, with a media type guessed from the extension.</li>
 <li>In EPUB 3 books, <code>addContent()</code> and <code>updateContent()</code> set the manifest properties an XHTML document needs because of its content, and remove those it no longer needs: <code>svg</code> (inline SVG), <code>mathml</code>, <code>scripted</code> (<code>&lt;script&gt;</code> or <code>&lt;form&gt;</code>) and <code>remote-resources</code> (a resource loaded from <code>http(s)://</code>; links do not count). Other properties, such as <code>nav</code>, are kept, and the others are untouched.</li>
-<li><code>deleteContent()</code> removes the file's manifest item and its spine entry, plus package references to it (EPUB 2 cover meta, refinements, <code>spine@toc</code>, <code>fallback</code>/<code>media-overlay</code> of other items, <code>&lt;guide&gt;</code> references) and its table-of-contents entries (an entry with children stays as an unlinked heading in the navigation document; the NCX promotes the children).</li>
+<li><code>deleteContent()</code> removes the file's manifest item and its spine entry, its <code>META-INF/encryption.xml</code> entry (an obfuscated font) plus package references to it (EPUB 2 cover meta, refinements, <code>spine@toc</code>, <code>fallback</code>/<code>media-overlay</code> of other items, <code>&lt;guide&gt;</code> references) and its table-of-contents entries (an entry with children stays as an unlinked heading in the navigation document; the NCX promotes the children).</li>
 </ul>
 <p>Adding a file does not put it in the reading order; call <code>Spine::add()</code> for that.</p>
 <p>The package document (OPF) itself cannot be added, updated or deleted through <code>ContentManager</code>: <code>Metadata</code>, <code>Manifest</code> and <code>Spine</code> hold it in memory and <code>EpubFile::save()</code> writes it, so a direct write would be overwritten or leave them out of date. These methods throw an <code>Exception</code> for the OPF path.</p>
@@ -201,7 +203,7 @@ $contentManager = $epubFile-&gt;getContentManager();
 <p>Moves or renames a file. Its manifest item keeps its id, so its place in the reading order is unchanged, and points at the new path; <code>&lt;guide&gt;</code> references, table-of-contents entries and the <code>META-INF/encryption.xml</code> entry of an obfuscated font follow it. Moving the navigation document rewrites its links for the new location. A case-only rename (<code>ch.xhtml</code> to <code>Ch.xhtml</code>) also works on case-insensitive filesystems.</p>
 <p>References inside content documents follow the move (pass <code>$updateReferences = false</code> to leave them alone; <code>EpubFile::validate()</code> then reports those that break, <code>CONTENT_REFERENCE_MISSING</code>):</p>
 <ul>
-<li>In XHTML and SVG documents, the attributes <code>src</code>, <code>poster</code>, <code>data</code>, and <code>href</code> (including <code>xlink:href</code>) on <code>a</code>, <code>area</code>, <code>link</code>, <code>image</code> and <code>use</code> that point at the moved file are rewritten.</li>
+<li>In XHTML, SVG and media overlay (SMIL) documents, the attributes <code>src</code> (including the <code>text</code> and <code>audio</code> elements of a media overlay), <code>poster</code>, <code>data</code>, <code>altimg</code> (MathML), <code>longdesc</code>, and <code>href</code> (including <code>xlink:href</code>) on <code>a</code>, <code>area</code>, <code>link</code>, <code>image</code> and <code>use</code> that point at the moved file are rewritten.</li>
 <li>In stylesheets, <code>&lt;style&gt;</code> elements and <code>style</code> attributes, <code>url(...)</code> values and <code>@import "..."</code> strings are rewritten.</li>
 <li>A document that moves to another directory gets its own relative references recomputed, so they still reach the same files.</li>
 </ul>
@@ -212,7 +214,11 @@ $contentManager = $epubFile-&gt;getContentManager();
 <pre class="codehilite"><code class="language-php">public function getContent(string $filePath): string
 </code></pre>
 
-<p>Returns the content of a file. Throws an exception if the file doesn't exist or cannot be read.</p>
+<p>Returns the content of a file. Throws an exception if the file doesn't exist or cannot be read, or if it is encrypted (DRM, see <code>EpubFile::getEncryptedPaths()</code>), since its text would be ciphertext.</p>
+<pre class="codehilite"><code class="language-php">public function getMarkup(string $filePath): string
+</code></pre>
+
+<p>Returns an XHTML or HTML document that is about to be parsed as markup, refusing one larger than <code>Limits::$maxHtmlBytes</code> before it is read. Use it instead of <code>getContent()</code> when the result goes to a DOM parser. Throws <code>InvalidEpubException</code> if the document is larger than the limit, and an exception if the file cannot be read.</p>
 <pre class="codehilite"><code class="language-php">public function getText(string $filePath): string
 </code></pre>
 

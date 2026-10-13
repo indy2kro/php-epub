@@ -59,6 +59,8 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../kindle/">Checking for Kindle</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../cli/">Command Line</a>
+                  </li>
               </ul>
               <ul>
                 <li class="toctree-l1"><a class="reference internal" href="../architecture/">Architecture</a>
@@ -180,7 +182,7 @@
 <p><strong><code>getBook(): ?EpubFile</code></strong>: The book this table of contents belongs to, when it came from <code>EpubFile::getTableOfContents()</code>. Holding the object keeps the book's extracted files alive, so <code>EpubFile::open($path)-&gt;getTableOfContents()</code> is safe to use on its own.</p>
 </li>
 </ul>
-<p>Deleting a file with <code>ContentManager::deleteContent()</code> removes its entries (if that removes the last one, the table of contents stays empty and <code>EpubFile::validate()</code> reports <code>NAV_EMPTY</code> / <code>NCX_EMPTY</code>), and <code>EpubFile::save()</code> keeps the NCX <code>docTitle</code> in step with the book title. Whenever the NCX is written, its <code>dtb:depth</code> meta is set to the real nesting depth of the entries (created when missing, as long as the NCX has a <code>&lt;head&gt;</code>).</p>
+<p>Deleting a file with <code>ContentManager::deleteContent()</code> removes its entries (if that removes the last one, the table of contents stays empty and <code>EpubFile::validate()</code> reports <code>NAV_EMPTY</code> / <code>NCX_EMPTY</code>), and <code>EpubFile::save()</code> keeps the NCX <code>docTitle</code> in step with the book title (and the navigation document's <code>&lt;title&gt;</code> and language, unless they were set to something else). Whenever the NCX is written, its <code>dtb:depth</code> meta is set to the real nesting depth of the entries (created when missing, as long as the NCX has a <code>&lt;head&gt;</code>).</p>
 <h2 id="usage-example">Usage Example<a class="headerlink" href="#usage-example" title="Permanent link">&para;</a></h2>
 <pre class="codehilite"><code class="language-php">use PhpEpub\EpubFile;
 use PhpEpub\TocEntry;

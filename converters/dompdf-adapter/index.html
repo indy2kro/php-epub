@@ -59,6 +59,8 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../../kindle/">Checking for Kindle</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../../cli/">Command Line</a>
+                  </li>
               </ul>
               <ul>
                 <li class="toctree-l1"><a class="reference internal" href="../../architecture/">Architecture</a>
@@ -190,7 +192,7 @@
 <p><strong>Fonts and languages:</strong> the default font is DejaVu Sans, which Dompdf ships and which covers Latin, Greek, Cyrillic, Hebrew and Arabic, not only Latin-1 like the PDF core fonts (<code>Arial</code> is mapped to Helvetica). Chinese, Japanese and Korean need a font installed in Dompdf: pass its family as <code>font</code>, which always wins. Books with <code>page-progression-direction="rtl"</code> in the spine, or (when the spine says nothing) with a primary language of <code>ar</code>, <code>he</code>, <code>fa</code>, <code>ur</code>, <code>yi</code>, <code>ps</code>, <code>sd</code>, <code>ug</code> or <code>dv</code>, get <code>dir="rtl"</code> on the generated <code>&lt;html&gt;</code> and <code>&lt;body&gt;</code>; the book's language is set as <code>lang</code>. Dompdf does not shape Arabic script, so Arabic letters are not joined.</p>
 <p><strong>Embedded fonts:</strong> the fonts a book loads with <code>@font-face</code> are used. Obfuscated fonts (IDPF or Adobe, listed in <code>META-INF/encryption.xml</code>) are de-obfuscated in memory and handed to Dompdf as <code>data:</code> URIs, so nothing is written into the book; a font that cannot be de-obfuscated (an Adobe font in a book without a <code>urn:uuid:</code> identifier) is dropped. Dompdf loads only TrueType fonts (a <code>src</code> without <code>format()</code>, or <code>format("truetype")</code>). Dompdf keeps the fonts it loads in a font directory; each conversion gets a private temporary one, deleted afterwards, so books leave nothing in Dompdf's own <code>lib/fonts</code> and cannot change the fonts of later conversions.</p>
 <p>A DRM-protected book is refused with a <code>ConversionException</code>.</p>
-<p>Dompdf cannot write a PDF outline, so use <code>TCPDFAdapter</code> when you need chapter bookmarks.</p>
+<p>Dompdf has no API to write a PDF outline (bookmarks), so use <code>TCPDFAdapter</code> when you need them; it follows the book's nested table of contents.</p>
 </li>
 <li>
 <p><strong><code>convert(string $epubDirectory, string $outputPath): void</code></strong>: Renders every spine document in reading order, each on a new page, sets the PDF title and author from the EPUB metadata, and writes the PDF. Throws a <code>ConversionException</code> if the book cannot be read, Dompdf fails (its exception is kept as the previous exception) or the PDF cannot be written.</p>

@@ -59,6 +59,8 @@
                   </li>
                   <li class="toctree-l1"><a class="reference internal" href="../kindle/">Checking for Kindle</a>
                   </li>
+                  <li class="toctree-l1"><a class="reference internal" href="../cli/">Command Line</a>
+                  </li>
               </ul>
               <ul>
                 <li class="toctree-l1"><a class="reference internal" href="../architecture/">Architecture</a>
@@ -209,7 +211,7 @@ public function convert(string $epubDirectory, string $outputPath): void;
 <li><code>headings: false</code> leaves out the title block and the added chapter headings (the book's own headings stay, as they are part of the text).</li>
 </ul>
 <h2 id="html">HTML<a class="headerlink" href="#html" title="Permanent link">&para;</a></h2>
-<p><code>HtmlAdapter</code> writes one self-contained HTML document: a title block, a table of contents when the book has several chapters, and every chapter in a <code>&lt;section class="epub-chapter"&gt;</code>.</p>
+<p><code>HtmlAdapter</code> writes one self-contained HTML document: a title block, a table of contents when the book has several chapters (the book's own, nested, with its sections linking to their anchors; else one entry per chapter), and every chapter in a <code>&lt;section class="epub-chapter"&gt;</code>.</p>
 <pre class="codehilite"><code class="language-php">public function __construct(
     int $maxInlinedBytes = 33554432,
     bool $includeNonLinear = true,
