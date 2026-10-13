@@ -137,9 +137,13 @@ final class FragmentReferences
         }
 
         $document = $root->ownerDocument;
+        // An element parsed from a file always has its document; this narrows the type.
+        // @codeCoverageIgnoreStart
         if (! $document instanceof \DOMDocument) {
             return null;
         }
+
+        // @codeCoverageIgnoreEnd
 
         $ids = [];
         foreach ($document->getElementsByTagName('*') as $element) {

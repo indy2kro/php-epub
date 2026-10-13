@@ -7,6 +7,7 @@ namespace PhpEpub\Test\Cli;
 use PhpEpub\Cli\Application;
 use PhpEpub\EpubFile;
 use PhpEpub\Test\Support\EpubBuilder;
+use PhpEpub\Test\Support\MergeBook;
 use PhpEpub\Util\FileSystemHelper;
 use PHPUnit\Framework\TestCase;
 
@@ -244,6 +245,29 @@ final class ApplicationTest extends TestCase
         $this->assertStringStartsWith('%PDF', (string) file_get_contents($output));
     }
 
+    public function testConvertToPdfWithTcpdf(): void
+    {
+        if (! class_exists(\TCPDF::class)) {
+            $this->markTestSkipped('TCPDF is not installed.');
+        }
+
+        $output = $this->workDir . '/tcpdf.pdf';
+
+        $this->assertSame(0, $this->cli(['convert', $this->book(), '-o', $output, '--engine=tcpdf'])[0]);
+        $this->assertStringStartsWith('%PDF', (string) file_get_contents($output));
+    }
+
+    public function testAnEmptyNumberOptionIsAUsageError(): void
+    {
+        $book = $this->book();
+
+        [$code, , $err] = $this->cli(['split', $book, '-d', $this->workDir . '/parts', '--every=']);
+
+        $this->assertSame(2, $code);
+        $this->assertStringContainsString('The option --every needs a number', $err);
+        $this->assertSame(0, $this->cli(['split', $book, '-d', $this->workDir . '/by-toc', '--toc', '--level='])[0], 'an empty --level falls back to its default');
+    }
+
     public function testSplitWritesParts(): void
     {
         $book = $this->book('nested.epub', EpubBuilder::nestedToc());
@@ -285,6 +309,20 @@ final class ApplicationTest extends TestCase
         $this->assertSame('Both', $merged->getMetadata()->getTitle());
         $this->assertSame(['Ann', 'Bob'], $merged->getMetadata()->getAuthors());
         $this->assertSame(0, $this->cli(['validate', $output])[0]);
+    }
+
+    public function testMergeReportsWhatCouldNotBeReadOnStandardError(): void
+    {
+        $first = MergeBook::builder('urn:uuid:11111111-1111-4111-8111-111111111111', 'One')->buildEpub($this->workDir . '/one.epub');
+        $second = MergeBook::builder('urn:uuid:22222222-2222-4222-8222-222222222222', 'Two', 2, files: ['EPUB/nav.xhtml' => 'this is not xml'])->buildEpub($this->workDir . '/two.epub');
+        $output = $this->workDir . '/merged.epub';
+
+        [$code, $out, $err] = $this->cli(['merge', $first, $second, '-o', $output]);
+
+        $this->assertSame(0, $code);
+        $this->assertStringContainsString('Merged 2 books', $out);
+        $this->assertStringContainsString('warning: Book 2', $err);
+        $this->assertStringContainsString('table of contents', $err);
     }
 
     public function testBooksAreOpenedWithWebLimitsUnlessTrusted(): void

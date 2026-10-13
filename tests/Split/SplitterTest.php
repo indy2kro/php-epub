@@ -16,6 +16,8 @@ use PhpEpub\Test\Support\MergeBook;
 use PhpEpub\TocEntry;
 use PhpEpub\Util\FileSystemHelper;
 use PhpEpub\ValidationIssue;
+use PhpEpub\XmlException;
+use PhpEpub\XmlParser;
 use PHPUnit\Framework\TestCase;
 
 final class SplitterTest extends TestCase
@@ -689,6 +691,23 @@ final class SplitterTest extends TestCase
             (new Splitter())->split($book, SplitPlan::everySpineItems(1), $directory);
             $this->fail('Saving a part with a new identifier needs a readable encryption.xml');
         } catch (Exception) {
+            $this->assertSame([], glob($directory . '/*.epub'));
+        }
+    }
+
+    public function testEncryptionInfoTheParserCannotReadStopsTheSplitAndLeavesNoPart(): void
+    {
+        // Within the book's own limits, but over the splitter's parser limit: pruning notes that the entries cannot be
+        // read (a warning in the report), and saving the part, which has to rewrite them, then fails.
+        $encryption = '<?xml version="1.0"?><encryption xmlns="urn:oasis:names:tc:opendocument:xmlns:container">' . str_repeat(' ', 6000) . '</encryption>';
+        $book = $this->open(MergeBook::builder(self::UID, 'Book', 2, files: ['META-INF/encryption.xml' => $encryption]));
+        $directory = $this->tmpDir . '/blind';
+
+        try {
+            (new Splitter(xmlParser: new XmlParser(maxBytes: 5000)))->splitWithReport($book, SplitPlan::everySpineItems(1), $directory);
+            $this->fail('Expected the oversized encryption.xml to stop the split.');
+        } catch (XmlException $exception) {
+            $this->assertStringContainsString('larger than the limit', $exception->getMessage());
             $this->assertSame([], glob($directory . '/*.epub'));
         }
     }

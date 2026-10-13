@@ -404,9 +404,13 @@ final class Application
             foreach ($books as $book) {
                 try {
                     $book->close();
+                    // Closing only fails when the scratch directory cannot be deleted; cannot be provoked portably.
+                    // @codeCoverageIgnoreStart
                 } catch (Exception) {
                     // The merge's outcome stands; a leftover scratch directory is not worth hiding it.
                 }
+
+                // @codeCoverageIgnoreEnd
             }
         }
 

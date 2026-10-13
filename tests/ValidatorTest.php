@@ -526,6 +526,21 @@ final class ValidatorTest extends TestCase
         $this->assertSame([], array_filter($this->codes($this->open($book)->validate()), static fn (string $code): bool => str_starts_with($code, 'ACCESSIBILITY_')));
     }
 
+    public function testAPrintSourceWithABrokenNavigationDocumentLeavesThePageListToTheNavigationCheck(): void
+    {
+        $book = EpubBuilder::epub3()
+            ->withFile('EPUB/package.opf', str_replace(
+                '<dc:language>',
+                '<dc:source>urn:isbn:9780000000002</dc:source><dc:language>',
+                (string) EpubBuilder::epub3()->getFile('EPUB/package.opf')
+            ))
+            ->withFile('EPUB/nav.xhtml', 'this is not xml');
+
+        $codes = $this->codes($this->open($book)->validate());
+
+        $this->assertNotContains('ACCESSIBILITY_PAGE_LIST_MISSING', $codes);
+    }
+
     public function testAPrintSourceNeedsAPageList(): void
     {
         $withSource = EpubBuilder::epub3()->withFile('EPUB/package.opf', str_replace(

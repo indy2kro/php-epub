@@ -222,9 +222,13 @@ final class Repairer
 
             foreach ($broken as $link) {
                 $owner = $link['attribute']->ownerElement;
+                // The owner of an attribute found while walking elements is always an element; this narrows the type.
+                // @codeCoverageIgnoreStart
                 if (! $owner instanceof \DOMElement) {
                     continue;
                 }
+
+                // @codeCoverageIgnoreEnd
 
                 $target = "{$link['file']}#{$link['fragment']}";
                 if ($link['file'] === $item->path) {
@@ -256,9 +260,13 @@ final class Repairer
             return;
         }
 
+        // Every element reached through a document has a parent (at least the document); this narrows the type.
+        // @codeCoverageIgnoreStart
         if (! $element->parentNode instanceof \DOMNode) {
             return;
         }
+
+        // @codeCoverageIgnoreEnd
 
         while ($isAnchor && $element->firstChild instanceof \DOMNode) {
             $element->parentNode->insertBefore($element->firstChild, $element);

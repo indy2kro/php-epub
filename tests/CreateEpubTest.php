@@ -53,6 +53,23 @@ final class CreateEpubTest extends TestCase
         $this->assertStringNotContainsString('xml:lang="en"', $package);
     }
 
+    public function testAnUnreadableNavigationDocumentIsLeftAloneWhenTheTitleChanges(): void
+    {
+        $path = $this->tmpDir . DIRECTORY_SEPARATOR . 'broken-nav.epub';
+        $epubFile = EpubFile::create($path, 'T', 'en');
+        $epubFile->addChapter('One', '<p>Text.</p>');
+        $nav = $epubFile->getManifest()->get('nav');
+        $this->assertInstanceOf(ManifestItem::class, $nav);
+        file_put_contents($epubFile->getTempDir() . '/' . $nav->path, 'this is not xml');
+
+        $epubFile->getMetadata()->setTitle('Nouveau');
+        $epubFile->save();
+
+        $reopened = EpubFile::open($path);
+        $this->assertSame('Nouveau', $reopened->getMetadata()->getTitle());
+        $this->assertSame('this is not xml', file_get_contents($reopened->getTempDir() . '/' . $nav->path));
+    }
+
     public function testACustomNavigationTitleAndLanguageAreLeftAlone(): void
     {
         $path = $this->tmpDir . DIRECTORY_SEPARATOR . 'custom.epub';

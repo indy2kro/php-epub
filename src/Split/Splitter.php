@@ -573,10 +573,15 @@ final readonly class Splitter
                         $changed = $this->pruneEntry($entry, $xpath, $links, $item->path, $keep) || $changed;
                     }
 
+                    // pruneNavigations() has already pruned (and dropped, when emptied) every nav but the toc and the
+                    // landmarks with the same rule, so a page list reaching this point still has its pages.
+                    // @codeCoverageIgnoreStart
                     if ($this->countNodes($xpath, ".//*[local-name()='li']", $nav) === 0 && $nav->parentNode instanceof \DOMNode) {
                         $nav->parentNode->removeChild($nav);
                         $changed = true;
                     }
+
+                    // @codeCoverageIgnoreEnd
                 }
             } else {
                 foreach ($this->elements($xpath->query("//*[local-name()='pageList']")) as $pageList) {

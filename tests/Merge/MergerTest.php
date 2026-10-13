@@ -15,6 +15,7 @@ use PhpEpub\Test\Support\MergeBook;
 use PhpEpub\TocEntry;
 use PhpEpub\Util\FileSystemHelper;
 use PhpEpub\ValidationIssue;
+use PhpEpub\XmlParser;
 use PHPUnit\Framework\TestCase;
 
 final class MergerTest extends TestCase
@@ -651,6 +652,18 @@ final class MergerTest extends TestCase
         $this->assertStringContainsString('EPUB/fonts/a.otf', $warnings);
         $this->assertStringContainsString('Book 2', $warnings);
         $this->assertStringContainsString('table of contents', $warnings);
+    }
+
+    public function testEncryptionInfoTheParserCannotReadIsReportedAsAWarning(): void
+    {
+        // Within the book's own limits, but over the merger's parser limit.
+        $encryption = '<?xml version="1.0"?><encryption xmlns="urn:oasis:names:tc:opendocument:xmlns:container">' . str_repeat(' ', 6000) . '</encryption>';
+        $one = $this->open(MergeBook::builder(self::UID_ONE, 'One', 1, files: ['META-INF/encryption.xml' => $encryption]));
+        $two = $this->open(MergeBook::builder(self::UID_TWO, 'Two', 1));
+
+        $report = (new Merger(xmlParser: new XmlParser(maxBytes: 5000)))->merge([$one, $two], new MergeOptions(), $this->tmpDir . DIRECTORY_SEPARATOR . 'blind.epub');
+
+        $this->assertSame(['Book 1: META-INF/encryption.xml could not be read, so its fonts are copied as they are.'], $report->warnings);
     }
 
     public function testLegacyDoctypeKeepsXmlEntities(): void

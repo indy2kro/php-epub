@@ -690,6 +690,41 @@ final class RepairerTest extends TestCase
         $this->assertCount(2, (new Encryption((string) $epub->getTempDir()))->entries());
     }
 
+    public function testLeavesAnEncryptionEntryThatPointsOutsideTheBookAlone(): void
+    {
+        $epub = $this->open($this->bookWithFontEntries(['../outside.otf' => 'http://www.idpf.org/2008/embedding', 'EPUB/fonts/gone.otf' => 'http://www.idpf.org/2008/embedding']));
+
+        $fixes = $epub->repair();
+
+        $this->assertSame(['ENCRYPTION_ENTRY_MISSING'], $this->fixCodes($fixes));
+        $this->assertSame('EPUB/fonts/gone.otf', $fixes[0]->location);
+        $this->assertSame(['../outside.otf'], array_column((new Encryption((string) $epub->getTempDir()))->entries(), 'uri'));
+    }
+
+    public function testAnAnchorThatIsATargetItselfKeepsItsIdWhenItsBrokenLinkGoes(): void
+    {
+        $book = EpubBuilder::epub3()
+            ->withFile('EPUB/text/chapter.xhtml', EpubBuilder::xhtml('Chapter', '<p><a id="here" href="#nowhere">Both</a></p>'));
+        $epub = $this->open($book);
+
+        $this->assertSame(['CONTENT_FRAGMENT_MISSING'], $this->fixCodes($epub->repair()));
+
+        $chapter = $epub->getContentManager()->getContent('EPUB/text/chapter.xhtml');
+        $this->assertStringContainsString('<a id="here">Both</a>', $chapter);
+        $this->assertStringNotContainsString('nowhere', $chapter);
+        $this->assertSame([], $this->codes($epub->validate()));
+    }
+
+    public function testLeavesLinksThatPointOutsideTheBookAlone(): void
+    {
+        $book = EpubBuilder::epub3()
+            ->withFile('EPUB/text/chapter.xhtml', EpubBuilder::xhtml('Chapter', '<p><a href="../../../outside.xhtml#frag">Out</a></p>'));
+        $epub = $this->open($book);
+
+        $this->assertNotContains('CONTENT_FRAGMENT_MISSING', $this->fixCodes($epub->repair()));
+        $this->assertStringContainsString('../../../outside.xhtml#frag', $epub->getContentManager()->getContent('EPUB/text/chapter.xhtml'));
+    }
+
     public function testRetargetsLinksToMissingFragments(): void
     {
         $book = EpubBuilder::epub3()

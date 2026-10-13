@@ -139,9 +139,13 @@ class ZipHandler
         $files = [];
         $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root, RecursiveDirectoryIterator::SKIP_DOTS), RecursiveIteratorIterator::SELF_FIRST);
         foreach ($iterator as $entry) {
+            // RecursiveDirectoryIterator yields SplFileInfo; this narrows the type for static analysis.
+            // @codeCoverageIgnoreStart
             if (! $entry instanceof \SplFileInfo) {
                 continue;
             }
+
+            // @codeCoverageIgnoreEnd
 
             $path = $entry->getPathname();
             $name = str_replace('\\', '/', substr($path, $prefix));
@@ -199,9 +203,13 @@ class ZipHandler
         try {
             while (! feof($input)) {
                 $chunk = @fread($input, self::CHUNK_SIZE);
+                // A read error after a successful open (I/O failure); cannot be provoked portably.
+                // @codeCoverageIgnoreStart
                 if ($chunk === false) {
                     throw new ZipException("Failed to read file: {$name}" . $this->lastError());
                 }
+
+                // @codeCoverageIgnoreEnd
 
                 $written += strlen($chunk);
                 if ($copiedBytes + $written > $this->maxUncompressedBytes) {

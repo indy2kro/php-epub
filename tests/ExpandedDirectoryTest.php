@@ -8,6 +8,7 @@ use PhpEpub\EpubFile;
 use PhpEpub\Exception;
 use PhpEpub\Limits;
 use PhpEpub\Test\Support\EpubBuilder;
+use PhpEpub\Test\Support\UnreadableFile;
 use PhpEpub\Util\FileSystemHelper;
 use PhpEpub\ZipException;
 use PhpEpub\ZipHandler;
@@ -201,6 +202,53 @@ final class ExpandedDirectoryTest extends TestCase
         $this->expectException(ZipException::class);
         $this->expectExceptionMessage('symbolic link');
         EpubFile::openDirectory($directory);
+    }
+
+    public function testSaveToDirectoryLeavesNothingBehindWhenAFileCannotBeCopied(): void
+    {
+        foreach (['created' => false, 'empty' => true] as $label => $exists) {
+            $epubFile = EpubFile::openDirectory($this->bookDirectory());
+            $target = $this->workDir . '/out-' . $label;
+            $exists && mkdir($target);
+            $unreadable = UnreadableFile::make($epubFile->getTempDir() . '/EPUB/css/style.css');
+
+            try {
+                // A Windows lock stops reads but not a copy, and root reads everything.
+                if (! $unreadable->isUnreadable() || @copy($epubFile->getTempDir() . '/EPUB/css/style.css', $this->workDir . '/probe')) {
+                    $this->markTestSkipped('The file can still be copied.');
+                }
+
+                try {
+                    $epubFile->saveToDirectory($target);
+                    $this->fail('Expected the copy to fail.');
+                } catch (Exception $exception) {
+                    $this->assertStringContainsString('Failed to copy', $exception->getMessage(), $label);
+                }
+
+                // Nothing half written: the directory is missing or empty again, as it was before.
+                $this->assertSame($exists, is_dir($target), $label);
+                $exists && $this->assertSame(['.', '..'], scandir($target), $label);
+            } finally {
+                $unreadable->restore();
+                $epubFile->cleanup();
+                (new FileSystemHelper())->deleteDirectory($this->workDir . '/source');
+            }
+        }
+    }
+
+    public function testSaveToDirectoryLeavesSymbolicLinksOut(): void
+    {
+        $epubFile = EpubFile::openDirectory($this->bookDirectory());
+        $tempDir = (string) $epubFile->getTempDir();
+        if (! @symlink($tempDir . '/EPUB/css/style.css', $tempDir . '/EPUB/css/link.css')) {
+            $this->markTestSkipped('Symbolic links cannot be created here.');
+        }
+
+        $epubFile->saveToDirectory($this->workDir . '/linked');
+
+        $this->assertFileExists($this->workDir . '/linked/EPUB/css/style.css');
+        $this->assertFileDoesNotExist($this->workDir . '/linked/EPUB/css/link.css');
+        $epubFile->cleanup();
     }
 
     /**

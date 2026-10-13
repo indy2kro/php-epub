@@ -137,6 +137,22 @@ final class ExportAdaptersTest extends TestCase
         $this->assertStringContainsString('id="epub-c0-s11"', $html);
     }
 
+    public function testHtmlContentsListSkipsEntriesWithoutATitle(): void
+    {
+        $nav = EpubBuilder::xhtml(
+            'Contents',
+            '<nav epub:type="toc"><h1>Contents</h1><ol>'
+            . '<li><a href="text/chapter.xhtml">Chapter One</a></li>'
+            . '<li><a href="text/two.xhtml">  </a></li></ol></nav>'
+        );
+        $directory = EpubBuilder::nestedToc()->withFile('EPUB/nav.xhtml', $nav)->writeTo($this->tmpDir . '/untitled');
+
+        $html = (new HtmlAdapter())->toString($directory);
+
+        $this->assertStringContainsString('<a href="#epub-c0">Chapter One</a>', $html);
+        $this->assertStringNotContainsString('href="#epub-c1"', $html);
+    }
+
     public function testHtmlLeavesOutNonLinearItemsOnRequest(): void
     {
         $directory = self::twoChapterBook()->writeTo($this->tmpDir . '/book');

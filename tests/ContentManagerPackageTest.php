@@ -319,6 +319,18 @@ final class ContentManagerPackageTest extends TestCase
         $this->assertSame('<encryption', $epubFile->getContentManager()->getContent('META-INF/encryption.xml'));
     }
 
+    public function testDeleteContentWorksWhenTheEncryptionFileIsBroken(): void
+    {
+        $epubFile = EpubFile::open(EpubBuilder::epub3()
+            ->withFile('META-INF/encryption.xml', '<encryption')
+            ->buildEpub($this->tmpDir . '/in.epub'));
+
+        $epubFile->getContentManager()->deleteContent('EPUB/css/style.css');
+
+        $this->assertFileDoesNotExist((string) $epubFile->getTempDir() . '/EPUB/css/style.css');
+        $this->assertSame('<encryption', $epubFile->getContentManager()->getContent('META-INF/encryption.xml'));
+    }
+
     public function testMoveContentOfAFileOutsideTheManifest(): void
     {
         [$contentManager, $manifest] = $this->open();

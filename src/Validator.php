@@ -586,9 +586,13 @@ final readonly class Validator
         }
 
         $document = $root->ownerDocument;
+        // The root of a parsed document is always an element with a document; this narrows the types.
+        // @codeCoverageIgnoreStart
         if (! $root instanceof \DOMElement || ! $document instanceof \DOMDocument) {
             return [];
         }
+
+        // @codeCoverageIgnoreEnd
 
         $issues = [];
         if (strtolower($root->localName ?? '') === 'html' && trim($root->getAttribute('lang')) === '' && trim($root->getAttributeNS('http://www.w3.org/XML/1998/namespace', 'lang')) === '') {
