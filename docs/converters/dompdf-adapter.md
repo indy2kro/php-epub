@@ -22,7 +22,7 @@ The `DompdfAdapter` class converts EPUB content into PDF using the Dompdf librar
 
     A DRM-protected book is refused with a `ConversionException`.
 
-    Dompdf cannot write a PDF outline, so use `TCPDFAdapter` when you need chapter bookmarks.
+    Dompdf has no API to write a PDF outline (bookmarks), so use `TCPDFAdapter` when you need them; it follows the book's nested table of contents.
 
 - **`convert(string $epubDirectory, string $outputPath): void`**: Renders every spine document in reading order, each on a new page, sets the PDF title and author from the EPUB metadata, and writes the PDF. Throws a `ConversionException` if the book cannot be read, Dompdf fails (its exception is kept as the previous exception) or the PDF cannot be written.
 

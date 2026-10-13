@@ -34,7 +34,7 @@ use PhpEpub\XmlParser;
  *
  * The navigation document, the NCX and the landmarks keep only the entries that point into the part; an entry for
  * another part is dropped, and a heading whose own page is elsewhere stays as an unlinked heading when part of its
- * children are here. Page lists are dropped. A link in a document to a document of another part becomes plain text
+ * children are here. A page list keeps the pages of the part's documents. A link in a document to a document of another part becomes plain text
  * (the link element is replaced by its content; a <link> element to it is removed). Documents that are not
  * well-formed are left as they are.
  *
@@ -58,10 +58,22 @@ final readonly class Splitter
      * @return list<string> The paths of the parts, in order.
      *
      * @throws Exception If the book is not loaded or DRM-protected, the plan does not fit the book (a range beyond
-     *                   the reading order, no table of contents entries to split at), or a part cannot be written.
+     *                   the reading order, no table of contents entries to split at), a part file already exists, or a
+     *                   part cannot be written.
      */
     public function split(EpubFile $book, SplitPlan $plan, string $outputDirectory): array
     {
+        return $this->splitWithReport($book, $plan, $outputDirectory)->paths;
+    }
+
+    /**
+     * Like split(), and reports what could not be read from the book (see SplitReport::$warnings).
+     *
+     * @throws Exception As split() does.
+     */
+    public function splitWithReport(EpubFile $book, SplitPlan $plan, string $outputDirectory): SplitReport
+    {
+        $warnings = [];
         $directory = $book->getTempDir() ?? throw new Exception('EPUB file must be loaded before splitting.');
         $book->isDrmProtected() && throw new Exception('The book is DRM-protected, so its content cannot be split.');
 
@@ -78,26 +90,33 @@ final readonly class Splitter
 
         $spinePaths !== [] || throw new Exception('The book has no content to split');
 
+        $toc = $this->tableOfContents($book, $warnings);
+        $landmarks = $this->landmarks($book, $warnings);
         $analysis = ReferenceGraph::forBook($book, $this->xmlParser)->analyzeFrom($this->roots($book, $spinePaths));
-        $groups = $this->groups($book, $plan, $spinePaths, $analysis, $directory);
+        $groups = $this->groups($toc, $plan, $spinePaths, $analysis, $directory);
         $total = count($groups);
         $total <= $plan->maxParts || throw new Exception("The split plan would produce {$total} parts; the limit is {$plan->maxParts}");
 
+        // A part file that exists is never overwritten: it could be someone's book, and a failed run would delete it.
+        $width = max(2, strlen((string) $total));
+        $targets = [];
+        foreach (array_keys($groups) as $number) {
+            $targets[$number] = rtrim($outputDirectory, '/\\') . DIRECTORY_SEPARATOR . sprintf('%s-%0' . $width . 'd.epub', $plan->filePrefix, $number + 1);
+            ! file_exists($targets[$number]) || throw new Exception('Refusing to overwrite an existing file: ' . $targets[$number]);
+        }
+
         is_dir($outputDirectory) || @mkdir($outputDirectory, 0777, true) || is_dir($outputDirectory) || throw new Exception("Failed to create directory: {$outputDirectory}");
 
-        $archive = $book->saveToString();
-        $toc = $this->tableOfContents($book);
-        $landmarks = $this->landmarks($book);
-        $width = max(2, strlen((string) $total));
         $written = [];
 
         try {
             foreach ($groups as $number => $positions) {
-                $path = rtrim($outputDirectory, '/\\') . DIRECTORY_SEPARATOR . sprintf('%s-%0' . $width . 'd.epub', $plan->filePrefix, $number + 1);
-                $part = EpubFile::openString($archive, null, $this->xmlParser ?? $book->getXmlParser());
+                $path = $targets[$number];
+                $part = $book->copy($this->xmlParser);
 
                 try {
-                    $this->buildPart($part, $book, $plan, $positions, $spinePaths, $analysis, $toc, $landmarks, $number + 1, $total);
+                    $this->buildPart($part, $book, $plan, $positions, $spinePaths, $analysis, $toc, $landmarks, $number + 1, $total, $warnings);
+                    // The path did not exist before this run, so whatever is there after a failed save is ours to delete.
                     $written[] = $path;
                     ModifiedDate::save($part, $path, $plan->clock);
                 } finally {
@@ -113,7 +132,7 @@ final readonly class Splitter
             throw $throwable;
         }
 
-        return $written;
+        return new SplitReport($written, $warnings);
     }
 
     /**
@@ -152,20 +171,21 @@ final readonly class Splitter
     /**
      * The reading order positions of every part.
      *
+     * @param list<TocEntry> $toc
      * @param array<int, string> $spinePaths
      *
      * @return list<list<int>>
      *
      * @throws Exception
      */
-    private function groups(EpubFile $book, SplitPlan $plan, array $spinePaths, ReferenceAnalysis $analysis, string $directory): array
+    private function groups(array $toc, SplitPlan $plan, array $spinePaths, ReferenceAnalysis $analysis, string $directory): array
     {
         $positions = array_keys($spinePaths);
 
         $groups = match ($plan->kind) {
             SplitKind::Count => array_chunk($positions, max(1, $plan->count)),
             SplitKind::Ranges => $this->rangeGroups($plan, $spinePaths),
-            SplitKind::Toc => $this->tocGroups($book, $plan->level, $spinePaths),
+            SplitKind::Toc => $this->tocGroups($toc, $plan->level, $spinePaths),
             SplitKind::Bytes => $this->byteGroups($plan->maxBytes, $spinePaths, $analysis, $directory),
         };
 
@@ -198,13 +218,14 @@ final readonly class Splitter
     }
 
     /**
+     * @param list<TocEntry> $toc
      * @param array<int, string> $spinePaths
      *
      * @return list<list<int>>
      *
      * @throws Exception
      */
-    private function tocGroups(EpubFile $book, int $level, array $spinePaths): array
+    private function tocGroups(array $toc, int $level, array $spinePaths): array
     {
         $positionOf = [];
         foreach ($spinePaths as $position => $path) {
@@ -212,7 +233,7 @@ final readonly class Splitter
         }
 
         $starts = [];
-        foreach ($this->entriesAtLevel($this->tableOfContents($book), $level) as $entry) {
+        foreach ($this->entriesAtLevel($toc, $level) as $entry) {
             $path = $this->firstPath($entry);
             if ($path !== null && isset($positionOf[$path])) {
                 $starts[$positionOf[$path]] = true;
@@ -353,25 +374,33 @@ final readonly class Splitter
     }
 
     /**
+     * @param list<string> $warnings
+     *
      * @return list<TocEntry>
      */
-    private function tableOfContents(EpubFile $book): array
+    private function tableOfContents(EpubFile $book, array &$warnings): array
     {
         try {
             return $book->getTableOfContents()->getEntries();
         } catch (Exception) {
+            $warnings[] = 'The table of contents could not be read, so the parts have an entry for their first document only.';
+
             return [];
         }
     }
 
     /**
+     * @param list<string> $warnings
+     *
      * @return list<Landmark>
      */
-    private function landmarks(EpubFile $book): array
+    private function landmarks(EpubFile $book, array &$warnings): array
     {
         try {
             return $book->getTableOfContents()->getLandmarks();
         } catch (Exception) {
+            $warnings[] = 'The landmarks could not be read, so the parts have none.';
+
             return [];
         }
     }
@@ -381,6 +410,7 @@ final readonly class Splitter
      * @param array<int, string> $spinePaths
      * @param list<TocEntry> $toc
      * @param list<Landmark> $landmarks
+     * @param list<string> $warnings
      *
      * @throws Exception
      */
@@ -394,7 +424,8 @@ final readonly class Splitter
         array $toc,
         array $landmarks,
         int $number,
-        int $total
+        int $total,
+        array &$warnings
     ): void {
         $directory = (string) $part->getTempDir();
         $inPart = array_fill_keys($positions, true);
@@ -409,7 +440,7 @@ final readonly class Splitter
             }
         }
 
-        $this->prune($part, $directory, $keep);
+        $this->prune($part, $directory, $keep, $warnings);
 
         // A hyperlink may only point to a document of the reading order, so every other content document
         // (another part's, and the navigation document when it is not in this part's reading order) is unlinked.
@@ -434,7 +465,7 @@ final readonly class Splitter
 
         $this->pruneNavigations($part, $directory, $inSpine);
         $this->unlinkRemovedDocuments($part, $directory, $removedDocuments);
-        $this->dropPageLists($part, $directory);
+        $this->prunePageLists($part, $directory, $inSpine);
         $this->setMetadata($part, $plan, $number, $total);
 
         $navigation = $part->getTableOfContents();
@@ -454,10 +485,11 @@ final readonly class Splitter
      * Deletes the files of the manifest that are not needed, and their encryption entries.
      *
      * @param array<string, true> $keep
+     * @param list<string> $warnings
      *
      * @throws Exception
      */
-    private function prune(EpubFile $part, string $directory, array $keep): void
+    private function prune(EpubFile $part, string $directory, array $keep, array &$warnings): void
     {
         $manifest = $part->getManifest();
         $obfuscation = new FontObfuscation($directory, $part->getXmlParser(), $this->paths);
@@ -465,6 +497,8 @@ final readonly class Splitter
             $fonts = $obfuscation->obfuscatedFonts();
         } catch (Exception) {
             $fonts = [];
+            $warning = 'META-INF/encryption.xml could not be read, so the parts keep its entries for fonts they no longer have.';
+            in_array($warning, $warnings, true) || $warnings[] = $warning;
         }
 
         foreach ($manifest->getItems() as $item) {
@@ -506,12 +540,16 @@ final readonly class Splitter
     }
 
     /**
-     * Removes the page list from the navigation document and the NCX: its pages are in the whole book.
+     * Keeps, in the page list of the navigation document and of the NCX, the pages that are in the part's reading
+     * order; the others go, and so does a page list left with no page.
+     *
+     * @param array<string, true> $keep The reading order documents of the part.
      *
      * @throws Exception
      */
-    private function dropPageLists(EpubFile $part, string $directory): void
+    private function prunePageLists(EpubFile $part, string $directory, array $keep): void
     {
+        $links = new LinkRemover($this->paths, $part->getXmlParser());
         foreach ($part->getManifest()->getItems() as $item) {
             $isNavigation = in_array('nav', explode(' ', $item->properties), true);
             if ($item->path === '' || (! $isNavigation && $item->mediaType !== 'application/x-dtbncx+xml')) {
@@ -527,15 +565,35 @@ final readonly class Splitter
 
             $root = dom_import_simplexml($xml);
             $xpath = new DOMXPath($root->ownerDocument ?? new DOMDocument());
-            $query = $isNavigation
-                ? "//*[local-name()='nav'][@*[local-name()='type' and contains(concat(' ', normalize-space(.), ' '), ' page-list ')]]"
-                : "//*[local-name()='pageList']";
-
             $changed = false;
-            foreach (iterator_to_array($xpath->query($query) ?: []) as $node) {
-                if ($node instanceof DOMElement) {
-                    $node->parentNode?->removeChild($node);
-                    $changed = true;
+            if ($isNavigation) {
+                $query = "//*[local-name()='nav'][@*[local-name()='type' and contains(concat(' ', normalize-space(.), ' '), ' page-list ')]]";
+                foreach ($this->elements($xpath->query($query)) as $nav) {
+                    foreach (array_reverse($this->elements($xpath->query(".//*[local-name()='li']", $nav))) as $entry) {
+                        $changed = $this->pruneEntry($entry, $xpath, $links, $item->path, $keep) || $changed;
+                    }
+
+                    if ($this->countNodes($xpath, ".//*[local-name()='li']", $nav) === 0 && $nav->parentNode instanceof \DOMNode) {
+                        $nav->parentNode->removeChild($nav);
+                        $changed = true;
+                    }
+                }
+            } else {
+                foreach ($this->elements($xpath->query("//*[local-name()='pageList']")) as $pageList) {
+                    foreach ($this->elements($xpath->query("./*[local-name()='pageTarget']", $pageList)) as $target) {
+                        $content = $this->elements($xpath->query("./*[local-name()='content']", $target))[0] ?? null;
+                        $source = $content instanceof DOMElement ? $content->getAttribute('src') : '';
+                        $path = $links->target($source, $item->path);
+                        if ($path !== null && ! isset($keep[$path])) {
+                            $pageList->removeChild($target);
+                            $changed = true;
+                        }
+                    }
+
+                    if ($this->countNodes($xpath, "./*[local-name()='pageTarget']", $pageList) === 0 && $pageList->parentNode instanceof \DOMNode) {
+                        $pageList->parentNode->removeChild($pageList);
+                        $changed = true;
+                    }
                 }
             }
 

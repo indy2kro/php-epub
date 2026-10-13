@@ -26,7 +26,7 @@ A repair never deletes a file of the book. `PhpEpub\Repair\Repairer` is the clas
 
 | Fix (`RepairFix`) | Codes | What it does |
 |---|---|---|
-| `ModifiedDate` | `METADATA_MODIFIED_MISSING` | Sets `dcterms:modified` to the current time (UTC) |
+| `ModifiedDate` | `METADATA_MODIFIED_MISSING`, `METADATA_MODIFIED_INVALID` | Sets `dcterms:modified` to the current time (UTC), also to replace a value that is not `CCYY-MM-DDThh:mm:ssZ` |
 | `Language` | `METADATA_LANGUAGE_MISSING` | Sets `dc:language` to the default language (`en`) |
 | `Identifier` | `METADATA_IDENTIFIER_MISSING`, `METADATA_UNIQUE_IDENTIFIER` | Gives the package a unique identifier: a `urn:uuid:` when it has no value, else its first non-empty `dc:identifier` is made the unique one |
 | `Navigation` | `NAV_MISSING`, `NCX_MISSING`, `NAV_EMPTY`, `NCX_EMPTY` | Creates the navigation document (from the NCX, else the headings, else the reading order) or the NCX (from the headings, else the reading order); fills an empty table of contents from the headings, else the reading order |
@@ -38,6 +38,9 @@ A repair never deletes a file of the book. `PhpEpub\Repair\Repairer` is the clas
 | `DuplicateIds` | `DUPLICATE_ID` | Gives a manifest item whose id an earlier item uses a new id (`id-2`). The first keeps the id, so the spine and other references keep pointing at it. Repeated ids outside the manifest are not fixed |
 | `Cover` | `COVER_NOT_IMAGE` | Removes the `cover-image` property from an item that is not an image; completes a half-declared cover (the EPUB 3 `cover-image` property and the EPUB 2 `cover` meta, including a cover named by the `<guide>`); declares an image (its content must be one) named `cover.*` or `cover-image.*` when the book declares none. Reported as `COVER_NOT_FLAGGED` and `COVER_NOT_DECLARED` |
 | `ManifestProperties` | `MANIFEST_PROPERTY_MISSING`, `MANIFEST_PROPERTY_UNNEEDED` | Recomputes the `scripted`, `svg`, `remote-resources` and `mathml` properties of the XHTML documents |
+| `EncryptionEntries` | `ENCRYPTION_ENTRY_MISSING` | Drops the `META-INF/encryption.xml` entries (font obfuscation) of files that are not in the book. A DRM-protected book and an entry that points outside the book are left alone |
+| `FragmentLinks` | `CONTENT_FRAGMENT_MISSING` | A link to a missing element of another document loses its `#fragment` and keeps pointing at the document; a link to a missing element of its own document is unlinked (its content stays as text; an anchor that is itself a target only loses its `href`) |
+| `Prefixes` | `OPF_PREFIX_UNDECLARED` | Declares the `ibooks` and `prism` prefixes when the package uses them undeclared; any other prefix has no known vocabulary URI and stays reported |
 | `UpgradeToEpub3` | (none) | Converts an EPUB 2 book with `upgradeToEpub3()`; reported as `UPGRADED_TO_EPUB3`. **Off by default** |
 
 Fixes that address manifest items by id (`MissingFiles`, `MediaTypes`, `Cover`, `ManifestProperties`, `UpgradeToEpub3`) are skipped while the manifest repeats an id and `DuplicateIds` is not selected: they could change the wrong item.

@@ -84,6 +84,22 @@ final class ZipHandlerTest extends TestCase
         $zipHandler->extract($this->invalidZipPath, $this->extractDir);
     }
 
+    public function testCompressToAnEmptyPathThrowsAndWritesNothing(): void
+    {
+        $before = scandir(getcwd() ?: '.');
+        $zipHandler = new ZipHandler();
+        $zipHandler->extract($this->validZipPath, $this->extractDir);
+
+        try {
+            $zipHandler->compress($this->extractDir, '');
+            $this->fail('Expected a ZipException.');
+        } catch (ZipException $exception) {
+            $this->assertStringContainsString('must not be empty', $exception->getMessage());
+        }
+
+        $this->assertSame($before, scandir(getcwd() ?: '.'));
+    }
+
     public function testExtractNonExistentZipThrowsException(): void
     {
         $this->expectException(Exception::class);

@@ -40,7 +40,7 @@ The facade. `open()`/`load()` extract and parse the book, `create()` starts a ne
 A read-only facade for untrusted uploads: it opens the archive with `ZipArchive`, checks the entry names and limits up front, and reads entries when `getMetadata()`, `getTableOfContents()`, `getCoverImage()`, `getText()` or `getContent()` ask for them, each streamed with the limits applied to the bytes actually read. It reuses `Parser`, `Metadata`, `Manifest`, `Spine`, `TableOfContents`, `Util\CoverLocator` and `Util\SpineText`, so its results match `EpubFile`'s. The trade-off: `Metadata`, `Manifest`, `Spine` and `ContentManager` all work on an extraction directory, so retrofitting a lazy mode into `EpubFile` would have meant guarding every mutating method and the file-based collaborators (`Validator`, `Encryption`, converters). A separate facade keeps the editing path untouched and the read-only guarantee structural: there is no `save()`, content manager or conversion to misuse, `Metadata::save()` and `TableOfContents` changes throw `ReadOnlyException`, and in-memory edits are never persisted. The price is that `validate()`, `isDrmProtected()` and conversion are only available on `EpubFile`.
 
 ### Limits
-An immutable value object (`Limits::default()`, `Limits::web()`) that builds the `ZipHandler` and `XmlParser` for `EpubFile` and `EpubReader` and carries the size cap for content documents.
+An immutable value object (`Limits::default()`, `Limits::web()`) that builds the `ZipHandler` and `XmlParser` for `EpubFile` and `EpubReader` and carries the size cap for content documents. `EpubFile::convert()` applies it to adapters that implement `Converters\LimitsAwareConverter`.
 
 ### Metadata
 Reads and edits the `<metadata>` element. Each Dublin Core field has a trait in `src/Traits/` (title, authors and creators, contributors, description, publisher, date, language, subject, identifier); `getMeta()`/`setMeta()` and `getProperty()`/`setProperty()` cover other `<meta>` elements. Values are checked with `Util\XmlText` before they are written.
@@ -80,6 +80,9 @@ Extracts archives with limits (entry count, total size, compression ratio; `Limi
 
 ### BookBuilder
 Builds a new book from Markdown, text, HTML or images (see [Book builder](book-builder.md)): `MarkdownParser` turns Markdown into HTML (raw HTML is escaped), `Util\HtmlSanitizer` reduces any HTML to an allowlist and resolves images against the supplied map only, `BookBuilder` splits the result into chapters, and `BookPackage` writes the package, navigation document and NCX as an OCF archive through `ZipHandler`. `BuildLimits` bounds chapters, bytes and images.
+
+### Command line
+The `php-epub` command (`bin/php-epub`, `Cli\Application`) is a thin layer over `EpubReader`, `EpubFile`, `Merger` and `Splitter` (see [Command line](cli.md)). It opens every book with `Limits::web()` unless told `--trusted`.
 
 ## Untrusted input
 

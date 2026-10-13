@@ -193,7 +193,7 @@ final class ValidatorTest extends TestCase
         yield 'a huge file is only read in part' => ['image/png', $png . random_bytes(2 * 1024 * 1024), []];
         yield 'image declared as XHTML' => ['application/xhtml+xml', $png, ['CONTENT_NOT_WELL_FORMED', 'MEDIA_TYPE_MISMATCH']];
         yield 'plain text declared as XHTML' => ['application/xhtml+xml', "  \n plain words", ['CONTENT_NOT_WELL_FORMED', 'MEDIA_TYPE_MISMATCH']];
-        yield 'XHTML after a byte order mark' => ['application/xhtml+xml', "\xEF\xBB\xBF\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><title>T</title></head><body/></html>", []];
+        yield 'XHTML after a byte order mark' => ['application/xhtml+xml', "\xEF\xBB\xBF\n<html xmlns=\"http://www.w3.org/1999/xhtml\" lang=\"en\"><head><title>T</title></head><body/></html>", []];
         yield 'broken XML is not a media type problem' => ['application/xhtml+xml', '<html><body><p>Open', ['CONTENT_NOT_WELL_FORMED']];
     }
 
@@ -392,6 +392,159 @@ final class ValidatorTest extends TestCase
         $this->expectExceptionMessage('EPUB file must be loaded before validating.');
 
         (new EpubFile($this->tmpDir . '/missing.epub'))->validate();
+    }
+
+    public function testReportsEncryptionEntriesThatNameNoFile(): void
+    {
+        $entry = static fn (string $uri, string $algorithm): string => "<enc:EncryptedData><enc:EncryptionMethod Algorithm=\"{$algorithm}\"/>"
+            . "<enc:CipherData><enc:CipherReference URI=\"{$uri}\"/></enc:CipherData></enc:EncryptedData>";
+        $encryption = static fn (string $entries): string => '<?xml version="1.0" encoding="UTF-8"?><encryption xmlns="urn:oasis:names:tc:opendocument:xmlns:container"'
+            . ' xmlns:enc="http://www.w3.org/2001/04/xmlenc#">' . $entries . '</encryption>';
+        $obfuscation = 'http://www.idpf.org/2008/embedding';
+
+        $book = EpubBuilder::epub3()->withFile('META-INF/encryption.xml', $encryption(
+            $entry('EPUB/css/style.css', $obfuscation) . $entry('EPUB/fonts/gone.otf', $obfuscation) . $entry('../outside.otf', $obfuscation)
+        ));
+        $issues = array_values(array_filter($this->open($book)->validate(), static fn (ValidationIssue $issue): bool => $issue->code === 'ENCRYPTION_ENTRY_MISSING'));
+
+        $this->assertCount(2, $issues);
+        $this->assertSame(ValidationIssue::ERROR, $issues[0]->severity);
+        $this->assertSame('EPUB/fonts/gone.otf', $issues[0]->location);
+        $this->assertSame('../outside.otf', $issues[1]->location);
+
+        // A DRM-protected book is one error: what its entries name is not examined.
+        $drm = EpubBuilder::epub3()->withFile('META-INF/encryption.xml', $encryption($entry('EPUB/fonts/gone.otf', 'http://www.w3.org/2001/04/xmlenc#aes128-cbc')));
+        $this->assertNotContains('ENCRYPTION_ENTRY_MISSING', $this->codes($this->open($drm)->validate()));
+    }
+
+    public function testReportsLinkFragmentsThatNameNoElement(): void
+    {
+        $book = EpubBuilder::epub3()
+            ->withFile('EPUB/text/two.xhtml', EpubBuilder::xhtml('Two', '<h1 id="top">Two</h1><p id="note">N</p>'))
+            ->withFile('EPUB/text/chapter.xhtml', EpubBuilder::xhtml('Chapter', '<h1 id="start">Chapter</h1>'
+                . '<p><a href="two.xhtml#note">ok</a> <a href="two.xhtml#gone">bad</a> <a href="#start">ok</a> <a href="#nowhere">bad</a>'
+                . ' <a href="two.xhtml#epubcfi(/6/2)">cfi</a> <a href="https://example.com/#x">remote</a></p>'));
+        $opf = (string) $book->getFile('EPUB/package.opf');
+        $book->withFile('EPUB/package.opf', str_replace(
+            '</manifest>',
+            '<item id="two" href="text/two.xhtml" media-type="application/xhtml+xml"/></manifest>',
+            $opf
+        ));
+
+        $issues = array_values(array_filter($this->open($book)->validate(), static fn (ValidationIssue $issue): bool => $issue->code === 'CONTENT_FRAGMENT_MISSING'));
+
+        $this->assertCount(2, $issues);
+        $this->assertSame(ValidationIssue::ERROR, $issues[0]->severity);
+        $this->assertSame('EPUB/text/chapter.xhtml', $issues[0]->location);
+        $this->assertStringContainsString('#gone', $issues[0]->message);
+        $this->assertStringContainsString('#nowhere', $issues[1]->message);
+    }
+
+    public function testChecksTheModifiedDateSyntax(): void
+    {
+        foreach (['2026-01-01T00:00:00Z' => false, '2026-01-01' => true, '2026-01-01T00:00:00+02:00' => true, '2026-13-01T00:00:00Z' => true, 'yesterday' => true] as $date => $invalid) {
+            $book = EpubBuilder::epub3();
+            $opf = str_replace('2026-01-01T00:00:00Z', $date, (string) $book->getFile('EPUB/package.opf'));
+            $codes = $this->codes($this->open($book->withFile('EPUB/package.opf', $opf))->validate());
+
+            $this->assertSame($invalid, in_array('METADATA_MODIFIED_INVALID', $codes, true), $date);
+            $this->assertNotContains('METADATA_MODIFIED_MISSING', $codes);
+        }
+    }
+
+    public function testReportsAnNcxIdentifierThatDiffersFromThePackage(): void
+    {
+        $book = EpubBuilder::epub2();
+        $ncx = str_replace('urn:uuid:7c1f0e2a-4b3d-4e5f-8a9b-0c1d2e3f4a5c', 'urn:uuid:other', (string) $book->getFile('OEBPS/toc.ncx'));
+
+        $issues = array_values(array_filter(
+            $this->open($book->withFile('OEBPS/toc.ncx', $ncx))->validate(),
+            static fn (ValidationIssue $issue): bool => $issue->code === 'NCX_UID_MISMATCH'
+        ));
+
+        $this->assertCount(1, $issues);
+        $this->assertSame(ValidationIssue::ERROR, $issues[0]->severity);
+        $this->assertSame('OEBPS/toc.ncx', $issues[0]->location);
+    }
+
+    public function testReportsPropertyPrefixesThePackageDoesNotDeclare(): void
+    {
+        $book = EpubBuilder::epub3();
+        $opf = (string) $book->getFile('EPUB/package.opf');
+        $opf = str_replace('</metadata>', '<meta property="foo:bar">x</meta><meta property="schema:accessMode">visual</meta></metadata>', $opf);
+        $opf = str_replace('id="chapter" href="text/chapter.xhtml"', 'id="chapter" properties="baz:flag" href="text/chapter.xhtml"', $opf);
+
+        $locations = [];
+        foreach ($this->open($book->withFile('EPUB/package.opf', $opf))->validate() as $issue) {
+            if ($issue->code === 'OPF_PREFIX_UNDECLARED') {
+                $locations[] = $issue->location;
+            }
+        }
+
+        $this->assertSame(['foo', 'baz'], $locations);
+
+        $declared = str_replace('version="3.0"', 'version="3.0" prefix="foo: http://example.com/foo# baz: http://example.com/baz#"', $opf);
+        $this->assertNotContains('OPF_PREFIX_UNDECLARED', $this->codes($this->open($book->withFile('EPUB/package.opf', $declared))->validate()));
+    }
+
+    public function testReportsContentAccessibilityProblemsOfEpub3Documents(): void
+    {
+        $body = '<h1>One</h1><img src="a.png" alt=""/><img src="b.png" alt="B"/><img src="c.png"/><img src="d.png"/>'
+            . '<h3>Skipped</h3><h2>Back</h2><table><tr><td>1</td></tr></table>'
+            . '<table role="presentation"><tr><td>layout</td></tr></table><table><tr><th>H</th></tr></table>';
+        $book = EpubBuilder::epub3()->withFile('EPUB/text/chapter.xhtml', str_replace(
+            ' xml:lang="en" lang="en"',
+            '',
+            EpubBuilder::xhtml('Chapter', $body)
+        ));
+
+        $content = ['ACCESSIBILITY_LANG_MISSING', 'ACCESSIBILITY_IMAGE_ALT_MISSING', 'ACCESSIBILITY_HEADING_SKIPPED', 'ACCESSIBILITY_TABLE_HEADERS_MISSING'];
+        $issues = array_column(array_filter(
+            $this->open($book)->validate(),
+            static fn (ValidationIssue $issue): bool => in_array($issue->code, $content, true)
+        ), null, 'code');
+
+        $this->assertSame(
+            ['ACCESSIBILITY_LANG_MISSING', 'ACCESSIBILITY_IMAGE_ALT_MISSING', 'ACCESSIBILITY_HEADING_SKIPPED', 'ACCESSIBILITY_TABLE_HEADERS_MISSING'],
+            array_keys($issues)
+        );
+        foreach ($issues as $issue) {
+            $this->assertSame(ValidationIssue::WARNING, $issue->severity);
+            $this->assertSame('EPUB/text/chapter.xhtml', $issue->location);
+        }
+
+        $this->assertStringContainsString('2 images', $issues['ACCESSIBILITY_IMAGE_ALT_MISSING']->message);
+        $this->assertStringContainsString('h1 to h3', $issues['ACCESSIBILITY_HEADING_SKIPPED']->message);
+        $this->assertStringContainsString('1 table', $issues['ACCESSIBILITY_TABLE_HEADERS_MISSING']->message);
+    }
+
+    public function testContentAccessibilityIsNotCheckedInEpub2Books(): void
+    {
+        $book = EpubBuilder::epub2()->withFile('OEBPS/text/chapter.xhtml', '<?xml version="1.0" encoding="UTF-8"?><html xmlns="http://www.w3.org/1999/xhtml">'
+            . '<head><title>C</title></head><body><h1>C</h1><h3>Skip</h3><img src="a.png"/></body></html>');
+
+        $this->assertSame([], array_filter($this->codes($this->open($book)->validate()), static fn (string $code): bool => str_starts_with($code, 'ACCESSIBILITY_')));
+    }
+
+    public function testAPrintSourceNeedsAPageList(): void
+    {
+        $withSource = EpubBuilder::epub3()->withFile('EPUB/package.opf', str_replace(
+            '<dc:language>',
+            '<dc:source>urn:isbn:9780000000002</dc:source><dc:language>',
+            (string) EpubBuilder::epub3()->getFile('EPUB/package.opf')
+        ));
+
+        $issues = array_values(array_filter($this->open($withSource)->validate(), static fn (ValidationIssue $issue): bool => $issue->code === 'ACCESSIBILITY_PAGE_LIST_MISSING'));
+        $this->assertCount(1, $issues);
+        $this->assertSame(ValidationIssue::WARNING, $issues[0]->severity);
+
+        $pageList = '<nav epub:type="page-list"><ol><li><a href="text/chapter.xhtml">1</a></li></ol></nav>';
+        $withList = $withSource->withFile('EPUB/nav.xhtml', EpubBuilder::xhtml(
+            'Contents',
+            '<nav epub:type="toc"><h1>Contents</h1><ol><li><a href="text/chapter.xhtml">Chapter</a></li></ol></nav>' . $pageList
+        ));
+        $this->assertNotContains('ACCESSIBILITY_PAGE_LIST_MISSING', $this->codes($this->open($withList)->validate()));
+        $this->assertNotContains('ACCESSIBILITY_PAGE_LIST_MISSING', $this->codes($this->open(EpubBuilder::epub3())->validate()));
     }
 
     private function open(EpubBuilder $builder): EpubFile

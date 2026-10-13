@@ -13,6 +13,10 @@
     failOnWarning="true"
     cacheDirectory=".phpunit.cache"
     xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd">
+    <php>
+        <!-- Coverage instrumentation plus the large-image tests need more than the default 128M. -->
+        <ini name="memory_limit" value="512M"/>
+    </php>
     <source>
         <include>
             <directory>./src/</directory>

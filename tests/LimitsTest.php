@@ -8,8 +8,14 @@ use PhpEpub\Cleanup\Cleanup;
 use PhpEpub\Cleanup\CleanupOptions;
 use PhpEpub\Cleanup\ReferenceGraph;
 use PhpEpub\ConversionException;
+use PhpEpub\Converters\DompdfAdapter;
 use PhpEpub\Converters\EpubDocumentLoader;
+use PhpEpub\Converters\HtmlAdapter;
+use PhpEpub\Converters\MarkdownAdapter;
+use PhpEpub\Converters\TCPDFAdapter;
+use PhpEpub\Converters\TextAdapter;
 use PhpEpub\EpubFile;
+use PhpEpub\EpubReader;
 use PhpEpub\Exception;
 use PhpEpub\InvalidEpubException;
 use PhpEpub\Limits;
@@ -22,6 +28,7 @@ use PhpEpub\XmlException;
 use PhpEpub\XmlParser;
 use PhpEpub\ZipException;
 use PhpEpub\ZipHandler;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use ZipArchive;
 
@@ -53,6 +60,53 @@ final class LimitsTest extends TestCase
             [2_000, 200 * 1024 * 1024, 100, 8 * 1024 * 1024, 8 * 1024 * 1024],
             [$web->maxEntries, $web->maxUncompressedBytes, $web->maxCompressionRatio, $web->maxXmlBytes, $web->maxHtmlBytes]
         );
+    }
+
+    public function testArchiveSizePresets(): void
+    {
+        $this->assertSame(PHP_INT_MAX, Limits::default()->maxArchiveBytes);
+        $this->assertSame(100 * 1024 * 1024, Limits::web()->maxArchiveBytes);
+    }
+
+    public function testArchiveSizeBoundaryForStringsAndStreams(): void
+    {
+        $data = (string) file_get_contents($this->book(EpubBuilder::epub3()));
+        $size = strlen($data);
+        $stream = fn () => $this->memoryStream($data);
+
+        EpubFile::openString($data, limits: new Limits(maxArchiveBytes: $size))->close();
+        EpubFile::openStream($stream(), limits: new Limits(maxArchiveBytes: $size))->close();
+        EpubReader::openString($data, new Limits(maxArchiveBytes: $size))->close();
+        EpubReader::openStream($stream(), new Limits(maxArchiveBytes: $size))->close();
+
+        $small = new Limits(maxArchiveBytes: $size - 1);
+        $opens = [
+            'EpubFile::openString' => static fn () => EpubFile::openString($data, limits: $small),
+            'EpubFile::openStream' => static fn () => EpubFile::openStream($stream(), limits: $small),
+            'EpubReader::openString' => static fn () => EpubReader::openString($data, $small),
+            'EpubReader::openStream' => static fn () => EpubReader::openStream($stream(), $small),
+        ];
+        foreach ($opens as $name => $open) {
+            try {
+                $open();
+                $this->fail("{$name} accepted an archive over the limit.");
+            } catch (ZipException $exception) {
+                $this->assertStringContainsString('maxArchiveBytes', $exception->getMessage(), $name);
+            }
+        }
+    }
+
+    public function testAnOversizedStreamIsNotBufferedInFull(): void
+    {
+        $handle = $this->memoryStream(str_repeat('x', 5000));
+
+        try {
+            EpubFile::openStream($handle, limits: new Limits(maxArchiveBytes: 1000));
+            $this->fail('Expected a ZipException.');
+        } catch (ZipException) {
+            // The copy stops one byte past the cap.
+            $this->assertSame(1001, ftell($handle));
+        }
     }
 
     public function testALimitMustBePositive(): void
@@ -259,6 +313,116 @@ final class LimitsTest extends TestCase
 
         $this->expectException(ConversionException::class);
         (new EpubDocumentLoader(maxHtmlBytes: strlen($chapter) - 1))->load($directory);
+    }
+
+    /**
+     * @return iterable<string, array{\Closure(): \PhpEpub\Converters\ConverterInterface}>
+     */
+    public static function convertersWithALoader(): iterable
+    {
+        yield 'html' => [static fn () => new HtmlAdapter()];
+        yield 'text' => [static fn () => new TextAdapter()];
+        yield 'markdown' => [static fn () => new MarkdownAdapter()];
+        yield 'dompdf' => [static fn () => new DompdfAdapter()];
+        yield 'tcpdf' => [static fn () => new TCPDFAdapter()];
+        yield 'explicitly unlimited loader' => [static fn () => new HtmlAdapter(loader: new EpubDocumentLoader())];
+    }
+
+    /**
+     * @param \Closure(): \PhpEpub\Converters\ConverterInterface $adapter
+     */
+    #[DataProvider('convertersWithALoader')]
+    public function testConvertAppliesTheBooksHtmlCapToTheAdapter(\Closure $adapter): void
+    {
+        $chapter = EpubBuilder::xhtml('Chapter', '<p>' . str_repeat('word ', 200) . '</p>');
+        $path = $this->book(EpubBuilder::epub3()->withFile('EPUB/text/chapter.xhtml', $chapter));
+        $output = $this->workDir . '/out.bin';
+
+        $epubFile = EpubFile::open($path);
+        $epubFile->convert($adapter(), $output);
+        $this->assertFileExists($output);
+        unlink($output);
+        $epubFile->close();
+
+        $epubFile = EpubFile::open($path, limits: new Limits(maxHtmlBytes: strlen($chapter) - 1));
+        try {
+            $this->expectException(ConversionException::class);
+            $this->expectExceptionMessage('larger than the limit');
+            $epubFile->convert($adapter(), $output);
+        } finally {
+            $epubFile->close();
+        }
+    }
+
+    public function testConvertKeepsATighterCapOfTheLoaderItself(): void
+    {
+        $chapter = EpubBuilder::xhtml('Chapter', '<p>' . str_repeat('word ', 200) . '</p>');
+        $path = $this->book(EpubBuilder::epub3()->withFile('EPUB/text/chapter.xhtml', $chapter));
+        $epubFile = EpubFile::open($path, limits: new Limits(maxHtmlBytes: strlen($chapter) * 2));
+
+        try {
+            $this->expectException(ConversionException::class);
+            $epubFile->convert(new TextAdapter(loader: new EpubDocumentLoader(maxHtmlBytes: strlen($chapter) - 1)), $this->workDir . '/out.txt');
+        } finally {
+            $epubFile->close();
+        }
+    }
+
+    public function testConvertAppliesTheBooksXmlCapToTheAdapter(): void
+    {
+        $path = $this->book(EpubBuilder::epub3());
+        $epubFile = EpubFile::open($path);
+        $epubFile->convert(new TextAdapter(), $this->workDir . '/out.txt');
+
+        $converter = new TextAdapter();
+        $limited = $converter->withLimits(new Limits(maxXmlBytes: 100));
+        $this->assertNotSame($converter, $limited);
+
+        try {
+            $this->expectException(\PhpEpub\Exception::class);
+            $limited->convert($epubFile->getTempDir() ?? '', $this->workDir . '/out2.txt');
+        } finally {
+            $epubFile->close();
+        }
+    }
+
+    public function testMergerRewritesWithTheBooksXmlParser(): void
+    {
+        $parser = new class () extends XmlParser {
+            /** @var list<string> */
+            public array $sources = [];
+
+            public function parseString(string $content, string $source = 'string'): \SimpleXMLElement
+            {
+                $this->sources[] = $source;
+
+                return parent::parseString($content, $source);
+            }
+        };
+        $books = [
+            MergeBook::builder('urn:uuid:11111111-1111-4111-8111-111111111111', 'One', 1),
+            MergeBook::builder('urn:uuid:22222222-2222-4222-8222-222222222222', 'Two', 1),
+        ];
+        $opened = array_map(fn (EpubBuilder $builder): EpubFile => EpubFile::open($builder->buildEpub($this->workDir . '/book-' . bin2hex(random_bytes(4)) . '.epub')), $books);
+        $report = (new Merger(xmlParser: $parser))->merge($opened, new MergeOptions(), $this->workDir . '/merged.epub');
+        array_walk($opened, static fn (EpubFile $book) => $book->close());
+
+        $this->assertGreaterThan(0, $report->deduplicated);
+        // Every document is parsed when collected and when checked for rewriting; one that is rewritten is parsed a third time.
+        $counts = array_count_values($parser->sources);
+        $this->assertNotEmpty(array_filter($counts, static fn (int $count): bool => $count >= 3));
+    }
+
+    /**
+     * @return resource
+     */
+    private function memoryStream(string $data)
+    {
+        $handle = fopen('php://memory', 'w+b') ?: throw new \RuntimeException('No memory stream');
+        fwrite($handle, $data);
+        rewind($handle);
+
+        return $handle;
     }
 
     private function book(EpubBuilder $builder): string

@@ -6,6 +6,7 @@ namespace PhpEpub\Test;
 
 use PhpEpub\EpubFile;
 use PhpEpub\Exception;
+use PhpEpub\ManifestItem;
 use PhpEpub\Test\Support\EpubBuilder;
 use PhpEpub\TocEntry;
 use PhpEpub\Util\FileSystemHelper;
@@ -26,6 +27,49 @@ final class CreateEpubTest extends TestCase
     protected function tearDown(): void
     {
         (new FileSystemHelper())->deleteDirectory($this->tmpDir);
+    }
+
+    public function testChangingTheLanguageAndTitleKeepsThePackageAndNavigationInStep(): void
+    {
+        $path = $this->tmpDir . DIRECTORY_SEPARATOR . 'relabel.epub';
+        $epubFile = EpubFile::create($path, 'T', 'en');
+        $epubFile->addChapter('One', '<p>Text.</p>');
+
+        $epubFile->getMetadata()->setLanguage('fr');
+        $epubFile->getMetadata()->setTitle('Nouveau');
+        $epubFile->save();
+
+        $reopened = EpubFile::open($path);
+        $nav = $reopened->getManifest()->get('nav');
+        $this->assertInstanceOf(ManifestItem::class, $nav);
+        $navigation = $reopened->getContentManager()->getContent($nav->path);
+        $this->assertStringContainsString('xml:lang="fr"', $navigation);
+        $this->assertStringContainsString('<title>Nouveau</title>', $navigation);
+        $this->assertStringNotContainsString('xml:lang="en"', $navigation);
+        $packages = glob($reopened->getTempDir() . '/EPUB/*.opf') ?: [];
+        $this->assertCount(1, $packages);
+        $package = (string) file_get_contents($packages[0]);
+        $this->assertStringContainsString('xml:lang="fr"', $package);
+        $this->assertStringNotContainsString('xml:lang="en"', $package);
+    }
+
+    public function testACustomNavigationTitleAndLanguageAreLeftAlone(): void
+    {
+        $path = $this->tmpDir . DIRECTORY_SEPARATOR . 'custom.epub';
+        $epubFile = EpubFile::create($path, 'T', 'en');
+        $epubFile->addChapter('One', '<p>Text.</p>');
+        $nav = $epubFile->getManifest()->get('nav');
+        $this->assertInstanceOf(ManifestItem::class, $nav);
+        $custom = str_replace(['<title>T</title>', 'xml:lang="en"'], ['<title>Contents</title>', 'xml:lang="de"'], $epubFile->getContentManager()->getContent($nav->path));
+        $epubFile->getContentManager()->updateContent($nav->path, $custom);
+
+        $epubFile->getMetadata()->setLanguage('fr');
+        $epubFile->getMetadata()->setTitle('Nouveau');
+        $epubFile->save();
+
+        $navigation = EpubFile::open($path)->getContentManager()->getContent($nav->path);
+        $this->assertStringContainsString('<title>Contents</title>', $navigation);
+        $this->assertStringContainsString('xml:lang="de"', $navigation);
     }
 
     public function testCreateWithChaptersSavesABookThatReopens(): void

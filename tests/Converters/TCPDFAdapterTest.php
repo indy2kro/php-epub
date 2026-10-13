@@ -407,6 +407,23 @@ final class TCPDFAdapterTest extends TestCase
         }
     }
 
+    public function testBookmarksFollowTheNestedTableOfContents(): void
+    {
+        $directory = EpubBuilder::nestedToc()->writeTo($this->epubDirectory . '-nested');
+
+        try {
+            $adapter = $this->exposedAdapter();
+            $adapter->createPdfFor($directory);
+
+            $this->assertSame(
+                [['Chapter One', 0], ['Section 1.1', 1], ['Section 1.2', 1], ['Chapter Two', 0]],
+                $adapter->bookmarks
+            );
+        } finally {
+            $this->fileSystemHelper->deleteDirectory($directory);
+        }
+    }
+
     public function testEveryChapterCarriesTheBookCss(): void
     {
         $directory = EpubBuilder::minimal()

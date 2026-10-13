@@ -215,6 +215,46 @@ final class EpubStringStreamTest extends TestCase
         $this->assertSame('Valid Book', EpubFile::open($target)->getMetadata()->getTitle());
     }
 
+    public function testSaveRejectsAnEmptyPath(): void
+    {
+        $epubFile = EpubFile::openString($this->bookData());
+
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('path must not be empty');
+        $epubFile->save('');
+    }
+
+    public function testCompressWithoutAPathNeedsOneForABookFromAString(): void
+    {
+        $epubFile = EpubFile::openString($this->bookData());
+        $before = scandir(getcwd() ?: '.');
+
+        try {
+            $epubFile->compress();
+            $this->fail('Expected an exception.');
+        } catch (Exception $exception) {
+            $this->assertStringContainsString('has no file to overwrite', $exception->getMessage());
+        }
+
+        $this->assertSame($before, scandir(getcwd() ?: '.'));
+
+        $target = $this->tmpDir . '/compressed.epub';
+        $epubFile->compress(filePath: $target);
+        $this->assertSame('Valid Book', EpubFile::open($target)->getMetadata()->getTitle());
+    }
+
+    public function testCompressRejectsAnEmptyPathBeforeChangingTheBook(): void
+    {
+        $epubFile = EpubFile::openString($this->bookData());
+
+        try {
+            $epubFile->compress(filePath: '');
+            $this->fail('Expected an exception.');
+        } catch (Exception $exception) {
+            $this->assertStringContainsString('path must not be empty', $exception->getMessage());
+        }
+    }
+
     public function testLoadCannotReloadABookFromAString(): void
     {
         $epubFile = EpubFile::openString($this->bookData());

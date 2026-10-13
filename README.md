@@ -33,7 +33,7 @@ composer require indy2kro/php-epub
 
 Ensure that you have the necessary PHP extensions and optional libraries installed for full functionality:
 
-- **Required**: `ext-ctype`, `ext-dom`, `ext-libxml`, `ext-simplexml`, `ext-xml`, `ext-zip` (most PHP builds include all of them; on Alpine, for example, `php-ctype`, `php-dom`, `php-simplexml`, `php-xml` and `php-zip` are separate packages)
+- **Required**: `ext-ctype`, `ext-dom`, `ext-libxml`, `ext-mbstring`, `ext-simplexml`, `ext-xml`, `ext-zip` (most PHP builds include all of them; on Alpine, for example, `php-ctype`, `php-dom`, `php-mbstring`, `php-simplexml`, `php-xml` and `php-zip` are separate packages)
 - **Optional**: `dompdf/dompdf` or `tecnickcom/tcpdf` for PDF conversion, and [Calibre](https://calibre-ebook.com/) for other formats (MOBI, AZW3, DOCX, …)
 
 ## Usage
@@ -125,7 +125,7 @@ $epubFile->convert(new CalibreAdapter(['calibre_path' => '/usr/bin/ebook-convert
 
 ### Untrusted uploads
 
-`Limits::web()` bounds a book's entries, size, compression ratio and the size of each XML or XHTML document. `EpubReader` reads a book without extracting it to disk, which suits inspecting an upload per request:
+`Limits::web()` bounds a book's archive size (for strings and streams), entries, size, compression ratio and the size of each XML or XHTML document. `EpubReader` reads a book without extracting it to disk, which suits inspecting an upload per request:
 
 ```php
 use PhpEpub\EpubFile;

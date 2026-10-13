@@ -16,6 +16,12 @@ The `Spine` class manages the reading order of the content within an EPUB file: 
 
 - **`remove(string $idref): void`**: Removes an item from the reading order (the manifest is not touched). Throws if it is not in the spine.
 
+- **`addMany(array $entries): void`**: Appends many manifest items to the reading order at once (each entry has an `idref`, optionally `linear` and `properties`); `add()` rewrites the whole spine each time, which is slow for thousands of items. Throws if an item is unknown or already in the spine (or listed twice), a property is invalid, or properties are given for a package that is not EPUB 3. Nothing is added then.
+
+- **`removeAt(int $position): void`**: Removes the itemref at a zero-based position, e.g. a duplicate that is not the first (`remove()` takes the first). Throws if the position is outside the spine.
+
+- **`getToc(): ?string`** and **`setToc(?string $id): void`**: The id of the NCX manifest item the spine names (`<spine toc="...">`), or `null`. EPUB 2 reading systems find the NCX this way; `null` removes the attribute. Setting throws if the item is not in the manifest.
+
 - **`move(string $idref, int $position): void`**: Moves an item to a new zero-based position (0 to the spine length - 1). Throws if it is not in the spine or the position is out of range.
 
 - **`setLinear(string $idref, bool $linear): void`**: Marks an entry as part of the main reading order or as auxiliary content (`linear="no"`), keeping its other attributes. Throws if it is not in the spine.

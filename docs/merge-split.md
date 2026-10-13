@@ -20,6 +20,14 @@ $report = (new Merger())->merge($books, new MergeOptions(title: 'The Complete Se
 echo $report->books . ' books, ' . $report->files . ' files, ' . $report->deduplicated . " duplicates left out\n";
 ```
 
+`$report->warnings` lists what could not be read from a source and was left out or copied as it was: a table of contents (the merged book then has no entries for that book), the cover landmark, or fonts whose obfuscation could not be read (they are copied as they are and will not decode). It is empty when every source was read in full.
+
+```php
+foreach ($report->warnings as $warning) {
+    error_log($warning);
+}
+```
+
 ```php
 public function merge(array $books, MergeOptions $options, string $outputPath): MergeReport;
 ```
@@ -100,6 +108,19 @@ public function withMaxParts(int $maxParts): self;
 
 `split()` creates the directory when needed, writes `part-01.epub`, `part-02.epub`, … (the prefix is configurable) and returns their paths in order.
 
+`splitWithReport()` does the same and returns a `SplitReport` with the `paths` and the `warnings`: what could not be read from the book (its table of contents, landmarks or font obfuscation) and was left out of the parts or kept as it was.
+
+```php
+public function splitWithReport(EpubFile $book, SplitPlan $plan, string $outputDirectory): SplitReport;
+```
+
+```php
+$report = (new Splitter())->splitWithReport($book, SplitPlan::byToc(), '/path/to/parts');
+foreach ($report->warnings as $warning) {
+    error_log($warning);
+}
+```
+
 ### Plans
 
 - **`byToc($level)`**: each entry of that table of contents level starts a part, which runs to the next entry's first reading order item. Items before the first entry go with the first part. Entries that do not point into the reading order are skipped; a book without such entries cannot be split this way (`Exception`).
@@ -107,12 +128,12 @@ public function withMaxParts(int $maxParts): self;
 - **`bySpineRanges($ranges)`**: `[first, last]` pairs of zero-based, inclusive positions in the reading order, in order and without overlap. Items outside every range are left out. A range beyond the reading order throws.
 - **`byMaxBytes($bytes)`**: items are added to a part while its files stay within the limit. The size counts the documents and the images, stylesheets and fonts they use (each once per part), uncompressed. An item that alone exceeds the limit gets a part of its own, so the limit is approximate.
 
-With `withMaxParts()` (50 by default) a plan that would produce more parts is refused before anything is written, and if writing a part fails the parts already written are deleted. A part is never empty. A book that ends up in a single part is still written, with its title unchanged.
+With `withMaxParts()` (50 by default) a plan that would produce more parts is refused before anything is written, and if writing a part fails the parts already written are deleted. A part file that already exists is never overwritten: the split is refused before anything is written, so parts of an earlier run must be moved away first. A part is never empty. A book that ends up in a single part is still written, with its title unchanged.
 
 ### What a part looks like
 
 - **Content**: the part's reading order items and what they need, found with `ReferenceGraph::analyzeFrom()`: images, stylesheets, fonts, fallbacks and media overlays, plus the navigation document, the NCX and the cover image. Everything else, including files nothing uses, is removed, together with the `META-INF/encryption.xml` entries of removed fonts.
-- **Navigation**: the navigation document, the NCX and the landmarks keep only the entries that point into the part. An entry whose own document is in another part stays as an unlinked heading when some of its children are in this one; otherwise it is dropped. A part without any entry gets one for its first document. Page lists are dropped, because their pages are spread over the whole book. Other navs (lists of figures or tables and the like) keep only the entries that point into the part, and a nav left empty is removed.
+- **Navigation**: the navigation document, the NCX and the landmarks keep only the entries that point into the part. An entry whose own document is in another part stays as an unlinked heading when some of its children are in this one; otherwise it is dropped. A part without any entry gets one for its first document. The page list keeps the pages that are in the part's documents (a part with no print page break has no page list, so `validate()` may report `ACCESSIBILITY_PAGE_LIST_MISSING` for it). Other navs (lists of figures or tables and the like) keep only the entries that point into the part, and a nav left empty is removed.
 - **Links to other parts**: an `<a>` or `<area>` that points to a document of another part is replaced by its content (the link text stays, the link goes), and a `<link>` element to it is removed. Links within the part, to resources and to fragments of the same document are kept. A document that is not well-formed is left as it is.
 - **Metadata**: cloned from the book, with a new `urn:uuid:` unique identifier for each part (other identifiers, such as an ISBN, are dropped because they identify the whole book), the title from the pattern and a new `dcterms:modified`. Obfuscated fonts are re-keyed to the part's identifier.
 

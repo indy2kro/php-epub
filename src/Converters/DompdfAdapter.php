@@ -9,10 +9,11 @@ use Dompdf\Dompdf;
 use Dompdf\Options;
 use PhpEpub\ConversionException;
 use PhpEpub\Exception;
+use PhpEpub\Limits;
 use PhpEpub\Util\FileSystemHelper;
 use Throwable;
 
-class DompdfAdapter implements ConverterInterface
+class DompdfAdapter implements LimitsAwareConverter
 {
     private const array STYLE_TYPES = [
         'font' => 'string',
@@ -64,7 +65,7 @@ class DompdfAdapter implements ConverterInterface
      */
     public function __construct(
         array $styles = [],
-        private readonly EpubDocumentLoader $loader = new EpubDocumentLoader(),
+        private EpubDocumentLoader $loader = new EpubDocumentLoader(),
         ?PdfConversionOptions $options = null
     ) {
         // Without options the adapter behaves as it always did, fixed-layout books included.
@@ -78,6 +79,14 @@ class DompdfAdapter implements ConverterInterface
         );
 
         $this->styles = array_merge(self::DEFAULT_STYLES, $styles);
+    }
+
+    public function withLimits(Limits $limits): static
+    {
+        $limited = clone $this;
+        $limited->loader = $this->loader->withLimits($limits);
+
+        return $limited;
     }
 
     /**

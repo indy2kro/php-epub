@@ -16,8 +16,8 @@ use PhpEpub\XmlParser;
  * Rewrites the references to a moved file inside XHTML (or other XML) documents and stylesheets,
  * and the relative references of a document that moves to another directory.
  *
- * References are resource attributes (the set Validator checks: src, poster, data, and href on
- * a, area, link, image and use, including xlink:href), srcset and imagesrcset candidates, and CSS url() / @import "…" values, in
+ * References are resource attributes (the set Validator checks: src, poster, data, altimg, longdesc, and href on
+ * a, area, link, image and use, including xlink:href; src covers media overlay text and audio elements), srcset and imagesrcset candidates, and CSS url() / @import "…" values, in
  * stylesheets, style elements and style attributes. Query strings and fragments are kept.
  *
  * @internal
@@ -95,7 +95,7 @@ final readonly class ReferenceRewriter
     {
         $name = $attribute->localName ?? '';
         $value = $attribute->value;
-        $isReference = in_array($name, ['src', 'poster', 'data'], true)
+        $isReference = in_array($name, ['src', 'poster', 'data', 'altimg', 'longdesc'], true)
             || ($name === 'href' && in_array($element->localName, ['a', 'area', 'link', 'image', 'use'], true));
         $rewritten = match (true) {
             $isReference => $this->retarget($value, $directories, $from, $to),

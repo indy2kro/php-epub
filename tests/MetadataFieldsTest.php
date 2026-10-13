@@ -389,6 +389,64 @@ final class MetadataFieldsTest extends TestCase
         $metadata->setAccessibilitySummary("Bad\x01");
     }
 
+    public function testSetPropertyRejectsAPrefixThePackageDoesNotDeclare(): void
+    {
+        $metadata = $this->load($this->epub3(''));
+
+        try {
+            $metadata->setPropertyValues('foo:bar', ['x']);
+            $this->fail('An undeclared prefix must be rejected.');
+        } catch (Exception $exception) {
+            $this->assertStringContainsString('declarePrefix', $exception->getMessage());
+        }
+
+        $this->assertSame([], $metadata->getPropertyValues('foo:bar'));
+        $this->assertStringNotContainsString('foo:bar', $this->saved($metadata));
+    }
+
+    public function testSetPropertyAcceptsReservedDeclaredAndKnownPrefixes(): void
+    {
+        $metadata = $this->load($this->epub3(''));
+        $metadata->setProperty('schema:accessMode', 'textual');
+        $metadata->setProperty('belongs-to-collection', 'Series');
+        $metadata->declarePrefix('foo', 'http://example.com/foo#');
+        $metadata->setProperty('foo:bar', 'x');
+        // A known vocabulary is declared on the fly.
+        $metadata->setProperty('ibooks:specified-fonts', 'true');
+        $metadata->declarePrefix('foo', 'http://example.com/other#');
+
+        $this->saved($metadata);
+        $this->assertSame('x', $metadata->getProperty('foo:bar'));
+        $this->assertSame('true', $metadata->getProperty('ibooks:specified-fonts'));
+        $this->assertSame(
+            'foo: http://example.com/foo# ibooks: http://vocabulary.itunes.apple.com/rdf/ibooks/vocabulary-extensions-1.0/',
+            (string) $this->reloadXml()['prefix']
+        );
+    }
+
+    public function testAnUndeclaredPropertyCanStillBeRemoved(): void
+    {
+        $metadata = $this->load($this->epub3('<meta property="foo:bar">x</meta>'));
+
+        $metadata->setProperty('foo:bar', null);
+
+        $this->assertNull($metadata->getProperty('foo:bar'));
+    }
+
+    public function testDeclarePrefixRejectsABadPrefixOrUri(): void
+    {
+        $metadata = $this->load($this->epub3(''));
+
+        foreach ([['not a prefix', 'http://example.com/'], ['foo', ''], ['foo', 'two words'], ['schema', 'http://example.com/']] as [$prefix, $uri]) {
+            try {
+                $metadata->declarePrefix($prefix, $uri);
+                $this->fail("{$prefix} {$uri} must be rejected");
+            } catch (Exception) {
+                $this->addToAssertionCount(1);
+            }
+        }
+    }
+
     private function epub3(string $metadata): string
     {
         return '<?xml version="1.0" encoding="UTF-8"?>'

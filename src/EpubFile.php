@@ -9,6 +9,7 @@ use PhpEpub\Cleanup\CleanupOptions;
 use PhpEpub\Cleanup\CleanupPreset;
 use PhpEpub\Cleanup\CleanupReport;
 use PhpEpub\Converters\ConverterInterface;
+use PhpEpub\Converters\LimitsAwareConverter;
 use PhpEpub\Repair\AppliedFix;
 use PhpEpub\Repair\RepairOptions;
 use PhpEpub\Repair\Repairer;
@@ -52,6 +53,8 @@ class EpubFile
     private ?ContentManager $contentManager = null;
     private readonly int $maxHtmlBytes;
 
+    private readonly Limits $limits;
+
     /**
      * The deflate level save() packs with while compress() runs (null: the zip handler's default).
      */
@@ -62,6 +65,13 @@ class EpubFile
      */
     private ?string $fontKeyIdentifier = null;
 
+    /**
+     * The title and main language the navigation document was last in step with (as loaded or last saved).
+     */
+    private string $syncedTitle = '';
+
+    private string $syncedLanguage = '';
+
     public function __construct(
         private readonly string $filePath,
         ?ZipHandler $zipHandler = null,
@@ -69,6 +79,7 @@ class EpubFile
         ?Limits $limits = null
     ) {
         $limits ??= Limits::default();
+        $this->limits = $limits;
         $this->maxHtmlBytes = $limits->maxHtmlBytes;
         $this->zipHandler = $zipHandler ?? $limits->zipHandler();
         $this->xmlParser = $xmlParser ?? $limits->xmlParser();
@@ -92,6 +103,25 @@ class EpubFile
     }
 
     /**
+     * Opens an expanded (unzipped) book: a directory with META-INF/container.xml, as EPUBCheck's expanded mode and many
+     * publishing workflows use. The files are copied into the private extraction (the directory itself is never changed),
+     * under the same limits as an archive (entry count, total size), and a symbolic link is refused. Such a book has no
+     * file to overwrite: save() needs a path, or use saveToDirectory(), saveToString() or saveToStream().
+     *
+     * @throws Exception If the directory does not exist, is not a valid EPUB or exceeds a limit.
+     */
+    public static function openDirectory(string $directory, ?ZipHandler $zipHandler = null, ?XmlParser $xmlParser = null, ?Limits $limits = null): self
+    {
+        is_dir($directory) || throw new Exception("Directory does not exist: {$directory}");
+
+        $epubFile = new self('', $zipHandler, $xmlParser, $limits);
+        $epubFile->hasFile = false;
+        $epubFile->openWith(fn (string $destination) => $epubFile->zipHandler->import($directory, $destination));
+
+        return $epubFile;
+    }
+
+    /**
      * Opens a book held in a string, e.g. an upload or an HTTP download. The limits apply as for files.
      * Such a book has no file: save() needs a path, or use saveToString() or saveToStream().
      *
@@ -99,6 +129,8 @@ class EpubFile
      */
     public static function openString(string $data, ?ZipHandler $zipHandler = null, ?XmlParser $xmlParser = null, ?Limits $limits = null): self
     {
+        ($limits ?? Limits::default())->assertArchiveSize(strlen($data));
+
         return self::openArchive(
             static fn (string $archive): bool => @file_put_contents($archive, $data) !== false || throw new Exception('Failed to buffer the EPUB data'),
             $zipHandler,
@@ -120,11 +152,13 @@ class EpubFile
         self::assertStream($stream);
 
         return self::openArchive(
-            static function (string $archive) use ($stream): void {
+            static function (string $archive) use ($stream, $limits): void {
                 $output = @fopen($archive, 'wb') ?: throw new Exception('Failed to buffer the EPUB stream');
-                $copied = @stream_copy_to_stream($stream, $output);
-                fclose($output);
-                $copied === false && throw new Exception('Failed to read the EPUB stream');
+                try {
+                    ($limits ?? Limits::default())->bufferStream($stream, $output);
+                } finally {
+                    fclose($output);
+                }
             },
             $zipHandler,
             $xmlParser,
@@ -244,7 +278,7 @@ class EpubFile
     public function load(): void
     {
         if (! $this->hasFile) {
-            throw new Exception('This book was opened from a string or stream and has no file to load again; open it again instead.');
+            throw new Exception('This book was opened from a string, stream or directory and has no file to load again; open it again instead.');
         }
 
         if ($this->tempDir !== null && ! is_file($this->filePath)) {
@@ -376,6 +410,8 @@ class EpubFile
 
             $this->metadata = new Metadata($this->opfXml, $opfFileFullPath);
             $this->fontKeyIdentifier = $this->metadata->getUniqueIdentifier();
+            $this->syncedTitle = $this->metadata->getTitle();
+            $this->syncedLanguage = $this->metadata->getLanguage();
             $this->manifest = new Manifest($this->opfXml, $opfFilePath);
             $this->spine = new Spine($this->opfXml, $this->manifest);
             // Fonts are keyed with the identifier of the last load or save, which rekeyObfuscatedFonts() keeps current.
@@ -396,11 +432,57 @@ class EpubFile
             throw new Exception('EPUB file must be loaded before saving.');
         }
 
-        if ($filePath === null) {
-            $this->hasFile || throw new Exception('This book was opened from a string or stream and has no file to overwrite: pass a path to save(), or use saveToString() or saveToStream().');
-            $filePath = $this->filePath;
+        $filePath = $this->targetPath($filePath);
+
+        $this->preparePackage($tempDir);
+
+        ($this->compressionLevel === null ? $this->zipHandler : $this->zipHandler->withCompressionLevel($this->compressionLevel))->compress($tempDir, $filePath);
+    }
+
+    /**
+     * Saves the book as an expanded (unzipped) directory, the counterpart of openDirectory(). The directory is created
+     * when missing; an existing one must be empty, so a book is never mixed into other files. The saved files are
+     * what save() would pack (including the exact mimetype file).
+     *
+     * @throws Exception If the book is not loaded, the path is empty, is a file or a directory that is not empty, or the files cannot be written.
+     */
+    public function saveToDirectory(string $directory): void
+    {
+        $tempDir = $this->tempDir;
+        if ($tempDir === null) {
+            throw new Exception('EPUB file must be loaded before saving.');
         }
 
+        $directory === '' && throw new Exception('The target path must not be empty.');
+        if (is_dir($directory)) {
+            count(scandir($directory) ?: []) > 2 && throw new Exception("The target directory is not empty: {$directory}");
+        } elseif (file_exists($directory)) {
+            throw new Exception("The target exists and is not a directory: {$directory}");
+        }
+
+        $this->preparePackage($tempDir);
+
+        $created = ! is_dir($directory);
+        $created && ! @mkdir($directory, 0777, true) && ! is_dir($directory) && throw new Exception("Failed to create directory: {$directory}");
+
+        try {
+            self::copyTree($tempDir, $directory);
+        } catch (Throwable $throwable) {
+            // Leave nothing half written behind: the directory was missing or empty.
+            (new FileSystemHelper())->deleteDirectory($directory);
+            $created || @mkdir($directory, 0777, true);
+
+            throw $throwable;
+        }
+    }
+
+    /**
+     * Writes the pending changes into the extraction and makes its mimetype file exact.
+     *
+     * @throws Exception
+     */
+    private function preparePackage(string $tempDir): void
+    {
         $this->writePackage();
 
         // Books with a missing or padded mimetype load (see Parser::parse()), but the saved one must be exact.
@@ -408,8 +490,71 @@ class EpubFile
         FileSystemHelper::readFile($mimetype) === 'application/epub+zip'
             || @file_put_contents($mimetype, 'application/epub+zip') !== false
             || throw new Exception("Failed to write the mimetype file: {$mimetype}");
+    }
 
-        ($this->compressionLevel === null ? $this->zipHandler : $this->zipHandler->withCompressionLevel($this->compressionLevel))->compress($tempDir, $filePath);
+    /**
+     * Copies the files and directories below $source into $destination (links are skipped).
+     *
+     * @throws Exception If a file cannot be copied.
+     */
+    private static function copyTree(string $source, string $destination): void
+    {
+        $prefix = strlen($source) + 1;
+        $files = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($source, \FilesystemIterator::SKIP_DOTS), \RecursiveIteratorIterator::SELF_FIRST);
+        foreach ($files as $file) {
+            if (! $file instanceof \SplFileInfo || $file->isLink()) {
+                continue;
+            }
+
+            $target = $destination . DIRECTORY_SEPARATOR . substr($file->getPathname(), $prefix);
+            if ($file->isDir()) {
+                is_dir($target) || @mkdir($target, 0777, true) || throw new Exception("Failed to create directory: {$target}");
+            } elseif ($file->isFile()) {
+                @copy($file->getPathname(), $target) || throw new Exception('Failed to copy: ' . substr($file->getPathname(), $prefix));
+            }
+        }
+    }
+
+    /**
+     * The path save() writes to: the given one, or the file the book was opened from.
+     *
+     * @throws Exception If the path is empty, or there is none and the book has no file.
+     */
+    private function targetPath(?string $filePath): string
+    {
+        if ($filePath === '') {
+            throw new Exception('The target path must not be empty.');
+        }
+
+        if ($filePath === null) {
+            $this->hasFile || throw new Exception('This book was opened from a string, stream or directory and has no file to overwrite: pass a path to save(), or use saveToString(), saveToStream() or saveToDirectory().');
+
+            return $this->filePath;
+        }
+
+        return $filePath;
+    }
+
+    /**
+     * Makes an independent copy of the loaded book, with its unsaved changes, by copying the extracted files. That is
+     * much cheaper than saveToString() and openString(), which pack and unpack the whole book. The copy has the
+     * same limits and ZipHandler and no file of its own (see openString()); changing it leaves this book alone, and
+     * it has its own extraction, so call cleanup() on it when done.
+     *
+     * @param XmlParser|null $xmlParser The parser for the copy; by default this book's.
+     *
+     * @throws Exception If the book is not loaded or the files cannot be copied.
+     */
+    public function copy(?XmlParser $xmlParser = null): self
+    {
+        $source = $this->tempDir ?? throw new Exception('EPUB file must be loaded before copying.');
+        $this->writePackage();
+
+        $copy = new self('', $this->zipHandler, $xmlParser ?? $this->xmlParser, $this->limits);
+        $copy->hasFile = false;
+        $copy->openWith(static fn (string $directory) => self::copyTree($source, $directory));
+
+        return $copy;
     }
 
     /**
@@ -419,18 +564,19 @@ class EpubFile
      * @param CleanupOptions|CleanupPreset $options What to do; a preset stands for CleanupOptions::preset().
      * @param string|null $filePath Where to write the book; null overwrites the file it was opened from.
      *
-     * @throws Exception If the book is not loaded or is DRM-protected, or cannot be written.
+     * @throws Exception If the book is not loaded or is DRM-protected, has no file to overwrite and no path was given, the path is empty, or the book cannot be written.
      */
     public function compress(CleanupOptions|CleanupPreset $options = CleanupPreset::Balanced, ?string $filePath = null): CleanupReport
     {
         $options = $options instanceof CleanupPreset ? CleanupOptions::preset($options) : $options;
+        // Refuse a missing target before the book is changed.
+        $target = $options->dryRun ? '' : $this->targetPath($filePath);
         $report = (new Cleanup($this))->run($options);
         if ($options->dryRun) {
             return $report;
         }
 
         $before = $this->hasFile && is_file($this->filePath) ? filesize($this->filePath) : false;
-        $target = $filePath ?? $this->filePath;
         $this->compressionLevel = $options->maxDeflate ? 9 : null;
 
         try {
@@ -481,7 +627,9 @@ class EpubFile
     }
 
     /**
-     * Converts the book with the given adapter, including changes that have not been saved yet.
+     * Converts the book with the given adapter, including changes that have not been saved yet. A converter that
+     * reads the book through an EpubDocumentLoader (every adapter but Calibre) also enforces the limits the book was
+     * opened with, besides its own.
      *
      * @throws ConversionException If the book is DRM-protected (see isDrmProtected()): its content cannot be read.
      * @throws Exception If the book is not loaded or the conversion fails.
@@ -496,7 +644,7 @@ class EpubFile
         (new Encryption($tempDir, $this->xmlParser))->assertNotDrmProtected();
 
         $this->writePackage();
-        $converter->convert($tempDir, $outputPath);
+        ($converter instanceof LimitsAwareConverter ? $converter->withLimits($this->limits) : $converter)->convert($tempDir, $outputPath);
     }
 
     /**
@@ -635,7 +783,8 @@ class EpubFile
     /**
      * The plain text of the book's XHTML and HTML documents in reading order, e.g. for a search index or a
      * word count: path (relative to the book root) => text, as ContentManager::getText() reads each.
-     * Spine items that are not XHTML or HTML documents, or whose file is missing, are left out.
+     * Spine items that are not XHTML or HTML documents, whose file is missing or that are encrypted (DRM, see
+     * getEncryptedPaths(): their text would be ciphertext) are left out.
      *
      * @param bool $linearOnly Skip the auxiliary content of the spine (linear="no"), such as notes.
      *
@@ -649,7 +798,7 @@ class EpubFile
         $contentManager = $this->getContentManager();
         $existing = array_flip($contentManager->getContentPaths());
 
-        return SpineText::collect($this->getSpine(), $linearOnly, static fn (string $path): bool => isset($existing[$path]), $contentManager->getText(...));
+        return SpineText::collect($this->getSpine(), $linearOnly, static fn (string $path): bool => isset($existing[$path]), $contentManager->getText(...), array_flip($this->encryption()->encryptedPaths()));
     }
 
     /**
@@ -737,6 +886,10 @@ class EpubFile
 
             // The NCX repeats the title (for EPUB 2 reading systems) and the unique identifier.
             $this->getTableOfContents()->syncNcx($metadata->getTitle(), $metadata->getUniqueIdentifier());
+            // The navigation document repeats the title and the language too.
+            $this->getTableOfContents()->syncNavigation($this->syncedTitle, $metadata->getTitle(), $this->syncedLanguage, $metadata->getLanguage());
+            $this->syncedTitle = $metadata->getTitle();
+            $this->syncedLanguage = $metadata->getLanguage();
         }
     }
 
@@ -798,7 +951,7 @@ class EpubFile
      * lists a resource encrypted with an algorithm that is not a font obfuscation, or the book has
      * META-INF/rights.xml or META-INF/license.lcpl. Such a book can be read as a package, but its
      * encrypted content cannot (the library never decrypts it), validate() reports it and
-     * convert() refuses it. A damaged encryption.xml is ignored here.
+     * convert() refuses it. A damaged, oversized or entity-declaring encryption.xml counts as protection, since what it lists is unknown.
      *
      * @throws Exception If the book is not loaded.
      */
@@ -858,7 +1011,7 @@ class EpubFile
      */
     public function repair(?RepairOptions $options = null): array
     {
-        return (new Repairer($this))->repair($options);
+        return (new Repairer($this, xmlParser: $this->xmlParser))->repair($options);
     }
 
     /**

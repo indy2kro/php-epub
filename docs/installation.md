@@ -6,6 +6,10 @@ Use Composer to install the PHP EPUB Processor library by running the following 
 composer require indy2kro/php-epub
 ```
 
+## Command line
+
+Composer links `vendor/bin/php-epub`, a small command line for validating, repairing, compressing, converting, splitting and merging books; see [Command line](cli.md).
+
 ## Optional: PDF conversion
 
 PDF conversion uses one of two optional libraries:

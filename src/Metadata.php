@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PhpEpub;
 
+use PhpEpub\Util\PackagePrefixes;
 use PhpEpub\Util\XmlText;
 use SimpleXMLElement;
 
@@ -205,11 +206,19 @@ class Metadata
      * Replaces every book-level <meta property="…"> with this property by one element per
      * value; [] removes them all. Refinements of other elements are not touched.
      *
+     * A prefixed property ("foo:bar") needs its prefix reserved (schema, dcterms, rendition, media, marc, onix,
+     * xsd, a11y) or declared: a few common vocabularies (ibooks, prism) are declared here, any other prefix
+     * must be declared with declarePrefix() first, as EPUBCheck rejects an undeclared one (OPF-028). Removing
+     * values is always allowed.
+     *
      * @param list<string> $values
+     *
+     * @throws Exception If a value is not valid XML text, or the property uses a prefix the package does not declare.
      */
     public function setPropertyValues(string $property, array $values): void
     {
         XmlText::assertValid($property, ...$values);
+        $values === [] || $this->assertPrefixDeclared($property);
         $metas = $this->propertyMetas($property);
 
         foreach ($values as $index => $value) {
@@ -226,6 +235,36 @@ class Metadata
         }
 
         $this->modified = true;
+    }
+
+    /**
+     * Declares a vocabulary prefix in the package's prefix attribute ("foo: http://example.com/foo#"), so that
+     * properties such as "foo:bar" can be set. A prefix the package already declares keeps its URI.
+     *
+     * @throws Exception If the prefix is not a valid, non-reserved prefix or the URI is empty or has white space.
+     */
+    public function declarePrefix(string $prefix, string $uri): void
+    {
+        preg_match('/^[A-Za-z_][\w.-]*$/D', $prefix) === 1 && ! in_array($prefix, PackagePrefixes::RESERVED, true)
+            || throw new Exception("Not a prefix that can be declared: {$prefix}");
+        preg_match('/^\S+$/D', $uri) === 1 || throw new Exception("Not a vocabulary URI: {$uri}");
+        XmlText::assertValid($prefix, $uri);
+
+        PackagePrefixes::declare($this->opfXml, $prefix, $uri);
+        $this->modified = true;
+    }
+
+    private function assertPrefixDeclared(string $property): void
+    {
+        $prefix = PackagePrefixes::prefixOf($property);
+        if ($prefix === null || ! $this->isEpub3() || PackagePrefixes::isUsable($this->opfXml, $property)) {
+            return;
+        }
+
+        isset(PackagePrefixes::KNOWN[$prefix]) || throw new Exception(
+            "The prefix \"{$prefix}:\" is not declared in the package: declare it with declarePrefix() before setting {$property}"
+        );
+        $this->declarePrefix($prefix, PackagePrefixes::KNOWN[$prefix]);
     }
 
     /**

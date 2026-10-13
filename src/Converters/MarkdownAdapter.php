@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PhpEpub\Converters;
 
 use PhpEpub\ConversionException;
+use PhpEpub\Limits;
 use PhpEpub\Util\HtmlSanitizer;
 use PhpEpub\Util\HtmlToMarkdown;
 
@@ -20,7 +21,7 @@ use PhpEpub\Util\HtmlToMarkdown;
  * Use export() for the Markdown and the images in memory, MarkdownExport::writeTo() to write "book.md" and
  * "images/" into a directory, or convert() to write the Markdown file with its "images" folder beside it.
  */
-final readonly class MarkdownAdapter implements ConverterInterface
+final readonly class MarkdownAdapter implements LimitsAwareConverter
 {
     /**
      * @param bool $includeNonLinear Also export the auxiliary spine items (linear="no"), such as notes.
@@ -35,6 +36,11 @@ final readonly class MarkdownAdapter implements ConverterInterface
         private int $maxImageSize = 16 * 1024 * 1024,
         private EpubDocumentLoader $loader = new EpubDocumentLoader()
     ) {
+    }
+
+    public function withLimits(Limits $limits): static
+    {
+        return new self($this->includeNonLinear, $this->includeHeader, $this->maxImageBytes, $this->maxImageSize, $this->loader->withLimits($limits));
     }
 
     /**

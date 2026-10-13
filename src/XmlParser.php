@@ -12,7 +12,7 @@ class XmlParser
     /**
      * @param int $maxBytes Largest document, in bytes, parse() and parseString() accept (no cap by default).
      */
-    public function __construct(private readonly int $maxBytes = PHP_INT_MAX)
+    public function __construct(public readonly int $maxBytes = PHP_INT_MAX)
     {
     }
 

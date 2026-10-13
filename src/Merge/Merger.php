@@ -54,11 +54,13 @@ final readonly class Merger
     /**
      * @param XmlParser|null $xmlParser The parser for the books' documents; by default each book's own, which keeps
      *                                  the Limits it was opened with.
+     * @param ReferenceRewriter|null $rewriter Rewrites the references of the documents; by default one that parses with
+     *                                         the same parser as the document's book, so the same caps apply.
      */
     public function __construct(
         private PathResolver $paths = new PathResolver(),
         private ?XmlParser $xmlParser = null,
-        private ReferenceRewriter $rewriter = new ReferenceRewriter()
+        private ?ReferenceRewriter $rewriter = null
     ) {
     }
 
@@ -171,8 +173,9 @@ final readonly class Merger
 
         $parsers = array_map(fn (EpubFile $book): XmlParser => $this->xmlParser ?? $book->getXmlParser(), $books);
         $files = [];
+        $warnings = [];
         foreach ($books as $index => $book) {
-            $this->collect($book, $index, $outputDirectory, $files, $parsers[$index]);
+            $this->collect($book, $index, $outputDirectory, $files, $parsers[$index], $warnings);
         }
 
         $deduplicated = $options->deduplicate ? $this->deduplicate($files, $parsers) : 0;
@@ -184,19 +187,20 @@ final readonly class Merger
         $this->copyOverlays($merged, $books, $files, $idMaps);
         $this->setCover($merged, $books[0], $options, $pathMaps[0], $idMaps[0]);
         $merged->getContentManager()->updateManifestProperties();
-        $this->writeNavigation($merged, $books, $options, $pathMaps, $outputDirectory);
+        $this->writeNavigation($merged, $books, $options, $pathMaps, $outputDirectory, $warnings);
 
-        return new MergeReport(count($books), count($files) - $deduplicated, $deduplicated, $bytes, $identifier);
+        return new MergeReport(count($books), count($files) - $deduplicated, $deduplicated, $bytes, $identifier, $warnings);
     }
 
     /**
      * Reads the files of a book that go into the merged one.
      *
      * @param list<MergeFile> $files
+     * @param list<string> $warnings
      *
      * @throws Exception
      */
-    private function collect(EpubFile $book, int $index, string $outputDirectory, array &$files, XmlParser $xmlParser): void
+    private function collect(EpubFile $book, int $index, string $outputDirectory, array &$files, XmlParser $xmlParser, array &$warnings): void
     {
         $directory = (string) $book->getTempDir();
         $manifest = $book->getManifest();
@@ -219,7 +223,7 @@ final readonly class Merger
         }
 
         $prefix = ($outputDirectory === '' ? '' : $outputDirectory . '/') . sprintf('book-%02d/', $index + 1);
-        $obfuscated = $this->obfuscatedFonts($directory, $xmlParser);
+        $obfuscated = $this->obfuscatedFonts($directory, $xmlParser, $index, $warnings);
         $links = new LinkRemover($this->paths, $xmlParser);
 
         foreach ($manifest->getItems() as $item) {
@@ -242,6 +246,7 @@ final readonly class Merger
                     $content = $book->getContentManager()->getFontData($item->path);
                 } catch (Exception) {
                     $isFont = false;
+                    $warnings[] = 'Book ' . ($index + 1) . ": the font {$item->path} could not be read de-obfuscated, so it is copied as it is and will not decode in the merged book.";
                 }
             }
 
@@ -300,13 +305,17 @@ final readonly class Merger
     }
 
     /**
+     * @param list<string> $warnings
+     *
      * @return array<string, string> path => algorithm
      */
-    private function obfuscatedFonts(string $directory, XmlParser $xmlParser): array
+    private function obfuscatedFonts(string $directory, XmlParser $xmlParser, int $index, array &$warnings): array
     {
         try {
             return (new FontObfuscation($directory, $xmlParser, $this->paths))->obfuscatedFonts();
         } catch (Exception) {
+            $warnings[] = 'Book ' . ($index + 1) . ': META-INF/encryption.xml could not be read, so its fonts are copied as they are.';
+
             return [];
         }
     }
@@ -362,7 +371,7 @@ final readonly class Merger
 
         foreach ($files as $document) {
             if ($document->url === '' && $document->aliasOf === null && ! $this->isBinary($document) && $this->isRewritable($document, $parsers[$document->book])) {
-                $document->content = $this->rewrite($document, $rewrites);
+                $document->content = $this->rewrite($document, $rewrites, $parsers[$document->book]);
             }
         }
 
@@ -419,8 +428,9 @@ final readonly class Merger
     /**
      * @param list<array{string, string}> $rewrites [from, to] pairs of book-relative paths.
      */
-    private function rewrite(MergeFile $document, array $rewrites): string
+    private function rewrite(MergeFile $document, array $rewrites, XmlParser $xmlParser): string
     {
+        $rewriter = $this->rewriter ?? new ReferenceRewriter($this->paths, $xmlParser);
         $content = $document->content;
         $isCss = $document->mediaType === 'text/css';
         foreach ($rewrites as [$from, $to]) {
@@ -429,8 +439,8 @@ final readonly class Merger
             }
 
             $content = ($isCss
-                ? $this->rewriter->rewriteCss($content, $document->newPath, $document->newPath, $from, $to)
-                : $this->rewriter->rewriteXml($content, $document->newPath, $document->newPath, $from, $to)) ?? $content;
+                ? $rewriter->rewriteCss($content, $document->newPath, $document->newPath, $from, $to)
+                : $rewriter->rewriteXml($content, $document->newPath, $document->newPath, $from, $to)) ?? $content;
         }
 
         return $content;
@@ -729,10 +739,11 @@ final readonly class Merger
     /**
      * @param list<EpubFile> $books
      * @param list<array<string, string>> $pathMaps
+     * @param list<string> $warnings
      *
      * @throws Exception
      */
-    private function writeNavigation(EpubFile $merged, array $books, MergeOptions $options, array $pathMaps, string $outputDirectory): void
+    private function writeNavigation(EpubFile $merged, array $books, MergeOptions $options, array $pathMaps, string $outputDirectory, array &$warnings): void
     {
         $ncxPath = ($outputDirectory === '' ? '' : $outputDirectory . '/') . 'toc.ncx';
         $ncx = '<?xml version="1.0" encoding="UTF-8"?>' . "\n"
@@ -759,6 +770,7 @@ final readonly class Merger
                 $sourceEntries = $book->getTableOfContents()->getEntries();
             } catch (Exception) {
                 $sourceEntries = [];
+                $warnings[] = 'Book ' . ($index + 1) . ': the table of contents could not be read, so the merged one has no entries for it' . ($options->oneSectionPerBook ? ' below its section.' : ' beyond its first document.');
             }
 
             $mapped = $this->mapEntries($sourceEntries, $pathMaps[$index]);
@@ -781,6 +793,7 @@ final readonly class Merger
             ));
         } catch (Exception) {
             $covers = [];
+            $warnings[] = 'Book 1: the landmarks could not be read, so the merged book has no cover landmark.';
         }
 
         $path = isset($covers[0]) ? ($pathMaps[0][$covers[0]->path] ?? null) : null;

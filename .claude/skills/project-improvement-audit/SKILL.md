@@ -63,7 +63,7 @@ CI runs `composer update` first, so it uses newer PHPStan / Rector than a stale
 ```sh
 composer update --no-progress                 # restore composer.lock afterwards: git checkout composer.lock
 vendor/bin/phpunit --coverage-text            # needs pcov or xdebug for coverage
-vendor/bin/phpcs src/ tests/ docs/
+vendor/bin/phpcs src/ tests/ docs/ bin/
 php -d memory_limit=512M vendor/bin/phpstan analyse --no-progress
 vendor/bin/rector --dry-run
 composer audit ; composer outdated --direct
@@ -83,6 +83,7 @@ actionlint
 4. `src/ContentManager.php`, `src/TableOfContents.php`, `src/Landmark.php`, `src/BookTemplate.php`, the remaining `src/Util/` classes
 5. `src/Validator.php`, `src/Converter.php`, `src/Converters/`, `scripts/`
 6. `docs/`, `mkdocs.yml`, `README.md`, `AGENTS.md`, `tests/`, `tests/fixtures/`, `.github/workflows/`, `composer.json`
+7. `src/Cleanup/`, `src/Merge/`, `src/Split/`, `src/Repair/`, `src/Kindle/`, `src/Build/`, `src/BookSummary.php`, `src/Cli/`, `bin/`
 
 For each batch, grep first and read only what a hit calls for. Useful probes:
 `ZipArchive` / `extractTo` / `getNameIndex`, `getFromName` with unchecked names,

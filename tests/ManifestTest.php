@@ -7,6 +7,8 @@ namespace PhpEpub\Test;
 use PhpEpub\Exception;
 use PhpEpub\InvalidEpubException;
 use PhpEpub\Manifest;
+use PhpEpub\ManifestItem;
+use PhpEpub\Spine;
 use PhpEpub\Test\Support\EpubBuilder;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -264,7 +266,8 @@ final class ManifestTest extends TestCase
 
         $manifest->remove('cover');
         $manifest->remove('ncx');
-        $manifest->remove('cover-page');
+        $manifest->remove('alt');
+        $manifest->remove('audio-page');
 
         $saved = (string) $xml->asXML();
         $this->assertStringNotContainsString('name="cover"', $saved);
@@ -272,11 +275,34 @@ final class ManifestTest extends TestCase
         $this->assertStringNotContainsString('fallback=', $saved);
         $this->assertStringNotContainsString('media-overlay=', $saved);
         $this->assertStringNotContainsString('toc=', $saved);
-        $this->assertStringNotContainsString('<reference', $saved);
-        // Unrelated metadata and spine entries stay; spine itemrefs are Spine's job.
+        $this->assertStringNotContainsString('<reference type="cover"', $saved);
+        // Unrelated metadata and spine entries stay.
         $this->assertStringContainsString('content="Kept"', $saved);
         $this->assertStringContainsString('refines="#uid"', $saved);
         $this->assertStringContainsString('<itemref idref="cover-page"/>', $saved);
+    }
+
+    public function testRemoveRefusesAnItemThatIsInTheSpine(): void
+    {
+        $opf = '<package xmlns="http://www.idpf.org/2007/opf" version="3.0"><metadata/><manifest>'
+            . '<item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml"/>'
+            . '</manifest><spine><itemref idref="chapter"/></spine></package>';
+        $xml = new SimpleXMLElement($opf);
+        $manifest = new Manifest($xml, 'EPUB/package.opf');
+
+        try {
+            $manifest->remove('chapter');
+            $this->fail('Removing a spine item must throw');
+        } catch (Exception $exception) {
+            $this->assertStringContainsString('is in the spine', $exception->getMessage());
+        }
+
+        $this->assertInstanceOf(ManifestItem::class, $manifest->get('chapter'));
+        $this->assertFalse($manifest->isModified());
+
+        (new Spine($xml, $manifest))->remove('chapter');
+        $manifest->remove('chapter');
+        $this->assertNull($manifest->get('chapter'));
     }
 
     public function testRemoveCopesWithHrefsOutsideTheBook(): void
@@ -303,7 +329,9 @@ final class ManifestTest extends TestCase
 
     public function testRemove(): void
     {
-        $manifest = $this->manifest();
+        $xml = new SimpleXMLElement(EpubBuilder::opf());
+        $manifest = new Manifest($xml, 'EPUB/package.opf');
+        (new Spine($xml, $manifest))->remove('chapter');
 
         $manifest->remove('chapter');
 

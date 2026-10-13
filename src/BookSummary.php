@@ -7,7 +7,7 @@ namespace PhpEpub;
 use PhpEpub\Util\WordCount;
 
 /**
- * A JSON-ready description of a loaded book, built by EpubFile::toArray(): metadata, cover, table of
+ * A JSON-ready description of a loaded book, built by EpubFile::toArray() and EpubReader::toArray(): metadata, cover, table of
  * contents, reading order, statistics and DRM state in one array of scalars and lists.
  *
  * The array holds only strings, ints, bools, nulls and arrays, so json_encode() accepts it. Dates are
@@ -82,9 +82,11 @@ final class BookSummary
     /**
      * @return SummaryShape
      *
+     * @param int|null $wordCount The words of the linear content, for a book that counts them itself (EpubReader); EpubFile is counted here.
+     *
      * @throws Exception If the book is not loaded.
      */
-    public static function of(EpubFile $book): array
+    public static function of(EpubFile|EpubReader $book, ?int $wordCount = null): array
     {
         $toc = $book->getTableOfContents();
         $entries = self::safeList(static fn (): array => $toc->getEntries());
@@ -109,7 +111,7 @@ final class BookSummary
                 'pageListCount' => count(self::safeList(static fn (): array => $toc->getPageList())),
             ],
             'spine' => self::spine($book, $titles),
-            'stats' => self::stats($book),
+            'stats' => self::stats($book, $wordCount),
             'drm' => [
                 'isDrmProtected' => $book->isDrmProtected(),
                 'encryptedPathCount' => count($book->getEncryptedPaths()),
@@ -128,7 +130,7 @@ final class BookSummary
     /**
      * @return MetadataShape
      */
-    private static function metadata(EpubFile $book): array
+    private static function metadata(EpubFile|EpubReader $book): array
     {
         $metadata = $book->getMetadata();
         $person = static fn (Contributor $contributor): array => [
@@ -185,7 +187,7 @@ final class BookSummary
     /**
      * @return array{path: string, mediaType: string, bytes: int}|null
      */
-    private static function cover(EpubFile $book): ?array
+    private static function cover(EpubFile|EpubReader $book): ?array
     {
         $cover = $book->getCoverImage();
 
@@ -234,7 +236,7 @@ final class BookSummary
      *
      * @return list<SpineShape>
      */
-    private static function spine(EpubFile $book, array $titles): array
+    private static function spine(EpubFile|EpubReader $book, array $titles): array
     {
         $spine = [];
         foreach ($book->getSpine()->getItems() as $spineItem) {
@@ -254,7 +256,7 @@ final class BookSummary
     /**
      * @return StatsShape
      */
-    private static function stats(EpubFile $book): array
+    private static function stats(EpubFile|EpubReader $book, ?int $wordCount): array
     {
         $groups = [
             'xhtml' => ['count' => 0, 'bytes' => 0],
@@ -270,7 +272,7 @@ final class BookSummary
             $groups[$group]['bytes'] += self::fileSize($book, $item->path);
         }
 
-        $words = self::wordCount($book);
+        $words = $wordCount ?? ($book instanceof EpubFile ? self::wordCount($book) : 0);
 
         return [
             'groups' => $groups,
@@ -328,8 +330,12 @@ final class BookSummary
         return $words;
     }
 
-    private static function totalBytes(EpubFile $book): int
+    private static function totalBytes(EpubFile|EpubReader $book): int
     {
+        if ($book instanceof EpubReader) {
+            return array_sum(array_map($book->getContentSize(...), $book->getContentPaths()));
+        }
+
         $root = $book->getTempDir();
 
         return $root !== null && is_dir($root) ? self::directoryBytes($root) : 0;
@@ -353,8 +359,12 @@ final class BookSummary
         return $total;
     }
 
-    private static function fileSize(EpubFile $book, string $path): int
+    private static function fileSize(EpubFile|EpubReader $book, string $path): int
     {
+        if ($book instanceof EpubReader) {
+            return $path !== '' && $book->hasContent($path) ? $book->getContentSize($path) : 0;
+        }
+
         $root = $book->getTempDir();
         if ($root === null || $path === '') {
             return 0;

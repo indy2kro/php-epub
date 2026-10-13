@@ -44,7 +44,16 @@ final readonly class Encryption
             return [];
         }
 
-        $encryption = $this->xmlParser->parse($file);
+        return self::entriesOf($this->xmlParser->parse($file));
+    }
+
+    /**
+     * The resources a parsed encryption.xml lists, as entries() returns them.
+     *
+     * @return list<array{uri: string, algorithm: string}>
+     */
+    public static function entriesOf(\SimpleXMLElement $encryption): array
+    {
         $encryption->registerXPathNamespace('enc', self::ENCRYPTION_NAMESPACE);
 
         $entries = [];
@@ -63,8 +72,9 @@ final readonly class Encryption
     }
 
     /**
-     * Whether the book is DRM-protected. An encryption.xml that cannot be parsed counts as
-     * listing nothing, so a damaged file never stops a book from being used.
+     * Whether the book is DRM-protected. An encryption.xml that cannot be read (malformed, with an entity
+     * declaration, or larger than the XML limit) counts as possibly protecting the book: what it lists is
+     * unknown, so its content must not be treated as plain.
      */
     public function isDrmProtected(): bool
     {
@@ -74,10 +84,28 @@ final readonly class Encryption
             }
         }
 
+        if ($this->isUnreadable()) {
+            return true;
+        }
+
         foreach ($this->safeEntries() as $entry) {
             if (! FontObfuscation::isObfuscation($entry['algorithm'])) {
                 return true;
             }
+        }
+
+        return false;
+    }
+
+    /**
+     * Whether the book has an encryption.xml that cannot be parsed (see isDrmProtected()).
+     */
+    public function isUnreadable(): bool
+    {
+        try {
+            $this->entries();
+        } catch (XmlException) {
+            return true;
         }
 
         return false;
@@ -91,14 +119,26 @@ final readonly class Encryption
      */
     public function encryptedPaths(): array
     {
+        return self::encryptedPathsOf($this->safeEntries(), $this->paths);
+    }
+
+    /**
+     * The encryptedPaths() of already read entries.
+     *
+     * @param list<array{uri: string, algorithm: string}> $entries
+     *
+     * @return list<string>
+     */
+    public static function encryptedPathsOf(array $entries, PathResolver $resolver): array
+    {
         $paths = [];
-        foreach ($this->safeEntries() as $entry) {
+        foreach ($entries as $entry) {
             if (FontObfuscation::isObfuscation($entry['algorithm'])) {
                 continue;
             }
 
             try {
-                $paths[] = $this->paths->normalize($entry['uri']);
+                $paths[] = $resolver->normalize($entry['uri']);
             } catch (InvalidEpubException) {
                 // A reference outside the book names nothing in it.
             }

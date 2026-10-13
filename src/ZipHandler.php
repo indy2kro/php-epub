@@ -115,6 +115,115 @@ class ZipHandler
     }
 
     /**
+     * Copies an expanded (unzipped) book into a directory, under the same limits as extract(): the entry count and the
+     * total size (the compression ratio does not apply to plain files), names that are unique after case folding. The
+     * source is treated as untrusted: a symbolic link is refused, so nothing outside it is ever read.
+     *
+     * @param string $sourceDirectory The expanded book.
+     * @param string $destination The directory to copy into (created when missing).
+     *
+     * @throws ZipException If the source is not a directory, holds a symbolic link, exceeds a limit or cannot be copied.
+     */
+    public function import(string $sourceDirectory, string $destination): void
+    {
+        $root = is_dir($sourceDirectory) ? realpath($sourceDirectory) : false;
+        if ($root === false) {
+            throw new ZipException("Directory does not exist: {$sourceDirectory}");
+        }
+
+        $this->ensureDirectory($destination);
+
+        $prefix = strlen($root) + 1;
+        $entries = 0;
+        $bytes = 0;
+        $files = [];
+        $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root, RecursiveDirectoryIterator::SKIP_DOTS), RecursiveIteratorIterator::SELF_FIRST);
+        foreach ($iterator as $entry) {
+            if (! $entry instanceof \SplFileInfo) {
+                continue;
+            }
+
+            $path = $entry->getPathname();
+            $name = str_replace('\\', '/', substr($path, $prefix));
+
+            if (++$entries > $this->maxEntries) {
+                throw new ZipException("Directory has too many entries (more than {$this->maxEntries}): {$sourceDirectory}");
+            }
+
+            if ($entry->isLink()) {
+                throw new ZipException("Directory contains a symbolic link: {$name}");
+            }
+
+            try {
+                $target = $this->paths->resolve($destination, $name);
+            } catch (InvalidEpubException $exception) {
+                throw new ZipException("Entry resolves outside the EPUB: {$name}", 0, $exception);
+            }
+
+            if ($entry->isDir()) {
+                $this->ensureDirectory($target);
+
+                continue;
+            }
+
+            $folded = self::foldName($name);
+            if (isset($files[$folded])) {
+                throw new ZipException("Entries differ only in case: {$files[$folded]} and {$name}");
+            }
+
+            $files[$folded] = $name;
+            $bytes += $this->copyFile($path, $target, $name, $bytes);
+        }
+    }
+
+    /**
+     * @return int The bytes copied.
+     *
+     * @throws ZipException
+     */
+    private function copyFile(string $path, string $target, string $name, int $copiedBytes): int
+    {
+        $input = @fopen($path, 'rb');
+        if ($input === false) {
+            throw new ZipException("Failed to read file: {$name}" . $this->lastError());
+        }
+
+        $output = @fopen($target, 'wb');
+        if ($output === false) {
+            fclose($input);
+            throw new ZipException("Failed to create file: {$name}" . $this->lastError());
+        }
+
+        $written = 0;
+
+        try {
+            while (! feof($input)) {
+                $chunk = @fread($input, self::CHUNK_SIZE);
+                if ($chunk === false) {
+                    throw new ZipException("Failed to read file: {$name}" . $this->lastError());
+                }
+
+                $written += strlen($chunk);
+                if ($copiedBytes + $written > $this->maxUncompressedBytes) {
+                    throw new ZipException("Directory exceeds the maximum uncompressed size of {$this->maxUncompressedBytes} bytes");
+                }
+
+                // A full disk or a closed handle; cannot be provoked portably.
+                // @codeCoverageIgnoreStart
+                if (fwrite($output, $chunk) === false) {
+                    throw new ZipException("Failed to write file: {$name}");
+                }
+                // @codeCoverageIgnoreEnd
+            }
+        } finally {
+            fclose($input);
+            fclose($output);
+        }
+
+        return $written;
+    }
+
+    /**
      * Extracts one entry and returns the number of bytes written.
      *
      * @param array<string, string> $files The file entries extracted so far, keyed by their case-folded target.
@@ -281,10 +390,12 @@ class ZipHandler
      * @param string $source The directory to compress.
      * @param string $zipFilePath The path where the ZIP file should be created.
      *
-     * @throws ZipException If the compression fails.
+     * @throws ZipException If the compression fails or the target path is empty.
      */
     public function compress(string $source, string $zipFilePath): void
     {
+        $zipFilePath === '' && throw new ZipException('The path of the ZIP file must not be empty.');
+
         $realSource = realpath($source);
         if ($realSource === false) {
             throw new ZipException("Invalid source directory: {$source}");

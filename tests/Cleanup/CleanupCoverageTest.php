@@ -91,16 +91,21 @@ final class CleanupCoverageTest extends TestCase
         $this->assertFileExists($book->getTempDir() . '/EPUB/stray.txt');
     }
 
-    public function testUnusedFontsAreRemovedEvenWhenEncryptionXmlIsDamaged(): void
+    public function testADamagedEncryptionXmlStopsTheCleanupLikeDrm(): void
     {
         $book = $this->open(CleanupBook::builder(
             '<item id="f" href="f.otf" media-type="font/otf"/>',
             ['EPUB/f.otf' => 'font', 'META-INF/encryption.xml' => '<encryption']
         ));
 
-        $report = (new Cleanup($book))->run(new CleanupOptions(removeUnusedFonts: true));
+        try {
+            (new Cleanup($book))->run(new CleanupOptions(removeUnusedFonts: true));
+            $this->fail('A book whose encryption.xml cannot be read is possibly DRM-protected.');
+        } catch (\PhpEpub\Exception $exception) {
+            $this->assertStringContainsString('DRM-protected', $exception->getMessage());
+        }
 
-        $this->assertSame(['EPUB/f.otf'], $report->getAction(CleanupAction::UNUSED_FONTS)?->files);
+        $this->assertFileExists($book->getTempDir() . '/EPUB/f.otf');
         $this->assertSame('<encryption', $this->read('META-INF/encryption.xml'));
     }
 

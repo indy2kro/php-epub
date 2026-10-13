@@ -9,8 +9,13 @@ use PhpEpub\Converters\ConverterInterface;
 use PhpEpub\Converters\DompdfAdapter;
 use PhpEpub\Converters\TCPDFAdapter;
 use PhpEpub\EpubFile;
+use PhpEpub\EpubReader;
 use PhpEpub\Exception;
+use PhpEpub\Limits;
+use PhpEpub\Merge\MergeOptions;
+use PhpEpub\Merge\Merger;
 use PhpEpub\Test\Support\EpubBuilder;
+use PhpEpub\Test\Support\MergeBook;
 use PhpEpub\Util\FileSystemHelper;
 use PHPUnit\Framework\TestCase;
 
@@ -133,13 +138,66 @@ final class EncryptionTest extends TestCase
         $this->assertSame([], $epubFile->getEncryptedPaths());
     }
 
-    public function testADamagedEncryptionFileDoesNotStopTheBookFromLoading(): void
+    public function testADamagedEncryptionFileDoesNotStopTheBookFromLoadingButCountsAsProtection(): void
     {
         $epubFile = $this->open(EpubBuilder::epub3()->withFile('META-INF/encryption.xml', '<encryption><broken'));
 
-        $this->assertFalse($epubFile->isDrmProtected());
+        $this->assertTrue($epubFile->isDrmProtected());
         $this->assertSame([], $epubFile->getEncryptedPaths());
-        $this->assertSame([], $epubFile->validate());
+        $this->assertSame('Valid Book', $epubFile->getMetadata()->getTitle());
+
+        $issues = $epubFile->validate();
+        $this->assertCount(1, $issues);
+        $this->assertSame('CONTENT_ENCRYPTED', $issues[0]->code);
+        $this->assertSame('META-INF/encryption.xml', $issues[0]->location);
+        $this->assertStringContainsString('cannot be read', $issues[0]->message);
+    }
+
+    public function testAnEncryptionFileWithAnEntityDeclarationCountsAsProtection(): void
+    {
+        $epubFile = $this->open(EpubBuilder::epub3()->withFile(
+            'META-INF/encryption.xml',
+            '<?xml version="1.0"?><!DOCTYPE encryption [<!ENTITY x "y">]><encryption xmlns="urn:oasis:names:tc:opendocument:xmlns:container"/>'
+        ));
+
+        $this->assertTrue($epubFile->isDrmProtected());
+        $this->expectException(ConversionException::class);
+        $epubFile->convert(new TCPDFAdapter(), $this->tmpDir . '/out.pdf');
+    }
+
+    public function testAnOversizedEncryptionFileCountsAsProtection(): void
+    {
+        // Padded to be larger than the package document, which the same cap applies to.
+        $xml = str_replace('</encryption>', '<!--' . str_repeat('x', 20000) . '--></encryption>', self::encryption(['EPUB/fonts/a.otf' => 'http://www.idpf.org/2008/embedding']));
+        $path = EpubBuilder::epub3()->withFile('META-INF/encryption.xml', $xml)->buildEpub($this->tmpDir . '/capped.epub');
+
+        $this->assertFalse(EpubFile::open($path, limits: new Limits(maxXmlBytes: strlen($xml)))->isDrmProtected());
+
+        $capped = EpubFile::open($path, limits: new Limits(maxXmlBytes: strlen($xml) - 1));
+        $this->assertTrue($capped->isDrmProtected());
+
+        $output = $this->tmpDir . '/out.pdf';
+        try {
+            $capped->convert(new DompdfAdapter(), $output);
+            $this->fail('A book whose encryption.xml is too large to read must not be converted');
+        } catch (ConversionException $conversionException) {
+            $this->assertStringContainsString('DRM-protected', $conversionException->getMessage());
+        }
+
+        $this->assertFileDoesNotExist($output);
+    }
+
+    public function testAnUnreadableEncryptionFileStopsAMerge(): void
+    {
+        $books = [
+            MergeBook::builder('urn:uuid:11111111-1111-4111-8111-111111111111', 'One', 1)->withFile('META-INF/encryption.xml', '<encryption><broken'),
+            MergeBook::builder('urn:uuid:22222222-2222-4222-8222-222222222222', 'Two', 1),
+        ];
+        $opened = array_map($this->open(...), $books);
+
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('DRM-protected');
+        (new Merger())->merge($opened, new MergeOptions(), $this->tmpDir . '/merged.epub');
     }
 
     public function testAnEntryWithoutAnAlgorithmCountsAsEncrypted(): void
@@ -152,6 +210,68 @@ final class EncryptionTest extends TestCase
 
         $this->assertTrue($epubFile->isDrmProtected());
         $this->assertSame(['EPUB/text/chapter.xhtml'], $epubFile->getEncryptedPaths());
+    }
+
+    public function testGetTextSkipsEncryptedDocuments(): void
+    {
+        $path = $this->twoChapterBook(['EPUB/text/secret.xhtml' => self::AES])->buildEpub($this->tmpDir . '/text.epub');
+
+        $epubFile = EpubFile::open($path);
+        $reader = EpubReader::open($path);
+        try {
+            $this->assertSame(['EPUB/text/chapter.xhtml'], array_keys($epubFile->getText()));
+            $this->assertSame($epubFile->getText(), $reader->getText());
+            $this->assertSame(['EPUB/text/chapter.xhtml'], array_keys($reader->getText(false)));
+        } finally {
+            $epubFile->close();
+            $reader->close();
+        }
+    }
+
+    public function testGetTextStillReadsObfuscatedFontBooksAndPlainBooks(): void
+    {
+        $path = $this->twoChapterBook(['EPUB/fonts/a.otf' => 'http://www.idpf.org/2008/embedding'])->buildEpub($this->tmpDir . '/fonts.epub');
+
+        $epubFile = EpubFile::open($path);
+        try {
+            $this->assertSame(['EPUB/text/chapter.xhtml', 'EPUB/text/secret.xhtml'], array_keys($epubFile->getText()));
+        } finally {
+            $epubFile->close();
+        }
+    }
+
+    public function testContentManagerRefusesTheTextOfAnEncryptedDocument(): void
+    {
+        $epubFile = EpubFile::open($this->twoChapterBook(['EPUB/text/secret.xhtml' => self::AES])->buildEpub($this->tmpDir . '/cm.epub'));
+        try {
+            $this->assertSame('Chapter' . "\n" . 'Text.', $epubFile->getContentManager()->getText('EPUB/text/chapter.xhtml'));
+
+            $this->expectException(Exception::class);
+            $this->expectExceptionMessage('encrypted');
+            $epubFile->getContentManager()->getText('EPUB/text/secret.xhtml');
+        } finally {
+            $epubFile->close();
+        }
+    }
+
+    /**
+     * A book with a plain chapter and a second spine document that is listed in encryption.xml as given.
+     *
+     * @param array<string, string> $entries CipherReference URI => algorithm
+     */
+    private function twoChapterBook(array $entries): EpubBuilder
+    {
+        $builder = EpubBuilder::epub3();
+        $opf = str_replace(
+            ['</manifest>', '</spine>'],
+            ['<item id="secret" href="text/secret.xhtml" media-type="application/xhtml+xml"/></manifest>', '<itemref idref="secret"/></spine>'],
+            (string) $builder->getFile('EPUB/package.opf')
+        );
+
+        return $builder
+            ->withFile('EPUB/package.opf', $opf)
+            ->withFile('EPUB/text/secret.xhtml', EpubBuilder::xhtml('Secret', '<p>Ciphertext stand-in.</p>'))
+            ->withFile('META-INF/encryption.xml', self::encryption($entries));
     }
 
     public function testTheQueriesNeedALoadedBook(): void

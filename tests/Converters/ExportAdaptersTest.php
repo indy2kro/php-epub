@@ -120,6 +120,23 @@ final class ExportAdaptersTest extends TestCase
         $this->assertSame(1, substr_count($html, '<style>'));
     }
 
+    public function testHtmlContentsListNestsTheSectionsOfTheTableOfContents(): void
+    {
+        $directory = EpubBuilder::nestedToc()->writeTo($this->tmpDir . '/nested');
+
+        $html = (new HtmlAdapter())->toString($directory);
+
+        $this->assertStringContainsString(
+            '<nav class="epub-toc"><h2>Contents</h2><ol>'
+            . '<li><a href="#epub-c0">Chapter One</a><ol>'
+            . '<li><a href="#epub-c0-s11">Section 1.1</a></li>'
+            . '<li><a href="#epub-c0-s12">Section 1.2</a></li></ol></li>'
+            . '<li><a href="#epub-c1">Chapter Two</a></li></ol></nav>',
+            $html
+        );
+        $this->assertStringContainsString('id="epub-c0-s11"', $html);
+    }
+
     public function testHtmlLeavesOutNonLinearItemsOnRequest(): void
     {
         $directory = self::twoChapterBook()->writeTo($this->tmpDir . '/book');

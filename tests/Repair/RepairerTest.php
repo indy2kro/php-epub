@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PhpEpub\Test\Repair;
 
 use DateTimeImmutable;
+use PhpEpub\Encryption;
 use PhpEpub\EpubFile;
 use PhpEpub\Exception;
 use PhpEpub\ManifestItem;
@@ -660,6 +661,112 @@ final class RepairerTest extends TestCase
     /**
      * A book with a dozen problems at once.
      */
+    public function testDropsEncryptionEntriesOfFilesThatAreGone(): void
+    {
+        $book = $this->bookWithFontEntries(['EPUB/fonts/a.otf' => 'http://www.idpf.org/2008/embedding', 'EPUB/fonts/gone.otf' => 'http://www.idpf.org/2008/embedding']);
+        $epub = $this->open($book);
+        $this->assertContains('ENCRYPTION_ENTRY_MISSING', $this->codes($epub->validate()));
+
+        $fixes = $epub->repair();
+
+        $this->assertSame(['ENCRYPTION_ENTRY_MISSING'], $this->fixCodes($fixes));
+        $this->assertSame('EPUB/fonts/gone.otf', $fixes[0]->location);
+        $entries = (new Encryption((string) $epub->getTempDir()))->entries();
+        $this->assertSame(['EPUB/fonts/a.otf'], array_column($entries, 'uri'));
+        $this->assertNotContains('ENCRYPTION_ENTRY_MISSING', $this->codes($epub->validate()));
+        $this->assertSame([], $epub->repair());
+
+        $epub = $this->open($book);
+        $this->assertSame([], $epub->repair(RepairOptions::only(RepairFix::Language)));
+        $this->assertCount(2, (new Encryption((string) $epub->getTempDir()))->entries());
+    }
+
+    public function testLeavesTheEncryptionEntriesOfADrmBookAlone(): void
+    {
+        $book = $this->bookWithFontEntries(['EPUB/text/chapter.xhtml' => 'http://www.w3.org/2001/04/xmlenc#aes128-cbc', 'EPUB/fonts/gone.otf' => 'http://www.idpf.org/2008/embedding']);
+        $epub = $this->open($book);
+
+        $this->assertNotContains('ENCRYPTION_ENTRY_MISSING', $this->fixCodes($epub->repair()));
+        $this->assertCount(2, (new Encryption((string) $epub->getTempDir()))->entries());
+    }
+
+    public function testRetargetsLinksToMissingFragments(): void
+    {
+        $book = EpubBuilder::epub3()
+            ->withFile('EPUB/text/two.xhtml', EpubBuilder::xhtml('Two', '<h1 id="note">Two</h1>'))
+            ->withFile('EPUB/text/chapter.xhtml', EpubBuilder::xhtml('Chapter', '<h1 id="start">Chapter</h1>'
+                . '<p><a href="two.xhtml#note">ok</a> <a href="two.xhtml?x=1#gone">cross</a> <a href="#start">ok</a> <a href="#nowhere"><em>same</em></a></p>'));
+        $book = $this->withOpf($book, static fn (string $opf): string => str_replace(
+            '</manifest>',
+            '<item id="two" href="text/two.xhtml" media-type="application/xhtml+xml"/></manifest>',
+            $opf
+        ));
+        $epub = $this->open($book);
+        $this->assertContains('CONTENT_FRAGMENT_MISSING', $this->codes($epub->validate()));
+
+        $fixes = $epub->repair();
+
+        $this->assertSame(['CONTENT_FRAGMENT_MISSING', 'CONTENT_FRAGMENT_MISSING'], $this->fixCodes($fixes));
+        $chapter = $epub->getContentManager()->getContent('EPUB/text/chapter.xhtml');
+        $this->assertStringContainsString('<a href="two.xhtml#note">ok</a>', $chapter);
+        $this->assertStringContainsString('<a href="two.xhtml?x=1">cross</a>', $chapter);
+        $this->assertStringContainsString('<a href="#start">ok</a>', $chapter);
+        $this->assertStringContainsString('<em>same</em>', $chapter);
+        $this->assertStringNotContainsString('nowhere', $chapter);
+        $this->assertSame([], $this->codes($epub->validate()));
+        $this->assertSame([], $epub->repair());
+    }
+
+    public function testDeclaresKnownPrefixesAndLeavesUnknownOnes(): void
+    {
+        $book = $this->withOpf(EpubBuilder::epub3(), static fn (string $opf): string => str_replace(
+            '</metadata>',
+            '<meta property="ibooks:version">1</meta><meta property="foo:bar">x</meta></metadata>',
+            $opf
+        ));
+        $epub = $this->open($book);
+
+        $fixes = $epub->repair();
+
+        $this->assertSame(['OPF_PREFIX_UNDECLARED'], $this->fixCodes($fixes));
+        $this->assertSame('ibooks', $fixes[0]->location);
+        $remaining = array_values(array_filter($epub->validate(), static fn (ValidationIssue $issue): bool => $issue->code === 'OPF_PREFIX_UNDECLARED'));
+        $this->assertCount(1, $remaining);
+        $this->assertSame('foo', $remaining[0]->location);
+    }
+
+    public function testReplacesAnInvalidModifiedDate(): void
+    {
+        $book = $this->withOpf(EpubBuilder::epub3(), static fn (string $opf): string => str_replace('2026-01-01T00:00:00Z', '2026-01-01', $opf));
+        $epub = $this->open($book);
+
+        $fixes = $epub->repair(new RepairOptions(now: new DateTimeImmutable('2026-10-09T12:30:00Z')));
+
+        $this->assertSame(['METADATA_MODIFIED_INVALID'], $this->fixCodes($fixes));
+        $this->assertSame('2026-10-09T12:30:00Z', $epub->getMetadata()->getProperty('dcterms:modified'));
+    }
+
+    /**
+     * @param array<string, string> $entries CipherReference URI => algorithm
+     */
+    private function bookWithFontEntries(array $entries): EpubBuilder
+    {
+        $data = '';
+        foreach ($entries as $uri => $algorithm) {
+            $data .= "<enc:EncryptedData><enc:EncryptionMethod Algorithm=\"{$algorithm}\"/>"
+                . "<enc:CipherData><enc:CipherReference URI=\"{$uri}\"/></enc:CipherData></enc:EncryptedData>";
+        }
+
+        return $this->withOpf(EpubBuilder::epub3(), static fn (string $opf): string => str_replace(
+            '</manifest>',
+            '<item id="font" href="fonts/a.otf" media-type="font/otf"/></manifest>',
+            $opf
+        ))
+            ->withFile('EPUB/fonts/a.otf', 'font')
+            ->withFile('META-INF/encryption.xml', '<?xml version="1.0" encoding="UTF-8"?><encryption xmlns="urn:oasis:names:tc:opendocument:xmlns:container"'
+                . ' xmlns:enc="http://www.w3.org/2001/04/xmlenc#">' . $data . '</encryption>');
+    }
+
     private function hostileBook(): EpubBuilder
     {
         return $this->withOpf(

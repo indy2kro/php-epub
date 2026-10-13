@@ -10,6 +10,7 @@ use PhpEpub\FontObfuscation;
 use PhpEpub\Landmark;
 use PhpEpub\Split\SplitPlan;
 use PhpEpub\Split\Splitter;
+use PhpEpub\Test\Support\CountingZipHandler;
 use PhpEpub\Test\Support\EpubBuilder;
 use PhpEpub\Test\Support\MergeBook;
 use PhpEpub\TocEntry;
@@ -221,7 +222,8 @@ final class SplitterTest extends TestCase
     public function testLinksToOtherPartsBecomePlainText(): void
     {
         $bodies = [
-            1 => '<p>Go to <a href="chapter-2.xhtml#x">the next chapter</a> or <a href="chapter-3.xhtml#y"><em>far away</em></a> or <a href="#here">here</a>.</p>',
+            2 => '<p id="x">Chapter two.</p>',
+            1 => '<p id="here">Go to <a href="chapter-2.xhtml#x">the next chapter</a> or <a href="chapter-3.xhtml#y"><em>far away</em></a> or <a href="#here">here</a>.</p>',
             3 => '<p>Back to <a href="chapter-1.xhtml">the start</a>.</p>',
         ];
         $book = $this->open(MergeBook::builder(self::UID, 'Book', 4, chapterBodies: $bodies));
@@ -336,20 +338,62 @@ final class SplitterTest extends TestCase
         }
     }
 
-    public function testPageListsAreDropped(): void
+    public function testPageListsKeepOnlyThePagesOfThePart(): void
     {
         $nav = EpubBuilder::xhtml('Contents', '<nav epub:type="toc"><h1>Contents</h1><ol><li><a href="text/chapter-1.xhtml">One</a></li><li><a href="text/chapter-2.xhtml">Two</a></li></ol></nav>'
-            . '<nav epub:type="page-list" hidden="hidden"><ol><li><a href="text/chapter-2.xhtml#p1">1</a></li></ol></nav>'
+            . '<nav epub:type="page-list" hidden="hidden"><ol><li><a href="text/chapter-1.xhtml#p0">i</a></li><li><a href="text/chapter-2.xhtml#p1">1</a></li></ol></nav>'
             . '<nav epub:type="landmarks"><ol><li><a epub:type="bodymatter" href="text/chapter-1.xhtml">Start</a></li><li><a epub:type="endnotes" href="text/chapter-2.xhtml">Notes</a></li></ol></nav>');
         $book = $this->open(MergeBook::builder(self::UID, 'Book', 2, files: ['EPUB/nav.xhtml' => $nav]));
 
         $parts = $this->split($book, SplitPlan::everySpineItems(1));
 
-        $navigation = $parts[0]->getContentManager()->getContent('EPUB/nav.xhtml');
-        $this->assertStringNotContainsString('page-list', $navigation);
-        $this->assertStringNotContainsString('chapter-2', $navigation);
+        $first = $parts[0]->getContentManager()->getContent('EPUB/nav.xhtml');
+        $this->assertStringContainsString('page-list', $first);
+        $this->assertStringContainsString('chapter-1.xhtml#p0', $first);
+        $this->assertStringNotContainsString('chapter-2', $first);
+        $this->assertSame(['i'], array_map(static fn (TocEntry $entry): string => $entry->title, $parts[0]->getTableOfContents()->getPageList()));
+        $this->assertSame(['1'], array_map(static fn (TocEntry $entry): string => $entry->title, $parts[1]->getTableOfContents()->getPageList()));
         $this->assertSame(['bodymatter'], array_map(static fn (Landmark $landmark): string => $landmark->type, $parts[0]->getTableOfContents()->getLandmarks()));
         $this->assertSame([], $this->errors($parts[0]));
+        $this->assertSame([], $this->errors($parts[1]));
+    }
+
+    public function testAPageListWithNoPageInThePartIsDropped(): void
+    {
+        $nav = EpubBuilder::xhtml('Contents', '<nav epub:type="toc"><h1>Contents</h1><ol><li><a href="text/chapter-1.xhtml">One</a></li><li><a href="text/chapter-2.xhtml">Two</a></li></ol></nav>'
+            . '<nav epub:type="page-list"><ol><li><a href="text/chapter-2.xhtml#p1">1</a></li></ol></nav>');
+        $book = $this->open(MergeBook::builder(self::UID, 'Book', 2, files: ['EPUB/nav.xhtml' => $nav]));
+
+        $parts = $this->split($book, SplitPlan::everySpineItems(1));
+
+        $this->assertStringNotContainsString('page-list', $parts[0]->getContentManager()->getContent('EPUB/nav.xhtml'));
+        $this->assertSame([], $parts[0]->getTableOfContents()->getPageList());
+        $this->assertSame([], $this->errors($parts[0]));
+    }
+
+    public function testTheNcxPageListKeepsOnlyThePagesOfThePart(): void
+    {
+        $ncx = '<?xml version="1.0" encoding="UTF-8"?><ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1"><head><meta name="dtb:uid" content="' . self::UID . '"/></head>'
+            . '<docTitle><text>Book</text></docTitle><navMap>'
+            . '<navPoint id="n1" playOrder="1"><navLabel><text>One</text></navLabel><content src="text/chapter-1.xhtml"/></navPoint>'
+            . '<navPoint id="n2" playOrder="2"><navLabel><text>Two</text></navLabel><content src="text/chapter-2.xhtml"/></navPoint></navMap>'
+            . '<pageList><navLabel><text>Pages</text></navLabel>'
+            . '<pageTarget id="p0" type="normal" value="1"><navLabel><text>i</text></navLabel><content src="text/chapter-1.xhtml#p0"/></pageTarget>'
+            . '<pageTarget id="p1" type="normal" value="2"><navLabel><text>1</text></navLabel><content src="text/chapter-2.xhtml#p1"/></pageTarget>'
+            . '</pageList></ncx>';
+        $book = $this->open(MergeBook::builder(
+            self::UID,
+            'Book',
+            2,
+            items: '<item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>',
+            files: ['EPUB/toc.ncx' => $ncx],
+            spineAttributes: ' toc="ncx"'
+        ));
+
+        $parts = $this->split($book, SplitPlan::everySpineItems(1));
+
+        $this->assertSame(['i'], array_map(static fn (TocEntry $entry): string => $entry->title, $parts[0]->getTableOfContents()->getPageList()));
+        $this->assertSame(['1'], array_map(static fn (TocEntry $entry): string => $entry->title, $parts[1]->getTableOfContents()->getPageList()));
     }
 
     public function testBooksWithAnNcxKeepOnlyTheirOwnPoints(): void
@@ -484,6 +528,49 @@ final class SplitterTest extends TestCase
         }
 
         $this->assertSame([], glob($directory . '/*.epub'));
+    }
+
+    public function testTheReportListsThePartsAndHasNoWarningsForAReadableBook(): void
+    {
+        $book = $this->open(MergeBook::builder(self::UID, 'Book', 3));
+        $directory = $this->tmpDir . '/reported';
+
+        $report = (new Splitter())->splitWithReport($book, SplitPlan::everySpineItems(1), $directory);
+
+        $this->assertSame(array_map(static fn (string $name): string => $directory . DIRECTORY_SEPARATOR . $name, ['part-01.epub', 'part-02.epub', 'part-03.epub']), $report->paths);
+        $this->assertSame([], $report->warnings);
+    }
+
+    public function testTheBookIsExtractedOnceWhateverTheNumberOfParts(): void
+    {
+        $zip = new CountingZipHandler();
+        $path = MergeBook::builder(self::UID, 'Book', 4)->buildEpub($this->tmpDir . '/counted.epub');
+        $book = $this->opened[] = EpubFile::open($path, $zip);
+        $this->assertSame(1, $zip->extracted);
+
+        $paths = (new Splitter())->split($book, SplitPlan::everySpineItems(1), $this->tmpDir . '/counted');
+
+        $this->assertCount(4, $paths);
+        $this->assertSame(1, $zip->extracted, 'The parts are copies of the extracted book, not extracted again');
+        $this->assertSame(4, $zip->compressed, 'Each part is packed once and the book itself is not packed');
+    }
+
+    public function testExistingPartFilesAreRefusedAndLeftUntouched(): void
+    {
+        $book = $this->open(MergeBook::builder(self::UID, 'Book', 3));
+        $directory = $this->tmpDir . '/existing';
+        mkdir($directory, 0777, true);
+        file_put_contents($directory . '/part-02.epub', 'precious');
+
+        try {
+            (new Splitter())->split($book, SplitPlan::everySpineItems(1), $directory);
+            $this->fail('An existing part file must be refused');
+        } catch (Exception $exception) {
+            $this->assertStringContainsString('part-02.epub', $exception->getMessage());
+        }
+
+        $this->assertSame('precious', file_get_contents($directory . '/part-02.epub'));
+        $this->assertSame([$directory . '/part-02.epub'], glob($directory . '/*.epub'));
     }
 
     /**

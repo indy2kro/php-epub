@@ -39,7 +39,29 @@ public static function openStream($stream, ?ZipHandler $zipHandler = null, ?XmlP
 
 Open a book held in a string (an upload, an HTTP response) or read from a stream (from its current position to the end; the stream is not rewound and stays open). `ZipArchive` needs a real file, so the data is buffered in a private temporary directory (random name, mode `0700`) that is deleted again, also on failure. The same ZIP size, entry and compression-ratio limits apply as for files, and a book that is not a valid EPUB throws as it would from `open()`.
 
-Such a book has no file: `save()` without a path throws an exception (pass a path, or use `saveToString()` / `saveToStream()`), and `load()` throws as well, because there is nothing to reload from; open the data again instead.
+Such a book has no file: `save()` without a path throws an exception (pass a path, or use `saveToString()` / `saveToStream()`; `compress()` without a path does the same, before it changes the book), and `load()` throws as well, because there is nothing to reload from; open the data again instead.
+
+### Expanded (unzipped) books
+
+```php
+public static function openDirectory(string $directory, ?ZipHandler $zipHandler = null, ?XmlParser $xmlParser = null, ?Limits $limits = null): EpubFile
+public function saveToDirectory(string $directory): void
+```
+
+`openDirectory()` opens a book that is a directory (`mimetype`, `META-INF/container.xml`, ...), as publishing workflows and EPUBCheck's expanded mode use. The files are copied into the private extraction, so the directory is never changed, and the copy is bound by the same entry-count and total-size limits as an archive (`ZipHandler::import()`); a symbolic link in the directory is refused with a `ZipException`. Like a book from `openString()`, it has no file: `save()` needs a path and `load()` throws.
+
+`saveToDirectory()` writes the book (with its pending changes and an exact `mimetype` file) as an expanded directory. The directory is created when missing; an existing one must be empty, otherwise an exception is thrown and nothing is written.
+
+```php
+use PhpEpub\EpubFile;
+use PhpEpub\Limits;
+
+$epubFile = EpubFile::openDirectory('/path/to/expanded-book', limits: Limits::web());
+$epubFile->getMetadata()->setTitle('Edited');
+$epubFile->saveToDirectory('/path/to/edited-book');
+$epubFile->save('/path/to/edited.epub');
+$epubFile->close();
+```
 
 ### Loading and Saving
 
@@ -61,7 +83,7 @@ Throws an exception if the file cannot be opened or the EPUB structure is invali
 public function save(?string $filePath = null): void
 ```
 
-Saves the modified EPUB back to disk. If `$filePath` is null, overwrites the original file. Pending metadata, manifest and spine changes are written to the OPF first. Throws an exception if called before `load()`, or, for a book opened with `openString()` / `openStream()`, when `$filePath` is null.
+Saves the modified EPUB back to disk. If `$filePath` is null, overwrites the original file. Pending metadata, manifest and spine changes are written to the OPF first. Throws an exception if called before `load()`, or, for a book opened with `openString()` / `openStream()`, when `$filePath` is null, and when `$filePath` is an empty string.
 
 ```php
 public function saveToString(): string
@@ -75,6 +97,19 @@ $epubFile = EpubFile::openString($request->getBody()->getContents());
 $epubFile->getMetadata()->setTitle('Edited');
 header('Content-Type: application/epub+zip');
 $epubFile->saveToStream(fopen('php://output', 'wb'));
+```
+
+```php
+public function copy(?XmlParser $xmlParser = null): self
+```
+
+Makes an independent copy of the loaded book, including unsaved changes, by copying the extracted files (cheaper than `saveToString()` followed by `openString()`, which packs and unpacks the whole book). The copy has the same limits and `ZipHandler`, no file of its own (like a book from `openString()`) and its own extraction, so call `cleanup()` on it when you are done; changing it leaves the original alone. Throws an exception if the book is not loaded.
+
+```php
+$copy = $epubFile->copy();
+$copy->getMetadata()->setTitle('A variant');
+$copy->save('/path/to/variant.epub');
+$copy->cleanup();
 ```
 
 ### Accessing Components
@@ -140,6 +175,8 @@ Checks the book, including unsaved changes, and returns a list of `PhpEpub\Valid
 | `METADATA_TITLE_MISSING`, `METADATA_LANGUAGE_MISSING`, `METADATA_IDENTIFIER_MISSING` | error | A required Dublin Core element is missing or empty |
 | `METADATA_UNIQUE_IDENTIFIER` | error | `package@unique-identifier` does not name a `dc:identifier` |
 | `METADATA_MODIFIED_MISSING` | error | An EPUB 3 package has no `dcterms:modified` |
+| `METADATA_MODIFIED_INVALID` | error | `dcterms:modified` is not of the form `CCYY-MM-DDThh:mm:ssZ` (UTC, no fractions) |
+| `OPF_PREFIX_UNDECLARED` | error | A property (`meta@property`, `properties`, `link@rel`, `meta@scheme`) uses a prefix that is neither reserved (`dcterms`, `marc`, `media`, `onix`, `rendition`, `schema`, `xsd`, `a11y`) nor declared in `package@prefix` |
 | `METADATA_LANGUAGE_INVALID` | error | A `dc:language` is not a well-formed BCP 47 tag (e.g. `English`) |
 | `METADATA_DATE_INVALID` | warning | A `dc:date` is not W3CDTF (e.g. `July 2020`) |
 | `DUPLICATE_ID` | error | An `id` is used more than once in the package document |
@@ -149,17 +186,22 @@ Checks the book, including unsaved changes, and returns a list of `PhpEpub\Valid
 | `SPINE_EMPTY`, `SPINE_UNKNOWN_IDREF`, `SPINE_DUPLICATE_IDREF` | error | The reading order is empty, or refers to an unknown or repeated item |
 | `SPINE_NOT_CONTENT` | warning | A spine item is not a content document and has no fallback |
 | `CONTENT_ENCRYPTED` | error | The book is DRM-protected (see [DRM-protected books](#drm-protected-books)). This is the only issue reported for its encrypted resources: they are not checked for well-formedness, media type or manifest properties |
+| `ENCRYPTION_ENTRY_MISSING` | error | `META-INF/encryption.xml` lists a resource (an obfuscated font) that is not in the book; not reported for a DRM-protected book |
 | `CONTENT_NOT_WELL_FORMED` | error | An XHTML content document is not well-formed XML |
 | `MEDIA_TYPE_MISMATCH` | error | A manifest item declared as a JPEG, PNG, GIF or WebP image holds another image type, or one declared as XHTML does not look like XML at all. Only the first 512 KiB of a file are read, and content that is not recognised is not judged |
 | `MANIFEST_PROPERTY_MISSING` | error | An EPUB 3 XHTML document needs a manifest property it lacks: `svg`, `mathml`, `scripted` or `remote-resources` (documents above 8 MiB are not examined) |
 | `MANIFEST_PROPERTY_UNNEEDED` | warning | An EPUB 3 XHTML document declares one of those properties, but its content does not need it |
 | `COVER_NOT_IMAGE` | error | A manifest item with the `cover-image` property is not an image |
-| `CONTENT_REFERENCE_MISSING`, `CONTENT_REFERENCE_NOT_IN_MANIFEST` | error | A content document refers (`src`, `href`, `data`, `poster`) to a local file that is missing or outside the book, or that is not in the manifest; remote URLs, `data:` URIs and links within the document are not checked |
+| `CONTENT_REFERENCE_MISSING`, `CONTENT_REFERENCE_NOT_IN_MANIFEST` | error | A content document refers (`src`, `href`, `data`, `poster`) to a local file that is missing or outside the book, or that is not in the manifest; remote URLs and `data:` URIs are not checked |
+| `CONTENT_FRAGMENT_MISSING` | error | A link (`a`, `area`, SVG `use` or `image`) names a `#fragment` that is not an element id of its target XHTML or SVG document, or of the document itself (`#top` and `#epubcfi(…)` are not judged) |
 | `NAV_MISSING` / `NCX_MISSING` | error | An EPUB 3 book has no navigation document / an EPUB 2 book has no NCX |
+| `NCX_UID_MISMATCH` | error | The NCX `dtb:uid` differs from the package's unique identifier (`save()` corrects it) |
 | `NAV_INVALID` / `NCX_INVALID` | error | The navigation document is not well-formed / the NCX is not well-formed or has no NCX namespace or `navMap` |
 | `NAV_EMPTY` / `NCX_EMPTY` | error | The `toc` nav of the navigation document has no list item / the NCX `navMap` has no `navPoint` (a table of contents needs an entry; deleting the last linked file leaves it empty) |
 | `TOC_LINK_NOT_IN_MANIFEST` | error | The table of contents links to a file that is not in the manifest |
 | `ACCESSIBILITY_ACCESS_MODE_MISSING`, `ACCESSIBILITY_FEATURE_MISSING`, `ACCESSIBILITY_HAZARD_MISSING`, `ACCESSIBILITY_SUMMARY_MISSING` | warning | An EPUB 3 book has no `schema:accessMode`, `schema:accessibilityFeature`, `schema:accessibilityHazard` or `schema:accessibilitySummary` metadata (see [accessibility metadata](metadata.md#accessibility)); a new book from `create()` starts without them |
+| `ACCESSIBILITY_LANG_MISSING`, `ACCESSIBILITY_IMAGE_ALT_MISSING`, `ACCESSIBILITY_HEADING_SKIPPED`, `ACCESSIBILITY_TABLE_HEADERS_MISSING` | warning | An EPUB 3 XHTML document has no `lang`/`xml:lang` on `html`, has `img` elements without `alt` (`alt=""` marks a decorative image), skips a heading level (`h1` then `h3`) or has data tables without `th` cells (`role="presentation"` marks a layout table). Reported once per document, with a count |
+| `ACCESSIBILITY_PAGE_LIST_MISSING` | warning | An EPUB 3 book with a print source (`dc:source`, or the `printPageNumbers`/`pageBreakMarkers` features) has no `page-list` nav or NCX `pageList` |
 
 ```php
 foreach ($epubFile->validate() as $issue) {
@@ -176,7 +218,7 @@ public function getEncryptedPaths(): array
 
 A book is DRM-protected when `META-INF/encryption.xml` lists a resource encrypted with an algorithm that is not a font obfuscation (the IDPF and Adobe font obfuscations are not DRM), or when the book has `META-INF/rights.xml` (Adobe ADEPT) or `META-INF/license.lcpl` (Readium LCP). `getEncryptedPaths()` returns the sorted, book-relative paths of the encrypted resources (empty when only `rights.xml` or `license.lcpl` marks the book). Both methods throw an `Exception` before `load()`.
 
-The library only detects DRM; it never decrypts. Such a book still opens, and its package (metadata, manifest, spine) can be read, but `getContent()` returns ciphertext for the encrypted files. `validate()` reports one `CONTENT_ENCRYPTED` error instead of an error per encrypted document, and `convert()` (and `TCPDFAdapter`, `DompdfAdapter` called on a directory) throws a `ConversionException` saying the book is DRM-protected. A damaged `encryption.xml` never stops a book from loading; it counts as listing nothing.
+The library only detects DRM; it never decrypts. Such a book still opens, and its package (metadata, manifest, spine) can be read, but `getContent()` returns ciphertext for the encrypted files. `validate()` reports one `CONTENT_ENCRYPTED` error instead of an error per encrypted document, and `convert()` (and `TCPDFAdapter`, `DompdfAdapter` called on a directory) throws a `ConversionException` saying the book is DRM-protected. A damaged `encryption.xml` (malformed, with an entity declaration, or larger than `Limits::$maxXmlBytes`) never stops a book from loading, but what it lists is unknown, so the book counts as possibly DRM-protected: `isDrmProtected()` returns true, `validate()` reports a `CONTENT_ENCRYPTED` error naming the file, and `convert()`, merging, splitting and cleanup refuse it.
 
 ```php
 $epubFile = EpubFile::open('/path/to/book.epub');
@@ -230,7 +272,7 @@ Converts a loaded EPUB 2 book to EPUB 3 in place: package version `3.0` with `dc
 public function getText(bool $linearOnly = true): array
 ```
 
-Returns `path => text` for the XHTML and HTML documents of the reading order, in order, as `ContentManager::getText()` reads them. Auxiliary content (`linear="no"`) is skipped unless `$linearOnly` is `false`; spine items that are not XHTML or HTML, or whose file is missing, are skipped.
+Returns `path => text` for the XHTML and HTML documents of the reading order, in order, as `ContentManager::getText()` reads them. Auxiliary content (`linear="no"`) is skipped unless `$linearOnly` is `false`; spine items that are not XHTML or HTML, whose file is missing, or that are encrypted (DRM: their text would be ciphertext, see `getEncryptedPaths()`) are skipped.
 
 ### Book Summary
 

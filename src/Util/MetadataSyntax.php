@@ -34,6 +34,15 @@ final class MetadataSyntax
      */
     private const string SMIL_CLOCK_VALUE = '/^(?:\d+:[0-5]\d:[0-5]\d(?:\.\d+)?|[0-5]\d:[0-5]\d(?:\.\d+)?|\d+(?:\.\d+)?(?:h|min|s|ms)?)$/D';
 
+    /**
+     * The form of dcterms:modified: CCYY-MM-DDThh:mm:ssZ, in UTC and without fractions.
+     */
+    public static function isModifiedDate(string $value): bool
+    {
+        return preg_match('/^(\d{4})-(\d{2})-(\d{2})T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\dZ$/D', $value, $parts) === 1
+            && checkdate((int) $parts[2], (int) $parts[3], (int) $parts[1]);
+    }
+
     public static function isSmilClockValue(string $value): bool
     {
         return preg_match(self::SMIL_CLOCK_VALUE, $value) === 1;
