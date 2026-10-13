@@ -256,7 +256,7 @@ final class EpubCheckTest extends TestCase
 
             $new = array_values(array_diff($after, $before, $allowed));
             $this->assertSame([], $new, 'validate() reports new problems in a part.');
-            $this->assertSame([], array_values(array_diff($this->epubCheckCodes($path), $expected)), 'EPUBCheck reports new problems in a part.');
+            $this->assertSame([], array_values(array_diff($this->epubCheckCodes($path), $expected)), 'EPUBCheck reports new problems in a part: ' . $this->epubCheckMessages($path));
         }
     }
 
@@ -474,6 +474,17 @@ final class EpubCheckTest extends TestCase
         preg_match_all('/^(?:ERROR|FATAL)\(([A-Z]+-\d+)\)/m', implode("\n", $result['output']), $matches);
 
         return array_values(array_unique($matches[1]));
+    }
+
+    /**
+     * The first error lines EPUBCheck prints for the book, to name the problem in a failure message.
+     */
+    private function epubCheckMessages(string $epubPath): string
+    {
+        $result = $this->runEpubCheck($epubPath);
+        $lines = array_filter($result['output'] ?? [], static fn (string $line): bool => preg_match('/^(?:ERROR|FATAL)\(/', $line) === 1);
+
+        return implode("\n", array_slice(array_values($lines), 0, 5));
     }
 
     /**

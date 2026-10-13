@@ -380,8 +380,8 @@ final class SplitterTest extends TestCase
             . '<navPoint id="n1" playOrder="1"><navLabel><text>One</text></navLabel><content src="text/chapter-1.xhtml"/></navPoint>'
             . '<navPoint id="n2" playOrder="2"><navLabel><text>Two</text></navLabel><content src="text/chapter-2.xhtml"/></navPoint></navMap>'
             . '<pageList><navLabel><text>Pages</text></navLabel>'
-            . '<pageTarget id="p0" type="normal" value="1"><navLabel><text>i</text></navLabel><content src="text/chapter-1.xhtml#p0"/></pageTarget>'
-            . '<pageTarget id="p1" type="normal" value="2"><navLabel><text>1</text></navLabel><content src="text/chapter-2.xhtml#p1"/></pageTarget>'
+            . '<pageTarget id="p0" type="normal" value="1" playOrder="3"><navLabel><text>i</text></navLabel><content src="text/chapter-1.xhtml#p0"/></pageTarget>'
+            . '<pageTarget id="p1" type="normal" value="2" playOrder="4"><navLabel><text>1</text></navLabel><content src="text/chapter-2.xhtml#p1"/></pageTarget>'
             . '</pageList></ncx>';
         $book = $this->open(MergeBook::builder(
             self::UID,
@@ -396,6 +396,13 @@ final class SplitterTest extends TestCase
 
         $this->assertSame(['i'], array_map(static fn (TocEntry $entry): string => $entry->title, $parts[0]->getTableOfContents()->getPageList()));
         $this->assertSame(['1'], array_map(static fn (TocEntry $entry): string => $entry->title, $parts[1]->getTableOfContents()->getPageList()));
+
+        // The playOrder values of the whole NCX form one sequence without gaps (EPUBCheck RSC-005 otherwise).
+        foreach ($parts as $part) {
+            $contents = (string) file_get_contents($part->getTempDir() . '/EPUB/toc.ncx');
+            preg_match_all('/playOrder="(\d+)"/', $contents, $orders);
+            $this->assertSame(['1', '2'], $orders[1]);
+        }
     }
 
     public function testBooksWithAnNcxKeepOnlyTheirOwnPoints(): void

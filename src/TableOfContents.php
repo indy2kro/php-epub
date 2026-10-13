@@ -869,9 +869,36 @@ final readonly class TableOfContents
 
         $state = ['order' => 0, 'count' => 0, 'seen' => []];
         $this->appendNavPoints($document, $namespace, $navMap, $entries, $ncxPath, $state);
+        $this->renumberTargets($root, $state['order']);
 
         $this->updateDepth($root);
         $this->save($root, $ncxPath);
+    }
+
+    /**
+     * Renumbers the playOrder of the page and nav targets after the navMap's: the playOrder values of a whole NCX
+     * form one sequence in document order, and the navMap was just renumbered (EPUBCheck RSC-005 on gaps).
+     */
+    private function renumberTargets(DOMElement $root, int $last): void
+    {
+        foreach ($this->childElements($root, 'pageList') as $list) {
+            $last = $this->renumberTargetList($list, 'pageTarget', $last);
+        }
+
+        foreach ($this->childElements($root, 'navList') as $list) {
+            $last = $this->renumberTargetList($list, 'navTarget', $last);
+        }
+    }
+
+    private function renumberTargetList(DOMElement $list, string $name, int $last): int
+    {
+        foreach ($this->childElements($list, $name) as $target) {
+            if ($target->hasAttribute('playOrder')) {
+                $target->setAttribute('playOrder', (string) ++$last);
+            }
+        }
+
+        return $last;
     }
 
     /**
