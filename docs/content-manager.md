@@ -10,7 +10,7 @@ When it is created by `EpubFile` (or given a `Manifest` and `Spine`), it keeps t
 
 - `addContent()` adds new files to the manifest, with a media type guessed from the extension.
 - In EPUB 3 books, `addContent()` and `updateContent()` set the manifest properties an XHTML document needs because of its content, and remove those it no longer needs: `svg` (inline SVG), `mathml`, `scripted` (`<script>` or `<form>`) and `remote-resources` (a resource loaded from `http(s)://`; links do not count). Other properties, such as `nav`, are kept, and the others are untouched.
-- `deleteContent()` removes the file's manifest item and its spine entry, plus package references to it (EPUB 2 cover meta, refinements, `spine@toc`, `fallback`/`media-overlay` of other items, `<guide>` references) and its table-of-contents entries (an entry with children stays as an unlinked heading in the navigation document; the NCX promotes the children).
+- `deleteContent()` removes the file's manifest item and its spine entry, its `META-INF/encryption.xml` entry (an obfuscated font) plus package references to it (EPUB 2 cover meta, refinements, `spine@toc`, `fallback`/`media-overlay` of other items, `<guide>` references) and its table-of-contents entries (an entry with children stays as an unlinked heading in the navigation document; the NCX promotes the children).
 
 Adding a file does not put it in the reading order; call `Spine::add()` for that.
 
@@ -73,7 +73,7 @@ Moves or renames a file. Its manifest item keeps its id, so its place in the rea
 
 References inside content documents follow the move (pass `$updateReferences = false` to leave them alone; `EpubFile::validate()` then reports those that break, `CONTENT_REFERENCE_MISSING`):
 
-- In XHTML and SVG documents, the attributes `src`, `poster`, `data`, and `href` (including `xlink:href`) on `a`, `area`, `link`, `image` and `use` that point at the moved file are rewritten.
+- In XHTML, SVG and media overlay (SMIL) documents, the attributes `src` (including the `text` and `audio` elements of a media overlay), `poster`, `data`, `altimg` (MathML), `longdesc`, and `href` (including `xlink:href`) on `a`, `area`, `link`, `image` and `use` that point at the moved file are rewritten.
 - In stylesheets, `<style>` elements and `style` attributes, `url(...)` values and `@import "..."` strings are rewritten.
 - A document that moves to another directory gets its own relative references recomputed, so they still reach the same files.
 
@@ -86,7 +86,13 @@ $epubFile->getContentManager()->moveContent('EPUB/chapter1.xhtml', 'EPUB/text/ch
 public function getContent(string $filePath): string
 ```
 
-Returns the content of a file. Throws an exception if the file doesn't exist or cannot be read.
+Returns the content of a file. Throws an exception if the file doesn't exist or cannot be read, or if it is encrypted (DRM, see `EpubFile::getEncryptedPaths()`), since its text would be ciphertext.
+
+```php
+public function getMarkup(string $filePath): string
+```
+
+Returns an XHTML or HTML document that is about to be parsed as markup, refusing one larger than `Limits::$maxHtmlBytes` before it is read. Use it instead of `getContent()` when the result goes to a DOM parser. Throws `InvalidEpubException` if the document is larger than the limit, and an exception if the file cannot be read.
 
 ```php
 public function getText(string $filePath): string

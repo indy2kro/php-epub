@@ -184,6 +184,20 @@ class ContentManager
         }
 
         $this->removeTableOfContentsEntries($this->paths->normalize($filePath));
+        $this->removeEncryptionEntry($this->paths->normalize($filePath));
+    }
+
+    /**
+     * Drops the META-INF/encryption.xml entry of a deleted file, so that a file added at that path later
+     * is not read as obfuscated. A missing or unreadable encryption.xml is left alone.
+     */
+    private function removeEncryptionEntry(string $path): void
+    {
+        try {
+            (new FontObfuscation($this->contentDirectory, $this->xmlParser))->setAlgorithm($path, null);
+        } catch (XmlException) {
+            return;
+        }
     }
 
     /**
@@ -191,8 +205,8 @@ class ContentManager
      * unchanged) and points at the new path, and the <guide>, the table of contents and
      * META-INF/encryption.xml (obfuscated fonts) follow it.
      *
-     * References to the moved file are rewritten too: attributes such as href, src, poster, data and
-     * xlink:href in the XHTML (and SVG) documents of the book, and url() and @import values in
+     * References to the moved file are rewritten too: attributes such as href, src, poster, data, altimg,
+     * longdesc and xlink:href in the XHTML, SVG and media overlay (SMIL) documents of the book, and url() and @import values in
      * stylesheets, <style> elements and style attributes. The relative references of the moved
      * document itself are rewritten when it changes directory. Query strings and fragments are kept,
      * documents that are not well-formed XML are left unchanged, and only documents that change are
@@ -381,10 +395,13 @@ class ContentManager
      * @param string $filePath The path of the document relative to the book root.
      *
      * @throws InvalidEpubException If the document is larger than the size limit.
-     * @throws Exception If the file cannot be read.
+     * @throws Exception If the file cannot be read, or is encrypted (DRM): its text would be ciphertext.
      */
     public function getText(string $filePath): string
     {
+        in_array($this->paths->normalize($filePath), (new Encryption($this->contentDirectory, $this->xmlParser, $this->paths))->encryptedPaths(), true)
+            && throw new Exception("The document is encrypted, so it has no readable text: {$filePath}");
+
         return HtmlText::extract($this->getMarkup($filePath));
     }
 
@@ -546,7 +563,7 @@ class ContentManager
 
     /**
      * The documents whose references change when $from moves to $to, as [path after the move => new content].
-     * XHTML and SVG documents are rewritten as XML (those that are not well-formed are skipped), stylesheets as text.
+     * XHTML, SVG and media overlay (SMIL) documents are rewritten as XML (those that are not well-formed are skipped), stylesheets as text.
      *
      * @return array<string, string>
      */
@@ -558,8 +575,8 @@ class ContentManager
             $mediaType = $this->manifest?->findByPath($path)?->mediaType;
             $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
             $isCss = $mediaType === 'text/css' || $extension === 'css';
-            $isXml = in_array($mediaType, ['application/xhtml+xml', 'image/svg+xml'], true)
-                || in_array($extension, ['xhtml', 'html', 'htm', 'svg'], true);
+            $isXml = in_array($mediaType, ['application/xhtml+xml', 'image/svg+xml', 'application/smil+xml'], true)
+                || in_array($extension, ['xhtml', 'html', 'htm', 'svg', 'smil'], true);
             $content = $isCss || $isXml ? FileSystemHelper::readFile($this->paths->resolve($this->contentDirectory, $path)) : null;
             if ($content === null) {
                 continue;

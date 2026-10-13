@@ -250,10 +250,13 @@ final class EpubCheckTest extends TestCase
         foreach ($paths as $path) {
             $part = EpubFile::open($path);
             $after = self::codes($part->validate());
+            // A part carries the pages of its own documents; one with no print page break has no page list to report.
+            $allowed = $part->getTableOfContents()->getPageList() === [] ? ['ACCESSIBILITY_PAGE_LIST_MISSING'] : [];
             $part->cleanup();
 
-            $this->assertSame([], array_values(array_diff($after, $before)), 'validate() reports new problems in a part.');
-            $this->assertSame([], array_values(array_diff($this->epubCheckCodes($path), $expected)), 'EPUBCheck reports new problems in a part.');
+            $new = array_values(array_diff($after, $before, $allowed));
+            $this->assertSame([], $new, 'validate() reports new problems in a part.');
+            $this->assertSame([], array_values(array_diff($this->epubCheckCodes($path), $expected)), 'EPUBCheck reports new problems in a part: ' . $this->epubCheckMessages($path));
         }
     }
 
@@ -337,7 +340,7 @@ final class EpubCheckTest extends TestCase
             . "## Two\n\n- a\n- b\n\n> quote\n\n```\ncode\n```\n\n| h | i |\n|---|---|\n| 1 | 2 |\n";
 
         yield 'markdown' => [static fn (): BuiltBook => (new BookBuilder($options))->fromMarkdown($markdown)];
-        yield 'html' => [static fn (): BuiltBook => (new BookBuilder($options))->fromHtml('<h1>One</h1><p id="a">Text <a href="#b">jump</a></p><h1>Two</h1><p id="b">More <img src="dot.png" alt="dot"/></p><table><tr><td>x</td></tr></table>')];
+        yield 'html' => [static fn (): BuiltBook => (new BookBuilder($options))->fromHtml('<h1>One</h1><p id="a">Text <a href="#b">jump</a></p><h1>Two</h1><p id="b">More <img src="dot.png" alt="dot"/></p><table><tr><th>x</th></tr></table>')];
         yield 'text' => [static fn (): BuiltBook => (new BookBuilder(new BookOptions(title: 'Plain', language: 'de')))->fromText("Chapter 1\n\nHello.\n\nChapter 2\n\nWorld.\n")];
         yield 'images' => [static fn (): BuiltBook => (new BookBuilder(new BookOptions(title: 'Comic', direction: 'rtl', language: 'ja')))->fromImages([
             ['name' => '1.png', 'bytes' => $png],
@@ -471,6 +474,17 @@ final class EpubCheckTest extends TestCase
         preg_match_all('/^(?:ERROR|FATAL)\(([A-Z]+-\d+)\)/m', implode("\n", $result['output']), $matches);
 
         return array_values(array_unique($matches[1]));
+    }
+
+    /**
+     * The first error lines EPUBCheck prints for the book, to name the problem in a failure message.
+     */
+    private function epubCheckMessages(string $epubPath): string
+    {
+        $result = $this->runEpubCheck($epubPath);
+        $lines = array_filter($result['output'] ?? [], static fn (string $line): bool => preg_match('/^(?:ERROR|FATAL)\(/', $line) === 1);
+
+        return implode("\n", array_slice(array_values($lines), 0, 5));
     }
 
     /**

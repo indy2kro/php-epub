@@ -15,6 +15,7 @@ use PhpEpub\Test\Support\MergeBook;
 use PhpEpub\TocEntry;
 use PhpEpub\Util\FileSystemHelper;
 use PhpEpub\ValidationIssue;
+use PhpEpub\XmlParser;
 use PHPUnit\Framework\TestCase;
 
 final class MergerTest extends TestCase
@@ -600,10 +601,10 @@ final class MergerTest extends TestCase
         $this->assertInstanceOf(\PhpEpub\ManifestItem::class, $merged->getManifest()->findByPath('EPUB/book-02/text/chapter-1.xhtml'));
     }
 
-    public function testMissingFilesAndUnreadableEncryptionInfoDoNotStopTheMerge(): void
+    public function testMissingFilesDoNotStopTheMerge(): void
     {
         $items = '<item id="ghost" href="images/ghost.png" media-type="image/png"/>';
-        $one = $this->open(MergeBook::builder(self::UID_ONE, 'One', 1, $items, ['META-INF/encryption.xml' => 'this is not xml']));
+        $one = $this->open(MergeBook::builder(self::UID_ONE, 'One', 1, $items));
 
         $merged = $this->merge([$one, $this->open(MergeBook::builder(self::UID_TWO, 'Two'))]);
 
@@ -623,6 +624,46 @@ final class MergerTest extends TestCase
         $merged = $this->merge([$one, $this->open(MergeBook::builder(self::UID_TWO, 'Two'))]);
 
         $this->assertSame($font, $merged->getContentManager()->getContent('EPUB/book-01/fonts/a.otf'));
+    }
+
+    public function testTheReportHasNoWarningsForReadableBooks(): void
+    {
+        $path = $this->tmpDir . DIRECTORY_SEPARATOR . 'clean.epub';
+        $report = (new Merger())->merge([$this->open(MergeBook::builder(self::UID_ONE, 'One')), $this->open(MergeBook::builder(self::UID_TWO, 'Two'))], new MergeOptions(), $path);
+
+        $this->assertSame([], $report->warnings);
+    }
+
+    public function testTheReportWarnsAboutATableOfContentsAndFontsThatCouldNotBeRead(): void
+    {
+        $encryption = '<?xml version="1.0"?><encryption xmlns="urn:oasis:names:tc:opendocument:xmlns:container" xmlns:enc="http://www.w3.org/2001/04/xmlenc#">'
+            . '<enc:EncryptedData><enc:EncryptionMethod Algorithm="' . FontObfuscation::ADOBE . '"/><enc:CipherData><enc:CipherReference URI="EPUB/fonts/a.otf"/></enc:CipherData></enc:EncryptedData></encryption>';
+        $items = '<item id="font" href="fonts/a.otf" media-type="font/otf"/>';
+        // The Adobe algorithm needs a urn:uuid identifier, which this book lacks.
+        $one = $this->open(MergeBook::builder('urn:isbn:9780000000002', 'One', 1, $items, ['EPUB/fonts/a.otf' => random_bytes(2000), 'META-INF/encryption.xml' => $encryption]));
+        $two = $this->open(MergeBook::builder(self::UID_TWO, 'Two', 2, files: ['EPUB/nav.xhtml' => 'this is not xml']));
+        $path = $this->tmpDir . DIRECTORY_SEPARATOR . 'warned.epub';
+
+        $report = (new Merger())->merge([$one, $two], new MergeOptions(), $path);
+
+        $warnings = implode("
+", $report->warnings);
+        $this->assertStringContainsString('Book 1', $warnings);
+        $this->assertStringContainsString('EPUB/fonts/a.otf', $warnings);
+        $this->assertStringContainsString('Book 2', $warnings);
+        $this->assertStringContainsString('table of contents', $warnings);
+    }
+
+    public function testEncryptionInfoTheParserCannotReadIsReportedAsAWarning(): void
+    {
+        // Within the book's own limits, but over the merger's parser limit.
+        $encryption = '<?xml version="1.0"?><encryption xmlns="urn:oasis:names:tc:opendocument:xmlns:container">' . str_repeat(' ', 6000) . '</encryption>';
+        $one = $this->open(MergeBook::builder(self::UID_ONE, 'One', 1, files: ['META-INF/encryption.xml' => $encryption]));
+        $two = $this->open(MergeBook::builder(self::UID_TWO, 'Two', 1));
+
+        $report = (new Merger(xmlParser: new XmlParser(maxBytes: 5000)))->merge([$one, $two], new MergeOptions(), $this->tmpDir . DIRECTORY_SEPARATOR . 'blind.epub');
+
+        $this->assertSame(['Book 1: META-INF/encryption.xml could not be read, so its fonts are copied as they are.'], $report->warnings);
     }
 
     public function testLegacyDoctypeKeepsXmlEntities(): void

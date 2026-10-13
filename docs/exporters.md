@@ -47,7 +47,7 @@ public function convert(string $epubDirectory, string $outputPath): void;
 
 ## HTML
 
-`HtmlAdapter` writes one self-contained HTML document: a title block, a table of contents when the book has several chapters, and every chapter in a `<section class="epub-chapter">`.
+`HtmlAdapter` writes one self-contained HTML document: a title block, a table of contents when the book has several chapters (the book's own, nested, with its sections linking to their anchors; else one entry per chapter), and every chapter in a `<section class="epub-chapter">`.
 
 ```php
 public function __construct(

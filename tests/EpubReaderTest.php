@@ -460,4 +460,78 @@ final class EpubReaderTest extends TestCase
 
         return $found;
     }
+
+    /**
+     * @return iterable<string, array{EpubBuilder}>
+     */
+    public static function drmBooks(): iterable
+    {
+        $encryption = static fn (string $algorithm): string => '<encryption xmlns="urn:oasis:names:tc:opendocument:xmlns:container" xmlns:enc="http://www.w3.org/2001/04/xmlenc#">'
+            . '<enc:EncryptedData><enc:EncryptionMethod Algorithm="' . $algorithm . '"/>'
+            . '<enc:CipherData><enc:CipherReference URI="EPUB/text/chapter.xhtml"/></enc:CipherData></enc:EncryptedData></encryption>';
+
+        yield 'plain' => [EpubBuilder::epub3()];
+        yield 'encrypted resource' => [EpubBuilder::epub3()->withFile('META-INF/encryption.xml', $encryption('http://www.w3.org/2001/04/xmlenc#aes128-cbc'))];
+        yield 'font obfuscation only' => [EpubBuilder::epub3()->withFile('META-INF/encryption.xml', $encryption('http://www.idpf.org/2008/embedding'))];
+        yield 'lcp license' => [EpubBuilder::epub3()->withFile('META-INF/license.lcpl', '{"id":"x"}')];
+        yield 'adept rights' => [EpubBuilder::epub3()->withFile('META-INF/rights.xml', '<rights/>')];
+        yield 'unreadable encryption.xml' => [EpubBuilder::epub3()->withFile('META-INF/encryption.xml', '<encryption')];
+    }
+
+    #[DataProvider('drmBooks')]
+    public function testDrmStateMatchesTheExtractingMode(EpubBuilder $builder): void
+    {
+        $path = $builder->buildEpub($this->workDir . '/drm.epub');
+        $file = EpubFile::open($path);
+        $reader = EpubReader::open($path);
+
+        $this->assertSame($file->isDrmProtected(), $reader->isDrmProtected());
+        $this->assertSame($file->getEncryptedPaths(), $reader->getEncryptedPaths());
+        $this->assertSame($file->toArray(), $reader->toArray());
+    }
+
+    #[DataProvider('fixtures')]
+    public function testToArrayMatchesTheExtractingMode(string $fixture): void
+    {
+        $this->assertSame(EpubFile::open($fixture)->toArray(), EpubReader::open($fixture, Limits::web())->toArray());
+    }
+
+    public function testToArrayOfAnEncryptedBookIsJsonReady(): void
+    {
+        $path = EpubBuilder::epub3()->withFile('META-INF/license.lcpl', '{}')->buildEpub($this->workDir . '/lcp.epub');
+
+        $summary = EpubReader::open($path)->toArray();
+
+        $this->assertSame(['isDrmProtected' => true, 'encryptedPathCount' => 0], $summary['drm']);
+        $this->assertJson(json_encode($summary, JSON_THROW_ON_ERROR));
+    }
+
+    public function testGetContentSizeIsTheUncompressedSize(): void
+    {
+        $path = EpubBuilder::epub3()->withFile('EPUB/size.txt', str_repeat('a', 1000))->buildEpub($this->workDir . '/size.epub');
+        $reader = EpubReader::open($path);
+
+        $this->assertSame(1000, $reader->getContentSize('EPUB/size.txt'));
+
+        $this->expectException(InvalidEpubException::class);
+        $reader->getContentSize('EPUB/missing.txt');
+    }
+
+    public function testADocumentOverTheSizeLimitIsSkippedInTheWordCount(): void
+    {
+        $path = EpubBuilder::epub3()->buildEpub($this->workDir . '/limited.epub');
+
+        $summary = EpubReader::open($path, new Limits(maxHtmlBytes: 10))->toArray();
+
+        $this->assertSame(0, $summary['stats']['wordCount']);
+    }
+
+    public function testDrmAndSummaryNeedAnOpenReader(): void
+    {
+        $reader = EpubReader::open(EpubBuilder::epub3()->buildEpub($this->workDir . '/closed.epub'));
+        $reader->close();
+
+        $this->expectException(Exception::class);
+        $reader->toArray();
+    }
 }

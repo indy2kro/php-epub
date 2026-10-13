@@ -78,16 +78,15 @@ final class ObfuscatedFontConversionTest extends TestCase
         $this->assertStringNotContainsString('data:font', $css);
     }
 
-    public function testADamagedEncryptionFileLeavesTheFontAsItIs(): void
+    public function testADamagedEncryptionFileIsTreatedAsDrm(): void
     {
         $directory = $this->book(FontObfuscation::IDPF)
             ->withFile('META-INF/encryption.xml', '<encryption><broken')
             ->writeTo($this->tmpDir . '/book');
 
-        $css = implode("\n", (new EpubDocumentLoader())->load($directory)->styles);
-
-        $this->assertStringContainsString('fonts/face.ttf")', $css);
-        $this->assertStringNotContainsString('data:font', $css);
+        $this->expectException(\PhpEpub\ConversionException::class);
+        $this->expectExceptionMessage('DRM-protected');
+        (new EpubDocumentLoader())->load($directory);
     }
 
     public function testAFontWithoutAKeyIsBlanked(): void

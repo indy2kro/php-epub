@@ -140,7 +140,7 @@ public function getLanguages(): array<int, string>
 public function setLanguages(array<int, string> $languages): void
 ```
 
-The language of the resource (dc:language). Use BCP 47 language tags (e.g., "en", "pt-BR", "zh-Hant"). `setLanguage()` and `setLanguages()` throw an `Exception` for a value that is not a well-formed tag (`"English"` or `"en_US"`); only the syntax is checked, not whether the language is registered. `getLanguage()`/`setLanguage()` work on the main (first) language; `getLanguages()`/`setLanguages()` on all of them, for multilingual books. At least one language is required.
+The language of the resource (dc:language). Use BCP 47 language tags (e.g., "en", "pt-BR", "zh-Hant"). `setLanguage()` and `setLanguages()` throw an `Exception` for a value that is not a well-formed tag (`"English"` or `"en_US"`); only the syntax is checked, not whether the language is registered. `getLanguage()`/`setLanguage()` work on the main (first) language; `getLanguages()`/`setLanguages()` on all of them, for multilingual books. At least one language is required. A `xml:lang` on the package element that declared the previous main language follows the new one; `save()` does the same for the navigation document, together with its `<title>` when it equalled the previous book title.
 
 ### Accessibility
 
@@ -308,6 +308,17 @@ Access to metadata beyond the Dublin Core fields:
 ```php
 $metadata->setMeta('calibre:title_sort', 'Expanse, The');
 $metadata->setProperty('schema:accessMode', 'textual');
+```
+
+A prefixed property needs its prefix reserved (`schema`, `dcterms`, `rendition`, `media`, `marc`, `onix`, `xsd`, `a11y`) or declared in the package's `prefix` attribute, because EPUBCheck rejects an undeclared one. `setProperty()`/`setPropertyValues()` declare `ibooks` and `prism` themselves and throw an `Exception` for any other undeclared prefix; declare it first with `declarePrefix()`. Removing a property never needs a declaration.
+
+```php
+public function declarePrefix(string $prefix, string $uri): void
+```
+
+```php
+$metadata->declarePrefix('foo', 'http://example.com/vocab/foo#');
+$metadata->setProperty('foo:bar', 'value');
 ```
 
 ## Usage Example

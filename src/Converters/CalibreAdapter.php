@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace PhpEpub\Converters;
 
+use PhpEpub\ConversionException;
 use PhpEpub\Exception;
 use PhpEpub\Util\FileSystemHelper;
+use PhpEpub\Util\ProcessTimeoutException;
 use PhpEpub\ZipHandler;
 
 class CalibreAdapter implements ConverterInterface
@@ -64,7 +66,8 @@ class CalibreAdapter implements ConverterInterface
      *                          (packaged into a temporary .epub first, so Converter works with Calibre).
      * @param string $outputPath The output file; its extension selects the format (.mobi, .azw3, .pdf, ...).
      *
-     * @throws Exception If Calibre is missing or the conversion fails.
+     * @throws ConversionException If Calibre or the input is missing, the conversion fails, or it runs
+     *         longer than the timeout (code ConversionException::CODE_TIME_BUDGET_EXCEEDED).
      */
     public function convert(string $inputFile, string $outputPath): void
     {
@@ -84,30 +87,40 @@ class CalibreAdapter implements ConverterInterface
         }
 
         if (! $this->helper->fileExists($inputFile)) {
-            throw new Exception("EPUB file not found: {$inputFile}");
+            throw new ConversionException("EPUB file not found: {$inputFile}");
         }
 
         $this->run($calibrePath, $inputFile, $outputPath);
     }
 
     /**
-     * @throws Exception
+     * @throws ConversionException
      */
     private function run(string $calibrePath, string $inputFile, string $outputPath): void
     {
         // No shell is involved: every argument reaches Calibre as it is. Output includes stderr,
         // so failures carry Calibre's message, and a conversion that hangs is stopped.
-        $result = $this->helper->runProcess(
-            [$calibrePath, self::pathArgument($inputFile), self::pathArgument($outputPath), ...$this->extraArguments()],
-            $this->options['timeout']
-        );
+        try {
+            $result = $this->helper->runProcess(
+                [$calibrePath, self::pathArgument($inputFile), self::pathArgument($outputPath), ...$this->extraArguments()],
+                $this->options['timeout']
+            );
+        } catch (ProcessTimeoutException $exception) {
+            throw new ConversionException(
+                $exception->getMessage(),
+                ConversionException::CODE_TIME_BUDGET_EXCEEDED,
+                $exception
+            );
+        } catch (Exception $exception) {
+            throw new ConversionException('Calibre conversion failed: ' . $exception->getMessage(), 0, $exception);
+        }
 
         if ($result['exitCode'] !== 0) {
-            throw new Exception('Calibre conversion failed: ' . trim($result['output']));
+            throw new ConversionException('Calibre conversion failed: ' . trim($result['output']));
         }
 
         if (! $this->helper->fileExists($outputPath) || $this->helper->fileSize($outputPath) === 0) {
-            throw new Exception('Calibre conversion failed');
+            throw new ConversionException('Calibre conversion failed');
         }
     }
 
@@ -123,14 +136,14 @@ class CalibreAdapter implements ConverterInterface
     /**
      * The configured ebook-convert, or else the one on the PATH or in a usual install location.
      *
-     * @throws Exception If it cannot be found.
+     * @throws ConversionException If it cannot be found.
      */
     private function calibrePath(): string
     {
         $configured = $this->options['calibre_path'];
         if ($configured !== null) {
             if (! $this->helper->fileExists($configured)) {
-                throw new Exception('Calibre tool not found at path: ' . $configured);
+                throw new ConversionException('Calibre tool not found at path: ' . $configured);
             }
 
             return $configured;
@@ -147,7 +160,7 @@ class CalibreAdapter implements ConverterInterface
             }
         }
 
-        throw new Exception(
+        throw new ConversionException(
             "Calibre's ebook-convert was not found on the PATH or in the usual install locations; set the calibre_path option."
         );
     }

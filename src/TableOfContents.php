@@ -542,6 +542,56 @@ final readonly class TableOfContents
         }
     }
 
+    /**
+     * Keeps the navigation document's own title and language in step with the book: its head title that
+     * equals the previous book title becomes the new one, and its xml:lang / lang that equals the previous
+     * main language becomes the new one. Values set to something else on purpose are left alone. Nothing is
+     * written without a navigation document, when nothing matches, or when it cannot be parsed.
+     * EpubFile::save() calls this after metadata changes.
+     *
+     * @internal
+     *
+     * @throws Exception If the navigation document cannot be written.
+     */
+    public function syncNavigation(string $previousTitle, string $title, string $previousLanguage, string $language): void
+    {
+        $this->assertWritable();
+        $navPath = $this->navPath();
+        if ($navPath === null) {
+            return;
+        }
+
+        try {
+            $root = $this->load($navPath);
+        } catch (Exception) {
+            return;
+        }
+
+        $changed = false;
+        $xpath = $this->navXPath($root);
+        if ($title !== '' && $previousTitle !== '' && $title !== $previousTitle) {
+            foreach ($xpath->query('/x:html/x:head/x:title') ?: [] as $element) {
+                if ($element instanceof DOMElement && trim($element->textContent) === $previousTitle) {
+                    $element->textContent = $title;
+                    $changed = true;
+                }
+            }
+        }
+
+        if ($language !== '' && $previousLanguage !== '' && strcasecmp($language, $previousLanguage) !== 0) {
+            foreach (['xml:lang', 'lang'] as $attribute) {
+                if (strcasecmp(trim($root->getAttribute($attribute)), $previousLanguage) === 0) {
+                    $root->setAttribute($attribute, $language);
+                    $changed = true;
+                }
+            }
+        }
+
+        if ($changed) {
+            $this->save($root, $navPath);
+        }
+    }
+
     private function navPath(): ?string
     {
         foreach ($this->manifest->getItems() as $item) {
@@ -819,9 +869,36 @@ final readonly class TableOfContents
 
         $state = ['order' => 0, 'count' => 0, 'seen' => []];
         $this->appendNavPoints($document, $namespace, $navMap, $entries, $ncxPath, $state);
+        $this->renumberTargets($root, $state['order']);
 
         $this->updateDepth($root);
         $this->save($root, $ncxPath);
+    }
+
+    /**
+     * Renumbers the playOrder of the page and nav targets after the navMap's: the playOrder values of a whole NCX
+     * form one sequence in document order, and the navMap was just renumbered (EPUBCheck RSC-005 on gaps).
+     */
+    private function renumberTargets(DOMElement $root, int $last): void
+    {
+        foreach ($this->childElements($root, 'pageList') as $list) {
+            $last = $this->renumberTargetList($list, 'pageTarget', $last);
+        }
+
+        foreach ($this->childElements($root, 'navList') as $list) {
+            $last = $this->renumberTargetList($list, 'navTarget', $last);
+        }
+    }
+
+    private function renumberTargetList(DOMElement $list, string $name, int $last): int
+    {
+        foreach ($this->childElements($list, $name) as $target) {
+            if ($target->hasAttribute('playOrder')) {
+                $target->setAttribute('playOrder', (string) ++$last);
+            }
+        }
+
+        return $last;
     }
 
     /**

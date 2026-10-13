@@ -35,7 +35,7 @@ Each entry is a `PhpEpub\TocEntry`:
 
 - **`getBook(): ?EpubFile`**: The book this table of contents belongs to, when it came from `EpubFile::getTableOfContents()`. Holding the object keeps the book's extracted files alive, so `EpubFile::open($path)->getTableOfContents()` is safe to use on its own.
 
-Deleting a file with `ContentManager::deleteContent()` removes its entries (if that removes the last one, the table of contents stays empty and `EpubFile::validate()` reports `NAV_EMPTY` / `NCX_EMPTY`), and `EpubFile::save()` keeps the NCX `docTitle` in step with the book title. Whenever the NCX is written, its `dtb:depth` meta is set to the real nesting depth of the entries (created when missing, as long as the NCX has a `<head>`).
+Deleting a file with `ContentManager::deleteContent()` removes its entries (if that removes the last one, the table of contents stays empty and `EpubFile::validate()` reports `NAV_EMPTY` / `NCX_EMPTY`), and `EpubFile::save()` keeps the NCX `docTitle` in step with the book title (and the navigation document's `<title>` and language, unless they were set to something else). Whenever the NCX is written, its `dtb:depth` meta is set to the real nesting depth of the entries (created when missing, as long as the NCX has a `<head>`).
 ## Usage Example
 
 ```php

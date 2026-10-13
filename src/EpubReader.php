@@ -9,6 +9,7 @@ use PhpEpub\Util\FileSystemHelper;
 use PhpEpub\Util\HtmlText;
 use PhpEpub\Util\PathResolver;
 use PhpEpub\Util\SpineText;
+use PhpEpub\Util\WordCount;
 use SimpleXMLElement;
 use ZipArchive;
 
@@ -25,6 +26,8 @@ use ZipArchive;
  * trusted): the entry count and the declared total are checked when the book is opened, then every entry
  * read counts once towards the total size and is checked against the compression ratio, and XML and XHTML
  * documents against their size caps.
+ *
+ * @phpstan-import-type SummaryShape from BookSummary
  */
 final class EpubReader
 {
@@ -145,9 +148,11 @@ final class EpubReader
 
         try {
             $output = @fopen($archive, 'wb') ?: throw new Exception('Failed to buffer the EPUB stream');
-            $copied = @stream_copy_to_stream($stream, $output);
-            fclose($output);
-            $copied === false && throw new Exception('Failed to read the EPUB stream');
+            try {
+                ($limits ?? Limits::default())->bufferStream($stream, $output);
+            } finally {
+                fclose($output);
+            }
 
             return new self(self::openArchive($archive), $limits, $xmlParser, $directory);
         } catch (\Throwable $throwable) {
@@ -164,6 +169,8 @@ final class EpubReader
      */
     public static function fromString(string $data, ?Limits $limits, ?XmlParser $xmlParser, bool $buffer): self
     {
+        ($limits ?? Limits::default())->assertArchiveSize(strlen($data));
+
         if (! $buffer) {
             // ZipArchive::openString() is an instance method that only newer ext-zip builds have (the minimum PHP
             // version does not); openString() checks for it. Whatever it throws is reported as a ZipException.
@@ -281,7 +288,7 @@ final class EpubReader
     }
 
     /**
-     * The plain text of the book's XHTML and HTML documents in reading order, as EpubFile::getText().
+     * The plain text of the book's XHTML and HTML documents in reading order, as EpubFile::getText() (encrypted documents are left out).
      *
      * @return array<string, string>
      *
@@ -296,8 +303,121 @@ final class EpubReader
             $this->spine,
             $linearOnly,
             $this->hasContent(...),
-            fn (string $path): string => HtmlText::extract($this->readMarkup($path))
+            fn (string $path): string => HtmlText::extract($this->readMarkup($path)),
+            array_flip($this->getEncryptedPaths())
         );
+    }
+
+    /**
+     * Whether the book is DRM-protected, as EpubFile::isDrmProtected(): an encrypted resource that is not a font
+     * obfuscation, a META-INF/rights.xml or license.lcpl, or an encryption.xml that cannot be read.
+     */
+    public function isDrmProtected(): bool
+    {
+        $this->assertOpen();
+
+        foreach (['META-INF/rights.xml', 'META-INF/license.lcpl'] as $file) {
+            if ($this->hasContent($file)) {
+                return true;
+            }
+        }
+
+        if ($this->hasContent('META-INF/encryption.xml')) {
+            try {
+                foreach (Encryption::entriesOf($this->readXml('META-INF/encryption.xml')) as $entry) {
+                    if (! FontObfuscation::isObfuscation($entry['algorithm'])) {
+                        return true;
+                    }
+                }
+            } catch (XmlException) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * The book-relative paths (sorted) of the resources encrypted with an algorithm that is not a font obfuscation,
+     * as EpubFile::getEncryptedPaths(); none when encryption.xml is missing or unreadable.
+     *
+     * @return list<string>
+     */
+    public function getEncryptedPaths(): array
+    {
+        $this->assertOpen();
+
+        if (! $this->hasContent('META-INF/encryption.xml')) {
+            return [];
+        }
+
+        try {
+            return Encryption::encryptedPathsOf(Encryption::entriesOf($this->readXml('META-INF/encryption.xml')), $this->paths);
+        } catch (XmlException) {
+            return [];
+        }
+    }
+
+    /**
+     * A JSON-ready summary of the book (metadata, cover, table of contents, reading order, statistics, DRM state),
+     * the same array EpubFile::toArray() returns, read without extracting. It reads the text of every linear
+     * document once to count its words, so its cost is that of getText().
+     *
+     * @return SummaryShape
+     *
+     * @throws Exception If the reader is closed.
+     * @throws ZipException If a document exceeds the limits while it is read.
+     */
+    public function toArray(): array
+    {
+        $this->assertOpen();
+
+        return BookSummary::of($this, $this->countWords());
+    }
+
+    /**
+     * The words of the linear XHTML documents, one document at a time; encrypted and unreadable (or too large)
+     * documents add nothing, as in EpubFile::toArray().
+     */
+    private function countWords(): int
+    {
+        $words = 0;
+        SpineText::collect(
+            $this->spine,
+            true,
+            $this->hasContent(...),
+            function (string $path) use (&$words): string {
+                try {
+                    $words += WordCount::count(HtmlText::extract($this->readMarkup($path)));
+                } catch (Exception) {
+                    // An unreadable document adds nothing; the others are still counted.
+                }
+
+                return '';
+            },
+            array_flip($this->getEncryptedPaths())
+        );
+
+        return $words;
+    }
+
+    /**
+     * The uncompressed size in bytes of a file of the book, as the archive declares it (nothing is read).
+     *
+     * @param string $path The path relative to the book root.
+     *
+     * @throws InvalidEpubException If the file does not exist or the path leaves the book.
+     */
+    public function getContentSize(string $path): int
+    {
+        $this->assertOpen();
+
+        $zip = $this->zip ?? throw new Exception('The EPUB reader is closed.');
+        $name = $this->paths->normalize($path);
+        $index = $this->entries[$name] ?? throw new InvalidEpubException("Content file does not exist: {$name}");
+        $stat = $zip->statIndex($index);
+
+        return $stat === false ? 0 : $stat['size'];
     }
 
     /**

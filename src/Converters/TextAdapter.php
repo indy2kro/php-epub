@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PhpEpub\Converters;
 
 use PhpEpub\ConversionException;
+use PhpEpub\Limits;
 use PhpEpub\Util\HtmlText;
 
 /**
@@ -15,7 +16,7 @@ use PhpEpub\Util\HtmlText;
  * The text is read from the same sanitised chapters the PDF adapters render (see EpubDocumentLoader), so it never
  * contains markup, script or style content.
  */
-final readonly class TextAdapter implements ConverterInterface
+final readonly class TextAdapter implements LimitsAwareConverter
 {
     private const int MAX_RULE_LENGTH = 72;
 
@@ -28,6 +29,11 @@ final readonly class TextAdapter implements ConverterInterface
         private bool $headings = true,
         private EpubDocumentLoader $loader = new EpubDocumentLoader()
     ) {
+    }
+
+    public function withLimits(Limits $limits): static
+    {
+        return new self($this->includeNonLinear, $this->headings, $this->loader->withLimits($limits));
     }
 
     /**

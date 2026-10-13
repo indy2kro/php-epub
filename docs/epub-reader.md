@@ -12,18 +12,20 @@ public function __construct(
     int $maxUncompressedBytes = 1024 * 1024 * 1024,
     int $maxCompressionRatio = 100,
     int $maxXmlBytes = PHP_INT_MAX,
-    int $maxHtmlBytes = PHP_INT_MAX
+    int $maxHtmlBytes = PHP_INT_MAX,
+    int $maxArchiveBytes = PHP_INT_MAX
 )
 ```
 
-- `Limits::default()`: what the library does without any configuration (10,000 entries, 1 GiB, ratio 100, no cap on single documents).
-- `Limits::web()`: for a public service processing uploads per request: 2,000 entries, 200 MiB, ratio 100, and 8 MiB per XML or XHTML document.
+- `Limits::default()`: what the library does without any configuration (10,000 entries, 1 GiB, ratio 100, no cap on single documents or the archive).
+- `Limits::web()`: for a public service processing uploads per request: 2,000 entries, 200 MiB, ratio 100, 8 MiB per XML or XHTML document, and a 100 MiB archive.
 
 | Limit | Applies to |
 |---|---|
 | `maxEntries`, `maxUncompressedBytes`, `maxCompressionRatio` | The archive, as `ZipHandler` limits an extraction: measured on the bytes actually read, not on the sizes the archive declares |
+| `maxArchiveBytes` | The compressed archive that `openString()` and `openStream()` accept: a string is checked up front and a stream is copied to its scratch file only up to one byte past the cap, so an oversized upload cannot fill the temp disk; both throw a `ZipException`. A book opened from a path is already on disk |
 | `maxXmlBytes` | Every XML document the library parses (container, package, navigation, NCX, `encryption.xml`): `XmlParser` checks the size before reading and throws an `XmlException` |
-| `maxHtmlBytes` | Every XHTML or HTML content document the library parses as markup: `getText()` throws an `InvalidEpubException`, `EpubDocumentLoader` (PDF conversion) a `ConversionException`; the lookup of a cover page's first image is best effort and treats a too large page as having no image |
+| `maxHtmlBytes` | Every XHTML or HTML content document the library parses as markup: `getText()` throws an `InvalidEpubException`, `EpubDocumentLoader` (conversion) a `ConversionException`; the lookup of a cover page's first image is best effort and treats a too large page as having no image |
 
 No limit passes `LIBXML_PARSEHUGE`, so libxml's own depth limit still refuses absurdly nested documents (with an `XmlException`).
 
@@ -40,7 +42,7 @@ $epubFile = EpubFile::openString($uploadedBytes, limits: $limits);
 $epubFile->close();
 ```
 
-A `ZipHandler` or `XmlParser` passed to `open()` replaces that part of the limits. A PDF conversion reads the book through an `EpubDocumentLoader`, which has its own `maxHtmlBytes` argument: `new DompdfAdapter([], new EpubDocumentLoader(maxHtmlBytes: Limits::web()->maxHtmlBytes))`.
+A `ZipHandler` or `XmlParser` passed to `open()` replaces that part of the limits. `EpubFile::convert()` carries the book's `maxXmlBytes` and `maxHtmlBytes` into the adapter's `EpubDocumentLoader` (every adapter except Calibre implements `LimitsAwareConverter::withLimits()`): the smaller of the loader's own cap and the book's applies, so a book opened with `Limits::web()` is converted under the same caps with a plain `new HtmlAdapter()`. An adapter used directly on a directory, outside `convert()`, takes its caps from its loader: `new DompdfAdapter([], new EpubDocumentLoader(maxHtmlBytes: Limits::web()->maxHtmlBytes))`. A `Merger` parses and rewrites each book's documents with that book's `XmlParser`, or with the one passed to it.
 
 ## Opening
 
@@ -66,10 +68,14 @@ public function getText(bool $linearOnly = true): array
 public function getContentPaths(): array
 public function hasContent(string $path): bool
 public function getContent(string $path, ?int $maxBytes = null): string
+public function getContentSize(string $path): int
+public function isDrmProtected(): bool
+public function getEncryptedPaths(): array
+public function toArray(): array
 public function close(): void
 ```
 
-They return the same results as the `EpubFile` methods of the same name (the tests compare them on the fixture books). `getContent()` holds the whole file in memory: pass `$maxBytes` (or keep the limits within your `memory_limit`) when you read files you do not know.
+They return the same results as the `EpubFile` methods of the same name (the tests compare them on the fixture books). `toArray()` is the JSON-ready summary of [`EpubFile::toArray()`](epub-file.md), `isDrmProtected()` and `getEncryptedPaths()` the DRM check, all without extracting; `getContentSize()` is the uncompressed size the archive declares for a file. `toArray()` reads each linear document once to count its words (documents that are encrypted, unreadable or over `maxHtmlBytes` add nothing). `getContent()` holds the whole file in memory: pass `$maxBytes` (or keep the limits within your `memory_limit`) when you read files you do not know.
 
 Every entry read counts once towards `maxUncompressedBytes`, however often it is read again, and is checked against the compression ratio while it is streamed.
 
@@ -101,4 +107,4 @@ try {
 
 There is no `save()`, content manager, validator or conversion. The `Metadata` and `TableOfContents` objects are the ones `EpubFile` uses, so they have setters; in a reader, `Metadata::save()` and every table of contents change throw a `ReadOnlyException` (a `PhpEpub\Exception`), and edits made to the metadata, manifest or spine in memory are never written anywhere. To edit, validate or convert a book, open it with `EpubFile`.
 
-`close()` is optional (the destructor closes the reader) and safe to call twice; a closed reader throws on use. DRM detection (`EpubFile::isDrmProtected()`) is not available: check `hasContent('META-INF/rights.xml')` and `hasContent('META-INF/license.lcpl')` if you need to know.
+`close()` is optional (the destructor closes the reader) and safe to call twice; a closed reader throws on use.

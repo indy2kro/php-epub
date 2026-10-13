@@ -1,0 +1,20 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+// Runs from a Composer install (vendor/indy2kro/php-epub/bin) or from a checkout of the repository.
+foreach ([__DIR__ . '/../../../autoload.php', __DIR__ . '/../vendor/autoload.php'] as $autoload) {
+    if (is_file($autoload)) {
+        require $autoload;
+
+        break;
+    }
+}
+
+if (! class_exists(PhpEpub\Cli\Application::class)) {
+    fwrite(STDERR, "php-epub: run \"composer install\" first (the autoloader was not found).\n");
+    exit(3);
+}
+
+exit((new PhpEpub\Cli\Application())->run(array_slice($argv, 1)));

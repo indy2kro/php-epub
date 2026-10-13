@@ -19,7 +19,7 @@ books. Namespace `PhpEpub\` → `src/`, tests `PhpEpub\Test\` → `tests/`.
 vendor/bin/phpunit
 
 # 2. Run PHPCS for code style
-vendor/bin/phpcs src/ tests/ docs/
+vendor/bin/phpcs src/ tests/ docs/ bin/
 
 # 3. Run PHPStan for static analysis
 php -d memory_limit=512M vendor/bin/phpstan analyse --no-progress
@@ -30,7 +30,7 @@ vendor/bin/rector --dry-run
 
 - PHPUnit fails on deprecations, notices, warnings, risky and incomplete tests (skips are allowed).
 - PHPStan runs at `level: max` over `src` and `tests`.
-- PHPCS is PSR-12 (line length unchecked) over `src`, `tests` and the PHP files in `docs/`.
+- PHPCS is PSR-12 (line length unchecked) over `src`, `tests`, `bin` and the PHP files in `docs/`.
 - Rector runs on `src/` and `tests/` but skips `src/EpubFile.php` entirely, because its suggestions there (e.g.
   `NewInInitializerRector`'s nullable parameters) conflict with PHPStan.
 - CI runs `composer update` before the gates, so it may use newer PHPStan/Rector than a stale `vendor/`.
@@ -67,6 +67,20 @@ bundles the `ZipHandler` and `XmlParser` limits and the content-document size ca
   the spine documents and makes their HTML safe to render; `CalibreAdapter` runs `ebook-convert`; `TextAdapter`, `HtmlAdapter`
   and `MarkdownAdapter` export text, sanitised HTML and Markdown from the loader's output (the HTML and Markdown go through
   `Util\HtmlSanitizer`, an allowlist). `Converter` maps formats to adapters.
+- `bin/php-epub` runs `Cli\Application` (`src/Cli/`), a thin command line (info, validate, repair, compress, convert, split, merge) over `EpubReader`, `EpubFile`, `Repairer`,
+  `Merger` and `Splitter` (`Cli\Arguments` parses the options, `Cli\UsageException` signals usage errors):
+  books are opened with `Limits::web()` unless `--trusted`, outputs are never overwritten without `--force` or equal to the
+  input, and exit codes are 0 ok, 1 problems found, 2 usage, 3 failure (see `docs/cli.md`). Tests run it in-process.
+- `Cleanup\Cleanup` (with `CleanupOptions`, `CleanupPreset`, `CleanupReport`) shrinks and tidies a book: it recompresses
+  images (`ImageRecompressor`, GD), strips scripts and remote references (`MarkupSanitizer`) and removes unreferenced
+  files, using `ReferenceGraph` to know what is referenced; `EpubFile::compress()` is the facade.
+- `Merge\Merger` joins several books into one and `Split\Splitter` (with `SplitPlan`) cuts one into several; both build
+  new books (manifest, spine, navigation, metadata) and report what they did (`MergeReport`, `SplitReport`).
+- `Repair\Repairer` fixes problems that `Validator` reports (`RepairFix`, `RepairOptions`, `AppliedFix`); each fix maps
+  to validation codes and is skipped when it cannot be done safely.
+- `Kindle\KindleChecker` reports what Kindle / KDP would reject or mangle; it only reads the book.
+- `BookSummary::of()` collects an `EpubFile` or `EpubReader` into one plain array (also behind `toArray()`), with word
+  count and reading time; `Util\WordCount` does the counting.
 - Core classes accept their collaborators as optional constructor arguments, which the tests use:
 
   ```php

@@ -241,13 +241,21 @@ class Manifest
      * the EPUB 2 cover meta, refinements, spine@toc, fallback / media-overlay
      * attributes of other items and <guide> references to its file.
      *
-     * Spine itemrefs are not touched; see Spine::remove().
+     * An item that is in the reading order cannot be removed (its itemref would point at nothing):
+     * take it out of the spine first with Spine::remove(), or use ContentManager::deleteContent(),
+     * which does both.
      *
-     * @throws Exception If no item has this id.
+     * @throws Exception If no item has this id, or the item is in the spine.
      */
     public function remove(string $id): void
     {
         $node = $this->requireNode($id);
+        foreach ($this->query('/opf:package/opf:spine/opf:itemref') as $itemref) {
+            if ((string) $itemref['idref'] === $id) {
+                throw new Exception("Item \"{$id}\" is in the spine; remove it from the spine first (Spine::remove()) or use ContentManager::deleteContent()");
+            }
+        }
+
         $href = (string) $node['href'];
 
         unset($node[0]);

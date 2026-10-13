@@ -5,13 +5,19 @@ declare(strict_types=1);
 namespace PhpEpub\Repair;
 
 use PhpEpub\BookTemplate;
+use PhpEpub\Encryption;
 use PhpEpub\EpubFile;
 use PhpEpub\Exception;
+use PhpEpub\FontObfuscation;
 use PhpEpub\Manifest;
 use PhpEpub\ManifestItem;
 use PhpEpub\TocEntry;
+use PhpEpub\Util\FragmentReferences;
+use PhpEpub\Util\PackagePrefixes;
 use PhpEpub\Util\PathResolver;
 use PhpEpub\ValidationIssue;
+use PhpEpub\XmlException;
+use PhpEpub\XmlParser;
 
 /**
  * Fixes the problems EpubFile::validate() reports that have one safe, deterministic fix. The changes are made to
@@ -31,6 +37,8 @@ final class Repairer
 
     private const int SNIFF_BYTES = 524288;
 
+    private const int MAX_DOCUMENT_BYTES = 8388608;
+
     /**
      * Files that editors and operating systems leave in a book folder: never listed in a manifest.
      */
@@ -43,7 +51,8 @@ final class Repairer
 
     public function __construct(
         private readonly EpubFile $epub,
-        private readonly PathResolver $paths = new PathResolver()
+        private readonly PathResolver $paths = new PathResolver(),
+        private readonly XmlParser $xmlParser = new XmlParser()
     ) {
     }
 
@@ -62,7 +71,7 @@ final class Repairer
         $root = $this->epub->getTempDir() ?? throw new Exception('EPUB file must be loaded before repairing.');
         $this->applied = [];
 
-        $issues = $options->includes(RepairFix::UnlistedFiles) || $options->includes(RepairFix::MediaTypes) ? $this->epub->validate() : [];
+        $issues = array_filter([RepairFix::UnlistedFiles, RepairFix::MediaTypes, RepairFix::Prefixes], $options->includes(...)) !== [] ? $this->epub->validate() : [];
 
         $this->when($options, RepairFix::DuplicateIds, $this->repairDuplicateIds(...));
         // These address manifest items by id: with a repeated id they would change the wrong item, so they wait
@@ -71,6 +80,7 @@ final class Repairer
         $options = $ambiguous ? $options->without(RepairFix::MissingFiles, RepairFix::MediaTypes, RepairFix::Cover, RepairFix::UpgradeToEpub3, RepairFix::ManifestProperties) : $options;
         $this->when($options, RepairFix::MissingFiles, fn () => $this->repairMissingFiles($root));
         $this->when($options, RepairFix::SpineReferences, $this->repairSpine(...));
+        $this->when($options, RepairFix::EncryptionEntries, fn () => $this->repairEncryptionEntries($root));
         $this->when($options, RepairFix::UnlistedFiles, fn () => $this->repairUnlistedFiles($root, $issues));
         $this->when($options, RepairFix::MediaTypes, fn () => $this->repairMediaTypes($root, $issues));
         $this->when($options, RepairFix::Cover, fn () => $this->repairCover($root));
@@ -84,6 +94,8 @@ final class Repairer
         $this->when($options, RepairFix::TocLinks, $this->repairTocLinks(...));
         $this->when($options, RepairFix::Navigation, $this->fillEmptyToc(...));
         $this->when($options, RepairFix::ManifestProperties, $this->repairManifestProperties(...));
+        $this->when($options, RepairFix::FragmentLinks, fn () => $this->repairFragmentLinks($root));
+        $this->when($options, RepairFix::Prefixes, fn () => $this->repairPrefixes($issues));
 
         return $this->applied;
     }
@@ -152,6 +164,149 @@ final class Repairer
 
             $manifest->remove($item->id);
             $this->fixed('MANIFEST_FILE_MISSING', "Removed the manifest item \"{$item->id}\", which has no file, from the manifest and the spine.", $item->path);
+        }
+    }
+
+    /**
+     * Drops the encryption.xml entries that name a file the book does not have. A DRM-protected book is left
+     * alone, and so is an entry that points outside the book (it cannot be addressed).
+     */
+    private function repairEncryptionEntries(string $root): void
+    {
+        $encryption = new Encryption($root, $this->xmlParser, $this->paths);
+        if ($encryption->isDrmProtected()) {
+            return;
+        }
+
+        $fonts = new FontObfuscation($root, $this->xmlParser, $this->paths);
+        $dropped = [];
+        foreach ($encryption->entries() as $entry) {
+            try {
+                $path = $this->paths->normalize($entry['uri']);
+            } catch (Exception) {
+                continue;
+            }
+
+            if (isset($dropped[$path]) || $this->fileExists($root, $path)) {
+                continue;
+            }
+
+            $dropped[$path] = true;
+            $fonts->setAlgorithm($path, null);
+            $this->fixed('ENCRYPTION_ENTRY_MISSING', 'Removed the encryption.xml entry of a file that is not in the book.', $path);
+        }
+    }
+
+    /**
+     * A link to a missing element of another document keeps pointing at that document (its fragment goes); a
+     * link to a missing element of its own document is unlinked: its content stays as plain text.
+     */
+    private function repairFragmentLinks(string $root): void
+    {
+        if ((new Encryption($root, $this->xmlParser, $this->paths))->isDrmProtected()) {
+            return;
+        }
+
+        $fragments = new FragmentReferences($root, $this->paths, $this->xmlParser);
+        foreach ($this->epub->getManifest()->getItems() as $item) {
+            if ($item->path === '' || $item->mediaType !== self::XHTML_MEDIA_TYPE || in_array('nav', $this->properties($item), true)) {
+                continue;
+            }
+
+            $document = $this->parseDocument($root, $item->path);
+            $element = $document?->documentElement;
+            $broken = $element instanceof \DOMElement ? $fragments->broken($element, $item->path) : [];
+            if ($document === null || $broken === []) {
+                continue;
+            }
+
+            foreach ($broken as $link) {
+                $owner = $link['attribute']->ownerElement;
+                // The owner of an attribute found while walking elements is always an element; this narrows the type.
+                // @codeCoverageIgnoreStart
+                if (! $owner instanceof \DOMElement) {
+                    continue;
+                }
+
+                // @codeCoverageIgnoreEnd
+
+                $target = "{$link['file']}#{$link['fragment']}";
+                if ($link['file'] === $item->path) {
+                    $this->unlink($owner);
+                    $description = "Unlinked the link to #{$link['fragment']}, which names no element of this document; its content stays.";
+                } else {
+                    $link['attribute']->value = substr($link['attribute']->value, 0, (int) strpos($link['attribute']->value, '#'));
+                    $description = "Removed the fragment of the link to {$target}, which names no element of {$link['file']}.";
+                }
+
+                $this->fixed('CONTENT_FRAGMENT_MISSING', $description, $item->path);
+            }
+
+            $this->epub->getContentManager()->updateContent($item->path, (string) $document->saveXML());
+        }
+    }
+
+    /**
+     * Turns a link into plain text: an anchor keeps its content (and, when it is a target itself, stays as an
+     * anchor without href); another linking element is removed.
+     */
+    private function unlink(\DOMElement $element): void
+    {
+        $isAnchor = strtolower($element->localName ?? '') === 'a';
+        if ($isAnchor && ($element->hasAttribute('id') || $element->hasAttribute('name'))) {
+            $element->removeAttribute('href');
+            $element->removeAttributeNS('http://www.w3.org/1999/xlink', 'href');
+
+            return;
+        }
+
+        // Every element reached through a document has a parent (at least the document); this narrows the type.
+        // @codeCoverageIgnoreStart
+        if (! $element->parentNode instanceof \DOMNode) {
+            return;
+        }
+
+        // @codeCoverageIgnoreEnd
+
+        while ($isAnchor && $element->firstChild instanceof \DOMNode) {
+            $element->parentNode->insertBefore($element->firstChild, $element);
+        }
+
+        $element->parentNode->removeChild($element);
+    }
+
+    /**
+     * The parsed document at a book path; null when it is missing, too large, encrypted or not well-formed.
+     */
+    private function parseDocument(string $root, string $path): ?\DOMDocument
+    {
+        try {
+            $file = $this->paths->resolve($root, $path);
+            if (! is_file($file) || (int) @filesize($file) > self::MAX_DOCUMENT_BYTES) {
+                return null;
+            }
+
+            return dom_import_simplexml($this->xmlParser->parse($file))->ownerDocument;
+        } catch (Exception | XmlException) {
+            return null;
+        }
+    }
+
+    /**
+     * Declares the prefixes of known vocabularies; a prefix this library cannot give a URI stays reported.
+     *
+     * @param list<ValidationIssue> $issues
+     */
+    private function repairPrefixes(array $issues): void
+    {
+        foreach ($issues as $issue) {
+            $prefix = (string) $issue->location;
+            if ($issue->code !== 'OPF_PREFIX_UNDECLARED' || ! isset(PackagePrefixes::KNOWN[$prefix])) {
+                continue;
+            }
+
+            $this->epub->getMetadata()->declarePrefix($prefix, PackagePrefixes::KNOWN[$prefix]);
+            $this->fixed('OPF_PREFIX_UNDECLARED', "Declared the prefix \"{$prefix}:\" as " . PackagePrefixes::KNOWN[$prefix] . '.', $prefix);
         }
     }
 
@@ -323,14 +478,15 @@ final class Repairer
      */
     private function repairModifiedDate(array $codes, RepairOptions $options): void
     {
-        if (! isset($codes['METADATA_MODIFIED_MISSING'])) {
+        $code = isset($codes['METADATA_MODIFIED_MISSING']) ? 'METADATA_MODIFIED_MISSING' : (isset($codes['METADATA_MODIFIED_INVALID']) ? 'METADATA_MODIFIED_INVALID' : null);
+        if ($code === null) {
             return;
         }
 
         $now = ($options->now ?? new \DateTimeImmutable())->getTimestamp();
         $modified = gmdate('Y-m-d\TH:i:s\Z', $now);
         $this->epub->getMetadata()->setProperty('dcterms:modified', $modified);
-        $this->fixed('METADATA_MODIFIED_MISSING', "Set dcterms:modified to {$modified}.", 'dcterms:modified');
+        $this->fixed($code, "Set dcterms:modified to {$modified}.", 'dcterms:modified');
     }
 
     /**

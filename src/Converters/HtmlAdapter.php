@@ -6,6 +6,8 @@ namespace PhpEpub\Converters;
 
 use DOMElement;
 use PhpEpub\ConversionException;
+use PhpEpub\Limits;
+use PhpEpub\TocEntry;
 use PhpEpub\Util\CssSanitizer;
 use PhpEpub\Util\CssScope;
 use PhpEpub\Util\FileSystemHelper;
@@ -27,7 +29,7 @@ use PhpEpub\Util\HtmlSanitizer;
  * http, https, mailto and in-document targets; nothing loads from a remote URL (images, stylesheets, @import,
  * url(), srcset); and a Content-Security-Policy <meta> repeats that for browsers.
  */
-final readonly class HtmlAdapter implements ConverterInterface
+final readonly class HtmlAdapter implements LimitsAwareConverter
 {
     private const string CONTAINER_CLASS = 'epub-book';
 
@@ -56,6 +58,11 @@ final readonly class HtmlAdapter implements ConverterInterface
         private bool $includeToc = true,
         private EpubDocumentLoader $loader = new EpubDocumentLoader()
     ) {
+    }
+
+    public function withLimits(Limits $limits): static
+    {
+        return new self($this->maxInlinedBytes, $this->includeNonLinear, $this->includeToc, $this->loader->withLimits($limits));
     }
 
     /**
@@ -147,14 +154,15 @@ final readonly class HtmlAdapter implements ConverterInterface
 
         $css .= "\n" . CssScope::scopeAll($sheets, '.' . self::CONTAINER_CLASS);
 
-        return $this->page($document, $included, $sections, $css);
+        return $this->page($document, $included, $sections, $css, $ids);
     }
 
     /**
      * @param list<int> $included Indexes of the exported chapters.
      * @param array<int, string> $sections
+     * @param array<string, true> $ids Every id in the exported chapters.
      */
-    private function page(EpubDocument $document, array $included, array $sections, string $css): string
+    private function page(EpubDocument $document, array $included, array $sections, string $css, array $ids): string
     {
         $title = htmlspecialchars($document->title, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
         $language = preg_match('/^[A-Za-z0-9-]{1,35}$/', $document->language) === 1 ? ' lang="' . $document->language . '"' : '';
@@ -170,7 +178,7 @@ final readonly class HtmlAdapter implements ConverterInterface
         $body = ($document->title === '' ? '' : '<header class="epub-title"><h1>' . $title . '</h1>'
             . ($document->authors === [] ? '' : '<p>' . htmlspecialchars(implode(', ', $document->authors), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</p>')
             . '</header>')
-            . ($this->includeToc ? $this->toc($document, $included) : '')
+            . ($this->includeToc ? $this->toc($document, $included, $ids) : '')
             . implode("\n", $sections);
 
         return "<!DOCTYPE html>\n<html{$language}{$direction}><head>{$head}</head>"
@@ -178,10 +186,21 @@ final readonly class HtmlAdapter implements ConverterInterface
     }
 
     /**
+     * The contents list: the book's table of contents, nested, when it has one that reaches the exported chapters;
+     * else one entry per chapter.
+     *
      * @param list<int> $included
+     * @param array<string, true> $ids
      */
-    private function toc(EpubDocument $document, array $included): string
+    private function toc(EpubDocument $document, array $included, array $ids): string
     {
+        if (count($included) > 1) {
+            $nested = $this->tocList($document->outline, array_flip($document->chapterPaths), $included, $ids);
+            if ($nested !== '') {
+                return '<nav class="epub-toc"><h2>Contents</h2>' . $nested . '</nav>';
+            }
+        }
+
         $items = '';
         foreach ($included as $index) {
             $title = ($document->tocTitles[$index] ?? '') !== '' ? $document->tocTitles[$index] : ($document->chapterTitles[$index] ?? '');
@@ -191,6 +210,36 @@ final readonly class HtmlAdapter implements ConverterInterface
         }
 
         return count($included) > 1 && $items !== '' ? '<nav class="epub-toc"><h2>Contents</h2><ol>' . $items . '</ol></nav>' : '';
+    }
+
+    /**
+     * @param list<TocEntry> $entries
+     * @param array<string, int> $indexes Book-relative path => chapter index.
+     * @param list<int> $included
+     * @param array<string, true> $ids
+     */
+    private function tocList(array $entries, array $indexes, array $included, array $ids): string
+    {
+        $items = '';
+        foreach ($entries as $entry) {
+            $title = trim((string) preg_replace('/\s+/u', ' ', $entry->title));
+            $chapter = $entry->path === '' ? null : ($indexes[$entry->path] ?? null);
+            if ($title === '') {
+                continue;
+            }
+
+            $children = $this->tocList($entry->children, $indexes, $included, $ids);
+            $label = htmlspecialchars($title, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+            if ($chapter !== null && in_array($chapter, $included, true)) {
+                $target = EpubDocumentLoader::anchorId($chapter, $entry->fragment === null || $entry->fragment === '' ? null : $entry->fragment);
+                $target = isset($ids[$target]) ? $target : EpubDocumentLoader::anchorId($chapter);
+                $items .= '<li><a href="#' . $target . '">' . $label . '</a>' . $children . '</li>';
+            } elseif ($children !== '') {
+                $items .= '<li>' . $label . $children . '</li>';
+            }
+        }
+
+        return $items === '' ? '' : '<ol>' . $items . '</ol>';
     }
 
     private static function serialize(DOMElement $body): string

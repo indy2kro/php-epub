@@ -48,6 +48,15 @@ enum RepairFix: string
     /** Recomputes the nav, scripted, svg, remote-resources and mathml manifest properties (MANIFEST_PROPERTY_MISSING, MANIFEST_PROPERTY_UNNEEDED). */
     case ManifestProperties = 'manifest-properties';
 
+    /** Drops encryption.xml entries for files that are not in the book (ENCRYPTION_ENTRY_MISSING). */
+    case EncryptionEntries = 'encryption-entries';
+
+    /** Removes the fragment of links to a missing element of another document, and unlinks a link to a missing element of its own document (CONTENT_FRAGMENT_MISSING). */
+    case FragmentLinks = 'fragment-links';
+
+    /** Declares the property prefixes of known vocabularies (ibooks, prism) that the package uses without declaring (OPF_PREFIX_UNDECLARED). */
+    case Prefixes = 'prefixes';
+
     /**
      * Every fix except UpgradeToEpub3, which changes the book's version.
      *

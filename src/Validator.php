@@ -6,7 +6,9 @@ namespace PhpEpub;
 
 use PhpEpub\Util\ContentDocumentProperties;
 use PhpEpub\Util\FileSystemHelper;
+use PhpEpub\Util\FragmentReferences;
 use PhpEpub\Util\MetadataSyntax;
+use PhpEpub\Util\PackagePrefixes;
 use PhpEpub\Util\PathResolver;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
@@ -88,6 +90,7 @@ final readonly class Validator
             ...$this->checkEncryption(),
             ...$this->checkMetadata(),
             ...$this->checkMetadataSyntax(),
+            ...$this->checkPrefixes(),
             ...$this->checkIds(),
             ...$this->checkManifest(),
             ...$this->checkSpine(),
@@ -118,14 +121,23 @@ final readonly class Validator
 
     /**
      * A DRM-protected book is one error: its encrypted content is not examined by the checks below
-     * (it would be reported as not well-formed, with the wrong media type, and so on).
+     * (it would be reported as not well-formed, with the wrong media type, and so on). Otherwise every
+     * resource encryption.xml lists (the obfuscated fonts) must be a file of the book.
      *
      * @return list<ValidationIssue>
      */
     private function checkEncryption(): array
     {
         if (! $this->encryption->isDrmProtected()) {
-            return [];
+            return $this->checkEncryptionEntries();
+        }
+
+        if ($this->encryption->isUnreadable()) {
+            return [$this->error(
+                'CONTENT_ENCRYPTED',
+                'META-INF/encryption.xml cannot be read (it is malformed, declares entities or is too large), so the book is treated as possibly DRM-protected; its content cannot be read or checked.',
+                'META-INF/encryption.xml'
+            )];
         }
 
         $count = count($this->encrypted);
@@ -135,6 +147,29 @@ final readonly class Validator
             'The book is DRM-protected' . ($count === 0 ? '' : ", and {$count} of its resources are encrypted") . '; they cannot be read or checked.',
             $count === 0 ? null : 'META-INF/encryption.xml'
         )];
+    }
+
+    /**
+     * @return list<ValidationIssue>
+     */
+    private function checkEncryptionEntries(): array
+    {
+        $issues = [];
+        foreach ($this->encryption->entries() as $entry) {
+            try {
+                $path = $this->paths->normalize($entry['uri']);
+                $exists = is_file($this->paths->resolve($this->rootDirectory, $path));
+            } catch (InvalidEpubException) {
+                $path = $entry['uri'];
+                $exists = false;
+            }
+
+            if (! $exists) {
+                $issues[$path] ??= $this->error('ENCRYPTION_ENTRY_MISSING', 'META-INF/encryption.xml lists a resource that is not in the book.', $path);
+            }
+        }
+
+        return array_values($issues);
     }
 
     /**
@@ -160,6 +195,12 @@ final readonly class Validator
 
         if ($this->isEpub3() && trim((string) $this->metadata->getProperty('dcterms:modified')) === '') {
             $issues[] = $this->error('METADATA_MODIFIED_MISSING', 'EPUB 3 packages need a dcterms:modified date.');
+        } elseif ($this->isEpub3() && ! MetadataSyntax::isModifiedDate(trim((string) $this->metadata->getProperty('dcterms:modified')))) {
+            $issues[] = $this->error(
+                'METADATA_MODIFIED_INVALID',
+                'dcterms:modified must have the form CCYY-MM-DDThh:mm:ssZ (UTC, without fractions), e.g. 2026-01-01T00:00:00Z.',
+                trim((string) $this->metadata->getProperty('dcterms:modified'))
+            );
         }
 
         return $issues;
@@ -189,6 +230,33 @@ final readonly class Validator
         }
 
         return $issues;
+    }
+
+    /**
+     * The prefixes of the properties the package uses ("foo:bar" in a meta property, a manifest or spine item's
+     * properties, a link's rel) must be reserved or declared in package@prefix (EPUBCheck OPF-028).
+     *
+     * @return list<ValidationIssue>
+     */
+    private function checkPrefixes(): array
+    {
+        if (! $this->isEpub3()) {
+            return [];
+        }
+
+        $attributes = $this->query('/opf:package//opf:meta/@property | /opf:package//opf:meta/@scheme | /opf:package//opf:item/@properties'
+            . ' | /opf:package//opf:itemref/@properties | /opf:package//opf:link/@rel | /opf:package//opf:link/@properties');
+        $issues = [];
+        foreach ($attributes as $attribute) {
+            foreach (preg_split('/\s+/', trim((string) $attribute), -1, PREG_SPLIT_NO_EMPTY) ?: [] as $value) {
+                $prefix = PackagePrefixes::prefixOf($value);
+                if ($prefix !== null && ! PackagePrefixes::isUsable($this->opfXml, $value) && ! isset($issues[$prefix])) {
+                    $issues[$prefix] = $this->error('OPF_PREFIX_UNDECLARED', "The package uses the prefix \"{$prefix}:\" (in \"{$value}\") without declaring it in package@prefix.", $prefix);
+                }
+            }
+        }
+
+        return array_values($issues);
     }
 
     /**
@@ -273,6 +341,7 @@ final readonly class Validator
     private function checkContent(): array
     {
         $issues = [];
+        $fragments = new FragmentReferences($this->rootDirectory, $this->paths, $this->xmlParser);
         foreach ($this->manifest->getItems() as $item) {
             // The navigation document is checked by checkNavigation().
             $isNav = in_array('nav', explode(' ', $item->properties), true);
@@ -298,9 +367,31 @@ final readonly class Validator
                     }
                 }
             }
+
+            if ($root instanceof \DOMElement) {
+                array_push($issues, ...$this->checkFragments($fragments, $root, $item->path));
+            }
         }
 
         return $issues;
+    }
+
+    /**
+     * @return list<ValidationIssue>
+     */
+    private function checkFragments(FragmentReferences $fragments, \DOMElement $root, string $document): array
+    {
+        $issues = [];
+        foreach ($fragments->broken($root, $document) as $broken) {
+            $where = $broken['file'] === $document ? 'this document' : $broken['file'];
+            $issues[$broken['file'] . '#' . $broken['fragment']] ??= $this->error(
+                'CONTENT_FRAGMENT_MISSING',
+                "The content document links to {$broken['file']}#{$broken['fragment']}, but {$where} has no element with the id \"{$broken['fragment']}\".",
+                $document
+            );
+        }
+
+        return array_values($issues);
     }
 
     /**
@@ -467,7 +558,111 @@ final readonly class Validator
             }
         }
 
+        foreach ($this->manifest->getItems() as $item) {
+            array_push($issues, ...$this->checkDocumentAccessibility($item));
+        }
+
+        return [...$issues, ...$this->checkPageList()];
+    }
+
+    /**
+     * The basics of WCAG that the content of an XHTML document shows: a language, a text alternative on every
+     * image (alt="" marks a decorative one), no skipped heading level and header cells in data tables. Each
+     * problem is reported once per document, with a count. Documents that cannot be read are not judged.
+     *
+     * @return list<ValidationIssue>
+     */
+    private function checkDocumentAccessibility(ManifestItem $item): array
+    {
+        $file = $item->path === '' ? '' : $this->paths->resolve($this->rootDirectory, $item->path);
+        if ($item->mediaType !== 'application/xhtml+xml' || isset($this->encrypted[$item->path]) || ! is_file($file) || (int) @filesize($file) > self::MAX_DOCUMENT_BYTES) {
+            return [];
+        }
+
+        try {
+            $root = dom_import_simplexml($this->xmlParser->parse($file));
+        } catch (XmlException) {
+            return [];
+        }
+
+        $document = $root->ownerDocument;
+        // The root of a parsed document is always an element with a document; this narrows the types.
+        // @codeCoverageIgnoreStart
+        if (! $root instanceof \DOMElement || ! $document instanceof \DOMDocument) {
+            return [];
+        }
+
+        // @codeCoverageIgnoreEnd
+
+        $issues = [];
+        if (strtolower($root->localName ?? '') === 'html' && trim($root->getAttribute('lang')) === '' && trim($root->getAttributeNS('http://www.w3.org/XML/1998/namespace', 'lang')) === '') {
+            $issues[] = $this->warning('ACCESSIBILITY_LANG_MISSING', 'The document declares no language (lang or xml:lang on html).', $item->path);
+        }
+
+        $images = 0;
+        $tables = 0;
+        $previous = null;
+        $skipped = null;
+        foreach ($document->getElementsByTagName('*') as $element) {
+            $name = strtolower($element->localName ?? '');
+            if ($name === 'img' && ! $element->hasAttribute('alt')) {
+                ++$images;
+            } elseif ($name === 'table' && ! $this->isAccessibleTable($element)) {
+                ++$tables;
+            } elseif (preg_match('/^h([1-6])$/D', $name, $heading) === 1) {
+                $level = (int) $heading[1];
+                $skipped ??= $previous !== null && $level > $previous + 1 ? "h{$previous} to h{$level}" : null;
+                $previous = $level;
+            }
+        }
+
+        if ($images > 0) {
+            $issues[] = $this->warning('ACCESSIBILITY_IMAGE_ALT_MISSING', "{$images} " . ($images === 1 ? 'image has' : 'images have') . ' no alt attribute (use alt="" for a decorative image).', $item->path);
+        }
+
+        if ($skipped !== null) {
+            $issues[] = $this->warning('ACCESSIBILITY_HEADING_SKIPPED', "The headings skip a level ({$skipped}).", $item->path);
+        }
+
+        if ($tables > 0) {
+            $issues[] = $this->warning('ACCESSIBILITY_TABLE_HEADERS_MISSING', "{$tables} " . ($tables === 1 ? 'table has' : 'tables have') . ' no header cells (th); a layout table needs role="presentation".', $item->path);
+        }
+
         return $issues;
+    }
+
+    /**
+     * Whether a table has header cells, or is marked as a layout table.
+     */
+    private function isAccessibleTable(\DOMElement $table): bool
+    {
+        return in_array(strtolower($table->getAttribute('role')), ['presentation', 'none'], true)
+            || $table->getElementsByTagNameNS('*', 'th')->length > 0;
+    }
+
+    /**
+     * A book with a print source (dc:source, or page break markers and print page numbers among its
+     * accessibility features) needs a page list to navigate by print page.
+     *
+     * @return list<ValidationIssue>
+     */
+    private function checkPageList(): array
+    {
+        $features = $this->metadata->getAccessibilityFeatures();
+        $hasPrintSource = $this->hasValue($this->metadata->getDublinCoreValues('source'))
+            || array_intersect(['printPageNumbers', 'pageBreakMarkers'], $features) !== [];
+        if (! $hasPrintSource) {
+            return [];
+        }
+
+        try {
+            $hasPageList = $this->tableOfContents->getPageList() !== [];
+        } catch (Exception) {
+            // The navigation document or NCX is broken, which is reported by checkNavigation().
+            return [];
+        }
+
+        return $hasPageList ? [] : [$this->warning('ACCESSIBILITY_PAGE_LIST_MISSING', 'The book has a print source, but the navigation document has no page-list nav to navigate by print page.')];
     }
 
     /**
@@ -541,7 +736,27 @@ final readonly class Validator
             return [$this->error('NCX_EMPTY', 'The NCX navMap has no navPoint.', $item->path)];
         }
 
+        if (! $isNav && ! $this->ncxIdentifierMatches($xml, (string) $namespace)) {
+            return [$this->error('NCX_UID_MISMATCH', 'The NCX\'s dtb:uid differs from the package\'s unique identifier; save() corrects it.', $item->path)];
+        }
+
         return $isNav && $this->hasEmptyTocList($xml) ? [$this->error('NAV_EMPTY', 'The navigation document\'s toc has no list item.', $item->path)] : [];
+    }
+
+    /**
+     * Whether the NCX's dtb:uid meta equals the unique identifier (NCX-001); true when either is missing.
+     */
+    private function ncxIdentifierMatches(SimpleXMLElement $ncx, string $namespace): bool
+    {
+        $identifier = $this->metadata->getUniqueIdentifier();
+        foreach ($ncx->children($namespace)->head->children($namespace)->meta ?? [] as $meta) {
+            $attributes = $meta->attributes('');
+            if ((string) $attributes['name'] === 'dtb:uid' && $identifier !== null && $identifier !== '') {
+                return trim((string) $attributes['content']) === $identifier;
+            }
+        }
+
+        return true;
     }
 
     /**

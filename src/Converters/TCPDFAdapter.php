@@ -7,11 +7,12 @@ namespace PhpEpub\Converters;
 use Com\Tecnick\Pdf\Page\Format;
 use PhpEpub\ConversionException;
 use PhpEpub\Exception;
+use PhpEpub\Limits;
 use PhpEpub\Util\FileSystemHelper;
 use TCPDF;
 use Throwable;
 
-class TCPDFAdapter implements ConverterInterface
+class TCPDFAdapter implements LimitsAwareConverter
 {
     /**
      * DejaVu Sans covers Latin, Greek, Cyrillic, Hebrew and Arabic, unlike the core fonts. It is
@@ -85,7 +86,7 @@ class TCPDFAdapter implements ConverterInterface
      */
     public function __construct(
         array $styles = [],
-        private readonly EpubDocumentLoader $loader = new EpubDocumentLoader(),
+        private EpubDocumentLoader $loader = new EpubDocumentLoader(),
         ?PdfConversionOptions $options = null
     ) {
         // Without options the adapter behaves as it always did, fixed-layout books included.
@@ -100,6 +101,14 @@ class TCPDFAdapter implements ConverterInterface
 
         $this->styles = array_merge(self::DEFAULT_STYLES, $styles);
         $this->defaultFont = ! array_key_exists('font', $styles);
+    }
+
+    public function withLimits(Limits $limits): static
+    {
+        $limited = clone $this;
+        $limited->loader = $this->loader->withLimits($limits);
+
+        return $limited;
     }
 
     /**
@@ -223,12 +232,19 @@ class TCPDFAdapter implements ConverterInterface
             $pdf->writeHTML($this->chapterHtml($document, $document->contents), true, false, true, false, '');
         }
 
+        $outline = $this->boolStyle('bookmarks') ? $document->outlineByChapter() : [];
+        $lastLevel = 0;
         foreach ($document->chapters as $index => $chapter) {
             $this->options->assertWithinBudget($this->deadline);
             $this->addPage($pdf);
             if ($this->boolStyle('bookmarks')) {
+                // The book's own (nested) table of contents when it lists the chapter, else the chapter's
+                // title. Sections of a chapter point to the page the chapter starts on.
                 $title = $document->chapterTitles[$index] ?? '';
-                $pdf->Bookmark($title !== '' ? $title : 'Chapter ' . ($index + 1), 0, 0);
+                foreach ($outline[$index] ?? [[$title !== '' ? $title : 'Chapter ' . ($index + 1), 0]] as [$entryTitle, $depth]) {
+                    $lastLevel = min($depth, $lastLevel + 1);
+                    $pdf->Bookmark($entryTitle, $lastLevel, 0);
+                }
             }
 
             $pdf->writeHTML($this->chapterHtml($document, $this->svgImagesAsFiles($chapter, $svgDirectory)), true, false, true, false, '');

@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace PhpEpub\Test\Converters;
 
+use PhpEpub\ConversionException;
 use PhpEpub\Converters\CalibreAdapter;
 use PhpEpub\Exception;
 use PhpEpub\Test\Support\EpubBuilder;
 use PhpEpub\Util\FileSystemHelper;
+use PhpEpub\Util\ProcessTimeoutException;
 use PHPUnit\Framework\Attributes\IgnoreDeprecations;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -51,7 +53,7 @@ final class CalibreAdapterTest extends TestCase
 
         $adapter = new CalibreAdapter(['calibre_path' => '/invalid/path/to/ebook-convert'], $this->helperMock);
 
-        $this->expectException(Exception::class);
+        $this->expectException(ConversionException::class);
         $this->expectExceptionMessage('Calibre tool not found at path: /invalid/path/to/ebook-convert');
 
         $adapter->convert($this->fakeInputFile, $this->fakeOutputFile);
@@ -90,7 +92,7 @@ final class CalibreAdapterTest extends TestCase
         $this->helperMock->method('fileExists')->willReturn(false);
         $this->helperMock->expects($this->never())->method('runProcess');
 
-        $this->expectException(Exception::class);
+        $this->expectException(ConversionException::class);
         $this->expectExceptionMessage('ebook-convert was not found on the PATH or in the usual install locations');
 
         (new CalibreAdapter([], $this->helperMock))->convert($this->fakeInputFile, $this->fakeOutputFile);
@@ -105,7 +107,7 @@ final class CalibreAdapterTest extends TestCase
 
         $adapter = new CalibreAdapter(['calibre_path' => $this->fakeCalibrePath], $this->helperMock);
 
-        $this->expectException(Exception::class);
+        $this->expectException(ConversionException::class);
         $this->expectExceptionMessage("EPUB file not found: {$this->fakeInputFile}");
 
         $adapter->convert($this->fakeInputFile, $this->fakeOutputFile);
@@ -122,7 +124,7 @@ final class CalibreAdapterTest extends TestCase
 
         $adapter = new CalibreAdapter(['calibre_path' => $this->fakeCalibrePath], $this->helperMock);
 
-        $this->expectException(Exception::class);
+        $this->expectException(ConversionException::class);
         $this->expectExceptionMessage('Calibre conversion failed: Error executing command');
 
         $adapter->convert($this->fakeInputFile, $this->fakeOutputFile);
@@ -229,6 +231,37 @@ final class CalibreAdapterTest extends TestCase
         $this->assertFileDoesNotExist($seenEpub);
     }
 
+    public function testConvertReportsATimeoutWithTheTimeBudgetCode(): void
+    {
+        $this->helperMock->method('fileExists')->willReturn(true);
+        $this->helperMock->expects($this->once())->method('runProcess')->willThrowException(
+            new ProcessTimeoutException('ebook-convert timed out after 5 seconds and was stopped')
+        );
+
+        $adapter = new CalibreAdapter(['calibre_path' => $this->fakeCalibrePath], $this->helperMock);
+
+        try {
+            $adapter->convert($this->fakeInputFile, $this->fakeOutputFile);
+            $this->fail('Expected a ConversionException.');
+        } catch (ConversionException $exception) {
+            $this->assertSame(ConversionException::CODE_TIME_BUDGET_EXCEEDED, $exception->getCode());
+            $this->assertStringContainsString('timed out after 5 seconds', $exception->getMessage());
+        }
+    }
+
+    public function testConvertWrapsAProcessThatCannotBeStarted(): void
+    {
+        $this->helperMock->method('fileExists')->willReturn(true);
+        $this->helperMock->expects($this->once())->method('runProcess')->willThrowException(new Exception('Failed to start ebook-convert'));
+
+        $adapter = new CalibreAdapter(['calibre_path' => $this->fakeCalibrePath], $this->helperMock);
+
+        $this->expectException(ConversionException::class);
+        $this->expectExceptionMessage('Failed to start ebook-convert');
+
+        $adapter->convert($this->fakeInputFile, $this->fakeOutputFile);
+    }
+
     public function testConvertFailsWhenOutputFileMissing(): void
     {
         $this->helperMock->expects($this->exactly(3))->method('fileExists')->willReturnMap([
@@ -240,7 +273,7 @@ final class CalibreAdapterTest extends TestCase
 
         $adapter = new CalibreAdapter(['calibre_path' => $this->fakeCalibrePath], $this->helperMock);
 
-        $this->expectException(Exception::class);
+        $this->expectException(ConversionException::class);
         $this->expectExceptionMessage('Calibre conversion failed');
 
         $adapter->convert($this->fakeInputFile, $this->fakeOutputFile);

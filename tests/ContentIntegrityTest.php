@@ -263,6 +263,37 @@ final class ContentIntegrityTest extends TestCase
         $this->assertSame(['CONTENT_NOT_WELL_FORMED'], $this->codes($epubFile->validate()));
     }
 
+    public function testMovingAFileRewritesMediaOverlayMathMlAndLongdescReferences(): void
+    {
+        $builder = $this->linkedBook();
+        $opf = str_replace(
+            '</manifest>',
+            '<item id="smil" href="smil/ch1.smil" media-type="application/smil+xml"/>'
+            . '<item id="audio" href="audio/a.mp3" media-type="audio/mpeg"/>'
+            . '<item id="math" href="text/math.xhtml" media-type="application/xhtml+xml" properties="mathml"/></manifest>',
+            (string) $builder->getFile('EPUB/package.opf')
+        );
+        $epubFile = $this->open($builder
+            ->withFile('EPUB/package.opf', $opf)
+            ->withFile('EPUB/smil/ch1.smil', '<smil xmlns="http://www.w3.org/ns/SMIL" version="3.0"><body><seq><par><text src="../text/ch1.xhtml#s1"/><audio src="../audio/a.mp3" clipBegin="0s" clipEnd="1s"/></par></seq></body></smil>')
+            ->withFile('EPUB/audio/a.mp3', 'audio')
+            ->withFile('EPUB/text/math.xhtml', '<?xml version="1.0"?><html xmlns="http://www.w3.org/1999/xhtml"><head><title>M</title></head><body>'
+                . '<math xmlns="http://www.w3.org/1998/Math/MathML" altimg="../img/a.png"><mi>x</mi></math>'
+                . '<img src="../img/a.png" alt="" longdesc="ch1.xhtml#s1"/></body></html>'));
+        $content = $epubFile->getContentManager();
+
+        $content->moveContent('EPUB/text/ch1.xhtml', 'EPUB/ch1.xhtml');
+        $content->moveContent('EPUB/audio/a.mp3', 'EPUB/audio/b.mp3');
+        $content->moveContent('EPUB/img/a.png', 'EPUB/images/a.png');
+
+        $smil = $content->getContent('EPUB/smil/ch1.smil');
+        $this->assertStringContainsString('<text src="../ch1.xhtml#s1"/>', $smil);
+        $this->assertStringContainsString('src="../audio/b.mp3"', $smil);
+        $math = $content->getContent('EPUB/text/math.xhtml');
+        $this->assertStringContainsString('altimg="../images/a.png"', $math);
+        $this->assertStringContainsString('longdesc="../ch1.xhtml#s1"', $math);
+    }
+
     public function testMovingAStylesheetRewritesItsImportsAndUrlsAndItsReferrers(): void
     {
         $epubFile = $this->open($this->linkedBook());
@@ -459,7 +490,7 @@ final class ContentIntegrityTest extends TestCase
     private function linkedBook(): EpubBuilder
     {
         $xhtml = static fn (string $body, string $head = ''): string => '<?xml version="1.0" encoding="UTF-8"?><html xmlns="http://www.w3.org/1999/xhtml"'
-            . ' xmlns:epub="http://www.idpf.org/2007/ops" xmlns:xlink="http://www.w3.org/1999/xlink"><head><title>T</title>' . $head . "</head><body id=\"top\">{$body}</body></html>";
+            . ' xmlns:epub="http://www.idpf.org/2007/ops" xmlns:xlink="http://www.w3.org/1999/xlink" lang="en"><head><title>T</title>' . $head . "</head><body id=\"top\">{$body}</body></html>";
         $items = '<item id="ch1" href="text/ch1.xhtml" media-type="application/xhtml+xml"/>'
             . '<item id="ch2" href="text/ch2.xhtml" media-type="application/xhtml+xml" properties="svg"/>'
             . '<item id="plain" href="text/plain.xhtml" media-type="application/xhtml+xml"/>'
@@ -483,12 +514,12 @@ final class ContentIntegrityTest extends TestCase
                 '<link rel="stylesheet" type="text/css" href="../css/style.css"/>'
             ))
             ->withFile('EPUB/text/ch2.xhtml', $xhtml(
-                '<a href="ch1.xhtml#s1">one</a><a href="ch1.xhtml?a=1&amp;b=2">q</a><a href="http://example.com/ch1.xhtml">r</a><a href="#top">t</a>'
+                '<span id="t"></span><a href="ch1.xhtml#s1">one</a><a href="ch1.xhtml?a=1&amp;b=2">q</a><a href="http://example.com/ch1.xhtml">r</a><a href="#top">t</a>'
                 . "<p style=\"background: url('../img/a.png')\">x</p>"
                 . '<svg xmlns="http://www.w3.org/2000/svg"><image xlink:href="../img/a.png" width="1" height="1"/></svg>',
                 '<style>@import "../css/style.css"; .a { background: url(ch1.xhtml); }</style>'
             ))
-            ->withFile('EPUB/text/plain.xhtml', "<?xml version='1.0'?><html xmlns='http://www.w3.org/1999/xhtml'><head><title>P</title></head><body><p>plain</p></body></html>")
+            ->withFile('EPUB/text/plain.xhtml', "<?xml version='1.0'?><html xmlns='http://www.w3.org/1999/xhtml' lang='en'><head><title>P</title></head><body><p>plain</p></body></html>")
             ->withFile('EPUB/text/broken.xhtml', '<html xmlns="http://www.w3.org/1999/xhtml"><body><a href="ch1.xhtml">broken')
             ->withFile('EPUB/css/style.css', "@import \"other.css\";\nbody { background: url(\"../img/a.png\"); }\n.x { background: url(../text/ch1.xhtml#f); }")
             ->withFile('EPUB/img/a.png', (string) base64_decode(EpubBuilder::PNG, true));

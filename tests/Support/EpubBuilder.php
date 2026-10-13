@@ -80,6 +80,39 @@ XML;
     }
 
     /**
+     * An EPUB 3 book with two chapters and a nested table of contents: "Chapter One" has the sections
+     * "Section 1.1" and "Section 1.2" (anchors `s11` and `s12` of the same file), then "Chapter Two".
+     */
+    public static function nestedToc(): self
+    {
+        $opf = str_replace(
+            ['<item id="chapter" href="text/chapter.xhtml" media-type="application/xhtml+xml"/>', '<itemref idref="chapter"/>'],
+            [
+                '<item id="chapter" href="text/chapter.xhtml" media-type="application/xhtml+xml"/>'
+                . '<item id="two" href="text/two.xhtml" media-type="application/xhtml+xml"/>',
+                '<itemref idref="chapter"/><itemref idref="two"/>',
+            ],
+            (string) self::epub3()->getFile('EPUB/package.opf')
+        );
+
+        return self::epub3()
+            ->withFile('EPUB/package.opf', $opf)
+            ->withFile('EPUB/nav.xhtml', self::xhtml(
+                'Contents',
+                '<nav epub:type="toc"><h1>Contents</h1><ol>'
+                . '<li><a href="text/chapter.xhtml">Chapter One</a><ol>'
+                . '<li><a href="text/chapter.xhtml#s11">Section 1.1</a></li>'
+                . '<li><a href="text/chapter.xhtml#s12">Section 1.2</a></li></ol></li>'
+                . '<li><a href="text/two.xhtml">Chapter Two</a></li></ol></nav>'
+            ))
+            ->withFile('EPUB/text/chapter.xhtml', self::xhtml(
+                'Chapter One',
+                '<h1>Chapter One</h1><h2 id="s11">Section 1.1</h2><p>First.</p><h2 id="s12">Section 1.2</h2><p>Second.</p>'
+            ))
+            ->withFile('EPUB/text/two.xhtml', self::xhtml('Chapter Two', '<h1>Chapter Two</h1><p>Third.</p>'));
+    }
+
+    /**
      * A small EPUB 2 book meant to pass EPUBCheck: NCX (with dtb:uid), opf:* attributes and a guide.
      */
     public static function epub2(): self

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PhpEpub\Converters;
 
+use PhpEpub\TocEntry;
+
 /**
  * The renderable content of a book, as prepared by EpubDocumentLoader.
  */
@@ -31,6 +33,8 @@ final readonly class EpubDocument
      *                                  spine items marked linear="no"), in the same order as $chapters.
      * @param list<string> $tocTitles The title the book's table of contents gives each chapter ("" when it
      *                                lists none), in the same order as $chapters.
+     * @param list<TocEntry> $outline The entries of the book's table of contents, nested (empty when the book has
+     *                                none or it cannot be read).
      */
     public function __construct(
         public string $title,
@@ -45,8 +49,52 @@ final readonly class EpubDocument
         public string $contents = '',
         public array $chapterPaths = [],
         public array $chapterLinear = [],
-        public array $tocTitles = []
+        public array $tocTitles = [],
+        public array $outline = []
     ) {
+    }
+
+    /**
+     * The table of contents as outline entries per chapter: chapter index => list of [title, depth], in
+     * reading order (depth 0 is the top level). An entry without a target in the book (a heading of a group)
+     * is attached to the chapter of the next entry that has one, so it still precedes its children; trailing
+     * ones are dropped. Chapters the table of contents does not list have no key.
+     *
+     * @return array<int, list<array{string, int}>>
+     */
+    public function outlineByChapter(): array
+    {
+        $byChapter = [];
+        $pending = [];
+        self::collectOutline($this->outline, 0, array_flip($this->chapterPaths), $byChapter, $pending);
+
+        return $byChapter;
+    }
+
+    /**
+     * @param list<TocEntry> $entries
+     * @param array<string, int> $indexes Book-relative path => chapter index.
+     * @param array<int, list<array{string, int}>> $byChapter
+     * @param list<array{string, int}> $pending
+     */
+    private static function collectOutline(array $entries, int $depth, array $indexes, array &$byChapter, array &$pending): void
+    {
+        foreach ($entries as $entry) {
+            $title = trim((string) preg_replace('/\s+/u', ' ', $entry->title));
+            $chapter = $entry->path === '' ? null : ($indexes[$entry->path] ?? null);
+            if ($title !== '') {
+                if ($chapter === null) {
+                    $pending[] = [$title, $depth];
+                } else {
+                    foreach ([...$pending, [$title, $depth]] as $item) {
+                        $byChapter[$chapter][] = $item;
+                    }
+                    $pending = [];
+                }
+            }
+
+            self::collectOutline($entry->children, $depth + 1, $indexes, $byChapter, $pending);
+        }
     }
 
     /**

@@ -527,6 +527,37 @@ final class EpubFileTest extends TestCase
         $this->assertNotSame('', $epubFile->getMetadata()->getTitle());
     }
 
+    public function testCopyIsAnIndependentBookWithTheUnsavedChanges(): void
+    {
+        $epubFile = EpubFile::open(__DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'valid.epub');
+        $epubFile->getMetadata()->setTitle('Edited, not saved');
+
+        $copy = $epubFile->copy();
+
+        try {
+            $this->assertNotSame($epubFile->getTempDir(), $copy->getTempDir());
+            $this->assertSame('Edited, not saved', $copy->getMetadata()->getTitle());
+            $this->assertSame($epubFile->getSpine()->get(), $copy->getSpine()->get());
+
+            $copy->getMetadata()->setTitle('Only the copy');
+            $copy->cleanup();
+
+            $this->assertSame('Edited, not saved', $epubFile->getMetadata()->getTitle());
+            $this->assertDirectoryExists((string) $epubFile->getTempDir());
+        } finally {
+            $copy->cleanup();
+        }
+
+        $epubFile->cleanup();
+
+        try {
+            $epubFile->copy();
+            $this->fail('An unloaded book cannot be copied');
+        } catch (Exception $exception) {
+            $this->assertStringContainsString('must be loaded', $exception->getMessage());
+        }
+    }
+
     public static function accessorProvider(): Iterator
     {
         yield ['getMetadata', 'EPUB file must be loaded before accessing metadata.'];

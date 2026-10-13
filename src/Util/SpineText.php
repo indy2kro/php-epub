@@ -19,10 +19,11 @@ final class SpineText
      *
      * @param \Closure(string): bool $exists Whether the book has a file at a path.
      * @param \Closure(string): string $text The text of the document at a path.
+     * @param array<string, mixed> $encrypted The encrypted paths, as keys: their text would be ciphertext, so they are left out.
      *
      * @return array<string, string>
      */
-    public static function collect(Spine $spine, bool $linearOnly, \Closure $exists, \Closure $text): array
+    public static function collect(Spine $spine, bool $linearOnly, \Closure $exists, \Closure $text, array $encrypted = []): array
     {
         $texts = [];
         foreach ($spine->getItems() as $spineItem) {
@@ -31,7 +32,7 @@ final class SpineText
                 continue;
             }
 
-            if (($spineItem->linear || ! $linearOnly) && $exists($item->path)) {
+            if (($spineItem->linear || ! $linearOnly) && ! isset($encrypted[$item->path]) && $exists($item->path)) {
                 $texts[$item->path] = $text($item->path);
             }
         }

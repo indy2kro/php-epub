@@ -17,7 +17,7 @@ Requires `tecnickcom/tcpdf` and its core fonts; see [Installation](../installati
     | `header`, `footer` | bool | `true` | The header shows the book title and authors. |
     | `paper_size` | string | `A4` | A format TCPDF knows, such as `A4` or `letter` (any case), as in `DompdfAdapter`. |
     | `orientation` | string | `portrait` | `portrait` or `landscape`, as in `DompdfAdapter`. |
-    | `bookmarks` | bool | `true` | A PDF outline entry per chapter, titled with the chapter's first `h1`–`h3` heading, else its `<title>`, else "Chapter N". |
+    | `bookmarks` | bool | `true` | A PDF outline that follows the book's table of contents, nested as the book nests it (a section points to the page its chapter starts on). A chapter the table of contents does not list gets an entry titled with its first `h1`–`h3` heading, else its `<title>`, else "Chapter N". |
 
     The constructor throws an `Exception` for a style it does not know (the message lists the valid ones), a value of the wrong type (a numeric string is not a number), an unusable value (a negative margin, an empty font, an unknown orientation) and a paper size TCPDF does not know. With TCPDF 6 the paper size is not checked, because TCPDF 6 has no list to check it against.
 

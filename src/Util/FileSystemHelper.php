@@ -36,7 +36,8 @@ class FileSystemHelper
      *
      * @return array{exitCode: int, output: string}
      *
-     * @throws Exception If the program cannot be found or started, or runs longer than $timeout.
+     * @throws ProcessTimeoutException If the program runs longer than $timeout.
+     * @throws Exception If the program cannot be found or started.
      */
     public function runProcess(array $command, ?int $timeout): array
     {
@@ -105,7 +106,7 @@ class FileSystemHelper
     /**
      * @param resource $process
      *
-     * @throws Exception If the process runs longer than $timeout seconds.
+     * @throws ProcessTimeoutException If the process runs longer than $timeout seconds.
      */
     private function waitFor($process, ?int $timeout, string $program): int
     {
@@ -125,7 +126,7 @@ class FileSystemHelper
                 proc_terminate($process, 9);
                 proc_close($process);
 
-                throw new Exception("{$program} timed out after {$timeout} seconds and was stopped");
+                throw new ProcessTimeoutException("{$program} timed out after {$timeout} seconds and was stopped");
             }
 
             usleep(50_000);

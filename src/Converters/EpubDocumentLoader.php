@@ -15,6 +15,7 @@ use PhpEpub\Encryption;
 use PhpEpub\Exception;
 use PhpEpub\FontObfuscation;
 use PhpEpub\InvalidEpubException;
+use PhpEpub\Limits;
 use PhpEpub\Manifest;
 use PhpEpub\ManifestItem;
 use PhpEpub\Metadata;
@@ -159,6 +160,21 @@ final class EpubDocumentLoader
     }
 
     /**
+     * A loader that also enforces the XML and HTML caps of $limits: for each, the smaller of the two caps applies.
+     * Without a smaller cap this loader is returned; otherwise the copy has a plain XmlParser with the cap.
+     */
+    public function withLimits(Limits $limits): self
+    {
+        $xmlBytes = min($this->xmlParser->maxBytes, $limits->maxXmlBytes);
+        $htmlBytes = min($this->maxHtmlBytes, $limits->maxHtmlBytes);
+        if ($xmlBytes === $this->xmlParser->maxBytes && $htmlBytes === $this->maxHtmlBytes) {
+            return $this;
+        }
+
+        return new self($xmlBytes === $this->xmlParser->maxBytes ? $this->xmlParser : new XmlParser($xmlBytes), $this->paths, $htmlBytes);
+    }
+
+    /**
      * @param PdfConversionOptions|null $options The limits and inclusions (see there); null for the defaults.
      * @param float|null $deadline The microtime() after which the conversion is over its time budget, when
      *                             the caller started the clock earlier; by default the budget starts now.
@@ -259,7 +275,8 @@ final class EpubDocumentLoader
             $contents,
             array_map(strval(...), array_keys($chapterIndexes)),
             array_values($linear),
-            array_map(static fn (int|string $path): string => $tocTitles[$path] ?? '', array_keys($chapterIndexes))
+            array_map(static fn (int|string $path): string => $tocTitles[$path] ?? '', array_keys($chapterIndexes)),
+            $tocEntries
         );
     }
 
@@ -677,7 +694,7 @@ final class EpubDocumentLoader
      * "epub-c<chapter>" for a chapter, "epub-c<chapter>-<id>" for an element, with characters other
      * than letters, digits, "." and "-" written as "_<hex byte>", so ids are unique across chapters.
      */
-    private static function anchorId(int $chapter, ?string $id = null): string
+    public static function anchorId(int $chapter, ?string $id = null): string
     {
         $encoded = $id === null ? '' : '-' . preg_replace_callback(
             '/[^A-Za-z0-9.-]/',

@@ -126,6 +126,23 @@ final class FontsTest extends TestCase
         $this->assertStringNotContainsString('plain.otf', (string) file_get_contents($epubFile->getTempDir() . '/META-INF/encryption.xml'));
     }
 
+    public function testDeletingAFontDropsItsEncryptionEntry(): void
+    {
+        $epubFile = $this->open(EpubBuilder::epub3());
+        $content = $epubFile->getContentManager();
+        $font = random_bytes(2000);
+        $content->addFont('EPUB/fonts/gone.otf', $font);
+        $content->addFont('EPUB/fonts/kept.otf', $font);
+
+        $content->deleteContent('EPUB/fonts/gone.otf');
+
+        $encryption = (string) file_get_contents($epubFile->getTempDir() . '/META-INF/encryption.xml');
+        $this->assertStringNotContainsString('gone.otf', $encryption);
+        $this->assertStringContainsString('kept.otf', $encryption);
+        $this->assertSame([], $epubFile->validate());
+        $this->assertSame($font, $content->getFontData('EPUB/fonts/kept.otf'));
+    }
+
     public function testAdobeObfuscatedFontsAreReadBackPlain(): void
     {
         $font = random_bytes(2000);

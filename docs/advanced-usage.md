@@ -26,7 +26,7 @@ $contentManager->updateContent($contentFile, $modifiedContent);
 
 `EpubFile::save()` writes everything that changed since `load()`:
 
-1. Pending metadata, manifest and spine changes are written to the OPF file (the modification date is refreshed, and the NCX `docTitle` follows the title). Calling `Metadata::save()` yourself first is optional.
+1. Pending metadata, manifest and spine changes are written to the OPF file (the modification date is refreshed, and the NCX `docTitle` follows the title; the navigation document's `<title>` and `xml:lang` follow the title and the main language when they still had the previous values). Calling `Metadata::save()` yourself first is optional.
 2. The extracted directory is packaged as an OCF-valid archive: `mimetype` first, uncompressed and exactly `application/epub+zip` (a wrong one is corrected), `/` separators on every OS.
 
 Changes are only in the temporary directory until `save()` is called; `load()` again or `cleanup()` discards them.
@@ -90,7 +90,7 @@ An EPUB is a ZIP of XML and HTML, so a book uploaded by a user can be hostile. p
 
 The extraction directory is created with an unpredictable name and owner-only permissions, and is removed by `EpubFile::close()` (or `cleanup()`) or when the object is destroyed; a failed open removes it too. `EpubReader` creates none.
 
-Use `Limits::web()` for user uploads: it caps the entry count, the total size, the compression ratio and the size of each XML or XHTML document (see [EpubReader and Limits](epub-reader.md)). To inspect an upload without extracting it, use `EpubReader`. For finer control, pass your own `ZipHandler`:
+Use `Limits::web()` for user uploads: it caps the archive size when buffered from a string or stream, the entry count, the total size, the compression ratio and the size of each XML or XHTML document (see [EpubReader and Limits](epub-reader.md)). To inspect an upload without extracting it, use `EpubReader`. For finer control, pass your own `ZipHandler`:
 
 ```php
 use PhpEpub\EpubFile;

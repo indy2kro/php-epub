@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace PhpEpub\Test;
 
 use PhpEpub\Exception;
+use PhpEpub\InvalidEpubException;
+use PhpEpub\Test\Support\ThrowingPathResolver;
+use PhpEpub\Test\Support\UnreadableFile;
 use PhpEpub\Util\FileSystemHelper;
 use PhpEpub\ZipException;
 use PhpEpub\ZipHandler;
@@ -84,6 +87,22 @@ final class ZipHandlerTest extends TestCase
         $zipHandler->extract($this->invalidZipPath, $this->extractDir);
     }
 
+    public function testCompressToAnEmptyPathThrowsAndWritesNothing(): void
+    {
+        $before = scandir(getcwd() ?: '.');
+        $zipHandler = new ZipHandler();
+        $zipHandler->extract($this->validZipPath, $this->extractDir);
+
+        try {
+            $zipHandler->compress($this->extractDir, '');
+            $this->fail('Expected a ZipException.');
+        } catch (ZipException $exception) {
+            $this->assertStringContainsString('must not be empty', $exception->getMessage());
+        }
+
+        $this->assertSame($before, scandir(getcwd() ?: '.'));
+    }
+
     public function testExtractNonExistentZipThrowsException(): void
     {
         $this->expectException(Exception::class);
@@ -136,6 +155,96 @@ final class ZipHandlerTest extends TestCase
         $zip->open($this->outputZipPath);
         $this->assertSame(1, $zip->numFiles);
         $zip->close();
+    }
+
+    public function testImportRejectsAMissingSourceDirectory(): void
+    {
+        $this->expectException(ZipException::class);
+        $this->expectExceptionMessage('Directory does not exist');
+
+        (new ZipHandler())->import($this->compressDir . DIRECTORY_SEPARATOR . 'missing', $this->extractDir);
+    }
+
+    public function testImportRefusesASymbolicLink(): void
+    {
+        $source = $this->compressDir . DIRECTORY_SEPARATOR . 'linked';
+        mkdir($source, 0777, true);
+        file_put_contents($source . DIRECTORY_SEPARATOR . 'real.txt', 'x');
+        if (! @symlink($source . DIRECTORY_SEPARATOR . 'real.txt', $source . DIRECTORY_SEPARATOR . 'link.txt')) {
+            $this->markTestSkipped('Creating symlinks is not permitted on this system.');
+        }
+
+        $this->expectException(ZipException::class);
+        $this->expectExceptionMessage('symbolic link');
+
+        (new ZipHandler())->import($source, $this->extractDir);
+    }
+
+    public function testImportWrapsAPathThatResolvesOutsideTheBook(): void
+    {
+        $source = $this->compressDir . DIRECTORY_SEPARATOR . 'plain';
+        mkdir($source, 0777, true);
+        file_put_contents($source . DIRECTORY_SEPARATOR . 'a.txt', 'x');
+
+        try {
+            (new ZipHandler(paths: new ThrowingPathResolver()))->import($source, $this->extractDir);
+            $this->fail('Expected an exception for an entry outside the destination.');
+        } catch (ZipException $exception) {
+            $this->assertStringContainsString('resolves outside the EPUB', $exception->getMessage());
+            $this->assertInstanceOf(InvalidEpubException::class, $exception->getPrevious());
+        }
+    }
+
+    public function testImportRejectsNamesThatDifferOnlyInCase(): void
+    {
+        $source = $this->compressDir . DIRECTORY_SEPARATOR . 'cased';
+        mkdir($source, 0777, true);
+        file_put_contents($source . DIRECTORY_SEPARATOR . 'Chapter.xhtml', 'a');
+        file_put_contents($source . DIRECTORY_SEPARATOR . 'chapter.xhtml', 'b');
+        if (count(glob($source . DIRECTORY_SEPARATOR . '*') ?: []) !== 2) {
+            $this->markTestSkipped('The file system is case-insensitive.');
+        }
+
+        $this->expectException(ZipException::class);
+        $this->expectExceptionMessage('differ only in case');
+
+        (new ZipHandler())->import($source, $this->extractDir);
+    }
+
+    public function testImportReportsAFileThatCannotBeRead(): void
+    {
+        $source = $this->compressDir . DIRECTORY_SEPARATOR . 'locked';
+        mkdir($source, 0777, true);
+        $file = $source . DIRECTORY_SEPARATOR . 'a.txt';
+        file_put_contents($file, 'x');
+        $unreadable = UnreadableFile::make($file);
+
+        try {
+            if (! $unreadable->isUnreadable()) {
+                $this->markTestSkipped('The file stays readable (running as root?).');
+            }
+
+            $this->expectException(ZipException::class);
+            $this->expectExceptionMessage('Failed to read file: a.txt');
+
+            (new ZipHandler())->import($source, $this->extractDir);
+        } finally {
+            $unreadable->restore();
+        }
+    }
+
+    public function testImportReportsATargetThatCannotBeCreated(): void
+    {
+        $source = $this->compressDir . DIRECTORY_SEPARATOR . 'blocked';
+        mkdir($source, 0777, true);
+        file_put_contents($source . DIRECTORY_SEPARATOR . 'a.txt', 'x');
+        // A directory where the file belongs: it cannot be opened for writing.
+        mkdir($this->extractDir . DIRECTORY_SEPARATOR . 'a.txt', 0777, true);
+
+        $this->expectException(ZipException::class);
+        $this->expectExceptionMessage('Failed to create file: a.txt');
+
+        (new ZipHandler())->import($source, $this->extractDir);
     }
 
     public function testExtractRejectsTooManyEntries(): void

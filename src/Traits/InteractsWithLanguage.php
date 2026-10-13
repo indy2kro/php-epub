@@ -19,7 +19,8 @@ trait InteractsWithLanguage
     }
 
     /**
-     * Sets the language of the EPUB, creating dc:language when missing.
+     * Sets the language of the EPUB, creating dc:language when missing. A package xml:lang that
+     * declared the previous language follows it, and so does the navigation document on save().
      *
      * @param string $language A well-formed BCP 47 tag, e.g. "en" or "pt-BR".
      *
@@ -28,7 +29,9 @@ trait InteractsWithLanguage
     public function setLanguage(string $language): void
     {
         $this->assertLanguageTags([$language]);
+        $previous = $this->getLanguage();
         $this->setDcValue('language', $language);
+        $this->followPackageLanguage($previous);
     }
 
     /**
@@ -51,7 +54,23 @@ trait InteractsWithLanguage
     public function setLanguages(array $languages): void
     {
         $this->assertLanguageTags($languages);
+        $previous = $this->getLanguage();
         $this->setDcValues('language', $languages);
+        $this->followPackageLanguage($previous);
+    }
+
+    /**
+     * Brings the xml:lang of the package element in step when it declared the previous main language;
+     * one set to something else on purpose is left alone.
+     */
+    private function followPackageLanguage(string $previous): void
+    {
+        $attributes = $this->opfXml->attributes('http://www.w3.org/XML/1998/namespace');
+        $declared = trim((string) ($attributes['lang'] ?? ''));
+        $current = $this->getLanguage();
+        if ($declared !== '' && $current !== '' && strcasecmp($declared, $previous) === 0 && strcasecmp($declared, $current) !== 0) {
+            $attributes['lang'] = $current;
+        }
     }
 
     /**

@@ -18,7 +18,7 @@ Manifest `href`s are URLs relative to the OPF file (for example `text/chapter%20
 
 - **`add(string $path, ?string $mediaType = null, ?string $id = null): ManifestItem`**: Adds a file. The media type is guessed from the extension (XHTML, CSS, JavaScript, NCX, SMIL, PLS, XML, JSON, text, WebVTT, the common image, font, audio and video formats; `application/octet-stream` otherwise) and the id is derived from the file name when not given. Throws if the path is already listed, the id is already used anywhere in the package, or the media type or id is not valid UTF-8 XML text.
 
-- **`remove(string $id): void`**: Removes an item and the package references to it (EPUB 2 cover meta, refinements, `spine@toc`, `fallback`/`media-overlay` of other items, `<guide>` references to its file). Spine entries are not touched; use `Spine::remove()` (or `ContentManager::deleteContent()`, which does both).
+- **`remove(string $id): void`**: Removes an item and the package references to it (EPUB 2 cover meta, refinements, `spine@toc`, `fallback`/`media-overlay` of other items, `<guide>` references to its file). Throws while the item is in the spine (its itemref would point at nothing): remove it with `Spine::remove()` first, or use `ContentManager::deleteContent()`, which does both.
 
 - **`pathToHref(string $path): string`** and **`hrefToPath(string $href): string`**: Convert between the two forms.
 
@@ -40,6 +40,14 @@ Manifest `href`s are URLs relative to the OPF file (for example `text/chapter%20
 - **`getMediaOverlay(string $id): ?string`** and **`setMediaOverlay(string $id, ?string $overlayId): void`**: The SMIL item (`application/smil+xml`) that narrates an XHTML or SVG item (its `media-overlay` attribute); `null` removes it. EPUB 3 only. See [EPUB 3 Features](epub3-features.md#media-overlays).
 
 - **`getOpfPath(): string`**: The OPF location relative to the book root.
+
+- **`addMany(array $specs): array`**: Adds many items at once (each spec has an `id` and a `path` or a remote `url`, optionally `mediaType` and `properties`); `add()` rewrites the manifest every time, which is slow for thousands of items. Returns the added `ManifestItem`s. Throws if a path is already listed, an id is taken, a spec has neither a path nor a url, or a value is not valid XML text; items before the failing one stay added.
+
+- **`getFallback(string $id): ?string`** and **`setFallback(string $id, ?string $fallbackId): void`**: The id of the fallback item (the item a reading system uses when it cannot render this one), or `null`; setting `null` removes it. Setting throws if an item is unknown.
+
+- **`getPackageReferences(): array`**: The files (paths relative to the book root) the package document refers to besides the manifest items: the spine's toc and page-map items, the handlers of `<bindings>`, and the `href` of `<link>` and other elements (`<guide>` references, collections). The paths are not checked against the manifest.
+
+- **`renameDuplicateIds(): array`**: Gives every item whose id is already used by an earlier item a new, unique id (`id-2`, `id-3`, ...); the first item keeps its id. Returns `[old id, new id, path]` for each renamed item.
 
 Lookups (`get()`, `findByPath()`, `getItems()`) use an index built on first use, so adding thousands of files to a large book stays fast.
 
