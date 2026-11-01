@@ -311,7 +311,30 @@ class TCPDFAdapter implements LimitsAwareConverter
      */
     protected function chapterHtml(EpubDocument $document, string $chapter): string
     {
-        return ($document->styles === [] ? '' : '<style>' . EpubDocument::styleSheet($document->styles) . '</style>') . $chapter;
+        $styles = $document->styles === []
+            ? ''
+            : '<style>' . \PhpEpub\Util\CssSanitizer::forTcpdf(EpubDocument::styleSheet($document->styles)) . '</style>';
+
+        // Also sanitize inline styles in the chapter HTML
+        $chapter = $this->sanitizeInlineStylesForTcpdf($chapter);
+
+        return $styles . $chapter;
+    }
+
+    /**
+     * Removes auto values from inline style attributes that TCPDF 7 cannot handle.
+     */
+    private function sanitizeInlineStylesForTcpdf(string $html): string
+    {
+        return preg_replace_callback(
+            '/style="([^"]*)"/i',
+            function (array $matches): string {
+                $css = $matches[1];
+                $sanitized = \PhpEpub\Util\CssSanitizer::forTcpdf($css);
+                return $sanitized === '' ? '' : 'style="' . $sanitized . '"';
+            },
+            $html
+        ) ?? $html;
     }
 
     /**

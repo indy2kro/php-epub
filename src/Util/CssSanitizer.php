@@ -129,4 +129,25 @@ final class CssSanitizer
     {
         return 'url("' . str_replace(['"', "\n", "\r", '<', '>', '\\'], ['%22', '', '', '%3C', '%3E', '%5C'], $url) . '")';
     }
+
+    /**
+     * Removes or normalizes CSS declarations that TCPDF 7 cannot handle.
+     * Currently removes 'width: auto', 'height: auto', 'min-width: auto', 'min-height: auto',
+     * 'max-width: auto', 'max-height: auto' which cause TCPDF to throw "Invalid value: auto".
+     *
+     * @internal Used by TCPDFAdapter.
+     */
+    public static function forTcpdf(string $css): string
+    {
+        // Remove entire declarations with auto values for width, height, min-width, min-height, max-width, max-height
+        // Match patterns like: width: auto; width:auto; width: auto !important; etc.
+        // This removes the entire property declaration including the semicolon
+        $css = preg_replace(
+            '/\b(?:width|height|min-(?:width|height)|max-(?:width|height))\s*:\s*auto\s*(?:!\s*important)?\s*(?=[;}])[;}]/i',
+            '',
+            $css
+        ) ?? $css;
+
+        return $css;
+    }
 }
