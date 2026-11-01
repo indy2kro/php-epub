@@ -36,9 +36,9 @@ class Parser
     {
         $containerPath = $directory . DIRECTORY_SEPARATOR . 'META-INF' . DIRECTORY_SEPARATOR . 'container.xml';
 
-        $opfPath = $this->locatePackage($this->xmlParser->parse($containerPath));
+        $opfPath = $this->locatePackage($this->xmlParser->parse($containerPath, 'META-INF/container.xml'));
 
-        $this->assertPackage($this->xmlParser->parse($this->paths->resolve($directory, $opfPath)));
+        $this->assertPackage($this->xmlParser->parse($this->paths->resolve($directory, $opfPath), $opfPath));
 
         return $opfPath;
     }

@@ -23,24 +23,27 @@ class XmlParser
      * and the parser never touches the network (DOCTYPE references are not fetched).
      *
      * @param string $filePath The path to the XML file.
+     * @param string|null $name The name used in error messages instead of $filePath, e.g. the book-relative path of
+     *                          a file in an extracted book, so messages do not reveal the extraction directory.
      *
      * @throws XmlException If the XML file cannot be loaded or is larger than the size limit.
      */
-    public function parse(string $filePath): SimpleXMLElement
+    public function parse(string $filePath, ?string $name = null): SimpleXMLElement
     {
+        $name ??= $filePath;
         if (! file_exists($filePath)) {
-            throw new XmlException("XML file not found: {$filePath}");
+            throw new XmlException("XML file not found: {$name}");
         }
 
         // Checked before reading, so an oversized document never gets into memory.
         $size = @filesize($filePath);
         if ($size !== false && $size > $this->maxBytes) {
-            throw new XmlException("XML file is larger than the limit of {$this->maxBytes} bytes: {$filePath}");
+            throw new XmlException("XML file is larger than the limit of {$this->maxBytes} bytes: {$name}");
         }
 
-        $content = FileSystemHelper::readFile($filePath) ?? throw new XmlException("Failed to read XML file: {$filePath}");
+        $content = FileSystemHelper::readFile($filePath) ?? throw new XmlException("Failed to read XML file: {$name}");
 
-        return $this->parseString($content, $filePath);
+        return $this->parseString($content, $name);
     }
 
     /**
