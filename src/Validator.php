@@ -96,6 +96,7 @@ final readonly class Validator
             ...$this->checkPrefixes(),
             ...$this->checkIds(),
             ...$this->checkManifest(),
+            ...$this->checkManifestReferences(),
             ...$this->checkSpine(),
             ...$this->checkContent(),
             ...$this->checkStylesheets(),
@@ -328,6 +329,113 @@ final readonly class Validator
         foreach ($this->bookFiles() as $path) {
             if (! $this->manifest->findByPath($path) instanceof ManifestItem) {
                 $issues[] = $this->warning('FILE_NOT_IN_MANIFEST', 'The file is not listed in the manifest, so readers ignore it.', $path);
+            }
+        }
+
+        return $issues;
+    }
+
+    /**
+     * @return list<ValidationIssue>
+     */
+    private function checkManifestReferences(): array
+    {
+        $itemsById = [];
+        foreach ($this->manifest->getItems() as $item) {
+            $itemsById[$item->id] ??= $item;
+        }
+
+        $issues = [];
+        $fallbacks = [];
+        foreach ($this->query('/opf:package/opf:manifest/opf:item[@fallback]') as $node) {
+            $id = (string) $node['id'];
+            $targetId = (string) $node['fallback'];
+            $item = $itemsById[$id] ?? null;
+            if ($targetId === '' || ! isset($itemsById[$targetId])) {
+                $issues[] = $this->error(
+                    'MANIFEST_FALLBACK_TARGET_MISSING',
+                    "Manifest item \"{$id}\" has a fallback to unknown item \"{$targetId}\".",
+                    $item?->path ?: $id
+                );
+            }
+
+            $fallbacks[$id] ??= $targetId;
+        }
+
+        $processed = [];
+        foreach ($fallbacks as $sourceId => $_targetId) {
+            if (isset($processed[$sourceId])) {
+                continue;
+            }
+
+            $path = [];
+            $visited = [];
+            $currentId = $sourceId;
+            while (true) {
+                if (isset($visited[$currentId])) {
+                    $source = $itemsById[$sourceId] ?? null;
+                    $issues[] = $this->error(
+                        'MANIFEST_FALLBACK_CYCLE',
+                        "The fallback chain starting at \"{$sourceId}\" contains a cycle.",
+                        $source?->path ?: $sourceId
+                    );
+                    break;
+                }
+
+                if (isset($processed[$currentId])) {
+                    break;
+                }
+
+                $visited[$currentId] = true;
+                $path[] = $currentId;
+                $item = $itemsById[$currentId] ?? null;
+                if (! $item instanceof ManifestItem) {
+                    break;
+                }
+
+                if (! array_key_exists($currentId, $fallbacks)) {
+                    if (! in_array($item->mediaType, self::CONTENT_MEDIA_TYPES, true)) {
+                        $source = $itemsById[$sourceId] ?? $item;
+                        $issues[] = $this->error(
+                            'MANIFEST_FALLBACK_NOT_CONTENT',
+                            "The fallback chain starting at \"{$sourceId}\" ends at \"{$currentId}\", which is not a content document.",
+                            $source->path ?: $sourceId
+                        );
+                    }
+
+                    break;
+                }
+
+                $targetId = $fallbacks[$currentId];
+                if ($targetId === '' || ! isset($itemsById[$targetId])) {
+                    break;
+                }
+
+                $currentId = $targetId;
+            }
+
+            foreach ($path as $id) {
+                $processed[$id] = true;
+            }
+        }
+
+        foreach ($this->query('/opf:package/opf:manifest/opf:item[@media-overlay]') as $node) {
+            $id = (string) $node['id'];
+            $overlayId = (string) $node['media-overlay'];
+            $item = $itemsById[$id] ?? null;
+            $overlay = $itemsById[$overlayId] ?? null;
+            if ($overlayId === '' || ! $overlay instanceof ManifestItem) {
+                $issues[] = $this->error(
+                    'MANIFEST_MEDIA_OVERLAY_TARGET_MISSING',
+                    "Manifest item \"{$id}\" has a media overlay reference to unknown item \"{$overlayId}\".",
+                    $item?->path ?: $id
+                );
+            } elseif ($overlay->mediaType !== 'application/smil+xml') {
+                $issues[] = $this->error(
+                    'MANIFEST_MEDIA_OVERLAY_NOT_SMIL',
+                    "Manifest item \"{$id}\" references media overlay \"{$overlayId}\", whose media type is {$overlay->mediaType}, not application/smil+xml.",
+                    $item?->path ?: $id
+                );
             }
         }
 

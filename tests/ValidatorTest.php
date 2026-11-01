@@ -35,6 +35,106 @@ final class ValidatorTest extends TestCase
         $this->assertSame([], $this->open(EpubBuilder::epub3())->validate());
     }
 
+    public function testReportsAManifestFallbackToAnUnknownId(): void
+    {
+        $opf = str_replace(
+            '<item id="style" href="css/style.css" media-type="text/css"/>',
+            '<item id="style" href="css/style.css" media-type="text/css" fallback="missing"/>',
+            (string) EpubBuilder::epub3()->getFile('EPUB/package.opf')
+        );
+
+        $this->assertContains(
+            'MANIFEST_FALLBACK_TARGET_MISSING',
+            $this->codes($this->open(EpubBuilder::epub3()->withFile('EPUB/package.opf', $opf))->validate())
+        );
+    }
+
+    public function testReportsAManifestFallbackCycle(): void
+    {
+        $opf = str_replace(
+            '<item id="style" href="css/style.css" media-type="text/css"/>',
+            '<item id="style" href="css/style.css" media-type="text/css" fallback="alternate"/>'
+                . '<item id="alternate" href="alternate.bin" media-type="application/x-alternate" fallback="style"/>',
+            (string) EpubBuilder::epub3()->getFile('EPUB/package.opf')
+        );
+        $book = EpubBuilder::epub3()
+            ->withFile('EPUB/package.opf', $opf)
+            ->withFile('EPUB/alternate.bin', 'alternate');
+
+        $this->assertContains('MANIFEST_FALLBACK_CYCLE', $this->codes($this->open($book)->validate()));
+    }
+
+    public function testReportsAManifestFallbackChainThatEndsAtANonContentItem(): void
+    {
+        $opf = str_replace(
+            '<item id="style" href="css/style.css" media-type="text/css"/>',
+            '<item id="style" href="css/style.css" media-type="text/css" fallback="alternate"/>'
+                . '<item id="alternate" href="alternate.bin" media-type="application/x-alternate"/>',
+            (string) EpubBuilder::epub3()->getFile('EPUB/package.opf')
+        );
+        $book = EpubBuilder::epub3()
+            ->withFile('EPUB/package.opf', $opf)
+            ->withFile('EPUB/alternate.bin', 'alternate');
+
+        $this->assertContains('MANIFEST_FALLBACK_NOT_CONTENT', $this->codes($this->open($book)->validate()));
+    }
+
+    public function testReportsAMediaOverlayReferenceToAnUnknownId(): void
+    {
+        $opf = str_replace(
+            '<item id="chapter" href="text/chapter.xhtml" media-type="application/xhtml+xml"/>',
+            '<item id="chapter" href="text/chapter.xhtml" media-type="application/xhtml+xml" media-overlay="missing"/>',
+            (string) EpubBuilder::epub3()->getFile('EPUB/package.opf')
+        );
+
+        $this->assertContains(
+            'MANIFEST_MEDIA_OVERLAY_TARGET_MISSING',
+            $this->codes($this->open(EpubBuilder::epub3()->withFile('EPUB/package.opf', $opf))->validate())
+        );
+    }
+
+    public function testReportsAMediaOverlayTargetThatIsNotSmil(): void
+    {
+        $opf = str_replace(
+            '<item id="chapter" href="text/chapter.xhtml" media-type="application/xhtml+xml"/>',
+            '<item id="chapter" href="text/chapter.xhtml" media-type="application/xhtml+xml" media-overlay="style"/>',
+            (string) EpubBuilder::epub3()->getFile('EPUB/package.opf')
+        );
+
+        $this->assertContains(
+            'MANIFEST_MEDIA_OVERLAY_NOT_SMIL',
+            $this->codes($this->open(EpubBuilder::epub3()->withFile('EPUB/package.opf', $opf))->validate())
+        );
+    }
+
+    public function testAllowsValidManifestFallbackChainsAndMediaOverlays(): void
+    {
+        $opf = str_replace(
+            [
+                '<item id="chapter" href="text/chapter.xhtml" media-type="application/xhtml+xml"/>',
+                '<item id="style" href="css/style.css" media-type="text/css"/>',
+            ],
+            [
+                '<item id="chapter" href="text/chapter.xhtml" media-type="application/xhtml+xml" media-overlay="overlay"/>',
+                '<item id="style" href="css/style.css" media-type="text/css" fallback="alternate"/>'
+                    . '<item id="alternate" href="alternate.bin" media-type="application/x-alternate" fallback="chapter"/>'
+                    . '<item id="overlay" href="overlay.smil" media-type="application/smil+xml"/>',
+            ],
+            (string) EpubBuilder::epub3()->getFile('EPUB/package.opf')
+        );
+        $book = EpubBuilder::epub3()
+            ->withFile('EPUB/package.opf', $opf)
+            ->withFile('EPUB/alternate.bin', 'alternate')
+            ->withFile('EPUB/overlay.smil', '<smil/>');
+
+        $codes = $this->codes($this->open($book)->validate());
+        $this->assertSame([], array_values(array_filter(
+            $codes,
+            static fn (string $code): bool => str_starts_with($code, 'MANIFEST_FALLBACK_')
+                || str_starts_with($code, 'MANIFEST_MEDIA_OVERLAY_')
+        )));
+    }
+
     public function testReportsDuplicateIdsInOneContentDocument(): void
     {
         $book = EpubBuilder::epub3()->withFile(
