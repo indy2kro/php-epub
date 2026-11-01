@@ -48,6 +48,27 @@ final class TableOfContentsTest extends TestCase
         $this->assertSame('Operating system/Platform accessibility', $entries[3]->children[0]->title);
     }
 
+    public function testSetEntriesRenumbersThePageAndNavTargetsAfterTheNavMap(): void
+    {
+        $builder = $this->epub2Book();
+        $ncx = str_replace(
+            '</navMap>',
+            '</navMap><pageList><pageTarget id="pg1" type="normal" value="1" playOrder="9"><navLabel><text>1</text></navLabel><content src="text/one.xhtml"/></pageTarget></pageList>'
+                . '<navList><navLabel><text>Figures</text></navLabel><navTarget id="f1" playOrder="7"><navLabel><text>Figure 1</text></navLabel><content src="text/two.xhtml"/></navTarget>'
+                . '<navTarget id="f2"><navLabel><text>Figure 2</text></navLabel><content src="text/two.xhtml#f2"/></navTarget></navList>',
+            (string) $builder->getFile('OEBPS/toc.ncx')
+        );
+        $epubFile = $this->open($builder->withFile('OEBPS/toc.ncx', $ncx));
+
+        $epubFile->getTableOfContents()->setEntries([new TocEntry('One', 'OEBPS/text/one.xhtml'), new TocEntry('Two', 'OEBPS/text/two.xhtml')]);
+
+        // The navMap now uses 1 and 2; the page and nav targets follow in document order, one sequence for the NCX.
+        $written = $epubFile->getContentManager()->getContent('OEBPS/toc.ncx');
+        $this->assertStringContainsString('<pageTarget id="pg1" type="normal" value="1" playOrder="3">', $written);
+        $this->assertStringContainsString('<navTarget id="f1" playOrder="4">', $written);
+        $this->assertStringContainsString('<navTarget id="f2">', $written, 'a target without a playOrder gets none');
+    }
+
     public function testReadsTheEpub2Ncx(): void
     {
         $toc = $this->open($this->epub2Book())->getTableOfContents();

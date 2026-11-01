@@ -444,9 +444,14 @@ final class EpubDocumentLoader
 
         try {
             $fonts = (new FontObfuscation($root, $this->xmlParser, $this->paths))->obfuscatedFonts();
+            // load() refuses a book whose encryption.xml cannot be read, as possibly DRM-protected, with this same
+            // parser, so this only guards against the file changing in between.
+            // @codeCoverageIgnoreStart
         } catch (XmlException) {
             return;
         }
+
+        // @codeCoverageIgnoreEnd
 
         foreach ($fonts as $path => $algorithm) {
             $real = realpath($this->paths->resolve($root, $path));
@@ -693,6 +698,8 @@ final class EpubDocumentLoader
     /**
      * "epub-c<chapter>" for a chapter, "epub-c<chapter>-<id>" for an element, with characters other
      * than letters, digits, "." and "-" written as "_<hex byte>", so ids are unique across chapters.
+     *
+     * @internal Used by the loader and HtmlAdapter.
      */
     public static function anchorId(int $chapter, ?string $id = null): string
     {

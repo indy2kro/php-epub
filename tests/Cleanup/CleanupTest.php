@@ -281,6 +281,31 @@ XML,
         $this->assertStringContainsString('used.otf', $encryptionXml);
     }
 
+    public function testAnEncryptionXmlThatCannotBeWrittenIsLeftAsItIs(): void
+    {
+        $encryption = '<?xml version="1.0" encoding="UTF-8"?><encryption xmlns="urn:oasis:names:tc:opendocument:xmlns:container" xmlns:enc="http://www.w3.org/2001/04/xmlenc#">'
+            . '<enc:EncryptedData><enc:EncryptionMethod Algorithm="http://www.idpf.org/2008/embedding"/><enc:CipherData><enc:CipherReference URI="EPUB/fonts/unused.otf"/></enc:CipherData></enc:EncryptedData></encryption>';
+        $book = $this->open(CleanupBook::builder(
+            '<item id="unused" href="fonts/unused.otf" media-type="font/otf"/>',
+            ['EPUB/fonts/unused.otf' => 'unused', 'META-INF/encryption.xml' => $encryption]
+        ));
+        $file = $book->getTempDir() . '/META-INF/encryption.xml';
+        chmod($file, 0444);
+
+        try {
+            if (is_writable($file)) {
+                $this->markTestSkipped('The process can write read-only files (e.g. running as root).');
+            }
+
+            $report = (new Cleanup($book))->run(new CleanupOptions(removeUnusedFonts: true));
+        } finally {
+            chmod($file, 0644);
+        }
+
+        $this->assertSame(['EPUB/fonts/unused.otf'], $report->getAction(CleanupAction::UNUSED_FONTS)?->files);
+        $this->assertSame($encryption, $this->read('META-INF/encryption.xml'));
+    }
+
     public function testRefusesDrmProtectedBooks(): void
     {
         $book = $this->open(CleanupBook::builder('', ['META-INF/rights.xml' => '<rights/>']));
