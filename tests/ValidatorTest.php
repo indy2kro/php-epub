@@ -107,6 +107,47 @@ final class ValidatorTest extends TestCase
         );
     }
 
+    public function testReportsAMediaOverlayOnAnUnsupportedSourceType(): void
+    {
+        $opf = str_replace(
+            '<item id="chapter" href="text/chapter.xhtml" media-type="application/xhtml+xml"/>',
+            '<item id="chapter" href="text/chapter.xhtml" media-type="application/x-dtbook+xml" media-overlay="overlay"/>'
+                . '<item id="overlay" href="overlay.smil" media-type="application/smil+xml"/>',
+            (string) EpubBuilder::epub3()->getFile('EPUB/package.opf')
+        );
+        $book = EpubBuilder::epub3()
+            ->withFile('EPUB/package.opf', $opf)
+            ->withFile('EPUB/overlay.smil', '<smil/>');
+
+        $issues = array_values(array_filter(
+            $this->open($book)->validate(),
+            static fn (ValidationIssue $issue): bool => $issue->code === 'MANIFEST_MEDIA_OVERLAY_SOURCE_INVALID'
+        ));
+
+        $this->assertCount(1, $issues);
+        $this->assertSame(ValidationIssue::ERROR, $issues[0]->severity);
+        $this->assertSame('EPUB/text/chapter.xhtml', $issues[0]->location);
+    }
+
+    public function testAllowsAMediaOverlayOnAnSvgSource(): void
+    {
+        $opf = str_replace(
+            '</manifest>',
+            '<item id="svg-source" href="images/figure.svg" media-type="image/svg+xml" media-overlay="overlay"/>'
+                . '<item id="overlay" href="overlay.smil" media-type="application/smil+xml"/></manifest>',
+            (string) EpubBuilder::epub3()->getFile('EPUB/package.opf')
+        );
+        $book = EpubBuilder::epub3()
+            ->withFile('EPUB/package.opf', $opf)
+            ->withFile('EPUB/images/figure.svg', '<svg xmlns="http://www.w3.org/2000/svg"/>')
+            ->withFile('EPUB/overlay.smil', '<smil/>');
+
+        $this->assertNotContains(
+            'MANIFEST_MEDIA_OVERLAY_SOURCE_INVALID',
+            $this->codes($this->open($book)->validate())
+        );
+    }
+
     public function testAllowsValidManifestFallbackChainsAndMediaOverlays(): void
     {
         $opf = str_replace(

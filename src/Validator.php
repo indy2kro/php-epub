@@ -424,6 +424,14 @@ final readonly class Validator
             $overlayId = (string) $node['media-overlay'];
             $item = $itemsById[$id] ?? null;
             $overlay = $itemsById[$overlayId] ?? null;
+            if ($item instanceof ManifestItem && ! in_array($item->mediaType, ['application/xhtml+xml', 'image/svg+xml'], true)) {
+                $issues[] = $this->error(
+                    'MANIFEST_MEDIA_OVERLAY_SOURCE_INVALID',
+                    "Manifest item \"{$id}\" has a media overlay, but its media type is {$item->mediaType}; only XHTML and SVG content documents may have a media overlay.",
+                    $item->path ?: $id
+                );
+            }
+
             if ($overlayId === '' || ! $overlay instanceof ManifestItem) {
                 $issues[] = $this->error(
                     'MANIFEST_MEDIA_OVERLAY_TARGET_MISSING',
