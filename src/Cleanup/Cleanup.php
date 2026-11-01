@@ -179,7 +179,8 @@ final readonly class Cleanup
         $kept = [];
         $before = 0;
         foreach ($paths as $path) {
-            if (! $this->forgetEncryption($path)) {
+            $algorithm = $this->forgetEncryption($path);
+            if ($algorithm === false) {
                 // Removing the file would leave encryption.xml naming a file that is not there.
                 $kept[] = $path;
                 continue;
@@ -188,8 +189,10 @@ final readonly class Cleanup
             $file = $this->paths->resolve($directory, $path);
             $size = is_file($file) ? (int) filesize($file) : 0;
             if (is_file($file) && ! @unlink($file)) {
-                // The file vanished or is locked between the check and the delete.
-                throw new Exception("Failed to delete: {$path}"); // @codeCoverageIgnore
+                // The file is locked (or vanished) between the check and the delete: it stays, and so does its entry.
+                $this->restoreEncryption($path, $algorithm);
+
+                throw new Exception("Failed to delete: {$path}");
             }
 
             foreach ($manifest->getItems() as $item) {
@@ -354,21 +357,40 @@ final readonly class Cleanup
     /**
      * Removes the encryption.xml entry of a file that is about to be removed.
      *
-     * @return bool False when the entry exists but cannot be removed (encryption.xml cannot be
-     *              read or written); the file must then stay, and encryption.xml is left as it is.
+     * @return string|false|null The obfuscation algorithm whose entry was removed (see restoreEncryption()), null
+     *                           when the file had none, or false when the entry exists but cannot be removed
+     *                           (encryption.xml cannot be read or written): the file must then stay, and
+     *                           encryption.xml is left as it is.
      */
-    private function forgetEncryption(string $path): bool
+    private function forgetEncryption(string $path): string|false|null
     {
         $obfuscation = new FontObfuscation($this->directory(), $this->xmlParser);
         try {
-            if (isset($obfuscation->obfuscatedFonts()[$path])) {
+            $algorithm = $obfuscation->obfuscatedFonts()[$path] ?? null;
+            if ($algorithm !== null) {
                 $obfuscation->setAlgorithm($path, null);
             }
         } catch (Exception) {
             return false;
         }
 
-        return true;
+        return $algorithm;
+    }
+
+    /**
+     * Lists a file in encryption.xml again after its removal failed, so that it is still read de-obfuscated.
+     */
+    private function restoreEncryption(string $path, ?string $algorithm): void
+    {
+        if ($algorithm === null) {
+            return;
+        }
+
+        try {
+            (new FontObfuscation($this->directory(), $this->xmlParser))->setAlgorithm($path, $algorithm);
+        } catch (Exception) {
+            // The failed removal is what the caller reports; encryption.xml just could be written a moment ago.
+        }
     }
 
     private function pruneEmptyDirectories(string $directory): void

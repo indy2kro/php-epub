@@ -12,6 +12,7 @@ use PhpEpub\Cleanup\CleanupReport;
 use PhpEpub\Cleanup\ImageRecompressor;
 use PhpEpub\EpubFile;
 use PhpEpub\Exception;
+use PhpEpub\FontObfuscation;
 use PhpEpub\ManifestItem;
 use PhpEpub\Test\Support\CleanupBook;
 use PhpEpub\Test\Support\EpubBuilder;
@@ -315,6 +316,44 @@ XML,
             $book->validate(),
             static fn (ValidationIssue $issue): bool => $issue->code === 'ENCRYPTION_ENTRY_MISSING'
         ));
+    }
+
+    public function testAFontThatCannotBeDeletedKeepsItsEncryptionEntry(): void
+    {
+        $encryption = '<?xml version="1.0" encoding="UTF-8"?><encryption xmlns="urn:oasis:names:tc:opendocument:xmlns:container" xmlns:enc="http://www.w3.org/2001/04/xmlenc#">'
+            . '<enc:EncryptedData><enc:EncryptionMethod Algorithm="http://www.idpf.org/2008/embedding"/><enc:CipherData><enc:CipherReference URI="EPUB/fonts/unused.otf"/></enc:CipherData></enc:EncryptedData></encryption>';
+        $book = $this->open(CleanupBook::builder(
+            '<item id="unused" href="fonts/unused.otf" media-type="font/otf"/>',
+            ['EPUB/fonts/unused.otf' => 'unused', 'META-INF/encryption.xml' => $encryption]
+        ));
+        // A read-only directory stops the delete on Linux and macOS, a read-only file on Windows.
+        $root = $book->getTempDir();
+        $this->assertNotNull($root);
+        $fonts = $root . '/EPUB/fonts';
+        chmod($fonts . '/unused.otf', 0444);
+        chmod($fonts, 0555);
+
+        $failure = null;
+        try {
+            (new Cleanup($book))->run(new CleanupOptions(removeUnusedFonts: true));
+        } catch (Exception $exception) {
+            $failure = $exception;
+        } finally {
+            chmod($fonts, 0755);
+            chmod($fonts . '/unused.otf', 0644);
+        }
+
+        if ($failure === null) {
+            $this->markTestSkipped('The process can delete the font anyway (e.g. running as root).');
+        }
+
+        $this->assertSame('Failed to delete: EPUB/fonts/unused.otf', $failure->getMessage());
+        $this->assertTrue($this->has('EPUB/fonts/unused.otf'));
+        $this->assertStringContainsString('URI="EPUB/fonts/unused.otf"', $this->read('META-INF/encryption.xml'), 'the entry is listed again');
+        $this->assertSame(
+            'http://www.idpf.org/2008/embedding',
+            (new FontObfuscation($root))->obfuscatedFonts()['EPUB/fonts/unused.otf'] ?? null
+        );
     }
 
     public function testRefusesDrmProtectedBooks(): void
