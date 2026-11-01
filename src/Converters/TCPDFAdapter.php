@@ -311,7 +311,44 @@ class TCPDFAdapter implements LimitsAwareConverter
      */
     protected function chapterHtml(EpubDocument $document, string $chapter): string
     {
-        return ($document->styles === [] ? '' : '<style>' . EpubDocument::styleSheet($document->styles) . '</style>') . $chapter;
+        $styles = $document->styles === []
+            ? ''
+            : '<style>' . \PhpEpub\Util\CssSanitizer::forTcpdf(EpubDocument::styleSheet($document->styles)) . '</style>';
+
+        // Also sanitize inline styles in the chapter HTML
+        $chapter = $this->sanitizeInlineStylesForTcpdf($chapter);
+
+        return $styles . $chapter;
+    }
+
+    /**
+     * Removes auto values from inline style attributes that TCPDF 7 cannot handle.
+     */
+    private function sanitizeInlineStylesForTcpdf(string $html): string
+    {
+        $body = \PhpEpub\Util\HtmlSanitizer::parseBody($html);
+        foreach (iterator_to_array($body->getElementsByTagName('*')) as $element) {
+            if ($element->hasAttribute('style')) {
+                $style = \PhpEpub\Util\CssSanitizer::forTcpdf($element->getAttribute('style'));
+                if ($style === '') {
+                    $element->removeAttribute('style');
+                } else {
+                    $element->setAttribute('style', $style);
+                }
+            }
+
+            if (strtolower($element->localName ?? '') === 'style') {
+                $element->textContent = \PhpEpub\Util\CssSanitizer::forTcpdf($element->textContent);
+            }
+        }
+
+        $document = $body->ownerDocument ?? throw new Exception('Failed to serialize sanitized chapter HTML');
+        $result = '';
+        foreach (iterator_to_array($body->childNodes) as $child) {
+            $result .= $document->saveHTML($child);
+        }
+
+        return $result;
     }
 
     /**

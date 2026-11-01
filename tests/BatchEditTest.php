@@ -54,6 +54,51 @@ final class BatchEditTest extends TestCase
         $this->assertTrue($manifest->isModified());
     }
 
+    public function testManifestAddManyIndexesRemoteItemsOnlyOnce(): void
+    {
+        $manifest = $this->book->getManifest();
+        $items = $manifest->addMany([
+            ['id' => 'remote-one', 'url' => 'https://example.com/one.mp3'],
+            ['id' => 'remote-two', 'url' => 'https://example.com/two.mp3'],
+        ]);
+
+        $this->assertCount(1, array_filter($manifest->getItems(), static fn ($item): bool => $item->id === 'remote-one'));
+        $this->assertCount(1, array_filter($manifest->getItems(), static fn ($item): bool => $item->id === 'remote-two'));
+        $this->assertCount(2, $items);
+    }
+
+    public function testManifestAddManyIndexesItemsAddedBeforeAnInvalidSpec(): void
+    {
+        $manifest = $this->book->getManifest();
+        $manifest->getItems();
+
+        try {
+            $manifest->addMany([
+                ['id' => 'remote', 'url' => 'https://example.com/one.mp3'],
+                ['id' => 'invalid'],
+            ]);
+            $this->fail('Invalid specs must be refused');
+        } catch (Exception) {
+            $this->assertSame('https://example.com/one.mp3', $manifest->get('remote')?->href);
+        }
+    }
+
+    public function testManifestAddManyRejectsDuplicatePathsWithinBatch(): void
+    {
+        $manifest = $this->book->getManifest();
+
+        try {
+            $manifest->addMany([
+                ['id' => 'first', 'path' => 'EPUB/text/duplicate.xhtml'],
+                ['id' => 'second', 'path' => 'EPUB/text/duplicate.xhtml'],
+            ]);
+            $this->fail('Duplicate paths within a batch must be refused');
+        } catch (Exception) {
+            $this->assertSame('first', $manifest->findByPath('EPUB/text/duplicate.xhtml')?->id);
+            $this->assertNull($manifest->get('second'));
+        }
+    }
+
     public function testManifestAddManyRefusesTakenIdsPathsAndIncompleteSpecs(): void
     {
         $manifest = $this->book->getManifest();

@@ -1,9 +1,35 @@
-# TCPDFAdapter
+# TCPDFAdapter (Legacy)
+
+**⚠️ Legacy Notice:** TCPDF 7 is now deprecated by its maintainer on Packagist. For new projects, we recommend using `DompdfAdapter` instead, which supports modern CSS features, embedded fonts via `@font-face`, and has active maintenance. TCPDFAdapter is kept for backwards compatibility.
 
 The `TCPDFAdapter` class in the PHP EPUB Processor library is responsible for converting EPUB content into PDF format using the TCPDF library.
 It provides a flexible interface to customize the PDF output through various styling options.
 
 Requires `tecnickcom/tcpdf` and its core fonts; see [Installation](../installation.md#tcpdf-core-fonts).
+
+## Migration to Dompdf
+
+Consider migrating to `DompdfAdapter` for better CSS support and embedded fonts. The migration is straightforward:
+
+```php
+// Old (TCPDF)
+$adapter = new TCPDFAdapter($styles, $loader, $options);
+
+// New (Dompdf)
+$dompdfStyles = array_intersect_key($styles, array_flip([
+    'font',
+    'font_size',
+    'paper_size',
+    'orientation',
+    'margin_top',
+    'margin_right',
+    'margin_bottom',
+    'margin_left',
+]));
+$adapter = new DompdfAdapter($dompdfStyles, $loader, $options);
+```
+
+Note: Dompdf has different default fonts and may render differently. Test your output after migrating.
 
 ## Key Methods
 

@@ -439,6 +439,25 @@ final class TCPDFAdapterTest extends TestCase
         $this->assertSame(["<style>p { color: #336699; }</style><a id=\"epub-c0\">\u{200B}</a><p>Text</p>"], $chapters);
     }
 
+    public function testTcpdfSanitizesBodyStylesWithoutChangingTextThatLooksLikeMarkup(): void
+    {
+        $directory = EpubBuilder::minimal()
+            ->withFile(
+                'EPUB/chapter.xhtml',
+                '<html><body><style>p { width: auto; }</style><p>Use style="width: auto;" in text.</p></body></html>'
+            )
+            ->writeTo($this->epubDirectory . '-body-style');
+
+        try {
+            $chapters = $this->exposedAdapter()->chapterHtmlFor($directory);
+        } finally {
+            $this->fileSystemHelper->deleteDirectory($directory);
+        }
+
+        $this->assertStringNotContainsString('<style>p { width: auto;', $chapters[0]);
+        $this->assertStringContainsString('Use style="width: auto;" in text.', $chapters[0]);
+    }
+
     public function testHeaderAndFooterCanBeSwitchedOff(): void
     {
         $withThem = $this->exposedAdapter()->createPdfFor($this->epubDirectory);

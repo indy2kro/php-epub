@@ -39,6 +39,40 @@ final class LinkRemoverTest extends TestCase
         $this->assertNull((new LinkRemover())->remove('a.xhtml', '<html><body><a href="b.xhtml">broken', ['b.xhtml' => true]));
     }
 
+    public function testRemovingXlinkAnchorPreservesItsSvgChildren(): void
+    {
+        $content = '<html xmlns="http://www.w3.org/1999/xhtml" xmlns:xlink="http://www.w3.org/1999/xlink">'
+            . '<body><svg xmlns="http://www.w3.org/2000/svg"><a xlink:href="image.svg">'
+            . '<text>Label</text><rect width="1" height="1"/></a></svg></body></html>';
+
+        $result = (new LinkRemover())->remove('EPUB/chapter.xhtml', $content, ['EPUB/image.svg' => true]);
+
+        $this->assertNotNull($result);
+        $this->assertStringNotContainsString('xlink:href="image.svg"', $result);
+        $this->assertStringContainsString('<text>Label</text>', $result);
+        $this->assertStringContainsString('<rect', $result);
+    }
+
+    public function testRemovingReferencesFromMediaAttributes(): void
+    {
+        $content = '<html xmlns="http://www.w3.org/1999/xhtml"><body>'
+            . '<object data="object.svg"/><video poster="poster.png"/>'
+            . '<img srcset="removed.png 1x, kept.png 2x"/><link imagesrcset="removed.png 1x, kept.png 2x"/>'
+            . '</body></html>';
+
+        $result = (new LinkRemover())->remove(
+            'EPUB/chapter.xhtml',
+            $content,
+            ['EPUB/removed.png' => true, 'EPUB/object.svg' => true, 'EPUB/poster.png' => true]
+        );
+
+        $this->assertNotNull($result);
+        $this->assertStringNotContainsString('object.svg', $result);
+        $this->assertStringNotContainsString('poster.png', $result);
+        $this->assertStringNotContainsString('removed.png', $result);
+        $this->assertStringContainsString('kept.png 2x', $result);
+    }
+
     public function testTargetResolvesFileReferencesOnly(): void
     {
         $remover = new LinkRemover();

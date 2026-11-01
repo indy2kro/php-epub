@@ -151,14 +151,24 @@ class Manifest
             throw new Exception("Manifest id is already in use: {$id}");
         }
 
+        $id ??= $this->uniqueId($path);
+        $href = $this->pathToHref($path);
+        $mediaType ??= $this->guessMediaType($path);
+
         $item = $this->manifestNode->addChild('item', null, Metadata::OPF_NAMESPACE);
-        $item->addAttribute('id', $id ?? $this->uniqueId($path));
-        $item->addAttribute('href', $this->pathToHref($path));
-        $item->addAttribute('media-type', $mediaType ?? $this->guessMediaType($path));
+        $item->addAttribute('id', $id);
+        $item->addAttribute('href', $href);
+        $item->addAttribute('media-type', $mediaType);
         $this->modified = true;
 
+        // Re-query the node we just added to work around SimpleXML's namespace prefix handling.
+        // When the OPF uses xmlns:opf="...", addChild() creates <opf:item> and the attributes
+        // are added without a namespace. Re-querying gives us a node that can be properly indexed.
+        // We query for the last item node instead of interpolating the ID to avoid XPath injection.
+        $node = $this->query('/opf:package/opf:manifest/opf:item[last()]')[0] ?? $item;
+
         // A new item goes last, so the index only needs extending.
-        return $this->items === null ? $this->toItem($item) : $this->indexItem($item);
+        return $this->items === null ? $this->toItem($node) : $this->indexItem($node);
     }
 
     /**
@@ -181,36 +191,86 @@ class Manifest
             $used[(string) $attribute] = true;
         }
 
+        $tempNodes = [];
+        $batchPaths = [];
+        try {
+            foreach ($specs as $spec) {
+                $id = $spec['id'];
+                $properties = trim($spec['properties'] ?? '');
+                XmlText::assertValid($id, $spec['mediaType'] ?? '', $properties, $spec['url'] ?? '');
+                isset($used[$id]) && throw new Exception("Manifest id is already in use: {$id}");
+
+                if (isset($spec['path'])) {
+                    $path = $this->paths->normalize($spec['path']);
+                    (
+                        $this->findByPath($path) instanceof ManifestItem ||
+                        isset($batchPaths[$path])
+                    ) && throw new Exception("File is already in the manifest: {$path}");
+                    $batchPaths[$path] = true;
+                    $href = $this->pathToHref($path);
+                    $mediaType = $spec['mediaType'] ?? $this->guessMediaType($path);
+                } else {
+                    $href = $spec['url'] ?? '';
+                    preg_match('#^[a-z][a-z0-9+.-]*:#i', $href) === 1 || throw new Exception("A manifest item needs a path or a remote URL, got: {$href}");
+                    $mediaType = $spec['mediaType'] ?? 'application/octet-stream';
+                }
+
+                $used[$id] = true;
+                $node = $this->manifestNode->addChild('item', null, Metadata::OPF_NAMESPACE);
+                $node->addAttribute('id', $id);
+                $node->addAttribute('href', $href);
+                $node->addAttribute('media-type', $mediaType);
+                if ($properties !== '') {
+                    $node->addAttribute('properties', $properties);
+                }
+
+                $this->modified = true;
+                // Store the temporary node and its ID for later indexing
+                $tempNodes[] = ['id' => $id, 'node' => $node];
+            }
+        } catch (Exception $exception) {
+            $this->indexAddedItems($tempNodes);
+            throw $exception;
+        }
+
+        return $this->indexAddedItems($tempNodes);
+    }
+
+    /**
+     * Indexes the items added by addMany(), including the partial results when a later spec is invalid.
+     *
+     * @param list<array{id: string, node: SimpleXMLElement}> $tempNodes
+     *
+     * @return list<ManifestItem>
+     */
+    private function indexAddedItems(array $tempNodes): array
+    {
+        if ($tempNodes === []) {
+            return [];
+        }
+
+        // Re-query all item nodes once to work around SimpleXML's namespace prefix handling.
+        // When the OPF uses xmlns:opf="...", addChild() creates <opf:item> and the attributes
+        // are added without a namespace. Re-querying gives us properly namespaced nodes.
+        $allNodes = $this->query('/opf:package/opf:manifest/opf:item');
+        $nodesById = [];
+        foreach ($allNodes as $node) {
+            $nodeId = (string) $node['id'];
+            if ($nodeId !== '') {
+                $nodesById[$nodeId] = $node;
+            }
+        }
+
+        $this->items();
         $added = [];
-        foreach ($specs as $spec) {
-            $id = $spec['id'];
-            $properties = trim($spec['properties'] ?? '');
-            XmlText::assertValid($id, $spec['mediaType'] ?? '', $properties, $spec['url'] ?? '');
-            isset($used[$id]) && throw new Exception("Manifest id is already in use: {$id}");
-
-            if (isset($spec['path'])) {
-                $path = $this->paths->normalize($spec['path']);
-                $this->findByPath($path) instanceof ManifestItem && throw new Exception("File is already in the manifest: {$path}");
-                $href = $this->pathToHref($path);
-                $mediaType = $spec['mediaType'] ?? $this->guessMediaType($path);
-            } else {
-                $href = $spec['url'] ?? '';
-                preg_match('#^[a-z][a-z0-9+.-]*:#i', $href) === 1 || throw new Exception("A manifest item needs a path or a remote URL, got: {$href}");
-                $mediaType = $spec['mediaType'] ?? 'application/octet-stream';
+        foreach ($tempNodes as $temp) {
+            $item = $this->itemsById[$temp['id']] ?? null;
+            if ($item === null) {
+                $node = $nodesById[$temp['id']] ?? $temp['node'];
+                $item = $this->indexItem($node);
             }
 
-            $used[$id] = true;
-            $node = $this->manifestNode->addChild('item', null, Metadata::OPF_NAMESPACE);
-            $node->addAttribute('id', $id);
-            $node->addAttribute('href', $href);
-            $node->addAttribute('media-type', $mediaType);
-            if ($properties !== '') {
-                $node->addAttribute('properties', $properties);
-            }
-
-            $this->modified = true;
-            $this->items();
-            $added[] = $this->indexItem($node);
+            $added[] = $item;
         }
 
         return $added;

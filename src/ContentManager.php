@@ -170,6 +170,9 @@ class ContentManager
             throw new Exception("Content file does not exist: {$fullPath}");
         }
 
+        // Remove links to the deleted file from other documents
+        $this->removeReferencesTo($this->paths->normalize($filePath));
+
         if (! @unlink($fullPath)) {
             throw new Exception("Failed to delete content from: {$fullPath}");
         }
@@ -184,7 +187,59 @@ class ContentManager
         }
 
         $this->removeTableOfContentsEntries($this->paths->normalize($filePath));
+        $this->removeReferencesTo($this->paths->normalize($filePath), true);
         $this->removeEncryptionEntry($this->paths->normalize($filePath));
+    }
+
+    /**
+     * Removes links to a deleted file from other documents in the book.
+     */
+    private function removeReferencesTo(string $deletedPath, bool $navigationPass = false): void
+    {
+        $linkRemover = new \PhpEpub\Util\LinkRemover($this->paths, $this->xmlParser);
+        $removed = [$deletedPath => true];
+        $pending = [];
+
+        // Iterate through all content documents that might reference the deleted file
+        foreach ($this->getContentPaths() as $contentPath) {
+            $item = $this->manifest?->findByPath($contentPath);
+            if ($item === null) {
+                continue;
+            }
+
+            $properties = $item->properties;
+            $isNavigation = str_contains($properties, 'nav');
+            if ($navigationPass !== $isNavigation || $item->mediaType === 'application/x-dtbncx+xml') {
+                continue;
+            }
+
+            // Only process XHTML, HTML, SVG, and SMIL documents
+            $mediaType = $item->mediaType;
+            if (
+                ! str_starts_with($mediaType, 'application/xhtml+xml') &&
+                ! str_starts_with($mediaType, 'text/html') &&
+                ! str_starts_with($mediaType, 'image/svg+xml') &&
+                $mediaType !== 'application/smil+xml'
+            ) {
+                continue;
+            }
+
+            // Skip the deleted file itself
+            if ($contentPath === $deletedPath) {
+                continue;
+            }
+
+            $content = $this->getContent($contentPath);
+            $updated = $linkRemover->remove($contentPath, $content, $removed, ! ($navigationPass && $isNavigation));
+
+            if ($updated !== null) {
+                $pending[$contentPath] = $updated;
+            }
+        }
+
+        foreach ($pending as $contentPath => $updated) {
+            $this->updateContent($contentPath, $updated);
+        }
     }
 
     /**

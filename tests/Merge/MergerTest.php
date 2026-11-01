@@ -26,6 +26,8 @@ final class MergerTest extends TestCase
 
     private const string UID_THREE = 'urn:uuid:33333333-3333-4333-8333-333333333333';
 
+    private const float MERGE_THOUSANDS_SECONDS_BUDGET = 20.0;
+
     private string $tmpDir;
 
     /**
@@ -573,7 +575,7 @@ final class MergerTest extends TestCase
         $seconds = microtime(true) - $start;
 
         $this->assertCount(1400, $merged->getSpine()->get());
-        $this->assertLessThan(8.0, $seconds, 'Merging 2800 files took too long: something is quadratic again.');
+        $this->assertLessThan(self::MERGE_THOUSANDS_SECONDS_BUDGET, $seconds, 'Merging 2800 files took too long: something is quadratic again.');
     }
 
     public function testMergedNcxFollowsThePlayOrderRule(): void

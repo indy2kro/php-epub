@@ -129,4 +129,78 @@ final class CssSanitizer
     {
         return 'url("' . str_replace(['"', "\n", "\r", '<', '>', '\\'], ['%22', '', '', '%3C', '%3E', '%5C'], $url) . '")';
     }
+
+    /**
+     * Removes or normalizes CSS declarations that TCPDF 7 cannot handle.
+     * Currently removes 'width: auto', 'height: auto', 'min-width: auto', 'min-height: auto',
+     * 'max-width: auto', 'max-height: auto' which cause TCPDF to throw "Invalid value: auto".
+     *
+     * @internal Used by TCPDFAdapter.
+     */
+    public static function forTcpdf(string $css): string
+    {
+        $tokens = CssTokenizer::tokenize($css);
+        if ($tokens === null) {
+            return '';
+        }
+
+        $result = '';
+        $declaration = '';
+        $nesting = 0;
+        $customPropertyBlockDepth = 0;
+        $flush = static function () use (&$result, &$declaration): void {
+            if (
+                preg_match(
+                    '/^\s*(?:width|height|min-(?:width|height)|max-(?:width|height))\s*:\s*auto\s*(?:!\s*important)?\s*$/i',
+                    $declaration
+                ) !== 1
+            ) {
+                $result .= $declaration;
+            }
+
+            $declaration = '';
+        };
+
+        foreach ($tokens as [$type, $text]) {
+            if ($customPropertyBlockDepth > 0) {
+                $declaration .= $text;
+                if ($type === '{') {
+                    $customPropertyBlockDepth++;
+                } elseif ($type === '}') {
+                    $customPropertyBlockDepth--;
+                }
+
+                continue;
+            }
+
+            if (
+                $nesting === 0 &&
+                $type === '{' &&
+                preg_match('/^\s*--/', $declaration) === 1
+            ) {
+                $declaration .= $text;
+                $customPropertyBlockDepth = 1;
+
+                continue;
+            }
+
+            if ($nesting === 0 && in_array($type, [';', '{', '}'], true)) {
+                $flush();
+                $result .= $text;
+
+                continue;
+            }
+
+            $declaration .= $text;
+            if (in_array($type, ['fn', '(', '['], true)) {
+                $nesting++;
+            } elseif (in_array($type, [')', ']'], true)) {
+                $nesting--;
+            }
+        }
+
+        $flush();
+
+        return $result;
+    }
 }

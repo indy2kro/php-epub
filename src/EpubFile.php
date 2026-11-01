@@ -72,6 +72,12 @@ class EpubFile
 
     private string $syncedLanguage = '';
 
+    /**
+     * The next chapter number to use for addChapter() when no path is specified.
+     * This is tracked to avoid scanning from chapter-1 every time.
+     */
+    private int $nextChapterNumber = 1;
+
     public function __construct(
         private readonly string $filePath,
         ?ZipHandler $zipHandler = null,
@@ -293,19 +299,34 @@ class EpubFile
      * Nothing is written to $filePath before save(). Add content with addChapter(); a book needs
      * at least one chapter to be valid.
      *
+     * @param string $filePath The path to write the book to.
+     * @param string $title The book's title.
+     * @param string $language The book's language (ISO 639-1 code).
      * @param string|null $identifier The unique identifier; a random "urn:uuid:…" when null.
+     * @param ZipHandler|null $zipHandler The zip handler for writing the book; uses $limits when null.
+     * @param XmlParser|null $xmlParser The XML parser for reading/writing the book; uses $limits when null.
+     * @param Limits|null $limits The limits for an untrusted book (Limits::web() for uploads);
+     *                            Limits::default() when null. A ZipHandler or XmlParser passed as well
+     *                            replaces that part of the limits.
      *
      * @throws Exception If a value is empty or not valid XML text, or the book cannot be prepared.
      */
-    public static function create(string $filePath, string $title, string $language = 'en', ?string $identifier = null): self
-    {
+    public static function create(
+        string $filePath,
+        string $title,
+        string $language = 'en',
+        ?string $identifier = null,
+        ?ZipHandler $zipHandler = null,
+        ?XmlParser $xmlParser = null,
+        ?Limits $limits = null
+    ): self {
         $identifier ??= BookTemplate::uuidUrn();
         XmlText::assertValid($title, $language, $identifier);
         if (trim($title) === '' || trim($language) === '' || trim($identifier) === '') {
             throw new Exception('A new book needs a title, a language and an identifier');
         }
 
-        $epubFile = new self($filePath);
+        $epubFile = new self($filePath, $zipHandler, $xmlParser, $limits);
         $epubFile->openWith(static function (string $directory) use ($title, $language, $identifier): void {
             $files = [
                 'mimetype' => 'application/epub+zip',
@@ -339,7 +360,7 @@ class EpubFile
         XmlText::assertValid($title, $body);
         $manifest = $this->getManifest();
         $spine = $this->getSpine();
-        $path ??= $this->unusedChapterPath();
+        $path ??= $this->nextChapterPath();
         $language = $this->getMetadata()->getLanguage();
         $language = $language === '' ? 'en' : $language;
 
@@ -361,25 +382,105 @@ class EpubFile
             $toc->addEntry(new TocEntry($title, $item->path));
         }
 
+        // Increment the next chapter number for the next call
+        if ($path === $this->nextChapterPath()) {
+            $this->nextChapterNumber++;
+        }
+
         return $item;
     }
 
     /**
-     * "text/chapter-N.xhtml" next to the OPF, with the first N not used by a file or manifest item.
+     * Add multiple chapters at once, which is more efficient than calling addChapter() multiple times
+     * because it only writes the TOC once at the end.
+     *
+     * @param iterable<array{0: string, 1: string, 2?: string}> $chapters List of [title, body, ?path] tuples
+     * @param bool $writeToc Whether to write the table of contents at the end (default: true)
+     *
+     * @return list<ManifestItem>
      */
-    private function unusedChapterPath(): string
+    public function addChapters(iterable $chapters, bool $writeToc = true): array
+    {
+        $manifest = $this->getManifest();
+        $spine = $this->getSpine();
+        $language = $this->getMetadata()->getLanguage();
+        $language = $language === '' ? 'en' : $language;
+
+        $toc = $this->getTableOfContents();
+        $tocAvailable = $toc->isAvailable();
+        $tocEntries = [];
+        $items = [];
+
+        try {
+            foreach ($chapters as $chapter) {
+                $title = $chapter[0];
+                $body = $chapter[1];
+                $path = $chapter[2] ?? null;
+                XmlText::assertValid($title, $body);
+                $path ??= $this->nextChapterPath();
+
+                try {
+                    $this->xmlParser->parseString(BookTemplate::chapter($title, $language, $body));
+                } catch (XmlException) {
+                    $body = XhtmlFragment::fromHtml($body);
+                }
+
+                $this->getContentManager()->addContent($path, BookTemplate::chapter($title, $language, $body));
+                $item = $manifest->findByPath($path) ?? throw new Exception("The chapter is not in the manifest: {$path}");
+
+                if (! $spine->contains($item->id)) {
+                    $spine->add($item->id);
+                }
+
+                if ($tocAvailable) {
+                    $tocEntries[] = new TocEntry($title, $item->path);
+                }
+
+                $items[] = $item;
+
+                // Increment the next chapter number for the next call
+                if ($path === $this->nextChapterPath()) {
+                    $this->nextChapterNumber++;
+                }
+            }
+        } finally {
+            $this->writeChapterTocEntries($toc, $tocAvailable, $writeToc, $tocEntries);
+        }
+
+        return $items;
+    }
+
+    /**
+     * Commits collected TOC entries after a successful batch or before a partial batch failure escapes.
+     *
+     * @param list<TocEntry> $entries
+     */
+    private function writeChapterTocEntries(TableOfContents $toc, bool $available, bool $writeToc, array $entries): void
+    {
+        if ($available && $writeToc && $entries !== []) {
+            $toc->writeEntries([...$toc->getEntries(), ...$entries]);
+        }
+    }
+
+    /**
+     * Returns the next chapter path and increments the counter.
+     */
+    private function nextChapterPath(): string
     {
         $manifest = $this->getManifest();
         $directory = dirname($manifest->getOpfPath());
         $base = ($directory === '.' ? '' : $directory . '/') . 'text/chapter-';
 
-        for ($number = 1;; $number++) {
-            $path = $base . $number . '.xhtml';
-            $file = (string) $this->tempDir . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $path);
-            if (! $manifest->findByPath($path) instanceof ManifestItem && ! file_exists($file)) {
-                return $path;
-            }
+        // Use the tracked number
+        $path = $base . $this->nextChapterNumber . '.xhtml';
+
+        // If the path is already in use, scan forward
+        while ($manifest->findByPath($path) instanceof ManifestItem || file_exists((string) $this->tempDir . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $path))) {
+            $this->nextChapterNumber++;
+            $path = $base . $this->nextChapterNumber . '.xhtml';
         }
+
+        return $path;
     }
 
     /**
@@ -684,7 +785,8 @@ class EpubFile
 
         $manifest = $this->getManifest();
         $metadata = $this->getMetadata();
-        $previous = $deletePrevious ? $this->getCoverImage() : null;
+        $contentManager = $this->getContentManager();
+        $previous = $this->getCoverImage();
 
         if ($path === null) {
             $opfDirectory = dirname($manifest->getOpfPath());
@@ -696,7 +798,7 @@ class EpubFile
         }
 
         $cover = $manifest->findByPath($path) ?? $manifest->add($path, $mediaType);
-        $this->getContentManager()->addContent($path, $imageData);
+        $contentManager->addContent($path, $imageData);
         // The path may have held another format before.
         $manifest->setMediaType($cover->id, $mediaType);
 
@@ -707,8 +809,17 @@ class EpubFile
         // EPUB 2 readers (and many EPUB 3 ones) look for this meta.
         $metadata->setMeta('cover', $cover->id);
 
+        // Update references to the previous cover in cover pages and delete it if requested
         if ($previous instanceof ManifestItem && $previous->id !== $cover->id) {
-            $this->deleteItem($previous);
+            // Only update references if the path changed
+            if ($previous->path !== $cover->path) {
+                $this->updateCoverPageReferences($previous->path, $cover->path);
+            }
+
+            // Only delete the previous cover if requested and it's not referenced by any content
+            if ($deletePrevious && ! $this->isPathReferenced($previous->path)) {
+                $this->deleteItem($previous);
+            }
         }
 
         return $manifest->get($cover->id) ?? $cover;
@@ -816,6 +927,99 @@ class EpubFile
     public function toArray(): array
     {
         return BookSummary::of($this);
+    }
+
+    /**
+     * Updates references to the old cover path in cover pages (guide cover or first spine page) to point to the new cover path.
+     */
+    private function updateCoverPageReferences(string $oldCoverPath, string $newCoverPath): void
+    {
+        $manifest = $this->getManifest();
+        $contentManager = $this->getContentManager();
+        $rewriter = new \PhpEpub\Util\ReferenceRewriter(xmlParser: $this->xmlParser);
+
+        // Find cover pages: guide cover reference and first spine page
+        $coverPages = [];
+
+        // Check guide cover reference
+        foreach ($manifest->getGuideReferences() as $reference) {
+            if ($reference->type === 'cover' && $reference->path !== '') {
+                $item = $manifest->findByPath($reference->path);
+                if ($item instanceof ManifestItem) {
+                    $coverPages[$item->path] = true;
+                }
+            }
+        }
+
+        // Check first spine page
+        $spine = $this->getSpine();
+        $firstSpineId = $spine->get()[0] ?? null;
+        if ($firstSpineId !== null) {
+            $firstItem = $manifest->get($firstSpineId);
+            if ($firstItem instanceof ManifestItem && $firstItem->mediaType === 'application/xhtml+xml') {
+                $coverPages[$firstItem->path] = true;
+            }
+        }
+
+        // Update references in each cover page
+        $existing = array_flip($contentManager->getContentPaths());
+        foreach (array_keys($coverPages) as $pagePath) {
+            if (! isset($existing[$pagePath])) {
+                continue;
+            }
+
+            $content = $contentManager->getContent($pagePath);
+            $updated = $rewriter->rewriteXml($content, $pagePath, $pagePath, $oldCoverPath, $newCoverPath);
+            if ($updated !== null) {
+                $contentManager->updateContent($pagePath, $updated);
+            }
+        }
+    }
+
+    /**
+     * Checks if a path is referenced by any content in the book.
+     * Uses ReferenceGraph for comprehensive reference checking including CSS url(), srcset, etc.
+     */
+    private function isPathReferenced(string $path): bool
+    {
+        $manifest = $this->getManifest();
+        $item = $manifest->findByPath($path);
+
+        // If the path is not in the manifest, it's not referenced
+        if (! $item instanceof ManifestItem) {
+            return false;
+        }
+
+        // Check every content document, including files not reachable from the reading order.
+        try {
+            $graph = new \PhpEpub\Cleanup\ReferenceGraph(
+                $this->tempDir ?? throw new Exception('EPUB file must be loaded'),
+                $manifest,
+                $this->getSpine(),
+                $this->getMetadata(),
+                new \PhpEpub\Util\PathResolver(),
+                $this->xmlParser
+            );
+
+            $analysis = $graph->analyzeFrom($this->getContentManager()->getContentPaths());
+
+            // Check if the path appears in any of the references
+            foreach ($analysis->references as $sourcePath => $targets) {
+                if (in_array($path, $targets, true)) {
+                    return true;
+                }
+            }
+
+            // Also check the mentioned paths (from unparsable documents)
+            if (in_array($path, $analysis->mentioned, true)) {
+                return true;
+            }
+        } catch (\PhpEpub\Exception) {
+            // If analysis fails, fail closed: assume it's referenced
+            return true;
+        }
+
+        return false;
     }
 
     /**
