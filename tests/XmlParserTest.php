@@ -195,4 +195,50 @@ final class XmlParserTest extends TestCase
         $this->expectExceptionMessage('Failed to save XML file:');
         $parser->save($xml, __DIR__ . DIRECTORY_SEPARATOR . 'nonexistent' . DIRECTORY_SEPARATOR . 'output.xml');
     }
+
+    public function testSaveReplacesAFileWholeAndLeavesNoTemporaryFile(): void
+    {
+        $directory = dirname($this->outputXmlFilePath);
+        file_put_contents($this->outputXmlFilePath, str_repeat('old ', 1000));
+        chmod($this->outputXmlFilePath, 0640);
+        $mode = fileperms($this->outputXmlFilePath) & 0777;
+        $before = scandir($directory);
+
+        (new XmlParser())->save(new SimpleXMLElement('<root><element>New</element></root>'), $this->outputXmlFilePath);
+
+        $this->assertSame("<?xml version=\"1.0\"?>\n<root><element>New</element></root>\n", file_get_contents($this->outputXmlFilePath));
+        $this->assertSame($mode, fileperms($this->outputXmlFilePath) & 0777, 'the file keeps its permissions');
+        $this->assertSame($before, scandir($directory), 'no temporary file is left behind');
+    }
+
+    public function testSaveRefusesAReadOnlyFileAndLeavesItAsItWas(): void
+    {
+        file_put_contents($this->outputXmlFilePath, '<root>old</root>');
+        chmod($this->outputXmlFilePath, 0444);
+        $directory = dirname($this->outputXmlFilePath);
+        $before = scandir($directory);
+
+        try {
+            if (is_writable($this->outputXmlFilePath)) {
+                $this->markTestSkipped('The process can write read-only files (e.g. running as root).');
+            }
+
+            (new XmlParser())->save(new SimpleXMLElement('<root>new</root>'), $this->outputXmlFilePath);
+            $this->fail('No exception was thrown.');
+        } catch (Exception $exception) {
+            $this->assertStringContainsString('Failed to save XML file:', $exception->getMessage());
+        } finally {
+            chmod($this->outputXmlFilePath, 0644);
+        }
+
+        $this->assertSame('<root>old</root>', file_get_contents($this->outputXmlFilePath));
+        $this->assertSame($before, scandir($directory));
+    }
+
+    public function testSaveRefusesADirectory(): void
+    {
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('Failed to save XML file:');
+        (new XmlParser())->save(new SimpleXMLElement('<root/>'), dirname($this->outputXmlFilePath));
+    }
 }

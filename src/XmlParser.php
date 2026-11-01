@@ -95,18 +95,46 @@ class XmlParser
     }
 
     /**
-     * Saves a SimpleXMLElement to a file.
+     * Saves a SimpleXMLElement to a file. The document is written to a temporary file next to it and renamed into
+     * place, so a failed or short write leaves the file as it was, never truncated.
      *
      * @param SimpleXMLElement $xml The XML element to save.
      * @param string $filePath The path where the XML should be saved.
      *
-     * @throws Exception If the XML file cannot be saved.
+     * @throws Exception If the XML file cannot be saved (also when it exists and is not writable).
      */
     public function save(SimpleXMLElement $xml, string $filePath): void
     {
-        $result = @$xml->asXML($filePath);
-        if ($result === false) {
+        $content = $xml->asXML();
+        if (! is_string($content) || ! self::replaceFile($filePath, $content)) {
             throw new Exception("Failed to save XML file: {$filePath}");
         }
+    }
+
+    /**
+     * Writes $content to a temporary file in $filePath's directory, checks that every byte was written and renames
+     * it over $filePath, which keeps its permissions. A file that exists but is not writable is refused, as writing
+     * it in place would be (a rename only needs the directory to be writable).
+     */
+    private static function replaceFile(string $filePath, string $content): bool
+    {
+        $directory = dirname($filePath);
+        if (! is_dir($directory) || is_dir($filePath) || (file_exists($filePath) && ! is_writable($filePath))) {
+            return false;
+        }
+
+        // tempnam() falls back to the system temporary directory when it cannot create the file in $directory.
+        $temporary = @tempnam($directory, '.xml-');
+        if ($temporary === false || realpath(dirname($temporary)) !== realpath($directory)) {
+            $temporary === false || @unlink($temporary);
+
+            return false;
+        }
+
+        $mode = file_exists($filePath) ? fileperms($filePath) & 0777 : 0666 & ~umask();
+        $saved = @file_put_contents($temporary, $content) === strlen($content) && @chmod($temporary, $mode) && @rename($temporary, $filePath);
+        $saved || @unlink($temporary);
+
+        return $saved;
     }
 }
