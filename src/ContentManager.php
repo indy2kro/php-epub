@@ -377,6 +377,82 @@ class ContentManager
     }
 
     /**
+     * Runs a DOM edit over the XHTML documents and writes back only those it changed, e.g. to fix a class, add a
+     * lang attribute or replace a word everywhere. The documents are those the manifest lists as
+     * application/xhtml+xml (the navigation document included), or, without a manifest, the .xhtml, .html and .htm
+     * files; in path order. Each is parsed safely (see XmlParser) and given to $change with its path; when $change
+     * returns true, the document is saved with updateContent(), which keeps the manifest properties in step.
+     * Documents that are not well-formed XML are skipped: validate() reports them. A DRM-protected book is refused,
+     * since its encrypted documents must not be rewritten.
+     *
+     * An exception thrown by $change stops the run; documents changed before it stay changed.
+     *
+     * @param callable(\DOMDocument, string): bool $change Edits the document and returns whether it changed it.
+     * @param list<string>|null $paths Only these documents (paths relative to the book root); others are ignored.
+     *
+     * @return list<string> The paths of the documents that were written.
+     *
+     * @throws InvalidEpubException If a document is larger than a size limit (Limits::$maxHtmlBytes or the XML cap).
+     * @throws Exception If the book is DRM-protected, a path leaves the book, or a document cannot be read or written.
+     */
+    public function transform(callable $change, ?array $paths = null): array
+    {
+        // isDrmProtected() also holds for an encryption.xml that cannot be read, so nothing encrypted slips through.
+        (new Encryption($this->contentDirectory, $this->xmlParser, $this->paths))->isDrmProtected()
+            && throw new Exception('The book is DRM-protected, so its documents cannot be transformed.');
+
+        $only = $paths === null ? null : array_flip(array_map($this->paths->normalize(...), $paths));
+        $documents = [];
+        if ($this->manifest instanceof Manifest) {
+            foreach ($this->manifest->getItems() as $item) {
+                if ($item->path !== '' && $item->mediaType === 'application/xhtml+xml') {
+                    $documents[$item->path] = true;
+                }
+            }
+        } else {
+            foreach ($this->getContentPaths() as $path) {
+                if (in_array(strtolower(pathinfo($path, PATHINFO_EXTENSION)), ['xhtml', 'html', 'htm'], true)) {
+                    $documents[$path] = true;
+                }
+            }
+        }
+
+        $documents = array_keys($only === null ? $documents : array_intersect_key($documents, $only));
+        sort($documents, SORT_STRING);
+
+        $changed = [];
+        foreach ($documents as $path) {
+            $path = (string) $path;
+            if (! is_file($this->paths->resolve($this->contentDirectory, $path))) {
+                continue;
+            }
+
+            $markup = $this->getMarkup($path);
+            // A size-limit failure is not a malformed document: it must not be skipped silently.
+            strlen($markup) <= $this->xmlParser->maxBytes
+                || throw new InvalidEpubException("Document is larger than the XML limit of {$this->xmlParser->maxBytes} bytes: {$path}");
+
+            try {
+                $root = dom_import_simplexml($this->xmlParser->parseString($markup, $path));
+            } catch (XmlException) {
+                continue;
+            }
+
+            $document = $root->ownerDocument ?? throw new Exception("Cannot read the parsed document: {$path}");
+            if ($change($document, $path) !== true) {
+                continue;
+            }
+
+            $xml = $document->saveXML();
+            $xml !== false || throw new Exception("Failed to serialise the document: {$path}");
+            $this->updateContent($path, $xml);
+            $changed[] = $path;
+        }
+
+        return $changed;
+    }
+
+    /**
      * Adds (or overwrites) an embedded font and, with a manifest, lists it there. By default the font is
      * obfuscated with the IDPF algorithm (OCF "Font Obfuscation") and listed in META-INF/encryption.xml
      * (created when missing), which publishers do to keep the font from being reused as a file.

@@ -29,7 +29,11 @@ Each entry is a `PhpEpub\TocEntry`:
 
 - **`getLandmarks(): array`** and **`setLandmarks(array $landmarks): void`**: Read and replace the book's landmarks (`PhpEpub\Landmark`: `type`, `title`, `path`, `fragment`) in the navigation document's `landmarks` nav and the EPUB 2 `<guide>`. See [EPUB 3 Features](epub3-features.md#landmarks-and-the-page-list).
 
-- **`getPageList(): array`**: The print page numbers of the navigation document's `page-list` nav or the NCX `pageList`, as `TocEntry` objects; `[]` when the book has none. Read-only.
+- **`getPageList(): array`**: The print page numbers of the navigation document's `page-list` nav or the NCX `pageList`, as `TocEntry` objects; `[]` when the book has none.
+
+- **`setPageList(array $pages): void`**: Replaces the page list. Each page is a `TocEntry` whose `title` is the print page number (`"12"`, `"iv"`) and whose `path` and `fragment` locate where the page begins. It is written to the navigation document's `page-list` nav (created hidden when missing) and to the NCX `pageList`, whichever the book has. In the NCX, arabic numbers become `normal` page targets, roman numerals `front` and anything else `special`; the targets are numbered after the `navMap`, and `dtb:totalPageCount` and `dtb:maxPageNumber` are updated. `[]` removes the page list. Throws an `Exception` when a page has no number, no path or children, points outside the book or is not valid XML text, when the book has neither file, or when a file cannot be written.
+
+- **`generatePageList(): array`**: Builds the page list from the page break markers of the spine documents, in reading order (elements with `epub:type="pagebreak"` or `role="doc-pagebreak"`), sets it with `setPageList()` and returns the pages. A marker's page number is its `title` attribute, else its `aria-label`, else its text. A marker without an `id` gets one (`page-1`, `page-2`, ..., unique in its document), which rewrites that document. A book without markers is left as it is and `[]` is returned. This fixes the `ACCESSIBILITY_PAGE_LIST_MISSING` warning of `EpubFile::validate()` for books whose content marks the print pages.
 
 - **`isAvailable(): bool`**: Whether the book has a navigation document or an NCX that can hold a table of contents, i.e. whether `setEntries()` can work.
 
@@ -56,6 +60,9 @@ $epubFile->getTableOfContents()->addEntry(new TocEntry('Epilogue', 'EPUB/text/ep
 
 // Or build the whole table of contents from the chapters' h1 to h3 headings.
 $epubFile->getTableOfContents()->generateFromHeadings();
+
+// Build the page list from the epub:type="pagebreak" markers of the chapters.
+$epubFile->getTableOfContents()->generatePageList();
 
 $epubFile->save();
 ```

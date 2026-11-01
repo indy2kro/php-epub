@@ -133,6 +133,19 @@ final class MergerTest extends TestCase
         );
     }
 
+    public function testMergesWithDefaultOptionsWhenNoneAreGiven(): void
+    {
+        $one = $this->open(MergeBook::builder(self::UID_ONE, 'One'));
+        $two = $this->open(MergeBook::builder(self::UID_TWO, 'Two'));
+
+        $report = (new Merger())->merge([$one, $two], null, $this->tmpDir . '/merged.epub');
+        $merged = $this->opened[] = EpubFile::open($this->tmpDir . '/merged.epub');
+
+        $this->assertSame(1, $report->deduplicated);
+        $this->assertSame('One', $merged->getMetadata()->getTitle());
+        $this->assertSame([], $this->errors($merged));
+    }
+
     public function testIdenticalStylesheetsAreKeptOnceAndReferencesFollow(): void
     {
         $one = $this->open(MergeBook::builder(self::UID_ONE, 'One'));

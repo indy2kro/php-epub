@@ -111,24 +111,24 @@ hardening. Theme 1 (BUG-01 to BUG-04, UX-02), Theme 2 (CONV-01, CONV-02, CONV-03
   `hasFallback()` only checks that a `fallback` attribute exists, and `setFallback()`/`setMediaOverlay()` accept cycles. Books that EPUBCheck rejects (OPF-040/045, MED-xxx) pass `validate()`.
 - [x] **FEAT-03** Add a `Repairer` fix for CONTENT_REFERENCE_MISSING: unwrap links and drop embeds that point at files missing from the book — `src/Repair/RepairFix.php:10-58`, `src/Repair/Repairer.php`, `src/Util/LinkRemover.php` — M · med
   Probe: after deleting a chapter of `valid_4`, `repair()` applies 1 fix and 6 CONTENT_REFERENCE_MISSING errors remain. `FragmentLinks` handles missing `#fragments` only, although `LinkRemover` already does the unwrapping.
-- [ ] **FEAT-04** Add `TableOfContents::setPageList()`, which writes the nav `page-list` and the NCX `pageList` together (e.g. generated from `epub:type="pagebreak"` markers) — `src/TableOfContents.php:320-378`, `src/Validator.php:644-660` — M · med
+- [x] **FEAT-04** Add `TableOfContents::setPageList()`, which writes the nav `page-list` and the NCX `pageList` together (e.g. generated from `epub:type="pagebreak"` markers) — `src/TableOfContents.php:320-378`, `src/Validator.php:644-660` — M · med
   The page list is read-only, yet `validate()` warns ACCESSIBILITY_PAGE_LIST_MISSING for books with a print source, and the European Accessibility Act expects page navigation. Callers cannot fix a warning the library raises.
 - [ ] **FEAT-05** Add CLI commands for building and editing: `build` (`BookBuilder` from Markdown, text or HTML) and `meta` (print or set the title, authors, language, identifier and cover) — `src/Cli/Application.php:143-149`, `docs/cli.md:11-34`, `src/Build/BookBuilder.php` — M · med
   The CLI covers inspect, repair, convert, split and merge. Making a book from Markdown and fixing a title or a cover, the two most common publishing chores, still need PHP code.
-- [ ] **FEAT-06** Add a DOM-level editing helper, e.g. `ContentManager::transform(callable(DOMDocument, string $path): bool)` over the XHTML documents, that writes back only the documents that changed — `src/ContentManager.php:294-330`, `src/Cleanup/MarkupSanitizer.php:105-130` — M · low
+- [x] **FEAT-06** Add a DOM-level editing helper, e.g. `ContentManager::transform(callable(DOMDocument, string $path): bool)` over the XHTML documents, that writes back only the documents that changed — `src/ContentManager.php:294-330`, `src/Cleanup/MarkupSanitizer.php:105-130` — M · low
   Batch edits (fix a class, add `lang`, replace a word) now take `getContent()`, a string replace and `updateContent()` per file. The library already has the parse, size-cap and serialise steps internally (`MarkupSanitizer::transform()`).
-- [ ] **FEAT-07** Let `EpubReader` copy an entry to a stream (`copyContentTo($path, $stream)`) under the same limits, instead of only returning strings — `src/EpubReader.php:464-478`, `src/EpubReader.php:604-660` — S · low
+- [x] **FEAT-07** Let `EpubReader` copy an entry to a stream (`copyContentTo($path, $stream)`) under the same limits, instead of only returning strings — `src/EpubReader.php:464-478`, `src/EpubReader.php:604-660` — S · low
   Serving a cover, an image or a 100 MB audio file of a read-aloud book from an upload means holding it in a PHP string, although `read()` already streams the entry chunk by chunk.
 - [ ] **FEAT-08** Turn Markdown footnotes (`[^1]` / `[^1]: …`) into EPUB 3 notes in `BookBuilder` (`epub:type` `noteref` and `footnote`, with backlinks) — `src/Build/MarkdownParser.php`, `src/Build/BookBuilder.php:61-73` — M · low
   Probe: footnote syntax comes out as literal `[^1]` text. Footnotes are standard in Pandoc and GFM manuscripts, and reading systems show `epub:type` notes as pop-ups.
 
 ### Public API
 
-- [ ] **UX-01** Add metadata helpers for typed identifiers (`setIsbn()`, or an identifier with a scheme), the subtitle (`title-type`) and rights — `src/Traits/InteractsWithIdentifier.php:40-66`, `src/Traits/InteractsWithTitle.php:13-51`, `src/Metadata.php:271-300` — M · med
+- [x] **UX-01** Add metadata helpers for typed identifiers (`setIsbn()`, or an identifier with a scheme), the subtitle (`title-type`) and rights — `src/Traits/InteractsWithIdentifier.php:40-66`, `src/Traits/InteractsWithTitle.php:13-51`, `src/Metadata.php:271-300` — M · med
   `getIsbn()`/`getTypedIdentifiers()` read schemes, but `setIdentifiers()` takes plain strings and drops `opf:scheme`/`identifier-type` on changed values. Adding the ISBN a store requires, a subtitle or a copyright line needs raw `setDublinCoreValues()` or hand-written refinement XML.
 - [x] **UX-02** Let `EpubFile::create()` take `Limits` / `ZipHandler` / `XmlParser` like `open()` — `src/EpubFile.php:300-325` — S · low
   A new book is always saved with the default `ZipHandler` and an uncapped `XmlParser`. Tests cannot inject collaborators, and a service cannot apply its limits to content added later.
-- [ ] **UX-03** Make `Merger::merge()`'s `MergeOptions` optional, and align it with `Splitter` (`split()`/`splitWithReport()` versus `merge()` returning the report) — `src/Merge/Merger.php:75`, `src/Split/Splitter.php:64-74` — S · low
+- [x] **UX-03** Make `Merger::merge()`'s `MergeOptions` optional, and align it with `Splitter` (`split()`/`splitWithReport()` versus `merge()` returning the report) — `src/Merge/Merger.php:75`, `src/Split/Splitter.php:64-74` — S · low
   `merge($books, null, $out)` is a TypeError although every `MergeOptions` field has a default, and the two sibling APIs return their reports differently.
 
 ### Documentation
