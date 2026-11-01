@@ -196,20 +196,11 @@ final class FileSystemHelperTest extends TestCase
         $this->helper->runProcess([$this->fixturesDir . DIRECTORY_SEPARATOR . 'no-such-program'], 5);
     }
 
-    public function testExecSuccessful(): void
+    public function testThereIsNoShellExecHelper(): void
     {
-        $phpBinary = PHP_BINARY;
-        if (DIRECTORY_SEPARATOR === '\\') {
-            $phpBinary = '"' . $phpBinary . '"';
-        }
-        $command = $phpBinary . ' -r "echo \"Hello, world!\";"';
-        $output = [];
-        $returnVar = 0;
-
-        $this->helper->exec($command, $output, $returnVar);
-
-        $this->assertSame(0, $returnVar);
-        $this->assertSame(['Hello, world!'], $output);
+        // Running a string through the shell is a foot-gun in a library that handles hostile input: runProcess()
+        // takes an argument list and never involves a shell.
+        $this->assertFalse(method_exists(FileSystemHelper::class, 'exec'));
     }
 
     public function testFileSize(): void
