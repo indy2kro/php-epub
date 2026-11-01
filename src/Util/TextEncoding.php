@@ -56,11 +56,19 @@ final class TextEncoding
      */
     private static function convert(string $content, string $encoding): ?string
     {
-        if (function_exists('mb_convert_encoding') && in_array(strtolower($encoding), array_map(strtolower(...), mb_list_encodings()), true)) {
-            $converted = mb_convert_encoding($content, 'UTF-8', $encoding);
-        } else {
-            $converted = function_exists('iconv') ? @iconv($encoding, 'UTF-8', $content) : false;
+        if (function_exists('mb_convert_encoding')) {
+            try {
+                // mbstring knows the aliases (latin1) too; an encoding it does not know is a ValueError.
+                $converted = mb_convert_encoding($content, 'UTF-8', $encoding);
+                if ($converted !== false) {
+                    return $converted;
+                }
+            } catch (\ValueError) {
+                // Left to iconv.
+            }
         }
+
+        $converted = function_exists('iconv') ? @iconv($encoding, 'UTF-8', $content) : false;
 
         return $converted === false ? null : $converted;
     }

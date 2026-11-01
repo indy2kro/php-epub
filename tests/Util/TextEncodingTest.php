@@ -35,7 +35,7 @@ final class TextEncodingTest extends TestCase
             $html,
         ];
         yield 'declared ISO-8859-1' => [sprintf($declaration, 'ISO-8859-1') . "<p>caf\xE9</p>", '<p>café</p>'];
-        yield 'declared alias only iconv knows' => [sprintf($declaration, 'latin1') . "<p>caf\xE9</p>", '<p>café</p>'];
+        yield 'declared alias of a known encoding' => [sprintf($declaration, 'latin1') . "<p>caf\xE9</p>", '<p>café</p>'];
         yield 'declared unknown encoding' => [sprintf($declaration, 'x-unknown') . '<p>text</p>', sprintf($declaration, 'x-unknown') . '<p>text</p>'];
     }
 }
