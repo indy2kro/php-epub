@@ -112,7 +112,7 @@ class ContentManager
         $fullPath = $this->paths->resolve($this->contentDirectory, $filePath);
         $directory = dirname($fullPath);
         if (! is_dir($directory) && ! @mkdir($directory, 0777, true) && ! is_dir($directory)) {
-            throw new Exception("Failed to create directory: {$directory}");
+            throw new Exception("Failed to create the directory for: {$filePath}");
         }
 
         if (@file_put_contents($fullPath, $content) === false) {
@@ -653,7 +653,7 @@ class ContentManager
         }
 
         if ($changed) {
-            $xmlParser->save($encryption, $file);
+            $xmlParser->save($encryption, $file, 'META-INF/encryption.xml');
         }
     }
 

@@ -96,7 +96,7 @@ final class ContentManagerPackageTest extends TestCase
         [$contentManager] = $this->open();
 
         $this->expectException(Exception::class);
-        $this->expectExceptionMessage('Failed to create directory:');
+        $this->expectExceptionMessage('Failed to create the directory for: EPUB/chapter.xhtml/nested.xhtml');
 
         $contentManager->addContent('EPUB/chapter.xhtml/nested.xhtml', '<html/>');
     }

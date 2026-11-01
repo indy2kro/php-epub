@@ -167,7 +167,7 @@ final readonly class FontObfuscation
             $root->appendChild($this->encryptedData($document, $path, $algorithm));
         }
 
-        $this->xmlParser->save($xml, $file);
+        $this->xmlParser->save($xml, $file, self::ENCRYPTION_FILE);
     }
 
     private function firstElement(DOMXPath $xpath, string $expression, DOMElement $context): ?DOMElement

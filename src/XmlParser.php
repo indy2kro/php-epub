@@ -102,14 +102,15 @@ class XmlParser
      *
      * @param SimpleXMLElement $xml The XML element to save.
      * @param string $filePath The path where the XML should be saved.
+     * @param string|null $name The name the error message uses for the file (e.g. its path inside the book), else $filePath.
      *
      * @throws Exception If the XML file cannot be saved.
      */
-    public function save(SimpleXMLElement $xml, string $filePath): void
+    public function save(SimpleXMLElement $xml, string $filePath, ?string $name = null): void
     {
         $result = @$xml->asXML($filePath);
         if ($result === false) {
-            throw new Exception("Failed to save XML file: {$filePath}");
+            throw new Exception('Failed to save XML file: ' . ($name ?? $filePath));
         }
     }
 }

@@ -52,7 +52,7 @@ Results go to standard output, errors and warnings to standard error, prefixed w
 
 ## Untrusted books
 
-The command line treats every book as untrusted input. Books are opened with [`Limits::web()`](epub-reader.md) (2,000 entries, 200 MiB, 8 MiB per XML or XHTML document), so a hostile archive fails with exit code `3` instead of filling the disk. `--trusted` switches to `Limits::default()` for books you made yourself.
+The command line treats every book as untrusted input. Books are opened with [`Limits::web()`](epub-reader.md) (2,000 entries, 200 MiB, 8 MiB per XML or XHTML document), so a hostile archive is refused instead of filling the disk: with exit code `3`, or for `validate` as an `EPUB_UNREADABLE` error with exit code `1`. `--trusted` switches to `Limits::default()` for books you made yourself.
 
 Nothing is overwritten without `--force`, and an output can never be the book it is made from: `repair`, `compress`, `convert` and `merge` always write a new file.
 

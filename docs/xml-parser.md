@@ -11,7 +11,7 @@ It provides methods to load and save XML files, ensuring that the XML data is co
 
 - **`parse(string $filePath, ?string $name = null): SimpleXMLElement`**: Loads an XML file from the specified path and returns it as a `SimpleXMLElement`. Documents with entity declarations (`<!ENTITY`) are rejected, whatever their encoding, and the parser never fetches external resources, so DOCTYPE references in EPUB 2 NCX files are left alone. Throws an `XmlException` (a subclass of `InvalidEpubException`) if the file cannot be found or loaded; the message includes the first libxml error and its line. The message names the file by `$name` when it is given, else by `$filePath`: the library passes a file's path inside the book (`META-INF/container.xml`), so messages never reveal the temporary directory a book was extracted to.
 
-- **`save(SimpleXMLElement $xml, string $filePath): void`**: Saves a `SimpleXMLElement` to the specified file path. Throws an exception if the file cannot be saved.
+- **`save(SimpleXMLElement $xml, string $filePath, ?string $name = null): void`**: Saves a `SimpleXMLElement` to the specified file path. Throws an exception if the file cannot be saved; like `parse()`, the message names the file by `$name` when it is given, else by `$filePath`.
 
 ## Usage Example
 

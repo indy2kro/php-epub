@@ -96,6 +96,34 @@ final class ErrorMessagePathsTest extends TestCase
         }
     }
 
+    public function testAnEncryptionXmlThatCannotBeSavedIsNamedRelativeToTheBook(): void
+    {
+        // A directory where encryption.xml should be: the file is missing, so a new one is written and fails.
+        $root = $this->tmpDir . DIRECTORY_SEPARATOR . 'extracted';
+        mkdir($root . DIRECTORY_SEPARATOR . 'META-INF' . DIRECTORY_SEPARATOR . 'encryption.xml', 0777, true);
+
+        try {
+            (new FontObfuscation($root))->setAlgorithm('EPUB/fonts/font.ttf', FontObfuscation::IDPF);
+            $this->fail('No exception was thrown.');
+        } catch (Exception $exception) {
+            $this->assertSame('Failed to save XML file: META-INF/encryption.xml', $exception->getMessage());
+        }
+    }
+
+    public function testADirectoryThatCannotBeCreatedIsNamedRelativeToTheBook(): void
+    {
+        $content = EpubFile::open(EpubBuilder::epub3()->buildEpub($this->tmpDir . '/book.epub'))->getContentManager();
+
+        try {
+            // The chapter is a file, so no directory can be created below it.
+            $content->addContent('EPUB/text/chapter.xhtml/note.xhtml', EpubBuilder::xhtml('Note', '<p>x</p>'));
+            $this->fail('No exception was thrown.');
+        } catch (Exception $exception) {
+            $this->assertStringContainsString('EPUB/text/chapter.xhtml/note.xhtml', $exception->getMessage());
+            $this->assertNoExtractionPath($exception->getMessage());
+        }
+    }
+
     private function openFailure(EpubBuilder $builder): string
     {
         try {
