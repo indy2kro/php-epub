@@ -911,7 +911,7 @@ final readonly class TableOfContents
     {
         $xml = $this->reader instanceof \Closure
             ? $this->xmlParser->parseString(($this->reader)($this->paths->normalize($path)), $path)
-            : $this->xmlParser->parse($this->paths->resolve($this->rootDirectory, $path));
+            : $this->xmlParser->withName($path)->parse($this->paths->resolve($this->rootDirectory, $path));
         $root = dom_import_simplexml($xml);
 
         return $root instanceof DOMElement ? $root : throw new Exception("Failed to load: {$path}");

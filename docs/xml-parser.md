@@ -9,9 +9,11 @@ It provides methods to load and save XML files, ensuring that the XML data is co
 
 ## Key Methods
 
-- **`parse(string $filePath): SimpleXMLElement`**: Loads an XML file from the specified path and returns it as a `SimpleXMLElement`. Documents with entity declarations (`<!ENTITY`) are rejected, whatever their encoding, and the parser never fetches external resources, so DOCTYPE references in EPUB 2 NCX files are left alone. Throws an `XmlException` (a subclass of `InvalidEpubException`) if the file cannot be found or loaded; the message includes the first libxml error and its line.
+- **`parse(string $filePath): SimpleXMLElement`**: Loads an XML file from the specified path and returns it as a `SimpleXMLElement`. Documents with entity declarations (`<!ENTITY`) are rejected, whatever their encoding, and the parser never fetches external resources, so DOCTYPE references in EPUB 2 NCX files are left alone. Throws an `XmlException` (a subclass of `InvalidEpubException`) if the file cannot be found or loaded; the message includes the first libxml error and its line, and names the file by its path (or by the name given to `withName()`).
 
-- **`save(SimpleXMLElement $xml, string $filePath): void`**: Saves a `SimpleXMLElement` to the specified file path. The document is written to a temporary file in the same directory, checked and renamed into place, so a failed write leaves an existing file as it was instead of truncated; the file keeps its permissions. Throws an exception if the file cannot be saved, also when it exists and is not writable.
+- **`save(SimpleXMLElement $xml, string $filePath): void`**: Saves a `SimpleXMLElement` to the specified file path. The document is written to a temporary file in the same directory, checked and renamed into place, so a failed write leaves an existing file as it was instead of truncated; the file keeps its permissions. Throws an exception if the file cannot be saved, also when it exists and is not writable, naming the file like `parse()`.
+
+- **`withName(string $name): static`**: Returns a copy of the parser (of the same class, with the same limit) whose `parse()` and `save()` name the file `$name` in their error messages instead of its path. The library uses it with a file's path inside the book (`$parser->withName('META-INF/container.xml')->parse($path)`), so messages never reveal the temporary directory a book was extracted to. A subclass that overrides `parse()` or `save()` keeps working and is still called.
 
 ## Usage Example
 

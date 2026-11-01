@@ -92,6 +92,89 @@ final class BookBuilderTest extends TestCase
         $book->cleanup();
     }
 
+    public function testAHeadingInANoteIsAParagraphAndStartsNoChapter(): void
+    {
+        $markdown = "# One\n\nCited.[^a]\n\n[^a]: # Not a heading\n    Text\n    ===\n    > ## Quoted\n    ```\n    # comment\n    ```\n";
+
+        $built = (new BookBuilder(new BookOptions(title: 'Headings')))->fromMarkdown($markdown);
+        $one = $this->chapterHtml($built, 1);
+
+        $this->assertSame(1, $built->chapterCount);
+        $this->assertMatchesRegularExpression('#<aside class="footnote"[^>]*>.*<p>Not a heading</p>.*<p>Text</p>.*<blockquote>\s*<p>Quoted</p>.*</aside>#s', $one);
+        $this->assertStringContainsString('<code># comment</code>', $one, 'fenced code in a note is kept as written');
+        $this->assertDoesNotMatchRegularExpression('#<h[1-6][ >]#', substr($one, (int) strpos($one, '<aside')));
+    }
+
+    public function testANoteCitedByANoteFollowsItIntoItsChapter(): void
+    {
+        $markdown = "# One\n\nA claim.[^a]\n\n# Two\n\nNothing cited.\n\n[^a]: See also.[^b]\n[^b]: The nested note.\n";
+
+        $built = (new BookBuilder(new BookOptions(title: 'Nested')))->fromMarkdown($markdown);
+        $one = $this->chapterHtml($built, 1);
+
+        $this->assertStringContainsString('id="fn-1"', $one);
+        $this->assertStringContainsString('id="fn-2"', $one);
+        $this->assertStringContainsString('href="#fn-2"', $one, 'the nested citation stays a local pop-up link');
+        $this->assertStringNotContainsString('<aside', $this->chapterHtml($built, 2));
+    }
+
+    public function testFootnoteSyntaxInCodeAndEscapesStaysText(): void
+    {
+        $markdown = "# One\n\nCited.[^a] Escaped \\[^a] stays.\n\n````\n```\n[^a]: inside a longer fence\n````\n\n[^a]: The note.\n";
+
+        $one = $this->chapterHtml((new BookBuilder(new BookOptions(title: 'Code')))->fromMarkdown($markdown), 1);
+
+        $this->assertStringContainsString('Escaped [^a] stays.', $one);
+        $this->assertStringContainsString('[^a]: inside a longer fence', $one);
+        $this->assertSame(1, substr_count($one, 'class="noteref"'));
+        $this->assertStringContainsString('The note.', $one);
+    }
+
+    public function testFootnotesOfOneMarkdownDocumentDoNotLeakIntoTheNext(): void
+    {
+        $parser = new \PhpEpub\Build\MarkdownParser();
+        $parser->toHtml("First.[^x]\n\n[^x]: First note.\n");
+
+        $second = $parser->toHtml("Second.[^y]\n\n[^y]: Second note.\n");
+
+        $this->assertStringContainsString('href="#fn-1">1</a>', $second);
+        $this->assertStringNotContainsString('First note', $second);
+    }
+
+    public function testAuthoredHtmlNotesStayWhereTheyAre(): void
+    {
+        $html = '<h1>One</h1><p>Cited<a class="noteref" href="#n1">1</a></p><h1>Two</h1><aside class="footnote" id="n1"><p>Authored note.</p></aside>';
+
+        $built = (new BookBuilder(new BookOptions(title: 'Authored')))->fromHtml($html);
+
+        $this->assertStringNotContainsString('Authored note.', $this->chapterHtml($built, 1));
+        $this->assertStringContainsString('Authored note.', $this->chapterHtml($built, 2));
+    }
+
+    public function testMarkdownFootnotesBecomeEpubNotesInTheChapterThatCitesThem(): void
+    {
+        $markdown = "# One\n\nA claim.[^src] Another.[^2]\n\n# Two\n\nAgain.[^src] An undefined [^nope] stays text.\n\n"
+            . "```\n[^src]: not a definition inside code\n```\n\n"
+            . "[^src]: The *source*, page 4.\n[^2]: Second note.\n    Its second line.\n[^unused]: Never cited.\n";
+
+        $built = (new BookBuilder(new BookOptions(title: 'Notes')))->fromMarkdown($markdown);
+        $one = $this->chapterHtml($built, 1);
+        $two = $this->chapterHtml($built, 2);
+
+        $this->assertStringContainsString('<sup><a class="noteref" epub:type="noteref" role="doc-noteref" id="fnref-1" href="#fn-1">1</a></sup>', $one);
+        $this->assertStringContainsString('href="#fn-2">2</a>', $one);
+        $this->assertMatchesRegularExpression('#<aside class="footnote" epub:type="footnote" role="doc-footnote" id="fn-1">.*<em>source</em>, page 4\..*href="\#fnref-1"#s', $one);
+        $this->assertStringContainsString('Second note. Its second line.', (string) preg_replace('/\s+/', ' ', $one));
+        $this->assertStringContainsString('class="footnote-back" role="doc-backlink"', $one);
+
+        $this->assertStringContainsString('href="chapter-001.xhtml#fn-1">1</a>', $two, 'a second citation links to the same note');
+        $this->assertStringContainsString('[^nope]', $two);
+        $this->assertStringContainsString('[^src]: not a definition inside code', $two);
+        $this->assertStringNotContainsString('<aside', $two);
+        $this->assertStringNotContainsString('Never cited', $one . $two);
+        $this->assertSame([], array_map(strval(...), $built->open()->validate()));
+    }
+
     public function testMarkdownBlocksAndInlineMarkup(): void
     {
         $markdown = <<<'MD'
