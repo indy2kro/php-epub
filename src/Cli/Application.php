@@ -636,6 +636,7 @@ final class Application
 
             return [
                 'title' => $metadata->getTitle(),
+                'subtitle' => $metadata->getSubtitle(),
                 'authors' => $metadata->getAuthors(),
                 'language' => $metadata->getLanguage(),
                 'identifier' => $metadata->getUniqueIdentifier(),
@@ -643,6 +644,7 @@ final class Application
                 'publisher' => $metadata->getPublisher(),
                 'description' => $metadata->getDescription(),
                 'date' => $metadata->getDate(),
+                'rights' => $metadata->getRights(),
                 'cover' => $book->getCoverImage()?->path,
             ];
         } finally {

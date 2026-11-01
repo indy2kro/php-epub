@@ -470,7 +470,7 @@ final class ApplicationTest extends TestCase
         $this->assertSame($book->getMetadata()->getLanguage(), $meta['language']);
         $this->assertSame($book->getMetadata()->getUniqueIdentifier(), $meta['identifier']);
         $this->assertSame($book->getCoverImage()?->path, $meta['cover']);
-        $this->assertSame(['title', 'authors', 'language', 'identifier', 'isbn', 'publisher', 'description', 'date', 'cover'], array_keys($meta));
+        $this->assertSame(['title', 'subtitle', 'authors', 'language', 'identifier', 'isbn', 'publisher', 'description', 'date', 'rights', 'cover'], array_keys($meta));
     }
 
     public function testMetaWritesAnEditedCopy(): void
