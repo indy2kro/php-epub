@@ -234,13 +234,6 @@ final class Repairer
             $content = $this->epub->getContentManager()->getContent($path);
             $parsed = dom_import_simplexml($this->xmlParser->parseString($content, $path));
             $document = $parsed->ownerDocument ?? throw new Exception("Cannot read the parsed content document: {$path}");
-            // References under xml:base resolve against another directory; this check does not follow it, so a
-            // document that uses xml:base is left alone rather than risk removing a valid reference.
-            $xpath = new \DOMXPath($document);
-            if ($xpath->evaluate('count(//@xml:base)') > 0) {
-                continue;
-            }
-
             $targets = [];
             foreach ($document->getElementsByTagName('*') as $element) {
                 $name = strtolower($element->localName ?? '');

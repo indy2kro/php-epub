@@ -38,10 +38,12 @@ final readonly class LinkRemover
     public function remove(string $path, string $content, array $removed, bool $failOnMalformed = false): ?string
     {
         // A quick check before parsing. Attribute values reach target() with their character references and
-        // percent-encoding decoded (g&#111;ne.png, g%6Fne.png), so the decoded content is searched as well.
+        // percent-encoding decoded (g&#111;ne.png, g%6Fne.png), so the decoded content is searched as well. A UTF-16
+        // document interleaves zero bytes with the names, so it is always parsed.
+        $isUtf16 = str_starts_with($content, "\xFF\xFE") || str_starts_with($content, "\xFE\xFF") || str_contains(substr($content, 0, 4), "\0");
         $decoded = rawurldecode(html_entity_decode($content, ENT_QUOTES | ENT_XML1, 'UTF-8'));
-        $mentioned = false;
-        foreach ($removed as $removedPath => $unused) {
+        $mentioned = $isUtf16;
+        foreach ($mentioned ? [] : $removed as $removedPath => $unused) {
             $name = basename($removedPath);
             if (str_contains($content, $name) || str_contains($content, rawurlencode($name)) || str_contains($decoded, $name)) {
                 $mentioned = true;
@@ -64,6 +66,14 @@ final readonly class LinkRemover
         }
 
         $document = $root->ownerDocument ?? new DOMDocument();
+
+        // xml:base and an HTML <base href> resolve references against another location, which target() does not
+        // follow: such a document is left as it is rather than risk removing references that are valid.
+        $xpath = new \DOMXPath($document);
+        if ($xpath->evaluate("count(//@xml:base) + count(//*[local-name() = 'base'][@href])") > 0) {
+            return null;
+        }
+
         $changed = false;
 
         // Elements with href attribute (a, area, link, base, and SVG 2 image and use)
