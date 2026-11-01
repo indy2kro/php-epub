@@ -13,6 +13,7 @@ use PhpEpub\Manifest;
 use PhpEpub\ManifestItem;
 use PhpEpub\TocEntry;
 use PhpEpub\Util\FragmentReferences;
+use PhpEpub\Util\LinkRemover;
 use PhpEpub\Util\PackagePrefixes;
 use PhpEpub\Util\PathResolver;
 use PhpEpub\ValidationIssue;
@@ -24,8 +25,8 @@ use PhpEpub\XmlParser;
  * the loaded book (EpubFile::save() writes them) and every change is returned as an AppliedFix.
  *
  * A repair never deletes a file of the book: a manifest item whose file is missing leaves the manifest, but a
- * file the manifest does not list is added to it. Problems without a safe fix (a title, broken XML, content
- * documents that refer to missing files) are left for validate() to keep reporting.
+ * file the manifest does not list is added to it. Problems without a safe fix (a title, broken XML, unsupported
+ * content references) are left for validate() to keep reporting.
  */
 final class Repairer
 {
@@ -71,7 +72,7 @@ final class Repairer
         $root = $this->epub->getTempDir() ?? throw new Exception('EPUB file must be loaded before repairing.');
         $this->applied = [];
 
-        $issues = array_filter([RepairFix::UnlistedFiles, RepairFix::MediaTypes, RepairFix::Prefixes], $options->includes(...)) !== [] ? $this->epub->validate() : [];
+        $issues = array_filter([RepairFix::UnlistedFiles, RepairFix::MediaTypes, RepairFix::Prefixes, RepairFix::ContentReferences], $options->includes(...)) !== [] ? $this->epub->validate() : [];
 
         $this->when($options, RepairFix::DuplicateIds, $this->repairDuplicateIds(...));
         // These address manifest items by id: with a repeated id they would change the wrong item, so they wait
@@ -93,6 +94,7 @@ final class Repairer
         $this->when($options, RepairFix::Navigation, fn () => $this->createNavigation($codes, $options->defaultLanguage));
         $this->when($options, RepairFix::TocLinks, $this->repairTocLinks(...));
         $this->when($options, RepairFix::Navigation, $this->fillEmptyToc(...));
+        $this->when($options, RepairFix::ContentReferences, fn () => $this->repairContentReferences($root, $issues));
         $this->when($options, RepairFix::ManifestProperties, $this->repairManifestProperties(...));
         $this->when($options, RepairFix::FragmentLinks, fn () => $this->repairFragmentLinks($root));
         $this->when($options, RepairFix::Prefixes, fn () => $this->repairPrefixes($issues));
@@ -194,6 +196,76 @@ final class Repairer
             $dropped[$path] = true;
             $fonts->setAlgorithm($path, null);
             $this->fixed('ENCRYPTION_ENTRY_MISSING', 'Removed the encryption.xml entry of a file that is not in the book.', $path);
+        }
+    }
+
+    /**
+     * Unlinks or removes local references to files that no longer exist. External, same-document and escaping paths
+     * are not candidates; a DRM-protected book is never edited.
+     *
+     * @param list<ValidationIssue> $issues
+     */
+    private function repairContentReferences(string $root, array $issues): void
+    {
+        if ((new Encryption($root, $this->xmlParser, $this->paths))->isDrmProtected()) {
+            return;
+        }
+
+        $reportedDocuments = [];
+        foreach ($issues as $issue) {
+            if ($issue->code === 'CONTENT_REFERENCE_MISSING' && $issue->location !== null) {
+                $reportedDocuments[$issue->location] = true;
+            }
+        }
+
+        $links = new LinkRemover($this->paths, $this->xmlParser);
+        foreach ($this->epub->getManifest()->getItems() as $item) {
+            $path = $item->path;
+            if ($path === '' || $item->mediaType !== self::XHTML_MEDIA_TYPE || ! isset($reportedDocuments[$path])) {
+                continue;
+            }
+            $file = $this->paths->resolve($root, $path);
+            $size = @filesize($file);
+            if (! is_int($size) || $size > self::MAX_DOCUMENT_BYTES) {
+                throw new Exception("Cannot repair references in unreadable or oversized content document: {$path}");
+            }
+
+            $content = $this->epub->getContentManager()->getContent($path);
+            $parsed = dom_import_simplexml($this->xmlParser->parseString($content, $path));
+            $document = $parsed->ownerDocument ?? throw new Exception("Cannot read the parsed content document: {$path}");
+            $targets = [];
+            foreach ($document->getElementsByTagName('*') as $element) {
+                $name = strtolower($element->localName ?? '');
+                foreach ($element->attributes ?? [] as $attribute) {
+                    $attributeName = strtolower($attribute->localName ?? '');
+                    $isReference = ($attributeName === 'href' && in_array($name, ['a', 'area', 'base', 'link', 'image', 'use'], true))
+                        || ($attributeName === 'src' && in_array($name, ['img', 'script', 'iframe', 'embed', 'source', 'audio', 'video', 'track', 'input'], true))
+                        || ($attributeName === 'data' && $name === 'object')
+                        || ($attributeName === 'poster' && $name === 'video');
+                    if (! $isReference) {
+                        continue;
+                    }
+
+                    $target = $links->target($attribute->value, $path);
+                    if ($target !== null && ! is_file($this->paths->resolve($root, $target))) {
+                        $targets[$target] = true;
+                    }
+                }
+            }
+
+            if ($targets === []) {
+                continue;
+            }
+
+            $updated = $links->remove($path, $content, $targets, true);
+            if ($updated === null) {
+                continue;
+            }
+
+            $this->epub->getContentManager()->updateContent($path, $updated);
+            foreach (array_keys($targets) as $target) {
+                $this->fixed('CONTENT_REFERENCE_MISSING', "Removed links and embeds to {$target}, which is not in the book.", $path);
+            }
         }
     }
 

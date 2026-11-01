@@ -703,6 +703,37 @@ final class RepairerTest extends TestCase
         $this->assertSame(['../outside.otf'], array_column((new Encryption((string) $epub->getTempDir()))->entries(), 'uri'));
     }
 
+    public function testDoesNotRepairMissingReferencesInADrmProtectedBook(): void
+    {
+        $encryption = '<?xml version="1.0"?><encryption xmlns="urn:oasis:names:tc:opendocument:xmlns:container" xmlns:enc="http://www.w3.org/2001/04/xmlenc#">'
+            . '<enc:EncryptedData><enc:EncryptionMethod Algorithm="http://www.w3.org/2001/04/xmlenc#aes128-cbc"/>'
+            . '<enc:CipherData><enc:CipherReference URI="EPUB/text/chapter.xhtml"/></enc:CipherData></enc:EncryptedData></encryption>';
+        $book = $this->withOpf(EpubBuilder::epub3(), static fn (string $opf): string => str_replace(
+            '</manifest>',
+            '<item id="two" href="text/two.xhtml" media-type="application/xhtml+xml"/></manifest>',
+            $opf
+        ))
+            ->withFile('EPUB/text/chapter.xhtml', 'ciphertext')
+            ->withFile('EPUB/text/two.xhtml', EpubBuilder::xhtml('Two', '<a href="gone.xhtml">Missing</a>'))
+            ->withFile('META-INF/encryption.xml', $encryption);
+        $epub = $this->open($book);
+
+        $this->assertSame([], $epub->repair(RepairOptions::only(RepairFix::ContentReferences)));
+        $this->assertStringContainsString('href="gone.xhtml"', $epub->getContentManager()->getContent('EPUB/text/two.xhtml'));
+        $this->assertSame('ciphertext', (string) file_get_contents($epub->getTempDir() . '/EPUB/text/chapter.xhtml'));
+    }
+
+    public function testDoesNotHidePathResolutionErrorsWhileRepairingMissingReferences(): void
+    {
+        $epub = $this->open(EpubBuilder::epub3()->withFile(
+            'EPUB/text/chapter.xhtml',
+            EpubBuilder::xhtml('Chapter', '<a href="gone.xhtml">Missing</a>')
+        ));
+
+        $this->expectException(Exception::class);
+        (new Repairer($epub, new ThrowingPathResolver()))->repair(RepairOptions::only(RepairFix::ContentReferences));
+    }
+
     public function testAnAnchorThatIsATargetItselfKeepsItsIdWhenItsBrokenLinkGoes(): void
     {
         $book = EpubBuilder::epub3()
@@ -723,8 +754,84 @@ final class RepairerTest extends TestCase
             ->withFile('EPUB/text/chapter.xhtml', EpubBuilder::xhtml('Chapter', '<p><a href="../../../outside.xhtml#frag">Out</a></p>'));
         $epub = $this->open($book);
 
-        $this->assertNotContains('CONTENT_FRAGMENT_MISSING', $this->fixCodes($epub->repair()));
+        $this->assertContains('CONTENT_REFERENCE_MISSING', $this->codes($epub->validate()));
+        $fixes = $this->fixCodes($epub->repair());
+        $this->assertNotContains('CONTENT_REFERENCE_MISSING', $fixes);
+        $this->assertNotContains('CONTENT_FRAGMENT_MISSING', $fixes);
         $this->assertStringContainsString('../../../outside.xhtml#frag', $epub->getContentManager()->getContent('EPUB/text/chapter.xhtml'));
+    }
+
+    public function testUnlinksReferencesToMissingFilesAndKeepsTheirText(): void
+    {
+        $book = EpubBuilder::epub3()
+            ->withFile('EPUB/text/two.xhtml', EpubBuilder::xhtml('Two', '<p>Two</p>'))
+            ->withFile('EPUB/text/chapter.xhtml', EpubBuilder::xhtml('Chapter', '<p>'
+                . '<a href="gone.xhtml#part">Missing chapter</a> '
+                . '<a href="two.xhtml">Existing chapter</a> '
+                . '<a href="https://example.com/book">External chapter</a> '
+                . '<a href="#here">Same document</a><span id="here">Target</span></p>'));
+        $book = $this->withOpf($book, static fn (string $opf): string => str_replace(
+            '</manifest>',
+            '<item id="two" href="text/two.xhtml" media-type="application/xhtml+xml"/></manifest>',
+            $opf
+        ));
+        $epub = $this->open($book);
+        $this->assertContains('CONTENT_REFERENCE_MISSING', $this->codes($epub->validate()));
+
+        $this->assertSame(['CONTENT_REFERENCE_MISSING'], $this->fixCodes($epub->repair()));
+
+        $chapter = $epub->getContentManager()->getContent('EPUB/text/chapter.xhtml');
+        $this->assertStringContainsString('Missing chapter', $chapter);
+        $this->assertStringNotContainsString('gone.xhtml', $chapter);
+        $this->assertStringContainsString('href="two.xhtml"', $chapter);
+        $this->assertStringContainsString('href="https://example.com/book"', $chapter);
+        $this->assertStringContainsString('href="#here"', $chapter);
+        $this->assertSame([], array_values(array_filter($this->codes($epub->validate()), static fn (string $code): bool => $code === 'CONTENT_REFERENCE_MISSING')));
+    }
+
+    public function testLeavesStylesheetReferencesAloneInsteadOfParsingCssAsXhtml(): void
+    {
+        $epub = $this->open(EpubBuilder::epub3()->withFile('EPUB/css/style.css', 'p { background: url(gone.png); }'));
+        $this->assertContains('CONTENT_REFERENCE_MISSING', $this->codes($epub->validate()));
+
+        $this->assertSame([], $epub->repair(RepairOptions::only(RepairFix::ContentReferences)));
+        $this->assertSame('p { background: url(gone.png); }', $epub->getContentManager()->getContent('EPUB/css/style.css'));
+    }
+
+    public function testRemovesEmbeddedResourcesThatPointAtMissingFiles(): void
+    {
+        $book = EpubBuilder::epub3()->withFile('EPUB/text/chapter.xhtml', EpubBuilder::xhtml('Chapter', '<p>'
+            . '<img src="gone.png" alt="missing image"/> '
+            . '<iframe src="gone.xhtml">missing embed</iframe> '
+            . '<img src="https://example.com/image.png" alt="external image"/></p>'));
+        $epub = $this->open($book);
+        $this->assertContains('CONTENT_REFERENCE_MISSING', $this->codes($epub->validate()));
+
+        $this->assertSame(
+            ['CONTENT_REFERENCE_MISSING', 'CONTENT_REFERENCE_MISSING'],
+            $this->fixCodes($epub->repair(RepairOptions::only(RepairFix::ContentReferences)))
+        );
+
+        $chapter = $epub->getContentManager()->getContent('EPUB/text/chapter.xhtml');
+        $this->assertStringNotContainsString('gone.png', $chapter);
+        $this->assertStringNotContainsString('gone.xhtml', $chapter);
+        $this->assertStringContainsString('https://example.com/image.png', $chapter);
+        $this->assertSame([], array_values(array_filter($this->codes($epub->validate()), static fn (string $code): bool => $code === 'CONTENT_REFERENCE_MISSING')));
+    }
+
+    public function testKeepsFragmentTargetsWhenUnlinkingAnAnchorToAMissingFile(): void
+    {
+        $epub = $this->open(EpubBuilder::epub3()->withFile(
+            'EPUB/text/chapter.xhtml',
+            EpubBuilder::xhtml('Chapter', '<p><a id="kept" href="gone.xhtml">Missing chapter</a> <a href="#kept">Jump</a></p>')
+        ));
+
+        $this->assertSame(['CONTENT_REFERENCE_MISSING'], $this->fixCodes($epub->repair()));
+
+        $chapter = $epub->getContentManager()->getContent('EPUB/text/chapter.xhtml');
+        $this->assertStringContainsString('<a id="kept">Missing chapter</a>', $chapter);
+        $this->assertStringContainsString('href="#kept"', $chapter);
+        $this->assertSame([], $this->codes($epub->validate()));
     }
 
     public function testRetargetsLinksToMissingFragments(): void

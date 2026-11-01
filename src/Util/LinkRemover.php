@@ -14,7 +14,7 @@ use PhpEpub\XmlParser;
  * replaced by its content, a <link> is removed, and elements with src/xlink:href/data/poster attributes
  * pointing to removed files are removed or the attribute is cleared.
  *
- * @internal Used by Merge\Merger and Split\Splitter.
+ * @internal Used by Repair\Repairer, Merge\Merger and Split\Splitter.
  */
 final readonly class LinkRemover
 {
@@ -92,14 +92,19 @@ final readonly class LinkRemover
                 if ($href !== '') {
                     $target = $this->target($href, $path);
                     if ($target !== null && isset($removed[$target])) {
-                        if ($name === 'a' || $name === 'area') {
-                            while ($element->firstChild instanceof \DOMNode) {
-                                $element->parentNode->insertBefore($element->firstChild, $element);
+                        if (($name === 'a' || $name === 'area') && ($element->hasAttribute('id') || ($name === 'a' && $element->hasAttribute('name')))) {
+                            $element->removeAttribute('href');
+                            $changed = true;
+                        } else {
+                            if ($name === 'a' || $name === 'area') {
+                                while ($element->firstChild instanceof \DOMNode) {
+                                    $element->parentNode->insertBefore($element->firstChild, $element);
+                                }
                             }
+                            $element->parentNode->removeChild($element);
+                            $changed = true;
+                            continue;
                         }
-                        $element->parentNode->removeChild($element);
-                        $changed = true;
-                        continue;
                     }
                 }
             }
@@ -123,14 +128,19 @@ final readonly class LinkRemover
                 if ($xlinkHref !== '') {
                     $target = $this->target($xlinkHref, $path);
                     if ($target !== null && isset($removed[$target])) {
-                        if ($name === 'a') {
-                            while ($element->firstChild instanceof \DOMNode) {
-                                $element->parentNode->insertBefore($element->firstChild, $element);
+                        if ($name === 'a' && ($element->hasAttribute('id') || $element->hasAttribute('name'))) {
+                            $element->removeAttributeNS(self::XLINK, 'href');
+                            $changed = true;
+                        } else {
+                            if ($name === 'a') {
+                                while ($element->firstChild instanceof \DOMNode) {
+                                    $element->parentNode->insertBefore($element->firstChild, $element);
+                                }
                             }
+                            $element->parentNode->removeChild($element);
+                            $changed = true;
+                            continue;
                         }
-                        $element->parentNode->removeChild($element);
-                        $changed = true;
-                        continue;
                     }
                 }
             }
