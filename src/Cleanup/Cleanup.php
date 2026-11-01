@@ -178,6 +178,11 @@ final readonly class Cleanup
         $files = [];
         $before = 0;
         foreach ($paths as $path) {
+            if (! $this->forgetEncryption($path)) {
+                // Removing the file would leave encryption.xml naming a file that is not there.
+                continue;
+            }
+
             $file = $this->paths->resolve($directory, $path);
             $size = is_file($file) ? (int) filesize($file) : 0;
             if (is_file($file) && ! @unlink($file)) {
@@ -191,7 +196,6 @@ final readonly class Cleanup
                 }
             }
 
-            $this->forgetEncryption($path);
             $files[] = $path;
             $before += $size;
         }
@@ -343,16 +347,24 @@ final readonly class Cleanup
         return count($container->xpath('//c:rootfile') ?: []) !== 1;
     }
 
-    private function forgetEncryption(string $path): void
+    /**
+     * Removes the encryption.xml entry of a file that is about to be removed.
+     *
+     * @return bool False when the entry exists but cannot be removed (encryption.xml cannot be
+     *              read or written); the file must then stay, and encryption.xml is left as it is.
+     */
+    private function forgetEncryption(string $path): bool
     {
-        $directory = $this->directory();
+        $obfuscation = new FontObfuscation($this->directory(), $this->xmlParser);
         try {
-            if (isset((new FontObfuscation($directory, $this->xmlParser))->obfuscatedFonts()[$path])) {
-                (new FontObfuscation($directory, $this->xmlParser))->setAlgorithm($path, null);
+            if (isset($obfuscation->obfuscatedFonts()[$path])) {
+                $obfuscation->setAlgorithm($path, null);
             }
         } catch (Exception) {
-            // A damaged encryption.xml is left as it is.
+            return false;
         }
+
+        return true;
     }
 
     private function pruneEmptyDirectories(string $directory): void

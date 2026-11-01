@@ -16,6 +16,7 @@ use PhpEpub\ManifestItem;
 use PhpEpub\Test\Support\CleanupBook;
 use PhpEpub\Test\Support\EpubBuilder;
 use PhpEpub\Util\FileSystemHelper;
+use PhpEpub\ValidationIssue;
 use PHPUnit\Framework\TestCase;
 
 final class CleanupTest extends TestCase
@@ -281,7 +282,7 @@ XML,
         $this->assertStringContainsString('used.otf', $encryptionXml);
     }
 
-    public function testAnEncryptionXmlThatCannotBeWrittenIsLeftAsItIs(): void
+    public function testAFontWhoseEncryptionEntryCannotBeRemovedIsKept(): void
     {
         $encryption = '<?xml version="1.0" encoding="UTF-8"?><encryption xmlns="urn:oasis:names:tc:opendocument:xmlns:container" xmlns:enc="http://www.w3.org/2001/04/xmlenc#">'
             . '<enc:EncryptedData><enc:EncryptionMethod Algorithm="http://www.idpf.org/2008/embedding"/><enc:CipherData><enc:CipherReference URI="EPUB/fonts/unused.otf"/></enc:CipherData></enc:EncryptedData></encryption>';
@@ -302,8 +303,14 @@ XML,
             chmod($file, 0644);
         }
 
-        $this->assertSame(['EPUB/fonts/unused.otf'], $report->getAction(CleanupAction::UNUSED_FONTS)?->files);
+        $this->assertSame([], $report->getAction(CleanupAction::UNUSED_FONTS)->files ?? []);
         $this->assertSame($encryption, $this->read('META-INF/encryption.xml'));
+        $this->assertTrue($this->has('EPUB/fonts/unused.otf'));
+        $this->assertInstanceOf(ManifestItem::class, $book->getManifest()->findByPath('EPUB/fonts/unused.otf'));
+        $this->assertSame([], array_filter(
+            $book->validate(),
+            static fn (ValidationIssue $issue): bool => $issue->code === 'ENCRYPTION_ENTRY_MISSING'
+        ));
     }
 
     public function testRefusesDrmProtectedBooks(): void
