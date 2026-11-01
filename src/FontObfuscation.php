@@ -23,6 +23,8 @@ final readonly class FontObfuscation
 
     public const string ADOBE = 'http://ns.adobe.com/pdf/enc#RC';
 
+    private const string ENCRYPTION_FILE = 'META-INF/encryption.xml';
+
     private const string ENCRYPTION_NAMESPACE = 'http://www.w3.org/2001/04/xmlenc#';
 
     private const string EMPTY_ENCRYPTION = '<?xml version="1.0" encoding="UTF-8"?>'
@@ -136,9 +138,9 @@ final readonly class FontObfuscation
             return;
         }
 
-        $xml = $exists ? $this->xmlParser->parse($file) : $this->xmlParser->parseString(self::EMPTY_ENCRYPTION, $file);
+        $xml = $exists ? $this->xmlParser->withName(self::ENCRYPTION_FILE)->parse($file) : $this->xmlParser->parseString(self::EMPTY_ENCRYPTION, self::ENCRYPTION_FILE);
         $root = dom_import_simplexml($xml);
-        $document = $root->ownerDocument ?? throw new Exception("Failed to update: {$file}");
+        $document = $root->ownerDocument ?? throw new Exception('Failed to update: ' . self::ENCRYPTION_FILE);
         $xpath = new DOMXPath($document);
         $xpath->registerNamespace('enc', self::ENCRYPTION_NAMESPACE);
 
@@ -165,7 +167,7 @@ final readonly class FontObfuscation
             $root->appendChild($this->encryptedData($document, $path, $algorithm));
         }
 
-        $this->xmlParser->save($xml, $file);
+        $this->xmlParser->withName(self::ENCRYPTION_FILE)->save($xml, $file);
     }
 
     private function firstElement(DOMXPath $xpath, string $expression, DOMElement $context): ?DOMElement

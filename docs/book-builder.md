@@ -72,6 +72,14 @@ public function open(): EpubFile;
 
 `fromMarkdown()` reads headings (ATX and setext), paragraphs, emphasis, strong text, `~~strikethrough~~`, code spans, fenced and indented code, block quotes, nested lists, thematic breaks, links, images, `<autolinks>`, hard line breaks and GFM tables. Headings get an id from their text (`# Chapter One` is `chapter-one`, repeats are numbered) or the one written as `{#id}`, so `[see](#chapter-one)` works, including across chapters.
 
+Footnotes are written as in Pandoc and GFM: `[^label]` cites a note, and `[^label]: text` on a line of its own defines it (indented lines continue it). Notes are numbered in the order they are first cited and become EPUB 3 notes that reading systems show as pop-ups: each citation is a superscript `<a epub:type="noteref" role="doc-noteref">` link, and each note an `<aside epub:type="footnote" role="doc-footnote">` at the end of the chapter that first cites it, with a link back. A later citation in another chapter links to that note. Notes that are never cited are left out, and `[^label]` without a definition stays as text.
+
+```markdown
+Darwin sailed in 1831.[^voyage]
+
+[^voyage]: On HMS *Beagle*, which returned in 1836.
+```
+
 Raw HTML in Markdown is **not** passed through: `<` and `&` are escaped, so `<script>` shows up as text. Use `fromHtml()` for HTML.
 
 Chapters start at headings up to `splitLevel`. Text before the first heading becomes a first chapter named after the book. The table of contents lists the chapters; the nav document and the NCX hold the same entries.

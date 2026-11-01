@@ -112,11 +112,11 @@ class ContentManager
         $fullPath = $this->paths->resolve($this->contentDirectory, $filePath);
         $directory = dirname($fullPath);
         if (! is_dir($directory) && ! @mkdir($directory, 0777, true) && ! is_dir($directory)) {
-            throw new Exception("Failed to create directory: {$directory}");
+            throw new Exception("Failed to create the directory for: {$filePath}");
         }
 
         if (@file_put_contents($fullPath, $content) === false) {
-            throw new Exception("Failed to add content to: {$fullPath}");
+            throw new Exception("Failed to add content to: {$filePath}");
         }
 
         $path = $this->paths->normalize($filePath);
@@ -144,11 +144,11 @@ class ContentManager
         $fullPath = $this->paths->resolve($this->contentDirectory, $filePath);
         // is_file(): a directory is not content (and reading one behaves differently per OS).
         if (! is_file($fullPath)) {
-            throw new Exception("Content file does not exist: {$fullPath}");
+            throw new Exception("Content file does not exist: {$filePath}");
         }
 
         if (@file_put_contents($fullPath, $newContent) === false) {
-            throw new Exception("Failed to update content in: {$fullPath}");
+            throw new Exception("Failed to update content in: {$filePath}");
         }
 
         $this->updateContentProperties($this->paths->normalize($filePath), $newContent);
@@ -167,14 +167,14 @@ class ContentManager
         $fullPath = $this->paths->resolve($this->contentDirectory, $filePath);
         // is_file(): a directory is not content (and reading one behaves differently per OS).
         if (! is_file($fullPath)) {
-            throw new Exception("Content file does not exist: {$fullPath}");
+            throw new Exception("Content file does not exist: {$filePath}");
         }
 
         // Remove links to the deleted file from other documents
         $this->removeReferencesTo($this->paths->normalize($filePath));
 
         if (! @unlink($fullPath)) {
-            throw new Exception("Failed to delete content from: {$fullPath}");
+            throw new Exception("Failed to delete content from: {$filePath}");
         }
 
         $item = $this->manifest?->findByPath($filePath);
@@ -286,7 +286,7 @@ class ContentManager
         $source = $this->paths->resolve($this->contentDirectory, $from);
         $target = $this->paths->resolve($this->contentDirectory, $to);
         if (! is_file($source)) {
-            throw new Exception("Content file does not exist: {$source}");
+            throw new Exception("Content file does not exist: {$from}");
         }
 
         $fromPath = $this->paths->normalize($from);
@@ -351,10 +351,10 @@ class ContentManager
         $fullPath = $this->paths->resolve($this->contentDirectory, $filePath);
         // is_file(): a directory is not content (and reading one behaves differently per OS).
         if (! is_file($fullPath)) {
-            throw new Exception("Content file does not exist: {$fullPath}");
+            throw new Exception("Content file does not exist: {$filePath}");
         }
 
-        return FileSystemHelper::readFile($fullPath) ?? throw new Exception("Failed to read content from: {$fullPath}");
+        return FileSystemHelper::readFile($fullPath) ?? throw new Exception("Failed to read content from: {$filePath}");
     }
 
     /**
@@ -653,7 +653,7 @@ class ContentManager
         }
 
         if ($changed) {
-            $xmlParser->save($encryption, $file);
+            $xmlParser->withName('META-INF/encryption.xml')->save($encryption, $file);
         }
     }
 

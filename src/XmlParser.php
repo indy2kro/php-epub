@@ -12,8 +12,26 @@ class XmlParser
     /**
      * @param int $maxBytes Largest document, in bytes, parse() and parseString() accept (no cap by default).
      */
+    /**
+     * The name error messages use for the file instead of its path (see withName()).
+     */
+    private ?string $name = null;
+
     public function __construct(public readonly int $maxBytes = PHP_INT_MAX)
     {
+    }
+
+    /**
+     * A copy of this parser (of the same class, with the same limit) whose parse() and save() name the file $name in
+     * their error messages instead of its path, e.g. the book-relative path of a file in an extracted book, so that
+     * messages do not reveal the extraction directory.
+     */
+    public function withName(string $name): static
+    {
+        $named = clone $this;
+        $named->name = $name;
+
+        return $named;
     }
 
     /**
@@ -28,19 +46,20 @@ class XmlParser
      */
     public function parse(string $filePath): SimpleXMLElement
     {
+        $name = $this->name ?? $filePath;
         if (! file_exists($filePath)) {
-            throw new XmlException("XML file not found: {$filePath}");
+            throw new XmlException("XML file not found: {$name}");
         }
 
         // Checked before reading, so an oversized document never gets into memory.
         $size = @filesize($filePath);
         if ($size !== false && $size > $this->maxBytes) {
-            throw new XmlException("XML file is larger than the limit of {$this->maxBytes} bytes: {$filePath}");
+            throw new XmlException("XML file is larger than the limit of {$this->maxBytes} bytes: {$name}");
         }
 
-        $content = FileSystemHelper::readFile($filePath) ?? throw new XmlException("Failed to read XML file: {$filePath}");
+        $content = FileSystemHelper::readFile($filePath) ?? throw new XmlException("Failed to read XML file: {$name}");
 
-        return $this->parseString($content, $filePath);
+        return $this->parseString($content, $name);
     }
 
     /**
@@ -106,7 +125,7 @@ class XmlParser
     {
         $result = @$xml->asXML($filePath);
         if ($result === false) {
-            throw new Exception("Failed to save XML file: {$filePath}");
+            throw new Exception('Failed to save XML file: ' . ($this->name ?? $filePath));
         }
     }
 }

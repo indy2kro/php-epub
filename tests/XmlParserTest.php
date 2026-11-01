@@ -195,4 +195,57 @@ final class XmlParserTest extends TestCase
         $this->expectExceptionMessage('Failed to save XML file:');
         $parser->save($xml, __DIR__ . DIRECTORY_SEPARATOR . 'nonexistent' . DIRECTORY_SEPARATOR . 'output.xml');
     }
+
+    public function testWithNameNamesTheFileInErrorsAndLeavesTheParserAsItIs(): void
+    {
+        $parser = new XmlParser(1000);
+        $named = $parser->withName('EPUB/package.opf');
+
+        $this->assertNotSame($parser, $named);
+        $this->assertSame(1000, $named->maxBytes);
+        $calls = [
+            fn () => $named->parse($this->invalidXmlFilePath),
+            static fn () => $named->save(new SimpleXMLElement('<root/>'), __DIR__ . DIRECTORY_SEPARATOR . 'nonexistent' . DIRECTORY_SEPARATOR . 'output.xml'),
+        ];
+        foreach ($calls as $call) {
+            try {
+                $call();
+                $this->fail('No exception was thrown.');
+            } catch (Exception $exception) {
+                $this->assertStringContainsString('EPUB/package.opf', $exception->getMessage());
+                $this->assertStringNotContainsString(__DIR__, $exception->getMessage());
+            }
+        }
+
+        $this->expectExceptionMessage($this->invalidXmlFilePath);
+        $parser->parse($this->invalidXmlFilePath);
+    }
+
+    public function testASubclassWithTheOriginalSignaturesKeepsWorkingThroughWithName(): void
+    {
+        // A subclass written against the original parse() and save() signatures still loads, and withName() keeps it.
+        $parser = new class extends XmlParser {
+            /** @var list<string> */
+            public array $calls = [];
+
+            public function parse(string $filePath): SimpleXMLElement
+            {
+                $this->calls[] = 'parse';
+
+                return parent::parse($filePath);
+            }
+
+            public function save(SimpleXMLElement $xml, string $filePath): void
+            {
+                $this->calls[] = 'save';
+                parent::save($xml, $filePath);
+            }
+        };
+
+        $named = $parser->withName('name.xml');
+        $named->save($named->parse($this->xmlFilePath), $this->outputXmlFilePath);
+
+        $this->assertInstanceOf($parser::class, $named);
+        $this->assertSame(['parse', 'save'], $named->calls);
+    }
 }

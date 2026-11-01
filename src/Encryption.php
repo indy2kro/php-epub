@@ -44,7 +44,7 @@ final readonly class Encryption
             return [];
         }
 
-        return self::entriesOf($this->xmlParser->parse($file));
+        return self::entriesOf($this->xmlParser->withName('META-INF/encryption.xml')->parse($file));
     }
 
     /**

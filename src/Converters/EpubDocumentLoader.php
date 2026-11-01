@@ -223,7 +223,7 @@ final class EpubDocumentLoader
     {
         $opfPath = (new Parser($this->xmlParser))->parse($root);
         $opfFile = $this->paths->resolve($root, $opfPath);
-        $opfXml = $this->xmlParser->parse($opfFile);
+        $opfXml = $this->xmlParser->withName($opfPath)->parse($opfFile);
 
         $metadata = new Metadata($opfXml, $opfFile);
         $manifest = new Manifest($opfXml, $opfPath);
