@@ -13,6 +13,7 @@ use PhpEpub\Converters\PdfConversionOptions;
 use PhpEpub\Exception;
 use PhpEpub\Test\Support\EpubBuilder;
 use PhpEpub\Test\Support\ExposedDompdfAdapter;
+use PhpEpub\Test\Support\RequiresGd;
 use PhpEpub\Util\FileSystemHelper;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -93,6 +94,7 @@ final class DompdfAdapterTest extends TestCase
 
     public function testSvgImagesAreRenderedWithTheImagesTheyReference(): void
     {
+        RequiresGd::check('for Dompdf to render raster images');
         $directory = TCPDFAdapterTest::svgBook()->writeTo($this->epubDirectory . '-svg');
 
         try {
@@ -166,6 +168,7 @@ final class DompdfAdapterTest extends TestCase
     }
     public function testACoverOutsideTheSpineBecomesTheFirstPage(): void
     {
+        RequiresGd::check('for Dompdf to render raster images');
         $directory = TCPDFAdapterTest::coverBook()->writeTo($this->epubDirectory . '-cover');
 
         try {

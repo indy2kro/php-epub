@@ -99,6 +99,21 @@ Pass `new PdfConversionOptions(allowFixedLayout: true)` to convert a fixed-layou
 
 Other adapters export plain text, a single HTML file and Markdown: see [Exporters](exporters.md).
 
+## Reading a book for your own renderer
+
+`EpubDocumentLoader::load()` is what the PDF adapters and the exporters use to read a book safely (see below). A custom adapter can use it too: it returns a `PhpEpub\Converters\EpubDocument`, a read-only value with the book's `title`, `authors`, `language` and `rightToLeft`; `chapters` (the sanitised `<body>` HTML of each spine document, in reading order) with the parallel lists `chapterTitles`, `chapterPaths`, `chapterLinear` and `tocTitles`; `styles` (the book's CSS, confined to the book); `coverImage` (an absolute path inside the book, or `""`); `contents` (a generated contents page when `PdfConversionOptions::$includeToc` asks for one); `outline` (the table of contents as nested `TocEntry` objects); and `directory`, the only directory a renderer may read files from.
+
+```php
+use PhpEpub\Converters\EpubDocumentLoader;
+use PhpEpub\Converters\PdfConversionOptions;
+
+$document = (new EpubDocumentLoader())->load('/path/to/extracted/epub', new PdfConversionOptions(maxChapters: 300));
+
+foreach ($document->chapters as $index => $html) {
+    echo $document->chapterTitles[$index], ': ', strlen($html), " bytes\n";
+}
+```
+
 ## How the PDF adapters read a book
 
 `DompdfAdapter` and `TCPDFAdapter` render every XHTML document in the **spine**, in reading order, each starting on a new page, and take the PDF title and author from the EPUB metadata. A directory that only contains a `content.xhtml` file (the layout older versions required) is still accepted.

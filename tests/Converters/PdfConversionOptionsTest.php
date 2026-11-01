@@ -14,6 +14,7 @@ use PhpEpub\Converters\PdfConversionOptions;
 use PhpEpub\Converters\TCPDFAdapter;
 use PhpEpub\Exception;
 use PhpEpub\Test\Support\EpubBuilder;
+use PhpEpub\Test\Support\RequiresGd;
 use PhpEpub\Util\FileSystemHelper;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -146,6 +147,7 @@ final class PdfConversionOptionsTest extends TestCase
     #[DataProvider('adapters')]
     public function testImageLimitAtTheBoundary(Closure $adapter): void
     {
+        RequiresGd::check('for the PDF engines to render raster images');
         $png = (string) base64_decode(EpubBuilder::PNG, true);
         $book = $this->book(
             2,

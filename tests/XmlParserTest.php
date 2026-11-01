@@ -196,6 +196,117 @@ final class XmlParserTest extends TestCase
         $parser->save($xml, __DIR__ . DIRECTORY_SEPARATOR . 'nonexistent' . DIRECTORY_SEPARATOR . 'output.xml');
     }
 
+    public function testSaveReplacesAFileWholeAndLeavesNoTemporaryFile(): void
+    {
+        $directory = dirname($this->outputXmlFilePath);
+        file_put_contents($this->outputXmlFilePath, str_repeat('old ', 1000));
+        chmod($this->outputXmlFilePath, 0640);
+        $mode = fileperms($this->outputXmlFilePath) & 0777;
+        $before = scandir($directory);
+
+        (new XmlParser())->save(new SimpleXMLElement('<root><element>New</element></root>'), $this->outputXmlFilePath);
+
+        $this->assertSame("<?xml version=\"1.0\"?>\n<root><element>New</element></root>\n", file_get_contents($this->outputXmlFilePath));
+        $this->assertSame($mode, fileperms($this->outputXmlFilePath) & 0777, 'the file keeps its permissions');
+        $this->assertSame($before, scandir($directory), 'no temporary file is left behind');
+    }
+
+    public function testSaveRefusesAReadOnlyFileAndLeavesItAsItWas(): void
+    {
+        file_put_contents($this->outputXmlFilePath, '<root>old</root>');
+        chmod($this->outputXmlFilePath, 0444);
+        $directory = dirname($this->outputXmlFilePath);
+        $before = scandir($directory);
+
+        try {
+            if (is_writable($this->outputXmlFilePath)) {
+                $this->markTestSkipped('The process can write read-only files (e.g. running as root).');
+            }
+
+            (new XmlParser())->save(new SimpleXMLElement('<root>new</root>'), $this->outputXmlFilePath);
+            $this->fail('No exception was thrown.');
+        } catch (Exception $exception) {
+            $this->assertStringContainsString('Failed to save XML file:', $exception->getMessage());
+        } finally {
+            chmod($this->outputXmlFilePath, 0644);
+        }
+
+        $this->assertSame('<root>old</root>', file_get_contents($this->outputXmlFilePath));
+        $this->assertSame($before, scandir($directory));
+    }
+
+    public function testSaveRefusesADirectory(): void
+    {
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('Failed to save XML file:');
+        (new XmlParser())->save(new SimpleXMLElement('<root/>'), dirname($this->outputXmlFilePath));
+    }
+
+    public function testSaveWritesInPlaceInADirectoryWhereNoFileCanBeCreated(): void
+    {
+        $directory = dirname($this->outputXmlFilePath) . DIRECTORY_SEPARATOR . 'read-only';
+        $file = $directory . DIRECTORY_SEPARATOR . 'file.xml';
+        mkdir($directory);
+        file_put_contents($file, '<root>old</root>');
+        chmod($directory, 0555);
+
+        try {
+            if (@touch($directory . DIRECTORY_SEPARATOR . 'probe')) {
+                @unlink($directory . DIRECTORY_SEPARATOR . 'probe');
+                $this->markTestSkipped('Files can be created in a read-only directory here (Windows, or running as root).');
+            }
+
+            (new XmlParser())->save(new SimpleXMLElement('<root>new</root>'), $file);
+
+            $this->assertSame("<?xml version=\"1.0\"?>\n<root>new</root>\n", file_get_contents($file));
+            $this->assertSame(['.', '..', 'file.xml'], scandir($directory));
+        } finally {
+            chmod($directory, 0755);
+            @unlink($file);
+            @rmdir($directory);
+        }
+    }
+
+    public function testSaveWritesThroughASymbolicLink(): void
+    {
+        $directory = dirname($this->outputXmlFilePath);
+        $target = $directory . DIRECTORY_SEPARATOR . 'target.xml';
+        $link = $directory . DIRECTORY_SEPARATOR . 'link.xml';
+        file_put_contents($target, '<root>old</root>');
+        if (! @symlink($target, $link)) {
+            unlink($target);
+            $this->markTestSkipped('Symbolic links cannot be created here.');
+        }
+
+        try {
+            (new XmlParser())->save(new SimpleXMLElement('<root>new</root>'), $link);
+
+            $this->assertTrue(is_link($link), 'the link stays a link');
+            $this->assertSame("<?xml version=\"1.0\"?>\n<root>new</root>\n", file_get_contents($target));
+            $this->assertSame([], glob($directory . DIRECTORY_SEPARATOR . '.xml-*') ?: [], 'no temporary file is left behind');
+        } finally {
+            @unlink($link);
+            @unlink($target);
+        }
+    }
+
+    public function testSaveRefusesADanglingSymbolicLink(): void
+    {
+        $link = dirname($this->outputXmlFilePath) . DIRECTORY_SEPARATOR . 'dangling.xml';
+        if (! @symlink(dirname($this->outputXmlFilePath) . DIRECTORY_SEPARATOR . 'missing.xml', $link)) {
+            $this->markTestSkipped('Symbolic links cannot be created here.');
+        }
+
+        try {
+            $this->expectException(Exception::class);
+            $this->expectExceptionMessage('Failed to save XML file:');
+            (new XmlParser())->save(new SimpleXMLElement('<root/>'), $link);
+        } finally {
+            @unlink($link);
+            $this->assertFileDoesNotExist(dirname($this->outputXmlFilePath) . DIRECTORY_SEPARATOR . 'missing.xml');
+        }
+    }
+
     public function testWithNameNamesTheFileInErrorsAndLeavesTheParserAsItIs(): void
     {
         $parser = new XmlParser(1000);

@@ -14,18 +14,6 @@ class FileSystemHelper
     }
 
     /**
-     * @param array<int, mixed> $output
-     */
-    /**
-     * @param array<int, mixed> $output
-     * @param-out list<string> $output
-     */
-    public function exec(string $command, array &$output, int &$returnVar): void
-    {
-        exec($command, $output, $returnVar);
-    }
-
-    /**
      * Runs a program without a shell and waits for it, up to $timeout seconds.
      *
      * Arguments are passed to the program as they are (nothing is interpreted by a shell),

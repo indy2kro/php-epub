@@ -35,7 +35,12 @@ final class TextEncodingTest extends TestCase
             $html,
         ];
         yield 'declared ISO-8859-1' => [sprintf($declaration, 'ISO-8859-1') . "<p>caf\xE9</p>", '<p>café</p>'];
-        yield 'declared alias only iconv knows' => [sprintf($declaration, 'latin1') . "<p>caf\xE9</p>", '<p>café</p>'];
+        yield 'declared alias of a known encoding' => [sprintf($declaration, 'latin1') . "<p>caf\xE9</p>", '<p>café</p>'];
+        // Transfer encodings and auto (detection) are not character sets: the document stays as it is, and escaped markup must not become elements before sanitising.
+        foreach (['HTML-ENTITIES', 'html', 'BASE64', 'Quoted-Printable', 'qprint', 'UUENCODE', 'auto'] as $pseudo) {
+            $document = sprintf($declaration, $pseudo) . '<p>&lt;script&gt;x&lt;/script&gt;</p>';
+            yield "declared pseudo-encoding {$pseudo}" => [$document, $document];
+        }
         yield 'declared unknown encoding' => [sprintf($declaration, 'x-unknown') . '<p>text</p>', sprintf($declaration, 'x-unknown') . '<p>text</p>'];
     }
 }

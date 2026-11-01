@@ -32,9 +32,23 @@ final class EpubCheckTest extends TestCase
 {
     private string $tmpDir;
 
+    /**
+     * The number of test cases started so far, which assigns each case to a shard.
+     */
+    private static int $started = 0;
+
+    /**
+     * The EPUBCheck error codes of the real-world fixtures, which several tests compare against.
+     *
+     * @var array<string, list<string>>
+     */
+    private static array $fixtureCodes = [];
+
     protected function setUp(): void
     {
         $this->tmpDir = __DIR__ . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'tmp' . DIRECTORY_SEPARATOR . 'epubcheck';
+        // After $tmpDir is set: tearDown() also runs for a skipped case.
+        $this->skipOtherShards();
         if (! is_dir($this->tmpDir)) {
             mkdir($this->tmpDir, 0777, true);
         }
@@ -107,7 +121,7 @@ final class EpubCheckTest extends TestCase
         $reopened->cleanup();
 
         $this->assertSame([], array_values(array_diff($after, $before)), 'validate() reports new problems after saving.');
-        $this->assertSame([], array_values(array_diff($this->epubCheckCodes($saved), $this->epubCheckCodes($fixture))), 'EPUBCheck reports new problems after saving.');
+        $this->assertSame([], array_values(array_diff($this->epubCheckCodes($saved), $this->fixtureCodes($fixture))), 'EPUBCheck reports new problems after saving.');
     }
 
     /**
@@ -132,7 +146,7 @@ final class EpubCheckTest extends TestCase
 
         $this->assertSame([], array_values(array_diff($after, $before)), 'validate() reports new problems after repairing.');
         $this->assertSame([], array_values(array_intersect($after, $fixed)), 'A fixed problem is still reported.');
-        $this->assertSame([], array_values(array_diff($this->epubCheckCodes($saved), $this->epubCheckCodes($fixture))), 'EPUBCheck reports new problems after repairing.');
+        $this->assertSame([], array_values(array_diff($this->epubCheckCodes($saved), $this->fixtureCodes($fixture))), 'EPUBCheck reports new problems after repairing.');
     }
 
     /**
@@ -159,7 +173,7 @@ final class EpubCheckTest extends TestCase
 
         $this->assertSame([], array_values(array_diff($after, $before)), 'validate() reports new problems after compressing.');
         $this->assertLessThanOrEqual((int) filesize($fixture), (int) filesize($compressed), 'The compressed book is larger.');
-        $this->assertSame([], array_values(array_diff($this->epubCheckCodes($compressed), $this->epubCheckCodes($fixture))), 'EPUBCheck reports new problems after compressing.');
+        $this->assertSame([], array_values(array_diff($this->epubCheckCodes($compressed), $this->fixtureCodes($fixture))), 'EPUBCheck reports new problems after compressing.');
     }
 
     /**
@@ -242,7 +256,7 @@ final class EpubCheckTest extends TestCase
     {
         $original = EpubFile::open($fixture);
         $before = self::codes($original->validate());
-        $expected = $this->epubCheckCodes($fixture);
+        $expected = $this->fixtureCodes($fixture);
 
         $paths = (new Splitter())->split($original, SplitPlan::everySpineItems(4), $this->tmpDir . DIRECTORY_SEPARATOR . 'parts');
         $original->cleanup();
@@ -457,6 +471,37 @@ final class EpubCheckTest extends TestCase
         }
 
         $this->assertSame(0, $result['exitCode'], "EPUBCheck reported errors:\n" . implode("\n", $result['output']));
+    }
+
+    /**
+     * EPUBCHECK_SHARD ("2/3": the second of three) runs every third case, counted in run order, so that CI can
+     * check the books in parallel jobs; the order is the same in every job, and mixing the scenarios balances them.
+     */
+    private function skipOtherShards(): void
+    {
+        $index = self::$started++;
+        $shard = getenv('EPUBCHECK_SHARD');
+        if ($shard === false || $shard === '') {
+            return;
+        }
+
+        if (preg_match('#^(\d+)/(\d+)$#', $shard, $match) !== 1 || (int) $match[1] < 1 || (int) $match[1] > (int) $match[2]) {
+            $this->fail("EPUBCHECK_SHARD must be like 1/3, not: {$shard}");
+        }
+
+        if ($index % (int) $match[2] !== (int) $match[1] - 1) {
+            $this->markTestSkipped("Checked in another EPUBCheck shard than {$shard}.");
+        }
+    }
+
+    /**
+     * The EPUBCheck error codes of a real-world fixture, checked once per run (the fixtures do not change).
+     *
+     * @return list<string>
+     */
+    private function fixtureCodes(string $fixture): array
+    {
+        return self::$fixtureCodes[$fixture] ??= $this->epubCheckCodes($fixture);
     }
 
     /**

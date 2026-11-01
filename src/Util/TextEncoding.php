@@ -10,10 +10,19 @@ namespace PhpEpub\Util;
  * EPUB content documents are UTF-8 or UTF-16, so the encoding is taken from the byte order mark,
  * else from the XML declaration. The conversion needs mbstring or iconv, both optional; without
  * either (or for an encoding neither knows) the bytes are returned as they are, as if they were UTF-8.
+ *
+ * @internal
  */
 final class TextEncoding
 {
     private const string UTF8_BOM = "\xEF\xBB\xBF";
+
+    /**
+     * mbstring's pseudo-encodings and their aliases (lower case), and auto (detection): none of them is a character set.
+     * HTML-ENTITIES would decode escaped markup into elements before the document is parsed and sanitised, and
+     * PHP 8.2 deprecates most of them.
+     */
+    private const array PSEUDO_ENCODINGS = ['html-entities', 'html', 'base64', 'uuencode', 'quoted-printable', 'qprint', '7bit', '8bit', 'binary', 'auto'];
 
     /**
      * The content as UTF-8: without a byte order mark and, when it had to be converted, without the
@@ -50,15 +59,28 @@ final class TextEncoding
     }
 
     /**
-     * @return string|null The UTF-8 text, or null when no extension can convert from $encoding.
+     * @return string|null The UTF-8 text, or null when no extension can convert from $encoding or it is not a
+     *                     character set (see PSEUDO_ENCODINGS).
      */
     private static function convert(string $content, string $encoding): ?string
     {
-        if (function_exists('mb_convert_encoding') && in_array(strtolower($encoding), array_map(strtolower(...), mb_list_encodings()), true)) {
-            $converted = mb_convert_encoding($content, 'UTF-8', $encoding);
-        } else {
-            $converted = function_exists('iconv') ? @iconv($encoding, 'UTF-8', $content) : false;
+        if (in_array(strtolower($encoding), self::PSEUDO_ENCODINGS, true)) {
+            return null;
         }
+
+        if (function_exists('mb_convert_encoding')) {
+            try {
+                // mbstring knows the aliases (latin1) too; an encoding it does not know is a ValueError.
+                $converted = mb_convert_encoding($content, 'UTF-8', $encoding);
+                if ($converted !== false) {
+                    return $converted;
+                }
+            } catch (\ValueError) {
+                // Left to iconv.
+            }
+        }
+
+        $converted = function_exists('iconv') ? @iconv($encoding, 'UTF-8', $content) : false;
 
         return $converted === false ? null : $converted;
     }

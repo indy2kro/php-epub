@@ -55,10 +55,10 @@ $options = new CleanupOptions(
 - **`removeStrayFiles`**: removes files that are not in the manifest and not needed. `mimetype`, `META-INF/`, the package document and files a reachable document refers to are kept; a book with several rootfiles (renditions) is left alone.
 - **`stripScripts`**: removes `<script>` elements, inline event-handler attributes (`onclick`, ...) and `javascript:` URLs from XHTML and SVG documents, and updates the `scripted` manifest properties.
 - **`removeRemoteReferences`**: removes images, media, stylesheets and other resources loaded from `http(s)` URLs (and CSS `@import` rules and `url()` declarations that point there), and updates the `remote-resources` properties. Links (`<a href>`) are kept.
-- **`removeUnusedFonts`**: removes font files no reachable document or stylesheet refers to (and their `encryption.xml` entries).
+- **`removeUnusedFonts`**: removes font files no reachable document or stylesheet refers to (and their `encryption.xml` entries). A font whose entry cannot be removed (an `encryption.xml` that cannot be written) is kept, and the action's `note` lists it.
 - **`recompressImages`** with `maxImageWidth`, `maxImageHeight`, `jpegQuality` and `convertOpaquePngToJpeg`: images are never scaled up, and the original is kept when the result is not smaller. Animated PNG, GIF, SVG, CMYK JPEG and JPEG with an EXIF orientation are left alone. Converting a PNG renames the file and updates the manifest and every reference (`src`, `href`, `srcset`, CSS `url()`); it is not done when a document cannot be parsed, since its references could not be rewritten. The displayed size of an image is set by the document, so scaling an image down does not change the layout.
 - **`maxDeflate`**: `compress()` writes the archive at deflate level 9 without directory entries.
-- **`dryRun`**: nothing is changed or written; the report says what would happen.
+- **`dryRun`**: nothing is changed or written; the report says what would happen. `$options->withDryRun()` returns a copy of any options (a preset, say) with it set.
 
 The actions run in this order: scripts, remote references, unused fonts, unreferenced files, stray files, images.
 

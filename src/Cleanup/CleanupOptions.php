@@ -78,6 +78,9 @@ final readonly class CleanupOptions
         };
     }
 
+    /**
+     * The same options, with dryRun set: nothing is changed or written, and the report says what would happen.
+     */
     public function withDryRun(bool $dryRun = true): self
     {
         return new self(

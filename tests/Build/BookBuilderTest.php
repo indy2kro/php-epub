@@ -13,6 +13,7 @@ use PhpEpub\Build\BuiltBook;
 use PhpEpub\BuildException;
 use PhpEpub\EpubFile;
 use PhpEpub\Test\Support\EpubBuilder;
+use PhpEpub\Test\Support\RequiresGd;
 use PhpEpub\Util\FileSystemHelper;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -685,11 +686,15 @@ MD;
             return (string) base64_decode(EpubBuilder::PNG, true);
         }
 
+        RequiresGd::check('to draw test images');
+
         return self::image($width, $height, imagepng(...));
     }
 
     private static function jpeg(int $width, int $height): string
     {
+        RequiresGd::check('to draw test images');
+
         return self::image($width, $height, imagejpeg(...));
     }
 

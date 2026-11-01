@@ -176,13 +176,24 @@ final readonly class Cleanup
         $directory = $this->directory();
         $manifest = $this->book->getManifest();
         $files = [];
+        $kept = [];
         $before = 0;
         foreach ($paths as $path) {
+            $algorithm = $this->forgetEncryption($path);
+            if ($algorithm === false) {
+                // Removing the file would leave encryption.xml naming a file that is not there.
+                $kept[] = $path;
+                continue;
+            }
+
             $file = $this->paths->resolve($directory, $path);
             $size = is_file($file) ? (int) filesize($file) : 0;
             if (is_file($file) && ! @unlink($file)) {
-                // The file vanished or is locked between the check and the delete.
-                throw new Exception("Failed to delete: {$path}"); // @codeCoverageIgnore
+                // The file cannot be deleted (locked, read-only): it stays, so it is listed in encryption.xml again and
+                // still read de-obfuscated. Should that write fail too, its exception is the one reported.
+                is_string($algorithm) && (new FontObfuscation($directory, $this->xmlParser))->setAlgorithm($path, $algorithm);
+
+                throw new Exception("Failed to delete: {$path}");
             }
 
             foreach ($manifest->getItems() as $item) {
@@ -191,14 +202,15 @@ final readonly class Cleanup
                 }
             }
 
-            $this->forgetEncryption($path);
             $files[] = $path;
             $before += $size;
         }
 
         sort($files, SORT_STRING);
+        sort($kept, SORT_STRING);
+        $note = $kept === [] ? '' : 'Kept because META-INF/encryption.xml could not be updated: ' . implode(', ', $kept);
 
-        return new CleanupAction($name, $files, $before, 0);
+        return new CleanupAction($name, $files, $before, 0, $files === [] && $kept !== [], $note);
     }
 
     private function removeStrayFiles(ReferenceAnalysis $analysis): CleanupAction
@@ -343,16 +355,27 @@ final readonly class Cleanup
         return count($container->xpath('//c:rootfile') ?: []) !== 1;
     }
 
-    private function forgetEncryption(string $path): void
+    /**
+     * Removes the encryption.xml entry of a file that is about to be removed.
+     *
+     * @return string|false|null The obfuscation algorithm whose entry was removed (to list the file again if it cannot be deleted), null
+     *                           when the file had none, or false when the entry exists but cannot be removed
+     *                           (encryption.xml cannot be read or written): the file must then stay, and
+     *                           encryption.xml is left as it is.
+     */
+    private function forgetEncryption(string $path): string|false|null
     {
-        $directory = $this->directory();
+        $obfuscation = new FontObfuscation($this->directory(), $this->xmlParser);
         try {
-            if (isset((new FontObfuscation($directory, $this->xmlParser))->obfuscatedFonts()[$path])) {
-                (new FontObfuscation($directory, $this->xmlParser))->setAlgorithm($path, null);
+            $algorithm = $obfuscation->obfuscatedFonts()[$path] ?? null;
+            if ($algorithm !== null) {
+                $obfuscation->setAlgorithm($path, null);
             }
         } catch (Exception) {
-            // A damaged encryption.xml is left as it is.
+            return false;
         }
+
+        return $algorithm;
     }
 
     private function pruneEmptyDirectories(string $directory): void
