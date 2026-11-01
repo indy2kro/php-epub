@@ -69,7 +69,10 @@ final class MetadataSettersTest extends TestCase
 
         $this->assertSame('0306406152', $metadata->getIsbn());
         $this->assertCount(2, $metadata->getIdentifiers());
-        $this->assertSame(1, substr_count((string) file_get_contents($this->opfPath), 'identifier-type'));
+        $opf = (string) file_get_contents($this->opfPath);
+        $this->assertSame(1, substr_count($opf, 'identifier-type'));
+        // An ISBN-10 is ONIX code 02; 15 is for an ISBN-13.
+        $this->assertMatchesRegularExpression('#property="identifier-type" scheme="onix:codelist5">02</#', $opf);
     }
 
     public function testSetIsbnRejectsAnInvalidIsbn(): void
@@ -78,6 +81,40 @@ final class MetadataSettersTest extends TestCase
 
         $this->expectException(Exception::class);
         $metadata->setIsbn('9780306406158');
+    }
+
+    public function testSetIsbnRejectsA13DigitValueOutsideTheIsbnPrefixes(): void
+    {
+        $metadata = $this->load('3.0');
+
+        // The check digit is valid, but 000 is not an ISBN prefix (978, 979).
+        $this->expectException(Exception::class);
+        $metadata->setIsbn('0000000000000');
+    }
+
+    public function testSetSubtitleReplacesAndRemovesEverySubtitle(): void
+    {
+        $twoSubtitles = '<dc:title id="m">Book</dc:title><dc:title id="s1">One</dc:title><dc:title id="s2">Two</dc:title>'
+            . '<meta refines="#s1" property="title-type">subtitle</meta><meta refines="#s2" property="title-type">subtitle</meta>';
+
+        $metadata = $this->load('3.0', '', $twoSubtitles);
+        $metadata->setSubtitle('New');
+        $this->assertSame(['Book', 'New'], $metadata->getTitles());
+        $this->assertSame('New', $metadata->getSubtitle());
+
+        $metadata = $this->load('3.0', '', $twoSubtitles);
+        $metadata->setSubtitle(null);
+        $metadata = $this->reload($metadata);
+        $this->assertNull($metadata->getSubtitle());
+        $this->assertSame(['Book'], $metadata->getTitles());
+    }
+
+    public function testSetSubtitleDoesNotRemoveTheOnlyTitle(): void
+    {
+        $metadata = $this->load('3.0', '', '<dc:title id="s">Only</dc:title><meta refines="#s" property="title-type">subtitle</meta>');
+
+        $this->expectException(Exception::class);
+        $metadata->setSubtitle(null);
     }
 
     public function testSetSubtitleAddsARefinedTitleAndMarksTheMainTitle(): void

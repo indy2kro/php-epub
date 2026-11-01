@@ -21,20 +21,23 @@ trait InteractsWithTitle
     }
 
     /**
-     * Sets the subtitle: a dc:title refined with title-type "subtitle", which replaces the previous subtitle;
-     * null removes it. The main title is refined as "main" when no title is, so reading systems can tell
+     * Sets the subtitle: a dc:title refined with title-type "subtitle", which replaces every previous subtitle;
+     * null removes them all. The main title is refined as "main" when no title is, so reading systems can tell
      * the two apart. Subtitles need EPUB 3 refinements: upgrade an EPUB 2 book with upgradeToEpub3() first.
      *
-     * @throws Exception If the book is EPUB 2, or the subtitle is empty or not valid XML text.
+     * @throws Exception If the book is EPUB 2, the subtitle is empty or not valid XML text, or removing the subtitles
+     *                   would leave the book without a title.
      */
     public function setSubtitle(?string $subtitle): void
     {
         $this->isEpub3() || throw new Exception('Subtitles need EPUB 3 title-type refinements: call upgradeToEpub3() first');
-        $existing = $this->subtitleElement();
+        $existing = $this->subtitleElements();
 
         if ($subtitle === null) {
-            if ($existing instanceof SimpleXMLElement) {
-                $this->removeElement($existing);
+            count($this->dcElements('title')) > count($existing)
+                || throw new Exception('dc:title cannot be empty: every EPUB package needs one, so the only titles cannot be removed');
+            foreach ($existing as $element) {
+                $this->removeElement($element);
                 $this->modified = true;
             }
 
@@ -44,9 +47,14 @@ trait InteractsWithTitle
         trim($subtitle) !== '' || throw new Exception('The subtitle cannot be empty: pass null to remove it');
         XmlText::assertValid($subtitle);
 
-        if ($existing instanceof SimpleXMLElement) {
-            $this->setText($existing, $subtitle);
-            $this->removeProperties($existing, ['file-as']);
+        if ($existing !== []) {
+            $first = array_shift($existing);
+            $this->setText($first, $subtitle);
+            $this->removeProperties($first, ['file-as']);
+            foreach ($existing as $element) {
+                $this->removeElement($element);
+            }
+
             $this->modified = true;
 
             return;
@@ -64,13 +72,18 @@ trait InteractsWithTitle
 
     private function subtitleElement(): ?SimpleXMLElement
     {
-        foreach ($this->dcElements('title') as $element) {
-            if ($this->refinementValue($element, 'title-type') === 'subtitle') {
-                return $element;
-            }
-        }
+        return $this->subtitleElements()[0] ?? null;
+    }
 
-        return null;
+    /**
+     * @return list<SimpleXMLElement>
+     */
+    private function subtitleElements(): array
+    {
+        return array_values(array_filter(
+            $this->dcElements('title'),
+            fn (SimpleXMLElement $element): bool => $this->refinementValue($element, 'title-type') === 'subtitle'
+        ));
     }
 
     /**

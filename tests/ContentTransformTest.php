@@ -108,6 +108,27 @@ final class ContentTransformTest extends TestCase
         $this->assertNotContains('EPUB/text/two.xhtml', $seen);
     }
 
+    public function testRefusesADrmProtectedBook(): void
+    {
+        $epub = $this->open($this->book()->withFile('META-INF/license.lcpl', '{}'));
+
+        $this->expectException(\PhpEpub\Exception::class);
+        $this->expectExceptionMessage('DRM-protected');
+        $epub->getContentManager()->transform(static fn (DOMDocument $document, string $path): bool => true);
+    }
+
+    public function testRefusesDocumentsOverTheXmlSizeLimitInsteadOfSkippingThem(): void
+    {
+        // Within maxHtmlBytes but over the XML cap: an incomplete run must not look complete.
+        $big = EpubBuilder::xhtml('Two', '<p class="old">' . str_repeat('Two ', 2000) . '</p>');
+        $path = $this->book()->withFile('EPUB/text/two.xhtml', $big)->buildEpub($this->tmpDir . '/xml-limited.epub');
+        $epub = EpubFile::open($path, limits: new Limits(maxXmlBytes: 4000));
+
+        $this->expectException(InvalidEpubException::class);
+        $this->expectExceptionMessage('XML limit');
+        $epub->getContentManager()->transform(static fn (DOMDocument $document, string $path): bool => false);
+    }
+
     public function testRefusesDocumentsOverTheHtmlSizeLimit(): void
     {
         $path = $this->book()->buildEpub($this->tmpDir . '/limited.epub');

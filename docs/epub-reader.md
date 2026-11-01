@@ -117,13 +117,18 @@ use PhpEpub\Limits;
 
 $reader = EpubReader::open($uploadedPath, Limits::web());
 $cover = $reader->getCoverImage();
-if ($cover !== null) {
+// The media type is what the book declares. Serve only raster images: an SVG "cover" can carry a script.
+if ($cover !== null && in_array($cover->mediaType, ['image/jpeg', 'image/png', 'image/gif', 'image/webp'], true)) {
     header('Content-Type: ' . $cover->mediaType);
+    header('X-Content-Type-Options: nosniff');
+    header("Content-Security-Policy: default-src 'none'; sandbox");
     $output = fopen('php://output', 'wb');
     $reader->copyContentTo($cover->path, $output, 5 * 1024 * 1024);
     fclose($output);
 }
 ```
+
+Everything in an uploaded book is untrusted, including the media types its manifest declares. When you serve its files from your own origin, serve only types that cannot run script (or re-encode images), send `X-Content-Type-Options: nosniff` and a restrictive `Content-Security-Policy`, or use a separate origin for book files.
 
 ## Read-only
 

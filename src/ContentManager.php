@@ -382,7 +382,8 @@ class ContentManager
      * application/xhtml+xml (the navigation document included), or, without a manifest, the .xhtml, .html and .htm
      * files; in path order. Each is parsed safely (see XmlParser) and given to $change with its path; when $change
      * returns true, the document is saved with updateContent(), which keeps the manifest properties in step.
-     * Documents that are not well-formed XML (or are encrypted) are skipped: validate() reports them.
+     * Documents that are not well-formed XML are skipped: validate() reports them. A DRM-protected book is refused,
+     * since its encrypted documents must not be rewritten.
      *
      * An exception thrown by $change stops the run; documents changed before it stay changed.
      *
@@ -391,11 +392,15 @@ class ContentManager
      *
      * @return list<string> The paths of the documents that were written.
      *
-     * @throws InvalidEpubException If a document is larger than the size limit (see Limits::$maxHtmlBytes).
-     * @throws Exception If a path leaves the book, or a document cannot be read or written.
+     * @throws InvalidEpubException If a document is larger than a size limit (Limits::$maxHtmlBytes or the XML cap).
+     * @throws Exception If the book is DRM-protected, a path leaves the book, or a document cannot be read or written.
      */
     public function transform(callable $change, ?array $paths = null): array
     {
+        // isDrmProtected() also holds for an encryption.xml that cannot be read, so nothing encrypted slips through.
+        (new Encryption($this->contentDirectory, $this->xmlParser, $this->paths))->isDrmProtected()
+            && throw new Exception('The book is DRM-protected, so its documents cannot be transformed.');
+
         $only = $paths === null ? null : array_flip(array_map($this->paths->normalize(...), $paths));
         $documents = [];
         if ($this->manifest instanceof Manifest) {
@@ -422,8 +427,13 @@ class ContentManager
                 continue;
             }
 
+            $markup = $this->getMarkup($path);
+            // A size-limit failure is not a malformed document: it must not be skipped silently.
+            strlen($markup) <= $this->xmlParser->maxBytes
+                || throw new InvalidEpubException("Document is larger than the XML limit of {$this->xmlParser->maxBytes} bytes: {$path}");
+
             try {
-                $root = dom_import_simplexml($this->xmlParser->parseString($this->getMarkup($path), $path));
+                $root = dom_import_simplexml($this->xmlParser->parseString($markup, $path));
             } catch (XmlException) {
                 continue;
             }

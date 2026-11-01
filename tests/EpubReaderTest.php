@@ -407,6 +407,24 @@ final class EpubReaderTest extends TestCase
         $reader->copyContentTo('EPUB/text/chapter.xhtml', $readOnly);
     }
 
+    public function testCopyingContentFinishesShortWrites(): void
+    {
+        $content = random_bytes(50_000);
+        $reader = EpubReader::open(EpubBuilder::epub3()->withFile('EPUB/data.bin', $content)->buildEpub($this->workDir . '/book.epub'));
+        stream_wrapper_register('shortwrite', \PhpEpub\Test\Support\ShortWriteStream::class);
+
+        try {
+            $stream = fopen('shortwrite://out', 'wb');
+            $this->assertIsResource($stream);
+            $this->assertSame(50_000, $reader->copyContentTo('EPUB/data.bin', $stream));
+            fclose($stream);
+        } finally {
+            stream_wrapper_unregister('shortwrite');
+        }
+
+        $this->assertSame($content, \PhpEpub\Test\Support\ShortWriteStream::$written);
+    }
+
     public function testCopyingContentFailsOnceTheReaderIsClosed(): void
     {
         $reader = EpubReader::open(EpubBuilder::epub3()->buildEpub($this->workDir . '/book.epub'));

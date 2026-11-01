@@ -501,9 +501,13 @@ final class EpubReader
             static fn (string $name, int $cap): InvalidEpubException => new InvalidEpubException("File is larger than {$cap} bytes: {$name}"),
             static fn (string $name): InvalidEpubException => new InvalidEpubException("Content file does not exist: {$name}"),
             static function (string $chunk) use ($stream, $path, &$copied): void {
-                $written = @fwrite($stream, $chunk);
-                $written === strlen($chunk) || throw new Exception("Failed to write {$path} to the stream.");
-                $copied += $written;
+                // A stream (a socket, say) may take part of a chunk: write the rest until it stops making progress.
+                while ($chunk !== '') {
+                    $written = @fwrite($stream, $chunk);
+                    is_int($written) && $written > 0 || throw new Exception("Failed to write {$path} to the stream.");
+                    $copied += $written;
+                    $chunk = substr($chunk, $written);
+                }
             }
         );
 
