@@ -853,13 +853,29 @@ final class RepairerTest extends TestCase
         $this->assertSame([], array_values(array_filter($this->codes($epub->validate()), static fn (string $code): bool => $code === 'CONTENT_REFERENCE_MISSING')));
     }
 
-    public function testLeavesDocumentsThatUseXmlBaseAlone(): void
+    public function testLeavesReferencesUnderXmlBaseAloneAndRepairsTheRest(): void
     {
         $body = '<svg xmlns="http://www.w3.org/2000/svg" xml:base="../images/"><image href="cover.png" width="10" height="10"/></svg>'
             . '<p><a href="gone.xhtml">Missing</a></p>';
         $book = EpubBuilder::epub3()
             ->withFile('EPUB/images/cover.png', 'png')
             ->withFile('EPUB/text/chapter.xhtml', EpubBuilder::xhtml('Chapter', $body));
+        $epub = $this->open($book);
+
+        $this->assertSame(['CONTENT_REFERENCE_MISSING'], $this->fixCodes($epub->repair(RepairOptions::only(RepairFix::ContentReferences))));
+        $chapter = $epub->getContentManager()->getContent('EPUB/text/chapter.xhtml');
+        $this->assertStringContainsString('<image href="cover.png"', $chapter);
+        $this->assertStringNotContainsString('gone.xhtml', $chapter);
+        $this->assertStringContainsString('Missing', $chapter);
+    }
+
+    public function testLeavesDocumentsWithAnHtmlBaseAlone(): void
+    {
+        $body = '<p><img src="cover.png" alt="cover"/><a href="gone.xhtml">Missing</a></p>';
+        $chapter = str_replace('<head>', '<head><base href="../images/"/>', EpubBuilder::xhtml('Chapter', $body));
+        $book = EpubBuilder::epub3()
+            ->withFile('EPUB/images/cover.png', 'png')
+            ->withFile('EPUB/text/chapter.xhtml', $chapter);
         $epub = $this->open($book);
         $before = $epub->getContentManager()->getContent('EPUB/text/chapter.xhtml');
 

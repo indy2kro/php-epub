@@ -44,6 +44,16 @@ final class LinkRemoverTest extends TestCase
             . '<div xml:base="../images/"><img src="b.png" alt=""/></div></body></html>', ['EPUB/b.png' => true]));
     }
 
+    public function testOnlyTheSubtreeOfAnXmlBaseIsLeftAlone(): void
+    {
+        $result = (new LinkRemover())->remove('EPUB/a.xhtml', '<html xmlns="http://www.w3.org/1999/xhtml"><body>'
+            . '<div xml:base="../images/"><img src="b.png" alt="kept"/></div><p><img src="b.png" alt="removed"/></p></body></html>', ['EPUB/b.png' => true]);
+
+        $this->assertNotNull($result);
+        $this->assertStringContainsString('alt="kept"', $result);
+        $this->assertStringNotContainsString('alt="removed"', $result);
+    }
+
     public function testFindsReferencesInAUtf16Document(): void
     {
         $xml = '<?xml version="1.0" encoding="UTF-16"?><html xmlns="http://www.w3.org/1999/xhtml"><body><p><a href="b.xhtml">B</a></p></body></html>';

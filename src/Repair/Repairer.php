@@ -234,8 +234,17 @@ final class Repairer
             $content = $this->epub->getContentManager()->getContent($path);
             $parsed = dom_import_simplexml($this->xmlParser->parseString($content, $path));
             $document = $parsed->ownerDocument ?? throw new Exception("Cannot read the parsed content document: {$path}");
+            if (LinkRemover::hasBaseUrl($document)) {
+                continue;
+            }
+
+            // References under xml:base resolve elsewhere: LinkRemover leaves them, so they are not collected either.
             $targets = [];
             foreach ($document->getElementsByTagName('*') as $element) {
+                if (LinkRemover::isUnderXmlBase($element)) {
+                    continue;
+                }
+
                 $name = strtolower($element->localName ?? '');
                 foreach ($element->attributes ?? [] as $attribute) {
                     $attributeName = strtolower($attribute->localName ?? '');

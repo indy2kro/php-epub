@@ -67,13 +67,13 @@ final readonly class LinkRemover
 
         $document = $root->ownerDocument ?? new DOMDocument();
 
-        // xml:base and an HTML <base href> resolve references against another location, which target() does not
-        // follow: such a document is left as it is rather than risk removing references that are valid.
-        $xpath = new \DOMXPath($document);
-        if ($xpath->evaluate("count(//@xml:base) + count(//*[local-name() = 'base'][@href])") > 0) {
+        // An HTML <base href> resolves every reference of the document against another location, which target() does
+        // not follow: such a document is left as it is rather than risk removing references that are valid.
+        if (self::hasBaseUrl($document)) {
             return null;
         }
 
+        // xml:base does the same for its own subtree only: those elements are left alone, the rest is handled.
         $changed = false;
 
         // Elements with href attribute (a, area, link, base, and SVG 2 image and use)
@@ -92,7 +92,7 @@ final readonly class LinkRemover
         $posterElements = ['video'];
 
         foreach (iterator_to_array($document->getElementsByTagName('*')) as $element) {
-            if (! $element->parentNode instanceof \DOMNode) {
+            if (! $element->parentNode instanceof \DOMNode || self::isUnderXmlBase($element)) {
                 continue;
             }
 
@@ -261,6 +261,29 @@ final readonly class LinkRemover
         }
 
         return $changed ? implode(', ', $kept) : null;
+    }
+
+    /**
+     * Whether the document has an HTML <base href>, which changes how every relative reference in it resolves.
+     */
+    public static function hasBaseUrl(DOMDocument $document): bool
+    {
+        return (new \DOMXPath($document))->evaluate("count(//*[local-name() = 'base'][@href])") > 0;
+    }
+
+    /**
+     * Whether the element or one of its ancestors has an xml:base: its references resolve against that base, which
+     * target() does not follow.
+     */
+    public static function isUnderXmlBase(\DOMElement $element): bool
+    {
+        for ($node = $element; $node instanceof \DOMElement; $node = $node->parentNode) {
+            if ($node->hasAttributeNS('http://www.w3.org/XML/1998/namespace', 'base')) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
