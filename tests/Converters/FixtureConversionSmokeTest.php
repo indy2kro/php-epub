@@ -11,6 +11,7 @@ use PhpEpub\Converters\PdfConversionOptions;
 use PhpEpub\Converters\TextAdapter;
 use PhpEpub\Converters\TCPDFAdapter;
 use PhpEpub\EpubFile;
+use PhpEpub\Test\Support\RequiresGd;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
@@ -163,7 +164,7 @@ final class FixtureConversionSmokeTest extends TestCase
     #[DataProvider('pdfFixtureProvider')]
     public function testDompdfAdapterWithFixture(string $fixturePath): void
     {
-        \PhpEpub\Test\Support\RequiresGd::check('for Dompdf to render the raster images of the fixtures');
+        RequiresGd::check('for Dompdf to render the raster images of the fixtures');
         if (! class_exists(\Dompdf\Dompdf::class)) {
             $this->markTestSkipped('Dompdf is not installed');
         }
