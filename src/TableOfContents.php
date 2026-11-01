@@ -555,10 +555,6 @@ final readonly class TableOfContents
         }
 
         $navMap = $this->childElements($root, 'navMap')[0] ?? null;
-        $last = 0;
-        foreach ($navMap?->getElementsByTagName('navPoint') ?? [] as $point) {
-            $last = max($last, (int) $point->getAttribute('playOrder'));
-        }
 
         $maxNumber = 0;
         if ($pages !== []) {
@@ -589,7 +585,7 @@ final readonly class TableOfContents
             }
         }
 
-        $this->renumberTargets($root, $last);
+        $this->renumberTargets($root);
         $this->setHeadMeta($root, 'dtb:totalPageCount', (string) count($pages));
         $this->setHeadMeta($root, 'dtb:maxPageNumber', (string) $maxNumber);
         $this->save($root, $ncxPath);
@@ -1161,7 +1157,7 @@ final readonly class TableOfContents
 
         $state = ['order' => 0, 'count' => 0, 'seen' => []];
         $this->appendNavPoints($document, $namespace, $navMap, $entries, $ncxPath, $state);
-        $this->renumberTargets($root, $state['order']);
+        $this->renumberTargets($root);
 
         $this->updateDepth($root);
         $this->save($root, $ncxPath);
@@ -1169,25 +1165,50 @@ final readonly class TableOfContents
 
     /**
      * Renumbers the playOrder of the page and nav targets after the navMap's: the playOrder values of a whole NCX
-     * form one sequence in document order, and the navMap was just renumbered (EPUBCheck RSC-005 on gaps).
+     * form one sequence in document order without gaps, and entries that point to the same content src share one
+     * playOrder (EPUBCheck RSC-005), so a target reuses the playOrder of a navPoint or earlier target with its src.
      */
-    private function renumberTargets(DOMElement $root, int $last): void
+    private function renumberTargets(DOMElement $root): void
     {
+        $seen = [];
+        $last = 0;
+        $navMap = $this->childElements($root, 'navMap')[0] ?? null;
+        foreach ($navMap?->getElementsByTagName('navPoint') ?? [] as $point) {
+            if ($point->hasAttribute('playOrder')) {
+                $order = (int) $point->getAttribute('playOrder');
+                $seen[$this->contentSrc($point) ?? ''] ??= $order;
+                $last = max($last, $order);
+            }
+        }
+
+        unset($seen['']);
         foreach ($this->childElements($root, 'pageList') as $list) {
-            $last = $this->renumberTargetList($list, 'pageTarget', $last);
+            $last = $this->renumberTargetList($list, 'pageTarget', $last, $seen);
         }
 
         foreach ($this->childElements($root, 'navList') as $list) {
-            $last = $this->renumberTargetList($list, 'navTarget', $last);
+            $last = $this->renumberTargetList($list, 'navTarget', $last, $seen);
         }
     }
 
-    private function renumberTargetList(DOMElement $list, string $name, int $last): int
+    /**
+     * @param array<string, int> $seen The playOrder of every content src numbered so far.
+     */
+    private function renumberTargetList(DOMElement $list, string $name, int $last, array &$seen): int
     {
         foreach ($this->childElements($list, $name) as $target) {
-            if ($target->hasAttribute('playOrder')) {
-                $target->setAttribute('playOrder', (string) ++$last);
+            if (! $target->hasAttribute('playOrder')) {
+                continue;
             }
+
+            $src = $this->contentSrc($target);
+            if ($src === null) {
+                $order = ++$last;
+            } else {
+                $order = $seen[$src] ??= ++$last;
+            }
+
+            $target->setAttribute('playOrder', (string) $order);
         }
 
         return $last;
@@ -1323,6 +1344,16 @@ final readonly class TableOfContents
     {
         // A parsed element always belongs to a document.
         return $root->ownerDocument ?? new DOMDocument();
+    }
+
+    /**
+     * The src of an NCX navPoint's, pageTarget's or navTarget's content element, or null when it has none.
+     */
+    private function contentSrc(DOMElement $node): ?string
+    {
+        $content = $this->childElements($node, 'content')[0] ?? null;
+
+        return $content instanceof DOMElement && $content->hasAttribute('src') ? $content->getAttribute('src') : null;
     }
 
     /**
