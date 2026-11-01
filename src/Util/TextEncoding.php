@@ -18,11 +18,11 @@ final class TextEncoding
     private const string UTF8_BOM = "\xEF\xBB\xBF";
 
     /**
-     * mbstring's pseudo-encodings and their aliases (lower case): they are transfer encodings, not character sets.
+     * mbstring's pseudo-encodings and their aliases (lower case), and auto (detection): none of them is a character set.
      * HTML-ENTITIES would decode escaped markup into elements before the document is parsed and sanitised, and
      * PHP 8.2 deprecates most of them.
      */
-    private const array PSEUDO_ENCODINGS = ['html-entities', 'html', 'base64', 'uuencode', 'quoted-printable', 'qprint', '7bit', '8bit', 'binary'];
+    private const array PSEUDO_ENCODINGS = ['html-entities', 'html', 'base64', 'uuencode', 'quoted-printable', 'qprint', '7bit', '8bit', 'binary', 'auto'];
 
     /**
      * The content as UTF-8: without a byte order mark and, when it had to be converted, without the
