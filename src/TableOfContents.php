@@ -353,6 +353,298 @@ final readonly class TableOfContents
     }
 
     /**
+     * Replaces the page list: each page is a TocEntry whose title is the print page number (e.g. "12" or "iv")
+     * and whose path and fragment locate where that page begins. It is written to the navigation document's
+     * "page-list" nav (created hidden when missing) and to the NCX pageList (with its dtb:totalPageCount and
+     * dtb:maxPageNumber), each that the book has. [] removes the page list.
+     *
+     * @param list<TocEntry> $pages
+     *
+     * @throws Exception If a page has no number, no path or children, a path leaves the book, a value is not valid
+     *                   XML text, the book has neither a navigation document nor an NCX, or a file cannot be written.
+     */
+    public function setPageList(array $pages): void
+    {
+        $this->assertWritable();
+        foreach ($pages as $page) {
+            (trim($page->title) !== '' && $page->path !== '') || throw new Exception('A page needs a number (its title) and a path');
+            $page->children === [] || throw new Exception('A page cannot have children: the page list is flat');
+        }
+
+        $this->assertValid($pages);
+
+        $navPath = $this->navPath();
+        $ncxPath = $this->ncxPath();
+        if ($navPath === null && $ncxPath === null) {
+            throw new Exception('The book has no navigation document or NCX to hold a page list');
+        }
+
+        if ($navPath !== null) {
+            $this->writeNavPageList($navPath, $pages);
+        }
+
+        if ($ncxPath !== null) {
+            $this->writeNcxPageList($ncxPath, $pages);
+        }
+    }
+
+    /**
+     * Builds the page list from the page break markers of the spine documents, in reading order, and sets it
+     * (see setPageList()). A marker is an element with epub:type "pagebreak" or role "doc-pagebreak"; its page
+     * number is its title attribute, else its aria-label, else its text. A marker without an id gets one
+     * ("page-N", unique in its document), which rewrites that document. Markers without a number, documents that
+     * are not well-formed XML and the navigation document are skipped. Without any marker nothing changes.
+     *
+     * @return list<TocEntry> The pages; [] when the book has no page break markers.
+     *
+     * @throws Exception If the table of contents has no spine (it did not come from EpubFile), the book has no
+     *                   navigation document or NCX, or a file cannot be written.
+     */
+    public function generatePageList(): array
+    {
+        if (! $this->spine instanceof Spine) {
+            throw new Exception('The spine is needed to read the page breaks: use EpubFile::getTableOfContents()');
+        }
+
+        if (! $this->isAvailable()) {
+            throw new Exception('The book has no navigation document or NCX to hold a page list');
+        }
+
+        $pages = [];
+        foreach ($this->spine->getItems() as $spineItem) {
+            $item = $spineItem->item;
+            if (! $item instanceof ManifestItem || $item->mediaType !== 'application/xhtml+xml' || $item->path === '' || in_array('nav', explode(' ', $item->properties), true)) {
+                continue;
+            }
+
+            foreach ($this->pageBreaks($item->path) as [$number, $id]) {
+                $pages[] = new TocEntry($number, $item->path, $id);
+            }
+        }
+
+        if ($pages !== []) {
+            $this->setPageList($pages);
+        }
+
+        return $pages;
+    }
+
+    /**
+     * The page break markers of one document as [page number, id], giving those without an id one (the document
+     * is then rewritten). [] for a document that cannot be read as XML.
+     *
+     * @return list<array{string, string}>
+     */
+    private function pageBreaks(string $path): array
+    {
+        try {
+            $root = $this->load($path);
+        } catch (XmlException) {
+            return [];
+        }
+
+        $ids = [];
+        foreach ($root->getElementsByTagName('*') as $element) {
+            $ids[$element->getAttribute('id')] = true;
+        }
+
+        $pages = [];
+        $added = 0;
+        $changed = false;
+        foreach ($root->getElementsByTagName('*') as $element) {
+            $types = preg_split('/\s+/', trim($element->getAttributeNS(self::OPS_NAMESPACE, 'type'))) ?: [];
+            $roles = preg_split('/\s+/', trim($element->getAttribute('role'))) ?: [];
+            if (! in_array('pagebreak', $types, true) && ! in_array('doc-pagebreak', $roles, true)) {
+                continue;
+            }
+
+            $number = '';
+            foreach ([$element->getAttribute('title'), $element->getAttribute('aria-label'), $element->textContent] as $candidate) {
+                $number = $this->collapse($candidate);
+                if ($number !== '') {
+                    break;
+                }
+            }
+
+            if ($number === '') {
+                continue;
+            }
+
+            if ($element->getAttribute('id') === '') {
+                do {
+                    $id = 'page-' . ++$added;
+                } while (isset($ids[$id]));
+
+                $element->setAttribute('id', $id);
+                $ids[$id] = true;
+                $changed = true;
+            }
+
+            $pages[] = [$number, $element->getAttribute('id')];
+        }
+
+        if ($changed) {
+            $this->save($root, $path);
+        }
+
+        return $pages;
+    }
+
+    /**
+     * Replaces the page-list nav's list, creating the nav (hidden, after the other navs) when missing; no pages
+     * remove it.
+     *
+     * @param list<TocEntry> $pages
+     *
+     * @throws Exception
+     */
+    private function writeNavPageList(string $navPath, array $pages): void
+    {
+        $root = $this->load($navPath);
+        $document = $this->document($root);
+        $namespace = (string) $root->namespaceURI;
+        $xpath = $this->navXPath($root);
+        $nav = $this->first($xpath, self::PAGE_LIST_NAV);
+
+        if ($pages === []) {
+            if ($nav instanceof DOMElement) {
+                $nav->parentNode?->removeChild($nav);
+            }
+
+            $this->save($root, $navPath);
+
+            return;
+        }
+
+        if (! $nav instanceof DOMElement) {
+            $nav = $document->createElementNS($namespace, 'nav');
+            $nav->setAttributeNS(self::OPS_NAMESPACE, 'epub:type', 'page-list');
+            $nav->setAttribute('hidden', '');
+            $nav->appendChild($document->createElementNS($namespace, 'h2'))->appendChild($document->createTextNode('Pages'));
+            ($this->first($xpath, '//x:body') ?? $root)->appendChild($nav);
+        }
+
+        $list = $this->buildNavList($document, $namespace, $pages, $navPath);
+        $oldList = $this->first($xpath, 'x:ol', $nav);
+        $oldList instanceof DOMElement ? $nav->replaceChild($list, $oldList) : $nav->appendChild($list);
+
+        $this->save($root, $navPath);
+    }
+
+    /**
+     * Replaces the NCX pageList (placed after the navMap), numbering its pageTargets after the navMap's
+     * playOrder, and updates dtb:totalPageCount and dtb:maxPageNumber; no pages remove the pageList.
+     *
+     * @param list<TocEntry> $pages
+     *
+     * @throws Exception
+     */
+    private function writeNcxPageList(string $ncxPath, array $pages): void
+    {
+        $root = $this->load($ncxPath);
+        $document = $this->document($root);
+        $namespace = (string) $root->namespaceURI;
+
+        foreach ($this->childElements($root, 'pageList') as $old) {
+            $root->removeChild($old);
+        }
+
+        $ids = [];
+        foreach ($root->getElementsByTagName('*') as $element) {
+            $ids[$element->getAttribute('id')] = true;
+        }
+
+        $navMap = $this->childElements($root, 'navMap')[0] ?? null;
+        $last = 0;
+        foreach ($navMap?->getElementsByTagName('navPoint') ?? [] as $point) {
+            $last = max($last, (int) $point->getAttribute('playOrder'));
+        }
+
+        $maxNumber = 0;
+        if ($pages !== []) {
+            $list = $document->createElementNS($namespace, 'pageList');
+            $navMap instanceof DOMElement && $navMap->nextSibling instanceof \DOMNode
+                ? $root->insertBefore($list, $navMap->nextSibling)
+                : $root->appendChild($list);
+
+            $added = 0;
+            foreach ($pages as $page) {
+                do {
+                    $id = 'page-' . ++$added;
+                } while (isset($ids[$id]));
+
+                $target = $list->appendChild($document->createElementNS($namespace, 'pageTarget'));
+                $target->setAttribute('id', $id);
+                [$type, $value] = $this->pageType($page->title);
+                $target->setAttribute('type', $type);
+                if ($value !== null) {
+                    $target->setAttribute('value', (string) $value);
+                    $maxNumber = $type === 'normal' ? max($maxNumber, $value) : $maxNumber;
+                }
+
+                $target->setAttribute('playOrder', '0');
+                $label = $target->appendChild($document->createElementNS($namespace, 'navLabel'));
+                $label->appendChild($document->createElementNS($namespace, 'text'))->appendChild($document->createTextNode($page->title));
+                $target->appendChild($document->createElementNS($namespace, 'content'))->setAttribute('src', $this->href($ncxPath, $page));
+            }
+        }
+
+        $this->renumberTargets($root, $last);
+        $this->setHeadMeta($root, 'dtb:totalPageCount', (string) count($pages));
+        $this->setHeadMeta($root, 'dtb:maxPageNumber', (string) $maxNumber);
+        $this->save($root, $ncxPath);
+    }
+
+    /**
+     * The NCX pageTarget type and value of a page number: arabic numbers are "normal", roman numerals "front",
+     * anything else "special" (without a value).
+     *
+     * @return array{string, int|null}
+     */
+    private function pageType(string $number): array
+    {
+        $number = trim($number);
+        if (preg_match('/^\d{1,9}$/', $number) === 1) {
+            return ['normal', (int) $number];
+        }
+
+        if (preg_match('/^(?=[ivxlcdm]+$)m{0,3}(cm|cd|d?c{0,3})(xc|xl|l?x{0,3})(ix|iv|v?i{0,3})$/i', $number) === 1) {
+            $values = ['m' => 1000, 'd' => 500, 'c' => 100, 'l' => 50, 'x' => 10, 'v' => 5, 'i' => 1];
+            $digits = array_map(static fn (string $digit): int => $values[$digit], str_split(strtolower($number)));
+            $value = 0;
+            foreach ($digits as $index => $digit) {
+                $value += $digit < ($digits[$index + 1] ?? 0) ? -$digit : $digit;
+            }
+
+            return ['front', $value];
+        }
+
+        return ['special', null];
+    }
+
+    /**
+     * Sets a meta of the NCX head (creating it); an NCX without a head is left alone.
+     */
+    private function setHeadMeta(DOMElement $root, string $name, string $content): void
+    {
+        $head = $this->childElements($root, 'head')[0] ?? null;
+        if (! $head instanceof DOMElement) {
+            return;
+        }
+
+        $meta = array_values(array_filter(
+            $this->childElements($head, 'meta'),
+            static fn (DOMElement $meta): bool => $meta->getAttribute('name') === $name
+        ))[0] ?? null;
+        if (! $meta instanceof DOMElement) {
+            $meta = $head->appendChild($this->document($root)->createElementNS((string) $root->namespaceURI, 'meta'));
+            $meta->setAttribute('name', $name);
+        }
+
+        $meta->setAttribute('content', $content);
+    }
+
+    /**
      * Appends a top-level entry.
      *
      * @throws Exception See setEntries().
