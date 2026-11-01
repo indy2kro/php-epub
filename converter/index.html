@@ -145,36 +145,46 @@
               
                 <h1 id="converter">Converter<a class="headerlink" href="#converter" title="Permanent link">&para;</a></h1>
 <p>The <code>Converter</code> class converts an extracted EPUB into other formats by dispatching to format-specific adapters (PDF via Dompdf or TCPDF, MOBI/AZW3/… via Calibre).</p>
+<p><strong>Note</strong>: For most use cases, we recommend using <code>EpubFile::convert()</code> directly (see the <a href="#usage-example">Usage Example</a> below), as it automatically handles DRM protection checks, saves unsaved edits, and applies the book's limits to the converter.</p>
 <h2 id="key-methods">Key Methods<a class="headerlink" href="#key-methods" title="Permanent link">&para;</a></h2>
 <ul>
 <li>
 <p><strong><code>__construct(string $epubDirectory, array $adapters)</code></strong>: Initializes the <code>Converter</code> with the directory containing the extracted EPUB and a map of format =&gt; <code>ConverterInterface</code> adapter. Throws an exception if the directory does not exist.</p>
 </li>
 <li>
-<p><strong><code>convert(string $format, string $outputPath): void</code></strong>: Converts the EPUB with the adapter registered for <code>$format</code>. Throws an exception if the format is not supported or if the conversion fails.</p>
+<p><strong><code>convert(string $format, string $outputPath): void</code></strong>: Converts the EPUB with the adapter registered for <code>$format</code>. Throws an exception if the format is not supported or if the conversion fails. <strong>Note</strong>: This method bypasses DRM checks and the book's limits; use <code>EpubFile::convert()</code> for a safer alternative.</p>
 </li>
 </ul>
 <p>Every adapter accepts the extracted directory. <code>CalibreAdapter</code> also accepts an <code>.epub</code> file; given a directory, it packages it into a temporary <code>.epub</code> first.</p>
+<p><strong>Note on TCPDF:</strong> TCPDF 7 is now deprecated by its maintainer on Packagist ("Deprecated legacy PDF engine for PHP. Use instead tecnickcom/tc-lib-pdf"). For new projects, we recommend using <code>DompdfAdapter</code> instead, which supports modern CSS features, embedded fonts via <code>@font-face</code>, and has active maintenance. TCPDFAdapter is kept for backwards compatibility. See <a href="../converters/tcpdf-adapter/">TCPDFAdapter documentation</a> for details.</p>
 <h2 id="usage-example">Usage Example<a class="headerlink" href="#usage-example" title="Permanent link">&para;</a></h2>
-<pre class="codehilite"><code class="language-php">use PhpEpub\ConversionException;
-use PhpEpub\Converter;
+<p>The recommended way to convert a book is through <code>EpubFile::convert()</code>. This ensures that:
+- DRM-protected books are refused
+- The book's unsaved edits are saved before conversion
+- The book's <code>Limits</code> are applied to the converter (for <code>LimitsAwareConverter</code> adapters)</p>
+<pre class="codehilite"><code class="language-php">use PhpEpub\Exception;
 use PhpEpub\Converters\CalibreAdapter;
 use PhpEpub\Converters\DompdfAdapter;
 use PhpEpub\EpubFile;
 
 $epubFile = EpubFile::open('/path/to/book.epub');
 
-$converter = new Converter($epubFile-&gt;getTempDir(), [
-    'pdf' =&gt; new DompdfAdapter(),
-    'mobi' =&gt; new CalibreAdapter(['calibre_path' =&gt; '/usr/bin/ebook-convert']),
-]);
-
 try {
-    $converter-&gt;convert('pdf', '/path/to/output.pdf');
-    $converter-&gt;convert('mobi', '/path/to/output.mobi');
-} catch (ConversionException $e) {
+    $epubFile-&gt;convert(new DompdfAdapter(), '/path/to/output.pdf');
+    $epubFile-&gt;convert(new CalibreAdapter(['calibre_path' =&gt; '/usr/bin/ebook-convert']), '/path/to/output.mobi');
+} catch (Exception $e) {
     echo &quot;Conversion failed: &quot; . $e-&gt;getMessage();
 }
+</code></pre>
+
+<p>For more complex scenarios (multiple conversions with the same adapters), you can still use the <code>Converter</code> class with the extracted directory, but be aware that it bypasses the safety checks mentioned above:</p>
+<pre class="codehilite"><code class="language-php">use PhpEpub\Converter;
+use PhpEpub\Converters\DompdfAdapter;
+use PhpEpub\EpubFile;
+
+$epubFile = EpubFile::open('/path/to/book.epub');
+$converter = new Converter($epubFile-&gt;getTempDir(), ['pdf' =&gt; new DompdfAdapter()]);
+$converter-&gt;convert('pdf', '/path/to/output.pdf');
 </code></pre>
 
 <h2 id="limits-and-options-for-untrusted-books">Limits and options for untrusted books<a class="headerlink" href="#limits-and-options-for-untrusted-books" title="Permanent link">&para;</a></h2>

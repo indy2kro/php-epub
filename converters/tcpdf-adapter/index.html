@@ -106,6 +106,8 @@
                 </li>
                 <li class="toctree-l2 current"><a class="reference internal current" href="#">TCPDF Adapter</a>
     <ul class="current">
+    <li class="toctree-l3"><a class="reference internal" href="#migration-to-dompdf">Migration to Dompdf</a>
+    </li>
     <li class="toctree-l3"><a class="reference internal" href="#key-methods">Key Methods</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#usage-example">Usage Example</a>
@@ -140,10 +142,31 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
             <div class="section" itemprop="articleBody">
               
-                <h1 id="tcpdfadapter">TCPDFAdapter<a class="headerlink" href="#tcpdfadapter" title="Permanent link">&para;</a></h1>
+                <h1 id="tcpdfadapter-legacy">TCPDFAdapter (Legacy)<a class="headerlink" href="#tcpdfadapter-legacy" title="Permanent link">&para;</a></h1>
+<p><strong>⚠️ Legacy Notice:</strong> TCPDF 7 is now deprecated by its maintainer on Packagist. For new projects, we recommend using <code>DompdfAdapter</code> instead, which supports modern CSS features, embedded fonts via <code>@font-face</code>, and has active maintenance. TCPDFAdapter is kept for backwards compatibility.</p>
 <p>The <code>TCPDFAdapter</code> class in the PHP EPUB Processor library is responsible for converting EPUB content into PDF format using the TCPDF library.
 It provides a flexible interface to customize the PDF output through various styling options.</p>
 <p>Requires <code>tecnickcom/tcpdf</code> and its core fonts; see <a href="../../installation/#tcpdf-core-fonts">Installation</a>.</p>
+<h2 id="migration-to-dompdf">Migration to Dompdf<a class="headerlink" href="#migration-to-dompdf" title="Permanent link">&para;</a></h2>
+<p>Consider migrating to <code>DompdfAdapter</code> for better CSS support and embedded fonts. The migration is straightforward:</p>
+<pre class="codehilite"><code class="language-php">// Old (TCPDF)
+$adapter = new TCPDFAdapter($styles, $loader, $options);
+
+// New (Dompdf)
+$dompdfStyles = array_intersect_key($styles, array_flip([
+    'font',
+    'font_size',
+    'paper_size',
+    'orientation',
+    'margin_top',
+    'margin_right',
+    'margin_bottom',
+    'margin_left',
+]));
+$adapter = new DompdfAdapter($dompdfStyles, $loader, $options);
+</code></pre>
+
+<p>Note: Dompdf has different default fonts and may render differently. Test your output after migrating.</p>
 <h2 id="key-methods">Key Methods<a class="headerlink" href="#key-methods" title="Permanent link">&para;</a></h2>
 <ul>
 <li>
