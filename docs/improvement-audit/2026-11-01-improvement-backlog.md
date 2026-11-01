@@ -30,7 +30,7 @@ BUG-01 to BUG-04, CONV-01, FEAT-01 and SWEEP-01/02.
 | Area | Items | High | Med | Low |
 |---|---:|---:|---:|---:|
 | SEC — untrusted input | 1 | 0 | 0 | 1 |
-| BUG — wrong behaviour | 4 | 1 | 3 | 0 |
+| BUG — wrong behaviour | 4 | 0 | 1 | 0 |
 | CONV — converters | 3 | 1 | 1 | 1 |
 | FEAT — new capability | 8 | 0 | 5 | 3 |
 | UX — public API | 3 | 0 | 1 | 2 |
@@ -38,14 +38,14 @@ BUG-01 to BUG-04, CONV-01, FEAT-01 and SWEEP-01/02.
 | TEST — tests | 3 | 0 | 2 | 1 |
 | CI — pipeline | 1 | 0 | 0 | 1 |
 | SWEEP — cross-cutting | 3 | 0 | 2 | 1 |
-| **Total** | **27** | **2** | **14** | **11** |
+| **Total** | **27** | **1** | **13** | **11** |
 
 Effort: S = one file, under 30 min · M = one class plus tests · L = cross-cutting.
 
 The target was 30. Only 27 items held up after checking, and the list was not padded. No security vulnerabilities
 were found. ZIP extraction and directory import, `PathResolver`, `XmlParser`, the stream buffering cap, Dompdf's
 sandbox options, Calibre's shell-free process call and the pinned font downloads were re-checked. SEC-01 is
-hardening. The two high items are data integrity, not security. BUG-01 makes a saved book unloadable. CONV-01 makes
+hardening. BUG-01, BUG-02 and BUG-03 (the three data integrity bugs) have been completed. CONV-01 makes
 TCPDF fail on most real books with the current dependencies.
 
 ## Execution instructions
