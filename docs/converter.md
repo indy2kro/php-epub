@@ -22,7 +22,7 @@ The recommended way to convert a book is through `EpubFile::convert()`. This ens
 - The book's `Limits` are applied to the converter (for `LimitsAwareConverter` adapters)
 
 ```php
-use PhpEpub\ConversionException;
+use PhpEpub\Exception;
 use PhpEpub\Converters\CalibreAdapter;
 use PhpEpub\Converters\DompdfAdapter;
 use PhpEpub\EpubFile;
@@ -32,7 +32,7 @@ $epubFile = EpubFile::open('/path/to/book.epub');
 try {
     $epubFile->convert(new DompdfAdapter(), '/path/to/output.pdf');
     $epubFile->convert(new CalibreAdapter(['calibre_path' => '/usr/bin/ebook-convert']), '/path/to/output.mobi');
-} catch (ConversionException $e) {
+} catch (Exception $e) {
     echo "Conversion failed: " . $e->getMessage();
 }
 ```

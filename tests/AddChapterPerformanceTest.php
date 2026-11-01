@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PhpEpub\Test;
 
 use PhpEpub\EpubFile;
+use PhpEpub\Exception;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -89,6 +90,54 @@ final class AddChapterPerformanceTest extends TestCase
 
         @unlink($path);
         $epub->close();
+    }
+
+    public function testAddChaptersWritesCompletedTocEntriesWhenLaterChapterFails(): void
+    {
+        $path = sys_get_temp_dir() . '/test_add_chapters_partial_failure.epub';
+        $epub = EpubFile::create($path, 'Test Book Batch Failure', 'en');
+
+        try {
+            $epub->addChapters([
+                ['First chapter', '<p>Valid content</p>'],
+                ['Invalid' . "\x01", '<p>Invalid title</p>'],
+            ]);
+            $this->fail('Invalid chapter text must be refused');
+        } catch (Exception) {
+            $entries = $epub->getTableOfContents()->getEntries();
+
+            $this->assertCount(1, $entries);
+            $this->assertSame('First chapter', $entries[0]->title);
+        } finally {
+            $epub->close();
+            @unlink($path);
+        }
+    }
+
+    public function testAddChaptersWritesCompletedTocEntriesWhenIteratorFails(): void
+    {
+        $path = sys_get_temp_dir() . '/test_add_chapters_iterator_failure.epub';
+        $epub = EpubFile::create($path, 'Test Book Iterator Failure', 'en');
+        $chapters = static function (): \Generator {
+            yield ['First chapter', '<p>Valid content</p>'];
+            throw new \RuntimeException('Chapter iteration failed');
+        };
+
+        try {
+            try {
+                $epub->addChapters($chapters());
+                $this->fail('The iterator failure must escape');
+            } catch (\RuntimeException $exception) {
+                $this->assertSame('Chapter iteration failed', $exception->getMessage());
+                $entries = $epub->getTableOfContents()->getEntries();
+
+                $this->assertCount(1, $entries);
+                $this->assertSame('First chapter', $entries[0]->title);
+            }
+        } finally {
+            $epub->close();
+            @unlink($path);
+        }
     }
 
     public function testNextChapterNumberIsTracked(): void

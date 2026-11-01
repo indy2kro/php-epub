@@ -411,45 +411,55 @@ class EpubFile
         $tocEntries = [];
         $items = [];
 
-        foreach ($chapters as $chapter) {
-            $title = $chapter[0];
-            $body = $chapter[1];
-            $path = $chapter[2] ?? null;
-            XmlText::assertValid($title, $body);
-            $path ??= $this->nextChapterPath();
+        try {
+            foreach ($chapters as $chapter) {
+                $title = $chapter[0];
+                $body = $chapter[1];
+                $path = $chapter[2] ?? null;
+                XmlText::assertValid($title, $body);
+                $path ??= $this->nextChapterPath();
 
-            try {
-                $this->xmlParser->parseString(BookTemplate::chapter($title, $language, $body));
-            } catch (XmlException) {
-                $body = XhtmlFragment::fromHtml($body);
+                try {
+                    $this->xmlParser->parseString(BookTemplate::chapter($title, $language, $body));
+                } catch (XmlException) {
+                    $body = XhtmlFragment::fromHtml($body);
+                }
+
+                $this->getContentManager()->addContent($path, BookTemplate::chapter($title, $language, $body));
+                $item = $manifest->findByPath($path) ?? throw new Exception("The chapter is not in the manifest: {$path}");
+
+                if (! $spine->contains($item->id)) {
+                    $spine->add($item->id);
+                }
+
+                if ($tocAvailable) {
+                    $tocEntries[] = new TocEntry($title, $item->path);
+                }
+
+                $items[] = $item;
+
+                // Increment the next chapter number for the next call
+                if ($path === $this->nextChapterPath()) {
+                    $this->nextChapterNumber++;
+                }
             }
-
-            $this->getContentManager()->addContent($path, BookTemplate::chapter($title, $language, $body));
-            $item = $manifest->findByPath($path) ?? throw new Exception("The chapter is not in the manifest: {$path}");
-
-            if (! $spine->contains($item->id)) {
-                $spine->add($item->id);
-            }
-
-            if ($tocAvailable) {
-                $tocEntries[] = new TocEntry($title, $item->path);
-            }
-
-            $items[] = $item;
-
-            // Increment the next chapter number for the next call
-            if ($path === $this->nextChapterPath()) {
-                $this->nextChapterNumber++;
-            }
-        }
-
-        // Write all TOC entries at once
-        if ($tocAvailable && $writeToc) {
-            $existingEntries = $toc->getEntries();
-            $toc->writeEntries([...$existingEntries, ...$tocEntries]);
+        } finally {
+            $this->writeChapterTocEntries($toc, $tocAvailable, $writeToc, $tocEntries);
         }
 
         return $items;
+    }
+
+    /**
+     * Commits collected TOC entries after a successful batch or before a partial batch failure escapes.
+     *
+     * @param list<TocEntry> $entries
+     */
+    private function writeChapterTocEntries(TableOfContents $toc, bool $available, bool $writeToc, array $entries): void
+    {
+        if ($available && $writeToc && $entries !== []) {
+            $toc->writeEntries([...$toc->getEntries(), ...$entries]);
+        }
     }
 
     /**

@@ -16,7 +16,17 @@ Consider migrating to `DompdfAdapter` for better CSS support and embedded fonts.
 $adapter = new TCPDFAdapter($styles, $loader, $options);
 
 // New (Dompdf)
-$adapter = new DompdfAdapter($styles, $loader, $options);
+$dompdfStyles = array_intersect_key($styles, array_flip([
+    'font',
+    'font_size',
+    'paper_size',
+    'orientation',
+    'margin_top',
+    'margin_right',
+    'margin_bottom',
+    'margin_left',
+]));
+$adapter = new DompdfAdapter($dompdfStyles, $loader, $options);
 ```
 
 Note: Dompdf has different default fonts and may render differently. Test your output after migrating.

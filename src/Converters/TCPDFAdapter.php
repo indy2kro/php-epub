@@ -326,15 +326,29 @@ class TCPDFAdapter implements LimitsAwareConverter
      */
     private function sanitizeInlineStylesForTcpdf(string $html): string
     {
-        return preg_replace_callback(
-            '/style="([^"]*)"/i',
-            function (array $matches): string {
-                $css = $matches[1];
-                $sanitized = \PhpEpub\Util\CssSanitizer::forTcpdf($css);
-                return $sanitized === '' ? '' : 'style="' . $sanitized . '"';
-            },
-            $html
-        ) ?? $html;
+        $body = \PhpEpub\Util\HtmlSanitizer::parseBody($html);
+        foreach (iterator_to_array($body->getElementsByTagName('*')) as $element) {
+            if ($element->hasAttribute('style')) {
+                $style = \PhpEpub\Util\CssSanitizer::forTcpdf($element->getAttribute('style'));
+                if ($style === '') {
+                    $element->removeAttribute('style');
+                } else {
+                    $element->setAttribute('style', $style);
+                }
+            }
+
+            if (strtolower($element->localName ?? '') === 'style') {
+                $element->textContent = \PhpEpub\Util\CssSanitizer::forTcpdf($element->textContent);
+            }
+        }
+
+        $document = $body->ownerDocument ?? throw new Exception('Failed to serialize sanitized chapter HTML');
+        $result = '';
+        foreach (iterator_to_array($body->childNodes) as $child) {
+            $result .= $document->saveHTML($child);
+        }
+
+        return $result;
     }
 
     /**

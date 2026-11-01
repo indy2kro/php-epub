@@ -139,13 +139,68 @@ final class CssSanitizer
      */
     public static function forTcpdf(string $css): string
     {
-        // Remove width and height declarations with auto values, but leave the rule delimiter intact.
-        $css = preg_replace(
-            '/\b(?:width|height|min-(?:width|height)|max-(?:width|height))\s*:\s*auto\s*(?:!\s*important)?\s*(?=[;}]|$)/i',
-            '',
-            $css
-        ) ?? $css;
+        $tokens = CssTokenizer::tokenize($css);
+        if ($tokens === null) {
+            return '';
+        }
 
-        return $css;
+        $result = '';
+        $declaration = '';
+        $nesting = 0;
+        $customPropertyBlockDepth = 0;
+        $flush = static function () use (&$result, &$declaration): void {
+            if (
+                preg_match(
+                    '/^\s*(?:width|height|min-(?:width|height)|max-(?:width|height))\s*:\s*auto\s*(?:!\s*important)?\s*$/i',
+                    $declaration
+                ) !== 1
+            ) {
+                $result .= $declaration;
+            }
+
+            $declaration = '';
+        };
+
+        foreach ($tokens as [$type, $text]) {
+            if ($customPropertyBlockDepth > 0) {
+                $declaration .= $text;
+                if ($type === '{') {
+                    $customPropertyBlockDepth++;
+                } elseif ($type === '}') {
+                    $customPropertyBlockDepth--;
+                }
+
+                continue;
+            }
+
+            if (
+                $nesting === 0 &&
+                $type === '{' &&
+                preg_match('/^\s*--/', $declaration) === 1
+            ) {
+                $declaration .= $text;
+                $customPropertyBlockDepth = 1;
+
+                continue;
+            }
+
+            if ($nesting === 0 && in_array($type, [';', '{', '}'], true)) {
+                $flush();
+                $result .= $text;
+
+                continue;
+            }
+
+            $declaration .= $text;
+            if (in_array($type, ['fn', '(', '['], true)) {
+                $nesting++;
+            } elseif (in_array($type, [')', ']'], true)) {
+                $nesting--;
+            }
+        }
+
+        $flush();
+
+        return $result;
     }
 }

@@ -113,7 +113,7 @@ XML;
 </package>
 XML;
 
-        $navXhtml = '<html xmlns="http://www.w3.org/1999/xhtml"><body><nav epub:type="toc"><ol><li><a href="text/chapter1.xhtml">Chapter 1</a></li></ol></nav></body></html>';
+        $navXhtml = '<html xmlns="http://www.w3.org/1999/xhtml"><body><nav epub:type="toc"><ol><li><a href="text/chapter1.xhtml">Chapter 1</a></li></ol></nav><img src="images/image1.png"/></body></html>';
         $chapter1Xhtml = '<html xmlns="http://www.w3.org/1999/xhtml"><body><h1>Chapter 1</h1><img src="../images/image1.png" alt="Image 1"/></body></html>';
 
         $path = sys_get_temp_dir() . '/test_delete_img_links.epub';
@@ -139,6 +139,8 @@ XML;
 
             // The img tag itself should be removed (and with it, the alt text)
             $this->assertStringNotContainsString('image1.png', $chapter1Content);
+            $navContent = $epub->getContentManager()->getContent('EPUB/nav.xhtml');
+            $this->assertStringNotContainsString('image1.png', $navContent);
         } finally {
             $epub?->close();
             @unlink($path);
@@ -254,14 +256,17 @@ XML;
     <dc:language>en</dc:language>
   </metadata>
   <manifest>
-    <item id="chapter" href="text/chapter.xhtml" media-type="application/xhtml+xml"/>
+    <item id="chapter1" href="text/a.xhtml" media-type="application/xhtml+xml"/>
+    <item id="chapter" href="text/z.xhtml" media-type="application/xhtml+xml"/>
     <item id="image" href="images/image.png" media-type="image/png"/>
   </manifest>
   <spine>
+    <itemref idref="chapter1"/>
     <itemref idref="chapter"/>
   </spine>
 </package>
 XML;
+        $chapter1 = '<html xmlns="http://www.w3.org/1999/xhtml"><body><img src="../images/image.png"/></body></html>';
         $chapter = '<html xmlns="http://www.w3.org/1999/xhtml"><body><p><img src="../images/image.png"></body></html>';
 
         $path = sys_get_temp_dir() . '/test_delete_malformed_reference.epub';
@@ -269,7 +274,8 @@ XML;
             ->withFile('mimetype', 'application/epub+zip')
             ->withContainer('EPUB/package.opf')
             ->withFile('EPUB/package.opf', $opf)
-            ->withFile('EPUB/text/chapter.xhtml', $chapter)
+            ->withFile('EPUB/text/a.xhtml', $chapter1)
+            ->withFile('EPUB/text/z.xhtml', $chapter)
             ->withFile('EPUB/images/image.png', 'image')
             ->buildEpub($path);
 
@@ -283,6 +289,7 @@ XML;
                 $this->fail('Deleting a referenced file from a malformed document must be reported');
             } catch (\PhpEpub\XmlException) {
                 $this->assertFileExists($imagePath);
+                $this->assertSame($chapter1, $epub->getContentManager()->getContent('EPUB/text/a.xhtml'));
             }
         } finally {
             $epub?->close();

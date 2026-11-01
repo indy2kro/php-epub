@@ -165,8 +165,7 @@ class Manifest
         // When the OPF uses xmlns:opf="...", addChild() creates <opf:item> and the attributes
         // are added without a namespace. Re-querying gives us a node that can be properly indexed.
         // We query for the last item node instead of interpolating the ID to avoid XPath injection.
-        $nodes = $this->query('/opf:package/opf:manifest/opf:item');
-        $node = end($nodes) ?: $item;
+        $node = $this->query('/opf:package/opf:manifest/opf:item[last()]')[0] ?? $item;
 
         // A new item goes last, so the index only needs extending.
         return $this->items === null ? $this->toItem($node) : $this->indexItem($node);
@@ -193,6 +192,7 @@ class Manifest
         }
 
         $tempNodes = [];
+        $batchPaths = [];
         try {
             foreach ($specs as $spec) {
                 $id = $spec['id'];
@@ -202,7 +202,11 @@ class Manifest
 
                 if (isset($spec['path'])) {
                     $path = $this->paths->normalize($spec['path']);
-                    $this->findByPath($path) instanceof ManifestItem && throw new Exception("File is already in the manifest: {$path}");
+                    (
+                        $this->findByPath($path) instanceof ManifestItem ||
+                        isset($batchPaths[$path])
+                    ) && throw new Exception("File is already in the manifest: {$path}");
+                    $batchPaths[$path] = true;
                     $href = $this->pathToHref($path);
                     $mediaType = $spec['mediaType'] ?? $this->guessMediaType($path);
                 } else {

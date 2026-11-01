@@ -187,15 +187,18 @@ class ContentManager
         }
 
         $this->removeTableOfContentsEntries($this->paths->normalize($filePath));
+        $this->removeReferencesTo($this->paths->normalize($filePath), true);
         $this->removeEncryptionEntry($this->paths->normalize($filePath));
     }
 
     /**
      * Removes links to a deleted file from other documents in the book.
      */
-    private function removeReferencesTo(string $deletedPath): void
+    private function removeReferencesTo(string $deletedPath, bool $navigationPass = false): void
     {
         $linkRemover = new \PhpEpub\Util\LinkRemover($this->paths, $this->xmlParser);
+        $removed = [$deletedPath => true];
+        $pending = [];
 
         // Iterate through all content documents that might reference the deleted file
         foreach ($this->getContentPaths() as $contentPath) {
@@ -204,10 +207,9 @@ class ContentManager
                 continue;
             }
 
-            // Skip navigation documents (EPUB 3) and NCX (EPUB 2)
-            // These are handled separately by removeTableOfContentsEntries
             $properties = $item->properties;
-            if (str_contains($properties, 'nav') || $item->mediaType === 'application/x-dtbncx+xml') {
+            $isNavigation = str_contains($properties, 'nav');
+            if ($navigationPass !== $isNavigation || $item->mediaType === 'application/x-dtbncx+xml') {
                 continue;
             }
 
@@ -228,12 +230,15 @@ class ContentManager
             }
 
             $content = $this->getContent($contentPath);
-            $removed = [$deletedPath => true];
-            $updated = $linkRemover->remove($contentPath, $content, $removed, true);
+            $updated = $linkRemover->remove($contentPath, $content, $removed, ! ($navigationPass && $isNavigation));
 
             if ($updated !== null) {
-                $this->updateContent($contentPath, $updated);
+                $pending[$contentPath] = $updated;
             }
+        }
+
+        foreach ($pending as $contentPath => $updated) {
+            $this->updateContent($contentPath, $updated);
         }
     }
 

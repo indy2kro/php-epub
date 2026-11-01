@@ -83,6 +83,22 @@ final class BatchEditTest extends TestCase
         }
     }
 
+    public function testManifestAddManyRejectsDuplicatePathsWithinBatch(): void
+    {
+        $manifest = $this->book->getManifest();
+
+        try {
+            $manifest->addMany([
+                ['id' => 'first', 'path' => 'EPUB/text/duplicate.xhtml'],
+                ['id' => 'second', 'path' => 'EPUB/text/duplicate.xhtml'],
+            ]);
+            $this->fail('Duplicate paths within a batch must be refused');
+        } catch (Exception) {
+            $this->assertSame('first', $manifest->findByPath('EPUB/text/duplicate.xhtml')?->id);
+            $this->assertNull($manifest->get('second'));
+        }
+    }
+
     public function testManifestAddManyRefusesTakenIdsPathsAndIncompleteSpecs(): void
     {
         $manifest = $this->book->getManifest();

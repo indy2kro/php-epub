@@ -225,11 +225,13 @@ XML;
   </metadata>
   <manifest>
     <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>
+    <item id="remote-page" href="https://example.com/remote.xhtml" media-type="application/xhtml+xml" properties="remote-resources"/>
     <item id="cover-page" href="cover.xhtml" media-type="application/xhtml+xml"/>
     <item id="cover-img" href="images/cover.png" media-type="image/png" properties="cover-image"/>
     <item id="appendix" href="appendix.xhtml" media-type="application/xhtml+xml"/>
   </manifest>
   <spine>
+    <itemref idref="remote-page"/>
     <itemref idref="cover-page"/>
   </spine>
 </package>

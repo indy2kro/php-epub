@@ -57,6 +57,35 @@ final class TCPDFAdapterAutoValuesTest extends TestCase
         $this->assertStringContainsString('padding: auto', $sanitized);
     }
 
+    public function testTcpdfSanitizerPreservesOtherPropertyNamesAndQuotedText(): void
+    {
+        $css = 'p { column-width: auto; content: "width: auto;"; color: red; }';
+
+        $this->assertSame($css, \PhpEpub\Util\CssSanitizer::forTcpdf($css));
+    }
+
+    public function testTcpdfSanitizerPreservesBracedCustomPropertyValues(): void
+    {
+        $css = 'p { --token: { width: auto; color: red; }; }';
+
+        $this->assertSame($css, \PhpEpub\Util\CssSanitizer::forTcpdf($css));
+    }
+
+    public function testTcpdfSanitizerPreservesNestedFunctionValues(): void
+    {
+        $css = 'p { width: calc(100% - var(--width, 1px)); height: auto; }';
+
+        $this->assertSame(
+            'p { width: calc(100% - var(--width, 1px));; }',
+            \PhpEpub\Util\CssSanitizer::forTcpdf($css)
+        );
+    }
+
+    public function testTcpdfSanitizerDropsMalformedCss(): void
+    {
+        $this->assertSame('', \PhpEpub\Util\CssSanitizer::forTcpdf('content: "unterminated width: auto;'));
+    }
+
     public function testTcpdfSanitizerHandlesImportant(): void
     {
         $css = 'div { width: auto !important; height: auto!important; }';
