@@ -105,7 +105,7 @@ hardening. Theme 1 (BUG-01 to BUG-04, UX-02) and Theme 2 (CONV-01, CONV-02, CONV
 
 ### Features
 
-- [ ] **FEAT-01** Check references in stylesheets (`url()`, `@import`, `<style>`, `style` attributes) and the fragments of navigation links (TOC, landmarks, page list) in `validate()` — `src/Validator.php:334-377`, `src/Util/FragmentReferences.php`, `src/Cleanup/ReferenceGraph.php` — M · med
+- [x] **FEAT-01** Check references in stylesheets (`url()`, `@import`, `<style>`, `style` attributes) and the fragments of navigation links (TOC, landmarks, page list) in `validate()` — `src/Validator.php:334-377`, `src/Util/FragmentReferences.php`, `src/Cleanup/ReferenceGraph.php` — M · med
   Probe: a stylesheet with `url(../img/nope.png)` and a TOC entry pointing at `#nofrag` both validate clean, while EPUBCheck reports RSC-007 and RSC-012. `ReferenceGraph` already parses CSS references.
 - [ ] **FEAT-02** Validate manifest `fallback` and `media-overlay` references: unknown ids, fallback cycles, chains that never reach a content document, overlays that are not SMIL — `src/Validator.php:320-330`, `src/Validator.php:847-850`, `src/Manifest.php:224-237`, `src/Manifest.php:559-580` — M · med
   `hasFallback()` only checks that a `fallback` attribute exists, and `setFallback()`/`setMediaOverlay()` accept cycles. Books that EPUBCheck rejects (OPF-040/045, MED-xxx) pass `validate()`.

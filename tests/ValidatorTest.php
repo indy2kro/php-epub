@@ -562,6 +562,65 @@ final class ValidatorTest extends TestCase
         $this->assertStringContainsString('#nowhere', $issues[1]->message);
     }
 
+    public function testReportsMissingResourcesReferencedByExternalStylesheets(): void
+    {
+        $book = EpubBuilder::epub3()->withFile(
+            'EPUB/css/style.css',
+            'p { background-image: url(../img/nope.png); } @import "missing.css";'
+        );
+
+        $issues = array_values(array_filter(
+            $this->open($book)->validate(),
+            static fn (ValidationIssue $issue): bool => $issue->code === 'CONTENT_REFERENCE_MISSING'
+        ));
+
+        $this->assertCount(2, $issues);
+        $this->assertSame(['EPUB/css/style.css', 'EPUB/css/style.css'], array_map(static fn (ValidationIssue $issue): ?string => $issue->location, $issues));
+        $this->assertStringContainsString('EPUB/img/nope.png', $issues[0]->message);
+        $this->assertStringContainsString('EPUB/css/missing.css', $issues[1]->message);
+    }
+
+    public function testReportsMissingResourcesReferencedByInlineCss(): void
+    {
+        $book = EpubBuilder::epub3()->withFile(
+            'EPUB/text/chapter.xhtml',
+            EpubBuilder::xhtml(
+                'Chapter',
+                '<style>p { background: url(../img/style.png); }</style><p style="background: url(../img/attribute.png)">Text</p>',
+                '../css/style.css'
+            )
+        );
+
+        $issues = array_values(array_filter(
+            $this->open($book)->validate(),
+            static fn (ValidationIssue $issue): bool => $issue->code === 'CONTENT_REFERENCE_MISSING'
+        ));
+
+        $this->assertCount(2, $issues);
+        $this->assertSame(['EPUB/text/chapter.xhtml', 'EPUB/text/chapter.xhtml'], array_map(static fn (ValidationIssue $issue): ?string => $issue->location, $issues));
+        $this->assertStringContainsString('EPUB/img/style.png', $issues[0]->message);
+        $this->assertStringContainsString('EPUB/img/attribute.png', $issues[1]->message);
+    }
+
+    public function testReportsMissingFragmentsInNavigationSections(): void
+    {
+        $nav = '<nav epub:type="toc"><ol><li><a href="text/chapter.xhtml#toc-missing">Chapter</a></li></ol></nav>'
+            . '<nav epub:type="landmarks"><ol><li><a href="text/chapter.xhtml#landmark-missing">Start</a></li></ol></nav>'
+            . '<nav epub:type="page-list"><ol><li><a href="text/chapter.xhtml#page-missing">1</a></li></ol></nav>';
+        $book = EpubBuilder::epub3()->withFile('EPUB/nav.xhtml', EpubBuilder::xhtml('Contents', $nav));
+
+        $issues = array_values(array_filter(
+            $this->open($book)->validate(),
+            static fn (ValidationIssue $issue): bool => $issue->code === 'CONTENT_FRAGMENT_MISSING'
+        ));
+
+        $this->assertCount(3, $issues);
+        $this->assertSame('EPUB/nav.xhtml', $issues[0]->location);
+        $this->assertStringContainsString('#toc-missing', $issues[0]->message);
+        $this->assertStringContainsString('#landmark-missing', $issues[1]->message);
+        $this->assertStringContainsString('#page-missing', $issues[2]->message);
+    }
+
     public function testChecksTheModifiedDateSyntax(): void
     {
         foreach (['2026-01-01T00:00:00Z' => false, '2026-01-01' => true, '2026-01-01T00:00:00+02:00' => true, '2026-13-01T00:00:00Z' => true, 'yesterday' => true] as $date => $invalid) {

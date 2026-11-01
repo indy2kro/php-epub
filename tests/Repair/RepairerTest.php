@@ -180,7 +180,9 @@ final class RepairerTest extends TestCase
             . '<li><a href="text/gone.xhtml">Gone</a></li>'
             . '<li><a href="text/gone.xhtml">Parent</a><ol><li><a href="text/chapter.xhtml#x">Child</a></li></ol></li>'
             . '</ol></nav>');
-        $epub = $this->open(EpubBuilder::epub3()->withFile('EPUB/nav.xhtml', $nav));
+        $epub = $this->open(EpubBuilder::epub3()
+            ->withFile('EPUB/nav.xhtml', $nav)
+            ->withFile('EPUB/text/chapter.xhtml', EpubBuilder::xhtml('Chapter', '<h1 id="x">Chapter</h1>', '../css/style.css')));
         $this->assertContains('TOC_LINK_NOT_IN_MANIFEST', $this->codes($epub->validate()));
 
         $fixes = $epub->repair();

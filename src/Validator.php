@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PhpEpub;
 
 use PhpEpub\Util\ContentDocumentProperties;
+use PhpEpub\Util\CssReferences;
 use PhpEpub\Util\FileSystemHelper;
 use PhpEpub\Util\FragmentReferences;
 use PhpEpub\Util\MetadataSyntax;
@@ -97,6 +98,7 @@ final readonly class Validator
             ...$this->checkManifest(),
             ...$this->checkSpine(),
             ...$this->checkContent(),
+            ...$this->checkStylesheets(),
             ...$this->checkNavigation(),
             ...$this->checkMediaTypes(),
             ...$this->checkManifestProperties(),
@@ -393,6 +395,7 @@ final readonly class Validator
 
             if ($root instanceof \DOMElement) {
                 array_push($issues, ...$this->checkDuplicateIds($root, $item->path));
+                array_push($issues, ...$this->checkInlineCssReferences($root, $item->path));
             }
 
             $directory = dirname($item->path) === '.' ? '' : dirname($item->path) . '/';
@@ -413,6 +416,108 @@ final readonly class Validator
         }
 
         return $issues;
+    }
+
+    /**
+     * Checks local references in the stylesheets listed in the manifest.
+     *
+     * @return list<ValidationIssue>
+     */
+    private function checkStylesheets(): array
+    {
+        $issues = [];
+        foreach ($this->manifest->getItems() as $item) {
+            if (
+                $item->path === '' || isset($this->encrypted[$item->path])
+                || ($item->mediaType !== 'text/css' && strtolower(pathinfo($item->path, PATHINFO_EXTENSION)) !== 'css')
+            ) {
+                continue;
+            }
+
+            $css = $this->readLimitedFile($item->path);
+            if ($css === null) {
+                continue;
+            }
+
+            $directory = dirname($item->path) === '.' ? '' : dirname($item->path) . '/';
+            $checked = [];
+            array_push($issues, ...$this->checkCssReferences($item->path, $css, $directory, $checked));
+        }
+
+        return $issues;
+    }
+
+    /**
+     * Checks local CSS references relative to the document or stylesheet that contains the CSS.
+     *
+     * @param array<string, true> $checked
+     *
+     * @return list<ValidationIssue>
+     */
+    private function checkCssReferences(string $source, string $css, string $directory, array &$checked): array
+    {
+        $issues = [];
+        foreach (CssReferences::parse($css)[0] as $reference) {
+            if (str_starts_with(trim($reference), '//')) {
+                continue;
+            }
+
+            $target = $this->localReference('link', 'href', $reference, $directory);
+            if ($target !== null && ! isset($checked[$target])) {
+                $checked[$target] = true;
+                array_push($issues, ...$this->checkReference($source, $target));
+            }
+        }
+
+        return $issues;
+    }
+
+    /**
+     * Checks the CSS in style elements and style attributes of an XHTML document.
+     *
+     * @return list<ValidationIssue>
+     */
+    private function checkInlineCssReferences(\DOMElement $root, string $source): array
+    {
+        $directory = dirname($source) === '.' ? '' : dirname($source) . '/';
+        $checked = [];
+        $issues = [];
+        foreach (($root->ownerDocument ?? $root)->getElementsByTagName('*') as $element) {
+            foreach ($element->attributes ?? [] as $attribute) {
+                if (strtolower($attribute->localName ?? '') === 'style') {
+                    array_push($issues, ...$this->checkCssReferences($source, $attribute->value, $directory, $checked));
+                }
+            }
+
+            if (strtolower($element->localName ?? '') === 'style') {
+                foreach ($element->childNodes as $child) {
+                    if ($child instanceof \DOMText) {
+                        array_push($issues, ...$this->checkCssReferences($source, $child->data, $directory, $checked));
+                    }
+                }
+            }
+        }
+
+        return $issues;
+    }
+
+    /**
+     * Reads a file only up to the content-document size cap; larger or unreadable files are not judged.
+     */
+    private function readLimitedFile(string $path): ?string
+    {
+        $file = $this->paths->resolve($this->rootDirectory, $path);
+        if (! is_file($file) || (int) @filesize($file) > self::MAX_DOCUMENT_BYTES) {
+            return null;
+        }
+
+        error_clear_last();
+        $content = @file_get_contents($file, false, null, 0, self::MAX_DOCUMENT_BYTES + 1);
+        if ($content === false || error_get_last() !== null || strlen($content) > self::MAX_DOCUMENT_BYTES) {
+            return null;
+        }
+
+        return $content;
     }
 
     /**
@@ -491,7 +596,7 @@ final readonly class Validator
         if ($target === '' || ! is_file($this->paths->resolve($this->rootDirectory, $target))) {
             $where = $target === '' ? 'a file outside the book' : "{$target}, which does not exist";
 
-            return [$this->error('CONTENT_REFERENCE_MISSING', "The content document refers to {$where}.", $document)];
+            return [$this->error('CONTENT_REFERENCE_MISSING', "The document refers to {$where}.", $document)];
         }
 
         return $this->manifest->findByPath($target) instanceof ManifestItem
@@ -821,7 +926,17 @@ final readonly class Validator
         }
 
         $root = dom_import_simplexml($xml);
-        $issues = $root instanceof \DOMElement ? $this->checkDuplicateIds($root, $item->path) : [];
+        $issues = [];
+        if ($root instanceof \DOMElement) {
+            array_push($issues, ...$this->checkDuplicateIds($root, $item->path));
+            array_push($issues, ...$this->checkInlineCssReferences($root, $item->path));
+            array_push($issues, ...$this->checkFragments(
+                new FragmentReferences($this->rootDirectory, $this->paths, $this->xmlParser),
+                $root,
+                $item->path
+            ));
+        }
+
         if ($this->hasEmptyTocList($xml)) {
             $issues[] = $this->error('NAV_EMPTY', 'The navigation document\'s toc has no list item.', $item->path);
         }
