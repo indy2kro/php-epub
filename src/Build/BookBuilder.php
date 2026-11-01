@@ -62,7 +62,7 @@ final readonly class BookBuilder
     {
         $markdown = self::clean($markdown);
 
-        return $this->buildReflowable((new MarkdownParser())->toHtml($markdown), strlen($markdown), $this->options->splitLevel);
+        return $this->buildReflowable((new MarkdownParser())->toHtml($markdown), strlen($markdown), $this->options->splitLevel, true);
     }
 
     /**
@@ -175,7 +175,10 @@ final readonly class BookBuilder
         return new BuiltBook($package->toEpub(), count($usable), $warnings);
     }
 
-    private function buildReflowable(string $html, int $inputBytes, int $splitLevel): BuiltBook
+    /**
+     * @param bool $placeNotes Move generated Markdown footnotes into the chapter that cites them (see placeFootnotes()).
+     */
+    private function buildReflowable(string $html, int $inputBytes, int $splitLevel, bool $placeNotes = false): BuiltBook
     {
         $this->validateOptions();
         $options = $this->options;
@@ -229,7 +232,7 @@ final readonly class BookBuilder
             throw new BuildException("Too many chapters: the limit is {$limits->maxChapters}");
         }
 
-        $documents = $this->documents($chapters);
+        $documents = $this->documents($chapters, $placeNotes);
 
         $package = $this->newPackage('text');
         $package->addResource('style', 'css/style.css', self::TEXT_CSS . "\n" . CssSanitizer::sanitize($options->css, static fn (): ?string => null), 'text/css');
@@ -643,10 +646,11 @@ final readonly class BookBuilder
      * chapter files; a link whose target is not in the book loses its href.
      *
      * @param list<array{title: string, nodes: list<DOMNode>}> $chapters
+     * @param bool $placeNotes Move the footnotes the Markdown parser generated; authored HTML stays where it is.
      *
      * @return list<string>
      */
-    private function documents(array $chapters): array
+    private function documents(array $chapters, bool $placeNotes): array
     {
         $containers = [];
         foreach ($chapters as $chapter) {
@@ -660,7 +664,7 @@ final readonly class BookBuilder
             $containers[] = $container;
         }
 
-        self::placeFootnotes($containers);
+        $placeNotes && self::placeFootnotes($containers);
 
         /** @var array<string, int> $ids Id => index of the chapter that has it. */
         $ids = [];
@@ -710,30 +714,59 @@ final readonly class BookBuilder
     }
 
     /**
-     * Moves each footnote (<aside class="footnote" id="...">) into the chapter of its first citation (<a class="noteref"
-     * href="#...">), at its end, so reading systems can show the note as a pop-up in that chapter.
+     * Moves each footnote (<aside class="footnote" id="...">) into the earliest chapter that cites it (<a class="noteref"
+     * href="#...">), at its end, so reading systems can show the note as a pop-up in that chapter. A citation inside
+     * another note counts where that note ends up, so a note cited by a note follows it.
      *
      * @param list<DOMElement> $containers
      */
     private static function placeFootnotes(array $containers): void
     {
-        /** @var array<string, int> $cited Note id => index of the chapter that cites it first. */
-        $cited = [];
+        /** @var array<string, array{DOMElement, int}> $notes Note id => [aside, chapter it is in now]. */
+        $notes = [];
+        /** @var array<string, list<array{int, string|null}>> $citations Note id => [chapter, id of the citing note or null]. */
+        $citations = [];
         foreach ($containers as $index => $container) {
+            foreach ($container->getElementsByTagName('aside') as $aside) {
+                if (self::hasClass($aside, 'footnote') && $aside->getAttribute('id') !== '') {
+                    $notes[$aside->getAttribute('id')] = [$aside, $index];
+                }
+            }
+
             foreach ($container->getElementsByTagName('a') as $link) {
                 $href = $link->getAttribute('href');
                 if (self::hasClass($link, 'noteref') && str_starts_with($href, '#')) {
-                    $cited[substr($href, 1)] ??= $index;
+                    $parent = $link->parentNode;
+                    while ($parent instanceof DOMElement && ! ($parent->localName === 'aside' && self::hasClass($parent, 'footnote'))) {
+                        $parent = $parent->parentNode;
+                    }
+
+                    $citations[substr($href, 1)][] = [$index, $parent instanceof DOMElement ? $parent->getAttribute('id') : null];
                 }
             }
         }
 
-        foreach ($containers as $index => $container) {
-            foreach (iterator_to_array($container->getElementsByTagName('aside')) as $aside) {
-                $target = $cited[$aside->getAttribute('id')] ?? null;
-                if ($target !== null && $target !== $index && self::hasClass($aside, 'footnote')) {
-                    $containers[$target]->appendChild($aside);
-                }
+        /** @var array<string, int|null> $chapters Note id => its chapter (null while being worked out, to stop cycles). */
+        $chapters = [];
+        $chapterOf = static function (string $id) use (&$chapterOf, &$chapters, $citations): ?int {
+            if (array_key_exists($id, $chapters)) {
+                return $chapters[$id];
+            }
+
+            $chapters[$id] = null;
+            $earliest = null;
+            foreach ($citations[$id] ?? [] as [$index, $citingNote]) {
+                $chapter = $citingNote === null ? $index : $chapterOf($citingNote);
+                $earliest = $chapter === null ? $earliest : min($earliest ?? $chapter, $chapter);
+            }
+
+            return $chapters[$id] = $earliest;
+        };
+
+        foreach ($notes as $id => [$aside, $index]) {
+            $target = $chapterOf((string) $id);
+            if ($target !== null && $target !== $index) {
+                $containers[$target]->appendChild($aside);
             }
         }
     }

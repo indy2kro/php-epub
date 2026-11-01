@@ -414,6 +414,22 @@ final class ApplicationTest extends TestCase
         $this->assertSame('Page', EpubFile::open($this->workDir . '/page.epub')->getMetadata()->getTitle());
     }
 
+    public function testBuildRefusesTooManyImagesBeforeReadingThemAll(): void
+    {
+        file_put_contents($this->workDir . '/a.md', '# A');
+        mkdir($this->workDir . '/many');
+        // One more than BuildLimits::$maxImages (2000).
+        for ($index = 0; $index <= 2000; $index++) {
+            file_put_contents($this->workDir . "/many/{$index}.png", 'x');
+        }
+
+        [$code, , $err] = $this->cli(['build', $this->workDir . '/a.md', '-o', $this->workDir . '/x.epub', '--images=' . $this->workDir . '/many']);
+
+        $this->assertSame(3, $code);
+        $this->assertStringContainsString('Too many images', $err);
+        $this->assertFileDoesNotExist($this->workDir . '/x.epub');
+    }
+
     public function testBuildUsageErrorsAndFailures(): void
     {
         file_put_contents($this->workDir . '/notes.rtf', 'x');

@@ -513,12 +513,17 @@ final class Application
 
         $limits = new BuildLimits();
         $images = [];
+        $imageBytes = 0;
         $directory = $input->value('images');
         if ($directory !== null) {
             is_dir($directory) || throw new UsageException("Not a directory: {$directory}");
             foreach (scandir($directory) ?: [] as $name) {
                 $file = $directory . DIRECTORY_SEPARATOR . $name;
                 if (in_array(strtolower(pathinfo($name, PATHINFO_EXTENSION)), self::IMAGE_EXTENSIONS, true) && is_file($file)) {
+                    // The limits apply before the bytes are held, so a large directory cannot exhaust the memory.
+                    count($images) < $limits->maxImages || throw new Exception("Too many images in {$directory}: the limit is {$limits->maxImages}");
+                    $imageBytes += (int) @filesize($file);
+                    $imageBytes <= $limits->maxTotalBytes || throw new Exception("The images in {$directory} are larger than the limit of {$limits->maxTotalBytes} bytes");
                     $images[$name] = $this->readFile($file, $limits->maxImageBytes);
                 }
             }

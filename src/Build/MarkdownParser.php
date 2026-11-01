@@ -64,6 +64,10 @@ final class MarkdownParser
     public function toHtml(string $markdown): string
     {
         $markdown = str_replace(["\r\n", "\r", "\t", "\x00", self::HOLD], ["\n", "\n", '    ', '', ''], $markdown);
+        // Each document has its own footnotes.
+        $this->notes = [];
+        $this->noteNumbers = [];
+        $this->citations = [];
         $lines = $this->extractNotes(explode("\n", $markdown));
 
         return $this->blocks($lines, 0, false) . $this->renderNotes();
@@ -82,15 +86,25 @@ final class MarkdownParser
         $fence = null;
         $label = null;
         foreach ($lines as $line) {
-            if ($fence === null && $label !== null && preg_match('/^ {4}(.*)$/', $line, $match) === 1) {
+            // A fenced block ends at a line of its own character, at least as long, with only white space after it.
+            if ($fence !== null) {
+                if (preg_match('/^ {0,3}' . preg_quote($fence[0], '/') . '{' . strlen($fence) . ',}[ \t]*$/', $line) === 1) {
+                    $fence = null;
+                }
+
+                $kept[] = $line;
+                continue;
+            }
+
+            if ($label !== null && preg_match('/^ {4}(.*)$/', $line, $match) === 1) {
                 $this->notes[$label][] = $match[1];
                 continue;
             }
 
             $label = null;
             if (preg_match('/^ {0,3}(`{3,}|~{3,})/', $line, $match) === 1) {
-                $fence = $fence === null ? $match[1][0] : ($match[1][0] === $fence ? null : $fence);
-            } elseif ($fence === null && preg_match('/^ {0,3}\[\^([^\]\s]{1,100})\]:[ \t]*(.*)$/', $line, $match) === 1) {
+                $fence = $match[1];
+            } elseif (preg_match('/^ {0,3}\[\^([^\]\s]{1,100})\]:[ \t]*(.*)$/', $line, $match) === 1) {
                 $label = $match[1];
                 $this->notes[$label] ??= [];
                 $this->notes[$label][] = $match[2];
@@ -497,12 +511,12 @@ final class MarkdownParser
             $text
         );
 
-        // Footnote citations, before anything could read the brackets as a link.
-        $text = self::replaceCallback('/\[\^([^\]\s]{1,100})\]/', fn (array $match): string => $this->citation($match[1], $match[0]), $text);
-
         // Hard line breaks and backslash escapes.
         $text = self::replaceCallback('/\\\\\n|\\\\([!-\/:-@\[-`{-~])/', fn (array $match): string => $this->hold(isset($match[1]) ? $this->escape($match[1]) : "<br/>\n"), $text);
         $text = self::replaceCallback('/ {2,}\n/', fn (): string => $this->hold("<br/>\n"), $text);
+
+        // Footnote citations: after the escapes, so \[^label] stays text, and before links could read the brackets.
+        $text = self::replaceCallback('/\[\^([^\]\s]{1,100})\]/', fn (array $match): string => $this->citation($match[1], $match[0]), $text);
 
         return $this->spans($this->escape($text));
     }

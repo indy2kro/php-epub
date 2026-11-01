@@ -92,6 +92,52 @@ final class BookBuilderTest extends TestCase
         $book->cleanup();
     }
 
+    public function testANoteCitedByANoteFollowsItIntoItsChapter(): void
+    {
+        $markdown = "# One\n\nA claim.[^a]\n\n# Two\n\nNothing cited.\n\n[^a]: See also.[^b]\n[^b]: The nested note.\n";
+
+        $built = (new BookBuilder(new BookOptions(title: 'Nested')))->fromMarkdown($markdown);
+        $one = $this->chapterHtml($built, 1);
+
+        $this->assertStringContainsString('id="fn-1"', $one);
+        $this->assertStringContainsString('id="fn-2"', $one);
+        $this->assertStringContainsString('href="#fn-2"', $one, 'the nested citation stays a local pop-up link');
+        $this->assertStringNotContainsString('<aside', $this->chapterHtml($built, 2));
+    }
+
+    public function testFootnoteSyntaxInCodeAndEscapesStaysText(): void
+    {
+        $markdown = "# One\n\nCited.[^a] Escaped \\[^a] stays.\n\n````\n```\n[^a]: inside a longer fence\n````\n\n[^a]: The note.\n";
+
+        $one = $this->chapterHtml((new BookBuilder(new BookOptions(title: 'Code')))->fromMarkdown($markdown), 1);
+
+        $this->assertStringContainsString('Escaped [^a] stays.', $one);
+        $this->assertStringContainsString('[^a]: inside a longer fence', $one);
+        $this->assertSame(1, substr_count($one, 'class="noteref"'));
+        $this->assertStringContainsString('The note.', $one);
+    }
+
+    public function testFootnotesOfOneMarkdownDocumentDoNotLeakIntoTheNext(): void
+    {
+        $parser = new \PhpEpub\Build\MarkdownParser();
+        $parser->toHtml("First.[^x]\n\n[^x]: First note.\n");
+
+        $second = $parser->toHtml("Second.[^y]\n\n[^y]: Second note.\n");
+
+        $this->assertStringContainsString('href="#fn-1">1</a>', $second);
+        $this->assertStringNotContainsString('First note', $second);
+    }
+
+    public function testAuthoredHtmlNotesStayWhereTheyAre(): void
+    {
+        $html = '<h1>One</h1><p>Cited<a class="noteref" href="#n1">1</a></p><h1>Two</h1><aside class="footnote" id="n1"><p>Authored note.</p></aside>';
+
+        $built = (new BookBuilder(new BookOptions(title: 'Authored')))->fromHtml($html);
+
+        $this->assertStringNotContainsString('Authored note.', $this->chapterHtml($built, 1));
+        $this->assertStringContainsString('Authored note.', $this->chapterHtml($built, 2));
+    }
+
     public function testMarkdownFootnotesBecomeEpubNotesInTheChapterThatCitesThem(): void
     {
         $markdown = "# One\n\nA claim.[^src] Another.[^2]\n\n# Two\n\nAgain.[^src] An undefined [^nope] stays text.\n\n"
