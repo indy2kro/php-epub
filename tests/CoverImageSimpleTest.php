@@ -211,4 +211,55 @@ XML;
             @unlink($path);
         }
     }
+
+    public function testSetCoverImageKeepsOldWhenUnspinedContentReferencesIt(): void
+    {
+        $opf = <<<XML
+<?xml version="1.0" encoding="UTF-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="uid">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:identifier id="uid">urn:uuid:test</dc:identifier>
+    <dc:title>Test Book</dc:title>
+    <dc:language>en</dc:language>
+    <meta name="cover" content="cover-img"/>
+  </metadata>
+  <manifest>
+    <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>
+    <item id="cover-page" href="cover.xhtml" media-type="application/xhtml+xml"/>
+    <item id="cover-img" href="images/cover.png" media-type="image/png" properties="cover-image"/>
+    <item id="appendix" href="appendix.xhtml" media-type="application/xhtml+xml"/>
+  </manifest>
+  <spine>
+    <itemref idref="cover-page"/>
+  </spine>
+</package>
+XML;
+
+        $path = sys_get_temp_dir() . '/test_cover_unspined.epub';
+        (new EpubBuilder())
+            ->withFile('mimetype', 'application/epub+zip')
+            ->withContainer('EPUB/package.opf')
+            ->withFile('EPUB/package.opf', $opf)
+            ->withFile('EPUB/nav.xhtml', '<html><body></body></html>')
+            ->withFile('EPUB/cover.xhtml', '<html xmlns="http://www.w3.org/1999/xhtml"><body><img src="images/cover.png"/></body></html>')
+            ->withFile('EPUB/appendix.xhtml', '<html xmlns="http://www.w3.org/1999/xhtml"><body><img src="images/cover.png"/></body></html>')
+            ->withFile('EPUB/images/cover.png', base64_decode(EpubBuilder::PNG))
+            ->buildEpub($path);
+
+        $epub = null;
+        try {
+            $epub = EpubFile::open($path);
+            $epub->setCoverImage((string) base64_decode(EpubBuilder::PNG), 'image/png', 'EPUB/images/new-cover.png', true);
+
+            $this->assertInstanceOf(\PhpEpub\ManifestItem::class, $epub->getManifest()->get('cover-img'));
+            $this->assertFileExists($epub->getTempDir() . '/EPUB/images/cover.png');
+            $this->assertStringContainsString(
+                'src="images/cover.png"',
+                $epub->getContentManager()->getContent('EPUB/appendix.xhtml')
+            );
+        } finally {
+            $epub?->close();
+            @unlink($path);
+        }
+    }
 }

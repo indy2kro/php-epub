@@ -170,12 +170,12 @@ class ContentManager
             throw new Exception("Content file does not exist: {$fullPath}");
         }
 
+        // Remove links to the deleted file from other documents
+        $this->removeReferencesTo($this->paths->normalize($filePath));
+
         if (! @unlink($fullPath)) {
             throw new Exception("Failed to delete content from: {$fullPath}");
         }
-
-        // Remove links to the deleted file from other documents
-        $this->removeReferencesTo($filePath);
 
         $item = $this->manifest?->findByPath($filePath);
         if ($item instanceof ManifestItem) {
@@ -227,17 +227,12 @@ class ContentManager
                 continue;
             }
 
-            try {
-                $content = $this->getContent($contentPath);
-                $removed = [$deletedPath => true];
-                $updated = $linkRemover->remove($contentPath, $content, $removed);
+            $content = $this->getContent($contentPath);
+            $removed = [$deletedPath => true];
+            $updated = $linkRemover->remove($contentPath, $content, $removed, true);
 
-                if ($updated !== null) {
-                    $this->updateContent($contentPath, $updated);
-                }
-            } catch (\PhpEpub\Exception) {
-                // If we can't read or process the content, skip it
-                continue;
+            if ($updated !== null) {
+                $this->updateContent($contentPath, $updated);
             }
         }
     }

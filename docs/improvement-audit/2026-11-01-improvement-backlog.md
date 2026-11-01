@@ -30,15 +30,15 @@ BUG-01 to BUG-04, CONV-01, FEAT-01 and SWEEP-01/02.
 | Area | Items | High | Med | Low |
 |---|---:|---:|---:|---:|
 | SEC — untrusted input | 1 | 0 | 0 | 1 |
-| BUG — wrong behaviour | 4 | 0 | 0 | 0 |
-| CONV — converters | 3 | 0 | 0 | 0 |
+| BUG — wrong behaviour | 4 | 1 | 3 | 0 |
+| CONV — converters | 3 | 1 | 1 | 1 |
 | FEAT — new capability | 8 | 0 | 5 | 3 |
-| UX — public API | 3 | 0 | 0 | 2 |
+| UX — public API | 3 | 0 | 1 | 2 |
 | DOC — documentation | 1 | 0 | 0 | 1 |
-| TEST — tests | 3 | 0 | 1 | 1 |
+| TEST — tests | 3 | 0 | 2 | 1 |
 | CI — pipeline | 1 | 0 | 0 | 1 |
 | SWEEP — cross-cutting | 3 | 0 | 2 | 1 |
-| **Total** | **27** | **0** | **8** | **10** |
+| **Total** | **27** | **2** | **14** | **11** |
 
 Effort: S = one file, under 30 min · M = one class plus tests · L = cross-cutting.
 
@@ -92,9 +92,6 @@ hardening. Theme 1 (BUG-01 to BUG-04, UX-02) and Theme 2 (CONV-01, CONV-02, CONV
   Probe: deleting the third spine document of each fixture leaves CONTENT_REFERENCE_MISSING in `valid_2`, `valid_4` and `valid_6` (cross-links from other chapters). The TOC, guide, spine, manifest and encryption entries are all cleaned up.
 - [x] **BUG-04** Make `addChapter()` linear: remember the next free chapter number and append TOC entries without re-reading and re-writing the whole navigation each time (or add `addChapters()`) — `src/EpubFile.php:337-383`, `src/TableOfContents.php:360` — M · med
   Probe: adding 1,500 chapters to a new book takes 31 s, and each batch of 500 is slower than the last (6.7 s, 10.4 s, 14.1 s). `unusedChapterPath()` probes from `chapter-1` every time, and each `addEntry()` rewrites the nav and the NCX.
-- [ ] **BUG-04** Make `addChapter()` linear: remember the next free chapter number and append TOC entries without re-reading and re-writing the whole navigation each time (or add `addChapters()`) — `src/EpubFile.php:337-383`, `src/TableOfContents.php:360` — M · med
-  Probe: adding 1,500 chapters to a new book takes 31 s, and each batch of 500 is slower than the last (6.7 s, 10.4 s, 14.1 s). `unusedChapterPath()` probes from `chapter-1` every time, and each `addEntry()` rewrites the nav and the NCX.
-
 ### Converters
 
 - [x] **CONV-01** Stop `TCPDFAdapter` from failing the whole book on CSS values TCPDF 7 rejects (`width:auto`, `height:auto`): drop or normalise them before `writeHTML()` — `src/Converters/TCPDFAdapter.php:232-250`, `src/Converters/EpubDocumentLoader.php`, `src/Util/CssSanitizer.php` — S · high
@@ -145,7 +142,7 @@ hardening. Theme 1 (BUG-01 to BUG-04, UX-02) and Theme 2 (CONV-01, CONV-02, CONV
   Carried over: round-5 TEST-01 is still open. All 7 committed books are reflowable Latin-script books without fonts, overlays, SVG or a page-progression direction. The EPUB 3 features most likely to break on save are only exercised by synthetic `EpubBuilder` books, and neither of the two OPF namespace layouts behind BUG-01 is covered by a test.
 - [ ] **TEST-02** Convert every real-world fixture with each adapter (Text, HTML, Markdown, Dompdf, TCPDF) in the test suite — `tests/Converters/`, `tests/fixtures/valid*.epub` — S · med
   CONV-01 (TCPDF fails on 2 of 3 real books) passes CI because the converter tests only use synthetic books. A smoke test over `tests/fixtures` would have caught it when `tc-lib-pdf` changed.
-- [ ] **TEST-03** Replace the wall-clock assertion in `MergerTest::testMergingThousandsOfFilesStaysFast` with an operation count, or a budget that allows for coverage — `tests/Merge/MergerTest.php:557-580` — S · low
+- [x] **TEST-03** Replace the wall-clock assertion in `MergerTest::testMergingThousandsOfFilesStaysFast` with an operation count, or a budget that allows for coverage — `tests/Merge/MergerTest.php:557-580` — S · low
   Under Xdebug coverage the test took 13.7 s against an 8 s budget and failed. A local coverage run, or any slow CI runner, reports a false regression.
 
 ### CI

@@ -926,7 +926,7 @@ class EpubFile
     {
         $manifest = $this->getManifest();
         $contentManager = $this->getContentManager();
-        $rewriter = new \PhpEpub\Util\ReferenceRewriter();
+        $rewriter = new \PhpEpub\Util\ReferenceRewriter(xmlParser: $this->xmlParser);
 
         // Find cover pages: guide cover reference and first spine page
         $coverPages = [];
@@ -952,7 +952,12 @@ class EpubFile
         }
 
         // Update references in each cover page
+        $existing = array_flip($contentManager->getContentPaths());
         foreach (array_keys($coverPages) as $pagePath) {
+            if (! isset($existing[$pagePath])) {
+                continue;
+            }
+
             $content = $contentManager->getContent($pagePath);
             $updated = $rewriter->rewriteXml($content, $pagePath, $pagePath, $oldCoverPath, $newCoverPath);
             if ($updated !== null) {
@@ -963,59 +968,45 @@ class EpubFile
 
     /**
      * Checks if a path is referenced by any content in the book.
+     * Uses ReferenceGraph for comprehensive reference checking including CSS url(), srcset, etc.
      */
     private function isPathReferenced(string $path): bool
     {
-        // Check if any content document references this path
-        $pathResolver = new \PhpEpub\Util\PathResolver();
-        $basename = basename($path);
-        $dirname = dirname($path);
+        $manifest = $this->getManifest();
+        $item = $manifest->findByPath($path);
 
-        foreach ($this->getContentManager()->getContentPaths() as $contentPath) {
-            $item = $this->getManifest()->findByPath($contentPath);
-            if ($item === null) {
-                continue;
-            }
+        // If the path is not in the manifest, it's not referenced
+        if (! $item instanceof ManifestItem) {
+            return false;
+        }
 
-            // Skip XML documents that might be in the manifest (like NCX)
-            if (
-                ! str_starts_with($item->mediaType, 'application/xhtml+xml') &&
-                ! str_starts_with($item->mediaType, 'text/html')
-            ) {
-                continue;
-            }
+        // Check every content document, including files not reachable from the reading order.
+        try {
+            $graph = new \PhpEpub\Cleanup\ReferenceGraph(
+                $this->tempDir ?? throw new Exception('EPUB file must be loaded'),
+                $manifest,
+                $this->getSpine(),
+                $this->getMetadata(),
+                new \PhpEpub\Util\PathResolver(),
+                $this->xmlParser
+            );
 
-            try {
-                $content = $this->getContentManager()->getContent($contentPath);
+            $analysis = $graph->analyzeFrom($this->getContentManager()->getContentPaths());
 
-                // Check for various forms of the path in reference attributes
-                // Match src, href, poster, data attributes that reference the exact path
-                // Use path boundaries to avoid matching substrings like "cover.png" in "new-cover.png"
-                $escapedPath = preg_quote($path, '/');
-                $escapedBasename = preg_quote($basename, '/');
-                $escapedUrlPath = preg_quote(rawurlencode($path), '/');
-                $escapedUrlBasename = preg_quote(rawurlencode($basename), '/');
-
-                $patterns = [
-                    // Exact path match
-                    '/(?:src|href|poster|data)\s*=\s*["\']' . $escapedPath . '(?:\?[^"\']*)?(?:#[^"\']*)?["\']/',
-                    // Path ending with basename (basename must be at end or preceded by /)
-                    '/(?:src|href|poster|data)\s*=\s*["\'](?:[^"\']*\/)?' . $escapedBasename . '(?:\?[^"\']*)?(?:#[^"\']*)?["\']/',
-                    // URL-encoded exact path
-                    '/(?:src|href|poster|data)\s*=\s*["\']' . $escapedUrlPath . '(?:\?[^"\']*)?(?:#[^"\']*)?["\']/',
-                    // URL-encoded path ending with basename
-                    '/(?:src|href|poster|data)\s*=\s*["\'](?:[^"\']*\/)?' . $escapedUrlBasename . '(?:\?[^"\']*)?(?:#[^"\']*)?["\']/',
-                ];
-
-                foreach ($patterns as $pattern) {
-                    if (preg_match($pattern, $content)) {
-                        return true;
-                    }
+            // Check if the path appears in any of the references
+            foreach ($analysis->references as $sourcePath => $targets) {
+                if (in_array($path, $targets, true)) {
+                    return true;
                 }
-            } catch (\PhpEpub\Exception) {
-                // If we can't read the content, assume it's referenced
-                continue;
             }
+
+            // Also check the mentioned paths (from unparsable documents)
+            if (in_array($path, $analysis->mentioned, true)) {
+                return true;
+            }
+        } catch (\PhpEpub\Exception) {
+            // If analysis fails, fail closed: assume it's referenced
+            return true;
         }
 
         return false;

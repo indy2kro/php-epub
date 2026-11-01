@@ -27,12 +27,15 @@ final readonly class LinkRemover
     }
 
     /**
-     * The document without its links to the removed files, or null when it has none (or is not well-formed).
+     * The document without its links to removed files, or null when no links were found or a malformed document is ignored.
      *
      * @param string $path The document's path relative to the book root.
      * @param array<string, true> $removed The removed files' paths relative to the book root.
+     * @param bool $failOnMalformed Throw when a document mentions a removed file but cannot be parsed.
+     *
+     * @throws XmlException When $failOnMalformed is true and the document cannot be parsed.
      */
-    public function remove(string $path, string $content, array $removed): ?string
+    public function remove(string $path, string $content, array $removed, bool $failOnMalformed = false): ?string
     {
         $mentioned = false;
         foreach ($removed as $removedPath => $unused) {
@@ -49,7 +52,11 @@ final readonly class LinkRemover
 
         try {
             $root = dom_import_simplexml($this->xmlParser->parseString($content, $path));
-        } catch (XmlException) {
+        } catch (XmlException $exception) {
+            if ($failOnMalformed) {
+                throw $exception;
+            }
+
             return null;
         }
 
@@ -116,6 +123,11 @@ final readonly class LinkRemover
                 if ($xlinkHref !== '') {
                     $target = $this->target($xlinkHref, $path);
                     if ($target !== null && isset($removed[$target])) {
+                        if ($name === 'a') {
+                            while ($element->firstChild instanceof \DOMNode) {
+                                $element->parentNode->insertBefore($element->firstChild, $element);
+                            }
+                        }
                         $element->parentNode->removeChild($element);
                         $changed = true;
                         continue;
@@ -148,9 +160,82 @@ final readonly class LinkRemover
                     }
                 }
             }
+
+            foreach (['srcset', 'imagesrcset'] as $attribute) {
+                $srcset = $element->getAttribute($attribute);
+                if ($srcset === '') {
+                    continue;
+                }
+
+                $updated = $this->removeSrcsetReferences($srcset, $path, $removed);
+                if ($updated !== null) {
+                    $element->setAttribute($attribute, $updated);
+                    $changed = true;
+                }
+            }
         }
 
         return $changed ? ($document->saveXML() ?: null) : null;
+    }
+
+    /**
+     * Removes candidates that point to deleted files, preserving the remaining URLs and descriptors.
+     *
+     * @param array<string, true> $removed
+     */
+    private function removeSrcsetReferences(string $srcset, string $fromPath, array $removed): ?string
+    {
+        $length = strlen($srcset);
+        $position = 0;
+        $changed = false;
+        $kept = [];
+
+        while ($position < $length) {
+            while ($position < $length && (ctype_space($srcset[$position]) || $srcset[$position] === ',')) {
+                $position++;
+            }
+
+            if ($position >= $length) {
+                break;
+            }
+
+            $urlStart = $position;
+            while ($position < $length && ! ctype_space($srcset[$position])) {
+                $position++;
+            }
+
+            $rawUrl = substr($srcset, $urlStart, $position - $urlStart);
+            $url = rtrim($rawUrl, ',');
+            $hasTrailingComma = strlen($url) !== strlen($rawUrl);
+            $descriptor = '';
+
+            if (! $hasTrailingComma) {
+                $descriptorStart = $position;
+                while ($position < $length && $srcset[$position] !== ',') {
+                    $position++;
+                }
+                $descriptor = trim(substr($srcset, $descriptorStart, $position - $descriptorStart));
+            }
+
+            if ($position < $length && $srcset[$position] === ',') {
+                $position++;
+            }
+
+            if ($url === '') {
+                continue;
+            }
+
+            $target = $this->target($url, $fromPath);
+            if ($target !== null && isset($removed[$target])) {
+                $changed = true;
+
+                continue;
+            }
+
+            $kept[] = $descriptor === '' ? $url : $url . ' ' . $descriptor;
+        }
+
+        return $changed ? implode(', ', $kept) : null;
     }
 
     /**

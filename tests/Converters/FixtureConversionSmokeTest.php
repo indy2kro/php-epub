@@ -26,9 +26,9 @@ final class FixtureConversionSmokeTest extends TestCase
 
     public static function setUpBeforeClass(): void
     {
-        self::$outputDir = sys_get_temp_dir() . '/epub_converter_smoke_test';
-        if (! is_dir(self::$outputDir)) {
-            mkdir(self::$outputDir, 0777, true);
+        self::$outputDir = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'epub_converter_smoke_test_' . bin2hex(random_bytes(16));
+        if (! mkdir(self::$outputDir, 0700)) {
+            throw new \RuntimeException('Could not create the fixture conversion output directory.');
         }
     }
 
@@ -40,6 +40,8 @@ final class FixtureConversionSmokeTest extends TestCase
 
     /**
      * Data provider for real-world fixtures
+     *
+     * @return array<string, array{0: string}>
      */
     public static function fixtureProvider(): array
     {
@@ -47,10 +49,25 @@ final class FixtureConversionSmokeTest extends TestCase
         $fixtures = [];
 
         // List all valid*.epub files
-        $files = glob($fixturesDir . '/valid*.epub');
+        $files = glob($fixturesDir . '/valid*.epub') ?: [];
 
         foreach ($files as $file) {
             $fixtures[basename($file)] = [$file];
+        }
+
+        return $fixtures;
+    }
+
+    /**
+     * Keeps the expensive PDF checks focused on the fixture that exposed CONV-01 in CI.
+     *
+     * @return array<string, array{0: string}>
+     */
+    public static function pdfFixtureProvider(): array
+    {
+        $fixtures = self::fixtureProvider();
+        if (getenv('CI') !== false || getenv('GITHUB_ACTIONS') !== false) {
+            $fixtures = array_intersect_key($fixtures, ['valid_4.epub' => true]);
         }
 
         return $fixtures;
@@ -62,10 +79,6 @@ final class FixtureConversionSmokeTest extends TestCase
     #[DataProvider('fixtureProvider')]
     public function testTextAdapterWithFixture(string $fixturePath): void
     {
-        if (! class_exists('\Dompdf\Dompdf') && ! class_exists('\TCPDF')) {
-            $this->markTestSkipped('Neither Dompdf nor TCPDF is installed');
-        }
-
         $epub = EpubFile::open($fixturePath);
         $outputPath = self::$outputDir . '/' . basename($fixturePath, '.epub') . '.txt';
 
@@ -80,7 +93,7 @@ final class FixtureConversionSmokeTest extends TestCase
             // Verify it's valid text (just check it's a string and not empty)
             $content = file_get_contents($outputPath);
             $this->assertIsString($content);
-            $this->assertGreaterThan(100, strlen($content ?? ''));
+            $this->assertGreaterThan(100, strlen($content));
         } finally {
             $epub->close();
             @unlink($outputPath);
@@ -93,10 +106,6 @@ final class FixtureConversionSmokeTest extends TestCase
     #[DataProvider('fixtureProvider')]
     public function testHtmlAdapterWithFixture(string $fixturePath): void
     {
-        if (! class_exists('\Dompdf\Dompdf') && ! class_exists('\TCPDF')) {
-            $this->markTestSkipped('Neither Dompdf nor TCPDF is installed');
-        }
-
         $epub = EpubFile::open($fixturePath);
         $outputPath = self::$outputDir . '/' . basename($fixturePath, '.epub') . '.html';
 
@@ -111,8 +120,8 @@ final class FixtureConversionSmokeTest extends TestCase
             // Verify it's valid HTML
             $content = file_get_contents($outputPath);
             $this->assertIsString($content);
-            $this->assertStringContainsString('<html', $content ?? '');
-            $this->assertStringContainsString('</html>', $content ?? '');
+            $this->assertStringContainsString('<html', $content);
+            $this->assertStringContainsString('</html>', $content);
         } finally {
             $epub->close();
             @unlink($outputPath);
@@ -125,10 +134,6 @@ final class FixtureConversionSmokeTest extends TestCase
     #[DataProvider('fixtureProvider')]
     public function testMarkdownAdapterWithFixture(string $fixturePath): void
     {
-        if (! class_exists('\Dompdf\Dompdf') && ! class_exists('\TCPDF')) {
-            $this->markTestSkipped('Neither Dompdf nor TCPDF is installed');
-        }
-
         $epub = EpubFile::open($fixturePath);
         $outputPath = self::$outputDir . '/' . basename($fixturePath, '.epub') . '.md';
 
@@ -143,7 +148,7 @@ final class FixtureConversionSmokeTest extends TestCase
             // Verify it's valid Markdown (just check it's a string and not empty)
             $content = file_get_contents($outputPath);
             $this->assertIsString($content);
-            $this->assertGreaterThan(100, strlen($content ?? ''));
+            $this->assertGreaterThan(100, strlen($content));
         } finally {
             $epub->close();
             @unlink($outputPath);
@@ -154,20 +159,12 @@ final class FixtureConversionSmokeTest extends TestCase
      * Test that DompdfAdapter can convert each real-world fixture
      *
      * Note: PDF generation can be slow, so this test has a generous timeout.
-     * These tests are skipped in CI when Dompdf is not installed.
      */
-    #[DataProvider('fixtureProvider')]
+    #[DataProvider('pdfFixtureProvider')]
     public function testDompdfAdapterWithFixture(string $fixturePath): void
     {
-        if (! class_exists('\Dompdf\Dompdf')) {
+        if (! class_exists(\Dompdf\Dompdf::class)) {
             $this->markTestSkipped('Dompdf is not installed');
-        }
-
-        // Skip this test in CI to avoid timeout issues
-        // The text, HTML, and Markdown tests above verify the adapters work
-        // and would catch most issues like CONV-01
-        if (getenv('CI') !== false || getenv('GITHUB_ACTIONS') !== false) {
-            $this->markTestSkipped('Skipping slow PDF generation tests in CI');
         }
 
         $epub = EpubFile::open($fixturePath);
@@ -184,7 +181,7 @@ final class FixtureConversionSmokeTest extends TestCase
             // Verify it's a valid PDF (starts with %PDF)
             $content = file_get_contents($outputPath);
             $this->assertIsString($content);
-            $this->assertStringStartsWith('%PDF', $content ?? '');
+            $this->assertStringStartsWith('%PDF', $content);
         } finally {
             $epub->close();
             @unlink($outputPath);
@@ -195,20 +192,12 @@ final class FixtureConversionSmokeTest extends TestCase
      * Test that TCPDFAdapter can convert each real-world fixture
      *
      * Note: PDF generation can be slow, so this test has a generous timeout.
-     * These tests are skipped in CI when TCPDF is not installed.
      */
-    #[DataProvider('fixtureProvider')]
+    #[DataProvider('pdfFixtureProvider')]
     public function testTCPDFAdapterWithFixture(string $fixturePath): void
     {
         if (! class_exists('\TCPDF')) {
             $this->markTestSkipped('TCPDF is not installed');
-        }
-
-        // Skip this test in CI to avoid timeout issues
-        // The text, HTML, and Markdown tests above verify the adapters work
-        // and would catch most issues like CONV-01
-        if (getenv('CI') !== false || getenv('GITHUB_ACTIONS') !== false) {
-            $this->markTestSkipped('Skipping slow PDF generation tests in CI');
         }
 
         $epub = EpubFile::open($fixturePath);
@@ -225,7 +214,7 @@ final class FixtureConversionSmokeTest extends TestCase
             // Verify it's a valid PDF (starts with %PDF)
             $content = file_get_contents($outputPath);
             $this->assertIsString($content);
-            $this->assertStringStartsWith('%PDF', $content ?? '');
+            $this->assertStringStartsWith('%PDF', $content);
         } finally {
             $epub->close();
             @unlink($outputPath);
@@ -237,14 +226,16 @@ final class FixtureConversionSmokeTest extends TestCase
      */
     private static function removeDirectory(string $path): void
     {
-        if (! is_dir($path)) {
+        if (is_link($path) || ! is_dir($path)) {
             return;
         }
 
         $files = array_diff(scandir($path), ['.', '..']);
         foreach ($files as $file) {
             $fullPath = $path . DIRECTORY_SEPARATOR . $file;
-            if (is_dir($fullPath)) {
+            if (is_link($fullPath)) {
+                @unlink($fullPath);
+            } elseif (is_dir($fullPath)) {
                 self::removeDirectory($fullPath);
             } else {
                 @unlink($fullPath);

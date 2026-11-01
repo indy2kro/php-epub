@@ -139,11 +139,9 @@ final class CssSanitizer
      */
     public static function forTcpdf(string $css): string
     {
-        // Remove entire declarations with auto values for width, height, min-width, min-height, max-width, max-height
-        // Match patterns like: width: auto; width:auto; width: auto !important; etc.
-        // This removes the entire property declaration including the semicolon
+        // Remove width and height declarations with auto values, but leave the rule delimiter intact.
         $css = preg_replace(
-            '/\b(?:width|height|min-(?:width|height)|max-(?:width|height))\s*:\s*auto\s*(?:!\s*important)?\s*(?=[;}])[;}]/i',
+            '/\b(?:width|height|min-(?:width|height)|max-(?:width|height))\s*:\s*auto\s*(?:!\s*important)?\s*(?=[;}]|$)/i',
             '',
             $css
         ) ?? $css;

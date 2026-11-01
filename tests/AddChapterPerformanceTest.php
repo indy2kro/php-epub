@@ -55,7 +55,7 @@ final class AddChapterPerformanceTest extends TestCase
         // Add 50 chapters in a batch
         $chapters = [];
         for ($i = 1; $i <= 50; $i++) {
-            $chapters[] = ["Chapter {$i}", "<p>Content of chapter {$i}</p>", null];
+            $chapters[] = ["Chapter {$i}", "<p>Content of chapter {$i}</p>"];
         }
 
         $start = microtime(true);
