@@ -4,8 +4,75 @@ declare(strict_types=1);
 
 namespace PhpEpub\Traits;
 
+use PhpEpub\Exception;
+use PhpEpub\Util\XmlText;
+use SimpleXMLElement;
+
 trait InteractsWithTitle
 {
+    /**
+     * Gets the subtitle: the first dc:title with the EPUB 3 title-type "subtitle"; null when there is none.
+     */
+    public function getSubtitle(): ?string
+    {
+        $subtitle = $this->subtitleElement();
+
+        return $subtitle instanceof SimpleXMLElement ? trim((string) $subtitle) : null;
+    }
+
+    /**
+     * Sets the subtitle: a dc:title refined with title-type "subtitle", which replaces the previous subtitle;
+     * null removes it. The main title is refined as "main" when no title is, so reading systems can tell
+     * the two apart. Subtitles need EPUB 3 refinements: upgrade an EPUB 2 book with upgradeToEpub3() first.
+     *
+     * @throws Exception If the book is EPUB 2, or the subtitle is empty or not valid XML text.
+     */
+    public function setSubtitle(?string $subtitle): void
+    {
+        $this->isEpub3() || throw new Exception('Subtitles need EPUB 3 title-type refinements: call upgradeToEpub3() first');
+        $existing = $this->subtitleElement();
+
+        if ($subtitle === null) {
+            if ($existing instanceof SimpleXMLElement) {
+                $this->removeElement($existing);
+                $this->modified = true;
+            }
+
+            return;
+        }
+
+        trim($subtitle) !== '' || throw new Exception('The subtitle cannot be empty: pass null to remove it');
+        XmlText::assertValid($subtitle);
+
+        if ($existing instanceof SimpleXMLElement) {
+            $this->setText($existing, $subtitle);
+            $this->removeProperties($existing, ['file-as']);
+            $this->modified = true;
+
+            return;
+        }
+
+        $titles = $this->dcElements('title');
+        $main = $titles[$this->mainTitleIndex()] ?? null;
+        if ($main instanceof SimpleXMLElement && $this->refinementValue($main, 'title-type') === null) {
+            $this->addRefinement($main, 'title-type', 'main');
+        }
+
+        $this->addRefinement($this->addDcElement('title', $subtitle), 'title-type', 'subtitle');
+        $this->modified = true;
+    }
+
+    private function subtitleElement(): ?SimpleXMLElement
+    {
+        foreach ($this->dcElements('title') as $element) {
+            if ($this->refinementValue($element, 'title-type') === 'subtitle') {
+                return $element;
+            }
+        }
+
+        return null;
+    }
+
     /**
      * Gets the main title of the EPUB: the dc:title refined with the EPUB 3
      * title-type "main", or else the first dc:title.
