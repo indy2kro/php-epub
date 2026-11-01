@@ -30,22 +30,22 @@ BUG-01 to BUG-04, CONV-01, FEAT-01 and SWEEP-01/02.
 | Area | Items | High | Med | Low |
 |---|---:|---:|---:|---:|
 | SEC — untrusted input | 1 | 0 | 0 | 1 |
-| BUG — wrong behaviour | 4 | 0 | 1 | 0 |
+| BUG — wrong behaviour | 4 | 0 | 0 | 0 |
 | CONV — converters | 3 | 1 | 1 | 1 |
 | FEAT — new capability | 8 | 0 | 5 | 3 |
-| UX — public API | 3 | 0 | 1 | 2 |
+| UX — public API | 3 | 0 | 0 | 2 |
 | DOC — documentation | 1 | 0 | 0 | 1 |
 | TEST — tests | 3 | 0 | 2 | 1 |
 | CI — pipeline | 1 | 0 | 0 | 1 |
 | SWEEP — cross-cutting | 3 | 0 | 2 | 1 |
-| **Total** | **27** | **1** | **13** | **11** |
+| **Total** | **27** | **1** | **11** | **11** |
 
 Effort: S = one file, under 30 min · M = one class plus tests · L = cross-cutting.
 
 The target was 30. Only 27 items held up after checking, and the list was not padded. No security vulnerabilities
 were found. ZIP extraction and directory import, `PathResolver`, `XmlParser`, the stream buffering cap, Dompdf's
 sandbox options, Calibre's shell-free process call and the pinned font downloads were re-checked. SEC-01 is
-hardening. BUG-01, BUG-02 and BUG-03 (the three data integrity bugs) have been completed. CONV-01 makes
+hardening. BUG-01, BUG-02, BUG-03, BUG-04 and UX-02 (all theme 1 items) have been completed. CONV-01 makes
 TCPDF fail on most real books with the current dependencies.
 
 ## Execution instructions
@@ -91,6 +91,8 @@ TCPDF fail on most real books with the current dependencies.
   Probe: `setCoverImage($png, 'image/png', null, true)` on the fixtures leaves CONTENT_REFERENCE_MISSING in 4 of 6 books (`valid`, `valid_2`, `valid_3`, `valid_6`), because the cover XHTML still points at the deleted image. Without `deletePrevious` the cover page keeps showing the old cover.
 - [x] **BUG-03** Make `deleteContent()` remove or unwrap the links and embeds in other documents that point at the deleted file (`LinkRemover`), or report them — `src/ContentManager.php:157-188`, `src/Util/LinkRemover.php` — M · med
   Probe: deleting the third spine document of each fixture leaves CONTENT_REFERENCE_MISSING in `valid_2`, `valid_4` and `valid_6` (cross-links from other chapters). The TOC, guide, spine, manifest and encryption entries are all cleaned up.
+- [x] **BUG-04** Make `addChapter()` linear: remember the next free chapter number and append TOC entries without re-reading and re-writing the whole navigation each time (or add `addChapters()`) — `src/EpubFile.php:337-383`, `src/TableOfContents.php:360` — M · med
+  Probe: adding 1,500 chapters to a new book takes 31 s, and each batch of 500 is slower than the last (6.7 s, 10.4 s, 14.1 s). `unusedChapterPath()` probes from `chapter-1` every time, and each `addEntry()` rewrites the nav and the NCX.
 - [ ] **BUG-04** Make `addChapter()` linear: remember the next free chapter number and append TOC entries without re-reading and re-writing the whole navigation each time (or add `addChapters()`) — `src/EpubFile.php:337-383`, `src/TableOfContents.php:360` — M · med
   Probe: adding 1,500 chapters to a new book takes 31 s, and each batch of 500 is slower than the last (6.7 s, 10.4 s, 14.1 s). `unusedChapterPath()` probes from `chapter-1` every time, and each `addEntry()` rewrites the nav and the NCX.
 
@@ -126,7 +128,7 @@ TCPDF fail on most real books with the current dependencies.
 
 - [ ] **UX-01** Add metadata helpers for typed identifiers (`setIsbn()`, or an identifier with a scheme), the subtitle (`title-type`) and rights — `src/Traits/InteractsWithIdentifier.php:40-66`, `src/Traits/InteractsWithTitle.php:13-51`, `src/Metadata.php:271-300` — M · med
   `getIsbn()`/`getTypedIdentifiers()` read schemes, but `setIdentifiers()` takes plain strings and drops `opf:scheme`/`identifier-type` on changed values. Adding the ISBN a store requires, a subtitle or a copyright line needs raw `setDublinCoreValues()` or hand-written refinement XML.
-- [ ] **UX-02** Let `EpubFile::create()` take `Limits` / `ZipHandler` / `XmlParser` like `open()` — `src/EpubFile.php:300-325` — S · low
+- [x] **UX-02** Let `EpubFile::create()` take `Limits` / `ZipHandler` / `XmlParser` like `open()` — `src/EpubFile.php:300-325` — S · low
   A new book is always saved with the default `ZipHandler` and an uncapped `XmlParser`. Tests cannot inject collaborators, and a service cannot apply its limits to content added later.
 - [ ] **UX-03** Make `Merger::merge()`'s `MergeOptions` optional, and align it with `Splitter` (`split()`/`splitWithReport()` versus `merge()` returning the report) — `src/Merge/Merger.php:75`, `src/Split/Splitter.php:64-74` — S · low
   `merge($books, null, $out)` is a TypeError although every `MergeOptions` field has a default, and the two sibling APIs return their reports differently.
