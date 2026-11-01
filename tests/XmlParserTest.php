@@ -242,6 +242,31 @@ final class XmlParserTest extends TestCase
         (new XmlParser())->save(new SimpleXMLElement('<root/>'), dirname($this->outputXmlFilePath));
     }
 
+    public function testSaveWritesInPlaceInADirectoryWhereNoFileCanBeCreated(): void
+    {
+        $directory = dirname($this->outputXmlFilePath) . DIRECTORY_SEPARATOR . 'read-only';
+        $file = $directory . DIRECTORY_SEPARATOR . 'file.xml';
+        mkdir($directory);
+        file_put_contents($file, '<root>old</root>');
+        chmod($directory, 0555);
+
+        try {
+            if (@touch($directory . DIRECTORY_SEPARATOR . 'probe')) {
+                @unlink($directory . DIRECTORY_SEPARATOR . 'probe');
+                $this->markTestSkipped('Files can be created in a read-only directory here (Windows, or running as root).');
+            }
+
+            (new XmlParser())->save(new SimpleXMLElement('<root>new</root>'), $file);
+
+            $this->assertSame("<?xml version=\"1.0\"?>\n<root>new</root>\n", file_get_contents($file));
+            $this->assertSame(['.', '..', 'file.xml'], scandir($directory));
+        } finally {
+            chmod($directory, 0755);
+            @unlink($file);
+            @rmdir($directory);
+        }
+    }
+
     public function testSaveWritesThroughASymbolicLink(): void
     {
         $directory = dirname($this->outputXmlFilePath);
