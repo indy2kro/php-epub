@@ -149,3 +149,4 @@ hardening. Theme 1 (BUG-01 to BUG-04, UX-02), Theme 2 (CONV-01, CONV-02, CONV-03
 
 - [x] **CI-01** Add a CI job without the optional extensions (`gd`, `intl`, `iconv`), drop the unused `ext-curl` from `require-dev`, and suggest `ext-intl` — `.github/workflows/tests.yml:45-50`, `composer.json` (`require-dev`, `suggest`), `src/ZipHandler.php:332-339`, `src/Util/TextEncoding.php:57-60`, `src/Cleanup/ImageRecompressor.php:34` — S · low
   Every job installs `gd`, and `intl` comes with the runners. The no-GD `compress()` path, the ASCII case-folding fallback and the `iconv` fallback therefore never run in CI, while nothing in `src/` or `tests/` calls `curl`.
+  Done for `gd` and `intl`. The job keeps `iconv`, because Dompdf (a development requirement) cannot be installed or run without it. `TextEncoding` now lets mbstring handle encoding aliases such as `latin1`, so iconv is only the fallback for encodings mbstring does not know.

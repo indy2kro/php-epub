@@ -111,8 +111,9 @@ jobs:
 
   minimal-extensions:
 
-    # gd, intl and iconv are optional: without them compress() skips images, ZipHandler folds names without NFC
-    # normalisation and TextEncoding has only mbstring. The other jobs always have them, so those paths need this one.
+    # gd and intl are optional: without them compress() skips images and ZipHandler folds names without NFC
+    # normalisation. The other jobs always have them, so those paths need this one. iconv stays: the library does not
+    # need it, but Dompdf (a development requirement) and its CSS parser call iconv() without checking for it.
     name: Without optional extensions (PHP 8.3)
 
     runs-on: ubuntu-latest
@@ -129,12 +130,12 @@ jobs:
           with:
             php-version: "8.3"
             # A leading ":" disables an extension the runner's PHP has by default.
-            extensions: xml, zip, dom, mbstring, json, :gd, :intl, :iconv
+            extensions: xml, zip, dom, mbstring, json, :gd, :intl
             coverage: none
 
         - name: Check that the optional extensions are missing
           run: |
-            for extension in gd intl iconv; do
+            for extension in gd intl; do
               if php -m | grep -qix "$extension"; then
                 echo "$extension is loaded" >&2
                 exit 1
