@@ -95,6 +95,26 @@ public function getMarkup(string $filePath): string
 Returns an XHTML or HTML document that is about to be parsed as markup, refusing one larger than `Limits::$maxHtmlBytes` before it is read. Use it instead of `getContent()` when the result goes to a DOM parser. Throws `InvalidEpubException` if the document is larger than the limit, and an exception if the file cannot be read.
 
 ```php
+public function transform(callable $change, ?array $paths = null): array
+```
+
+Runs a DOM edit over the XHTML documents and writes back only those it changed. `$change` receives each document as a `DOMDocument` with its path, edits it in place and returns `true` when it changed something; only then is the document saved (through `updateContent()`, so the manifest properties follow). The documents are the manifest's `application/xhtml+xml` items, the navigation document included (or, without a manifest, the `.xhtml`, `.html` and `.htm` files), in path order; `$paths` limits the run to some of them. Documents that are not well-formed XML, or are encrypted, are skipped. It returns the paths it wrote. Throws `InvalidEpubException` for a document larger than `Limits::$maxHtmlBytes`; an exception thrown by `$change` stops the run, and the documents changed before it stay changed.
+
+```php
+$changed = $epubFile->getContentManager()->transform(static function (DOMDocument $document, string $path): bool {
+    $changed = false;
+    foreach ($document->getElementsByTagName('p') as $paragraph) {
+        if ($paragraph->getAttribute('class') === 'calibre1') {
+            $paragraph->setAttribute('class', 'body');
+            $changed = true;
+        }
+    }
+
+    return $changed;
+});
+```
+
+```php
 public function getText(string $filePath): string
 ```
 
