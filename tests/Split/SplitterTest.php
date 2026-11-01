@@ -345,7 +345,13 @@ final class SplitterTest extends TestCase
         $nav = EpubBuilder::xhtml('Contents', '<nav epub:type="toc"><h1>Contents</h1><ol><li><a href="text/chapter-1.xhtml">One</a></li><li><a href="text/chapter-2.xhtml">Two</a></li></ol></nav>'
             . '<nav epub:type="page-list" hidden="hidden"><ol><li><a href="text/chapter-1.xhtml#p0">i</a></li><li><a href="text/chapter-2.xhtml#p1">1</a></li></ol></nav>'
             . '<nav epub:type="landmarks"><ol><li><a epub:type="bodymatter" href="text/chapter-1.xhtml">Start</a></li><li><a epub:type="endnotes" href="text/chapter-2.xhtml">Notes</a></li></ol></nav>');
-        $book = $this->open(MergeBook::builder(self::UID, 'Book', 2, files: ['EPUB/nav.xhtml' => $nav]));
+        $book = $this->open(MergeBook::builder(
+            self::UID,
+            'Book',
+            2,
+            files: ['EPUB/nav.xhtml' => $nav],
+            chapterBodies: [1 => '<p id="p0">i</p>', 2 => '<p id="p1">1</p>']
+        ));
 
         $parts = $this->split($book, SplitPlan::everySpineItems(1));
 
@@ -482,7 +488,13 @@ final class SplitterTest extends TestCase
         $nav = EpubBuilder::xhtml('Contents', '<nav epub:type="toc"><h1>Contents</h1><ol><li><a href="text/chapter-1.xhtml">One</a></li><li><a href="text/chapter-2.xhtml">Two</a></li></ol></nav>'
             . '<nav epub:type="lot"><h2>Tables</h2><ol><li><a href="text/chapter-1.xhtml">T1</a></li><li><a href="text/chapter-2.xhtml">T2</a></li></ol></nav>'
             . '<nav epub:type="loi"><ol><li><a href="text/chapter-2.xhtml">I2</a><ol><li><a href="text/chapter-2.xhtml#x">I2x</a></li></ol></li></ol></nav>');
-        $book = $this->open(MergeBook::builder(self::UID, 'Book', 2, files: ['EPUB/nav.xhtml' => $nav]));
+        $book = $this->open(MergeBook::builder(
+            self::UID,
+            'Book',
+            2,
+            files: ['EPUB/nav.xhtml' => $nav],
+            chapterBodies: [2 => '<p id="x">Table entry</p>']
+        ));
 
         $parts = $this->split($book, SplitPlan::everySpineItems(1));
 

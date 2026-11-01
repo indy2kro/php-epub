@@ -34,6 +34,37 @@ final class LinkRemoverTest extends TestCase
         $this->assertNull($remover->remove('a.xhtml', '<html xmlns="http://www.w3.org/1999/xhtml"><body><a href="c.xhtml">b.xhtml</a></body></html>', ['b.xhtml' => true]));
     }
 
+    public function testADocumentWithABaseUrlIsLeftAlone(): void
+    {
+        $remover = new LinkRemover();
+
+        $this->assertNull($remover->remove('EPUB/a.xhtml', '<html xmlns="http://www.w3.org/1999/xhtml"><head><base href="../images/"/></head>'
+            . '<body><img src="b.png" alt=""/></body></html>', ['EPUB/b.png' => true]));
+        $this->assertNull($remover->remove('EPUB/a.xhtml', '<html xmlns="http://www.w3.org/1999/xhtml"><body>'
+            . '<div xml:base="../images/"><img src="b.png" alt=""/></div></body></html>', ['EPUB/b.png' => true]));
+    }
+
+    public function testOnlyTheSubtreeOfAnXmlBaseIsLeftAlone(): void
+    {
+        $result = (new LinkRemover())->remove('EPUB/a.xhtml', '<html xmlns="http://www.w3.org/1999/xhtml"><body>'
+            . '<div xml:base="../images/"><img src="b.png" alt="kept"/></div><p><img src="b.png" alt="removed"/></p></body></html>', ['EPUB/b.png' => true]);
+
+        $this->assertNotNull($result);
+        $this->assertStringContainsString('alt="kept"', $result);
+        $this->assertStringNotContainsString('alt="removed"', $result);
+    }
+
+    public function testFindsReferencesInAUtf16Document(): void
+    {
+        $xml = '<?xml version="1.0" encoding="UTF-16"?><html xmlns="http://www.w3.org/1999/xhtml"><body><p><a href="b.xhtml">B</a></p></body></html>';
+        $utf16 = "\xFF\xFE" . (string) mb_convert_encoding($xml, 'UTF-16LE', 'UTF-8');
+
+        $result = (new LinkRemover())->remove('a.xhtml', $utf16, ['b.xhtml' => true]);
+
+        $this->assertNotNull($result);
+        $this->assertStringNotContainsString('href', (string) mb_convert_encoding($result, 'UTF-8', 'UTF-16'));
+    }
+
     public function testADocumentThatIsNotWellFormedIsLeftAlone(): void
     {
         $this->assertNull((new LinkRemover())->remove('a.xhtml', '<html><body><a href="b.xhtml">broken', ['b.xhtml' => true]));

@@ -496,6 +496,7 @@ final class ContentIntegrityTest extends TestCase
             . '<item id="plain" href="text/plain.xhtml" media-type="application/xhtml+xml"/>'
             . '<item id="broken" href="text/broken.xhtml" media-type="application/xhtml+xml"/>'
             . '<item id="css" href="css/style.css" media-type="text/css"/>'
+            . '<item id="otherCss" href="css/other.css" media-type="text/css"/>'
             . '<item id="img" href="img/a.png" media-type="image/png"/>';
 
         return EpubBuilder::epub3()
@@ -522,6 +523,7 @@ final class ContentIntegrityTest extends TestCase
             ->withFile('EPUB/text/plain.xhtml', "<?xml version='1.0'?><html xmlns='http://www.w3.org/1999/xhtml' lang='en'><head><title>P</title></head><body><p>plain</p></body></html>")
             ->withFile('EPUB/text/broken.xhtml', '<html xmlns="http://www.w3.org/1999/xhtml"><body><a href="ch1.xhtml">broken')
             ->withFile('EPUB/css/style.css', "@import \"other.css\";\nbody { background: url(\"../img/a.png\"); }\n.x { background: url(../text/ch1.xhtml#f); }")
+            ->withFile('EPUB/css/other.css', 'p { margin: 0; }')
             ->withFile('EPUB/img/a.png', (string) base64_decode(EpubBuilder::PNG, true));
     }
 

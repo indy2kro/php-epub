@@ -35,6 +35,343 @@ final class ValidatorTest extends TestCase
         $this->assertSame([], $this->open(EpubBuilder::epub3())->validate());
     }
 
+    public function testReportsAManifestFallbackToAnUnknownId(): void
+    {
+        $opf = str_replace(
+            '<item id="style" href="css/style.css" media-type="text/css"/>',
+            '<item id="style" href="css/style.css" media-type="text/css" fallback="missing"/>',
+            (string) EpubBuilder::epub3()->getFile('EPUB/package.opf')
+        );
+
+        $this->assertContains(
+            'MANIFEST_FALLBACK_TARGET_MISSING',
+            $this->codes($this->open(EpubBuilder::epub3()->withFile('EPUB/package.opf', $opf))->validate())
+        );
+    }
+
+    public function testReportsAManifestFallbackCycle(): void
+    {
+        $opf = str_replace(
+            '<item id="style" href="css/style.css" media-type="text/css"/>',
+            '<item id="style" href="css/style.css" media-type="text/css" fallback="alternate"/>'
+                . '<item id="alternate" href="alternate.bin" media-type="application/x-alternate" fallback="style"/>',
+            (string) EpubBuilder::epub3()->getFile('EPUB/package.opf')
+        );
+        $book = EpubBuilder::epub3()
+            ->withFile('EPUB/package.opf', $opf)
+            ->withFile('EPUB/alternate.bin', 'alternate');
+
+        $this->assertContains('MANIFEST_FALLBACK_CYCLE', $this->codes($this->open($book)->validate()));
+    }
+
+    public function testReportsASpineFallbackChainThatNeverReachesAContentDocument(): void
+    {
+        $this->assertContains('MANIFEST_FALLBACK_NOT_CONTENT', $this->codes($this->open($this->spineFallbackBook(
+            '<item id="first" href="first.bin" media-type="application/x-first" fallback="second"/>'
+                . '<item id="second" href="second.bin" media-type="application/x-second"/>'
+        ))->validate()));
+    }
+
+    public function testReportsASpineFallbackChainThatLoopsWithoutAContentDocument(): void
+    {
+        $codes = $this->codes($this->open($this->spineFallbackBook(
+            '<item id="first" href="first.bin" media-type="application/x-first" fallback="second"/>'
+                . '<item id="second" href="second.bin" media-type="application/x-second" fallback="first"/>'
+        ))->validate());
+
+        $this->assertContains('MANIFEST_FALLBACK_CYCLE', $codes);
+        $this->assertContains('MANIFEST_FALLBACK_NOT_CONTENT', $codes);
+    }
+
+    public function testAcceptsASpineFallbackChainThatReachesAContentDocument(): void
+    {
+        $codes = $this->codes($this->open($this->spineFallbackBook(
+            '<item id="first" href="first.bin" media-type="application/x-first" fallback="second"/>'
+                . '<item id="second" href="second.bin" media-type="application/x-second" fallback="chapter"/>'
+        ))->validate());
+
+        $this->assertNotContains('MANIFEST_FALLBACK_NOT_CONTENT', $codes);
+        $this->assertNotContains('SPINE_NOT_CONTENT', $codes);
+    }
+
+    public function testDoesNotRequireAContentDocumentInTheFallbackChainOfANonSpineItem(): void
+    {
+        $opf = str_replace(
+            '<item id="style" href="css/style.css" media-type="text/css"/>',
+            '<item id="style" href="css/style.css" media-type="text/css" fallback="alternate"/>'
+                . '<item id="alternate" href="alternate.bin" media-type="application/x-alternate"/>',
+            (string) EpubBuilder::epub3()->getFile('EPUB/package.opf')
+        );
+        $book = EpubBuilder::epub3()
+            ->withFile('EPUB/package.opf', $opf)
+            ->withFile('EPUB/alternate.bin', 'alternate');
+
+        $this->assertNotContains('MANIFEST_FALLBACK_NOT_CONTENT', $this->codes($this->open($book)->validate()));
+    }
+
+    public function testFallbackChainsThatShareATargetAreNotACycle(): void
+    {
+        $codes = $this->codes($this->open($this->spineFallbackBook(
+            '<item id="first" href="first.bin" media-type="application/x-first" fallback="chapter"/>'
+                . '<item id="second" href="second.bin" media-type="application/x-second" fallback="chapter"/>'
+        ))->validate());
+
+        $this->assertNotContains('MANIFEST_FALLBACK_CYCLE', $codes);
+        $this->assertNotContains('MANIFEST_FALLBACK_NOT_CONTENT', $codes);
+    }
+
+    public function testDoesNotCheckProtocolRelativeStylesheetUrls(): void
+    {
+        $book = EpubBuilder::epub3()->withFile('EPUB/css/style.css', 'p { background: url(//example.com/paper.png); }');
+
+        $this->assertNotContains('CONTENT_REFERENCE_MISSING', $this->codes($this->open($book)->validate()));
+    }
+
+    public function testReportsAnIdOfTheRootElementThatIsRepeated(): void
+    {
+        $chapter = str_replace('<html ', '<html id="dup" ', EpubBuilder::xhtml('Chapter', '<p id="dup">Text</p>'));
+        $book = EpubBuilder::epub3()->withFile('EPUB/text/chapter.xhtml', $chapter);
+
+        $this->assertContains('CONTENT_DUPLICATE_ID', $this->codes($this->open($book)->validate()));
+    }
+
+    /**
+     * A book whose spine starts with the item "first" from $items (manifest XML), before the chapter.
+     */
+    private function spineFallbackBook(string $items): EpubBuilder
+    {
+        $opf = str_replace(
+            ['</manifest>', '<itemref idref="chapter"/>'],
+            [$items . '</manifest>', '<itemref idref="first"/><itemref idref="chapter"/>'],
+            (string) EpubBuilder::epub3()->getFile('EPUB/package.opf')
+        );
+
+        return EpubBuilder::epub3()
+            ->withFile('EPUB/package.opf', $opf)
+            ->withFile('EPUB/first.bin', 'first')
+            ->withFile('EPUB/second.bin', 'second');
+    }
+
+    public function testReportsAMediaOverlayReferenceToAnUnknownId(): void
+    {
+        $opf = str_replace(
+            '<item id="chapter" href="text/chapter.xhtml" media-type="application/xhtml+xml"/>',
+            '<item id="chapter" href="text/chapter.xhtml" media-type="application/xhtml+xml" media-overlay="missing"/>',
+            (string) EpubBuilder::epub3()->getFile('EPUB/package.opf')
+        );
+
+        $this->assertContains(
+            'MANIFEST_MEDIA_OVERLAY_TARGET_MISSING',
+            $this->codes($this->open(EpubBuilder::epub3()->withFile('EPUB/package.opf', $opf))->validate())
+        );
+    }
+
+    public function testReportsAMediaOverlayTargetThatIsNotSmil(): void
+    {
+        $opf = str_replace(
+            '<item id="chapter" href="text/chapter.xhtml" media-type="application/xhtml+xml"/>',
+            '<item id="chapter" href="text/chapter.xhtml" media-type="application/xhtml+xml" media-overlay="style"/>',
+            (string) EpubBuilder::epub3()->getFile('EPUB/package.opf')
+        );
+
+        $this->assertContains(
+            'MANIFEST_MEDIA_OVERLAY_NOT_SMIL',
+            $this->codes($this->open(EpubBuilder::epub3()->withFile('EPUB/package.opf', $opf))->validate())
+        );
+    }
+
+    public function testReportsAMediaOverlayOnAnUnsupportedSourceType(): void
+    {
+        $opf = str_replace(
+            '<item id="chapter" href="text/chapter.xhtml" media-type="application/xhtml+xml"/>',
+            '<item id="chapter" href="text/chapter.xhtml" media-type="application/x-dtbook+xml" media-overlay="overlay"/>'
+                . '<item id="overlay" href="overlay.smil" media-type="application/smil+xml"/>',
+            (string) EpubBuilder::epub3()->getFile('EPUB/package.opf')
+        );
+        $book = EpubBuilder::epub3()
+            ->withFile('EPUB/package.opf', $opf)
+            ->withFile('EPUB/overlay.smil', '<smil/>');
+
+        $issues = array_values(array_filter(
+            $this->open($book)->validate(),
+            static fn (ValidationIssue $issue): bool => $issue->code === 'MANIFEST_MEDIA_OVERLAY_SOURCE_INVALID'
+        ));
+
+        $this->assertCount(1, $issues);
+        $this->assertSame(ValidationIssue::ERROR, $issues[0]->severity);
+        $this->assertSame('EPUB/text/chapter.xhtml', $issues[0]->location);
+    }
+
+    public function testAllowsAMediaOverlayOnAnSvgSource(): void
+    {
+        $opf = str_replace(
+            '</manifest>',
+            '<item id="svg-source" href="images/figure.svg" media-type="image/svg+xml" media-overlay="overlay"/>'
+                . '<item id="overlay" href="overlay.smil" media-type="application/smil+xml"/></manifest>',
+            (string) EpubBuilder::epub3()->getFile('EPUB/package.opf')
+        );
+        $book = EpubBuilder::epub3()
+            ->withFile('EPUB/package.opf', $opf)
+            ->withFile('EPUB/images/figure.svg', '<svg xmlns="http://www.w3.org/2000/svg"/>')
+            ->withFile('EPUB/overlay.smil', '<smil/>');
+
+        $this->assertNotContains(
+            'MANIFEST_MEDIA_OVERLAY_SOURCE_INVALID',
+            $this->codes($this->open($book)->validate())
+        );
+    }
+
+    public function testAllowsValidManifestFallbackChainsAndMediaOverlays(): void
+    {
+        $opf = str_replace(
+            [
+                '<item id="chapter" href="text/chapter.xhtml" media-type="application/xhtml+xml"/>',
+                '<item id="style" href="css/style.css" media-type="text/css"/>',
+            ],
+            [
+                '<item id="chapter" href="text/chapter.xhtml" media-type="application/xhtml+xml" media-overlay="overlay"/>',
+                '<item id="style" href="css/style.css" media-type="text/css" fallback="alternate"/>'
+                    . '<item id="alternate" href="alternate.bin" media-type="application/x-alternate" fallback="chapter"/>'
+                    . '<item id="overlay" href="overlay.smil" media-type="application/smil+xml"/>',
+            ],
+            (string) EpubBuilder::epub3()->getFile('EPUB/package.opf')
+        );
+        $book = EpubBuilder::epub3()
+            ->withFile('EPUB/package.opf', $opf)
+            ->withFile('EPUB/alternate.bin', 'alternate')
+            ->withFile('EPUB/overlay.smil', '<smil/>');
+
+        $codes = $this->codes($this->open($book)->validate());
+        $this->assertSame([], array_values(array_filter(
+            $codes,
+            static fn (string $code): bool => str_starts_with($code, 'MANIFEST_FALLBACK_')
+                || str_starts_with($code, 'MANIFEST_MEDIA_OVERLAY_')
+        )));
+    }
+
+    public function testReportsDuplicateIdsInOneContentDocument(): void
+    {
+        $book = EpubBuilder::epub3()->withFile(
+            'EPUB/text/chapter.xhtml',
+            EpubBuilder::xhtml('Chapter', '<p id="repeated">One</p><p id="repeated">Two</p>', '../css/style.css')
+        );
+
+        $issues = array_values(array_filter(
+            $this->open($book)->validate(),
+            static fn (ValidationIssue $issue): bool => $issue->code === 'CONTENT_DUPLICATE_ID'
+        ));
+
+        $this->assertCount(1, $issues);
+        $this->assertSame(ValidationIssue::ERROR, $issues[0]->severity);
+        $this->assertSame('EPUB/text/chapter.xhtml', $issues[0]->location);
+    }
+
+    public function testReportsDuplicateIdsInTheNavigationDocument(): void
+    {
+        $book = EpubBuilder::epub3()->withFile(
+            'EPUB/nav.xhtml',
+            EpubBuilder::xhtml(
+                'Contents',
+                '<nav epub:type="toc"><ol><li><a href="text/chapter.xhtml">Chapter</a></li></ol></nav>'
+                    . '<p id="repeated">One</p><p id="repeated">Two</p>'
+            )
+        );
+
+        $issues = array_values(array_filter(
+            $this->open($book)->validate(),
+            static fn (ValidationIssue $issue): bool => $issue->code === 'CONTENT_DUPLICATE_ID'
+        ));
+
+        $this->assertCount(1, $issues);
+        $this->assertSame('EPUB/nav.xhtml', $issues[0]->location);
+    }
+
+    public function testReportsASpineWithNoLinearItems(): void
+    {
+        $opf = str_replace('<itemref idref="chapter"/>', '<itemref idref="chapter" linear="no"/>', (string) EpubBuilder::epub3()->getFile('EPUB/package.opf'));
+
+        $this->assertSame(
+            ['SPINE_NO_LINEAR_ITEM'],
+            $this->codes($this->open(EpubBuilder::epub3()->withFile('EPUB/package.opf', $opf))->validate())
+        );
+    }
+
+    public function testAllowsANonLinearSpineItemWhenAnotherIsLinear(): void
+    {
+        $opf = str_replace(
+            ['</manifest>', '<itemref idref="chapter"/>'],
+            ['<item id="appendix" href="text/appendix.xhtml" media-type="application/xhtml+xml"/></manifest>', '<itemref idref="chapter"/><itemref idref="appendix" linear="no"/>'],
+            (string) EpubBuilder::epub3()->getFile('EPUB/package.opf')
+        );
+        $book = EpubBuilder::epub3()
+            ->withFile('EPUB/package.opf', $opf)
+            ->withFile('EPUB/text/appendix.xhtml', EpubBuilder::xhtml('Appendix', '<p>Notes.</p>'));
+
+        $this->assertSame([], $this->codes($this->open($book)->validate()));
+    }
+
+    public function testReportsMultipleCoverImageItems(): void
+    {
+        $opf = str_replace(
+            '</manifest>',
+            '<item id="cover-one" href="cover-one.png" media-type="image/png" properties="cover-image"/>'
+                . '<item id="cover-two" href="cover-two.png" media-type="image/png" properties="cover-image"/></manifest>',
+            (string) EpubBuilder::epub3()->getFile('EPUB/package.opf')
+        );
+        $png = (string) base64_decode(EpubBuilder::PNG, true);
+        $book = EpubBuilder::epub3()
+            ->withFile('EPUB/package.opf', $opf)
+            ->withFile('EPUB/cover-one.png', $png)
+            ->withFile('EPUB/cover-two.png', $png);
+
+        $this->assertSame(['COVER_IMAGE_MULTIPLE'], $this->codes($this->open($book)->validate()));
+    }
+
+    public function testAllowsASingleCoverImageItem(): void
+    {
+        $opf = str_replace(
+            '</manifest>',
+            '<item id="cover" href="cover.png" media-type="image/png" properties="cover-image"/></manifest>',
+            (string) EpubBuilder::epub3()->getFile('EPUB/package.opf')
+        );
+        $book = EpubBuilder::epub3()
+            ->withFile('EPUB/package.opf', $opf)
+            ->withFile('EPUB/cover.png', (string) base64_decode(EpubBuilder::PNG, true));
+
+        $this->assertSame([], $this->codes($this->open($book)->validate()));
+    }
+
+    public function testReportsInvalidRenditionValuesWithoutTighteningGenericSetter(): void
+    {
+        foreach (
+            [
+                'rendition:layout' => 'banana',
+                'rendition:orientation' => 'sideways',
+                'rendition:spread' => 'banana',
+                'rendition:flow' => 'banana',
+            ] as $property => $value
+        ) {
+            $epubFile = $this->open(EpubBuilder::epub3());
+            $metadata = $epubFile->getMetadata();
+            $metadata->setProperty($property, $value);
+
+            $this->assertSame($value, $metadata->getProperty($property));
+            $this->assertSame(['RENDITION_VALUE_INVALID'], $this->codes($epubFile->validate()));
+        }
+    }
+
+    public function testAllowsValidRenditionValues(): void
+    {
+        $epubFile = $this->open(EpubBuilder::epub3());
+        $metadata = $epubFile->getMetadata();
+        $metadata->setProperty('rendition:layout', 'pre-paginated');
+        $metadata->setProperty('rendition:orientation', 'landscape');
+        $metadata->setProperty('rendition:spread', 'both');
+        $metadata->setProperty('rendition:flow', 'scrolled-doc');
+
+        $this->assertSame([], $epubFile->validate());
+    }
+
     public function testABookCreatedFromScratchIsValidOnceItHasAChapterAndAccessibilityMetadata(): void
     {
         $epubFile = EpubFile::create($this->tmpDir . '/new.epub', 'New');
@@ -264,10 +601,9 @@ final class ValidatorTest extends TestCase
 
     public function testACoverImagePropertyNeedsAnImage(): void
     {
-        $opf = str_replace('media-type="text/css"/>', 'media-type="text/css" properties="cover-image"/><item id="cover" href="cover.png" media-type="image/png" properties="cover-image"/>', (string) EpubBuilder::epub3()->getFile('EPUB/package.opf'));
+        $opf = str_replace('media-type="text/css"/>', 'media-type="text/css" properties="cover-image"/>', (string) EpubBuilder::epub3()->getFile('EPUB/package.opf'));
         $book = EpubBuilder::epub3()
-            ->withFile('EPUB/package.opf', $opf)
-            ->withFile('EPUB/cover.png', (string) base64_decode(EpubBuilder::PNG, true));
+            ->withFile('EPUB/package.opf', $opf);
 
         $issues = $this->open($book)->validate();
 
@@ -438,6 +774,65 @@ final class ValidatorTest extends TestCase
         $this->assertSame('EPUB/text/chapter.xhtml', $issues[0]->location);
         $this->assertStringContainsString('#gone', $issues[0]->message);
         $this->assertStringContainsString('#nowhere', $issues[1]->message);
+    }
+
+    public function testReportsMissingResourcesReferencedByExternalStylesheets(): void
+    {
+        $book = EpubBuilder::epub3()->withFile(
+            'EPUB/css/style.css',
+            'p { background-image: url(../img/nope.png); } @import "missing.css";'
+        );
+
+        $issues = array_values(array_filter(
+            $this->open($book)->validate(),
+            static fn (ValidationIssue $issue): bool => $issue->code === 'CONTENT_REFERENCE_MISSING'
+        ));
+
+        $this->assertCount(2, $issues);
+        $this->assertSame(['EPUB/css/style.css', 'EPUB/css/style.css'], array_map(static fn (ValidationIssue $issue): ?string => $issue->location, $issues));
+        $this->assertStringContainsString('EPUB/img/nope.png', $issues[0]->message);
+        $this->assertStringContainsString('EPUB/css/missing.css', $issues[1]->message);
+    }
+
+    public function testReportsMissingResourcesReferencedByInlineCss(): void
+    {
+        $book = EpubBuilder::epub3()->withFile(
+            'EPUB/text/chapter.xhtml',
+            EpubBuilder::xhtml(
+                'Chapter',
+                '<style>p { background: url(../img/style.png); }</style><p style="background: url(../img/attribute.png)">Text</p>',
+                '../css/style.css'
+            )
+        );
+
+        $issues = array_values(array_filter(
+            $this->open($book)->validate(),
+            static fn (ValidationIssue $issue): bool => $issue->code === 'CONTENT_REFERENCE_MISSING'
+        ));
+
+        $this->assertCount(2, $issues);
+        $this->assertSame(['EPUB/text/chapter.xhtml', 'EPUB/text/chapter.xhtml'], array_map(static fn (ValidationIssue $issue): ?string => $issue->location, $issues));
+        $this->assertStringContainsString('EPUB/img/style.png', $issues[0]->message);
+        $this->assertStringContainsString('EPUB/img/attribute.png', $issues[1]->message);
+    }
+
+    public function testReportsMissingFragmentsInNavigationSections(): void
+    {
+        $nav = '<nav epub:type="toc"><ol><li><a href="text/chapter.xhtml#toc-missing">Chapter</a></li></ol></nav>'
+            . '<nav epub:type="landmarks"><ol><li><a href="text/chapter.xhtml#landmark-missing">Start</a></li></ol></nav>'
+            . '<nav epub:type="page-list"><ol><li><a href="text/chapter.xhtml#page-missing">1</a></li></ol></nav>';
+        $book = EpubBuilder::epub3()->withFile('EPUB/nav.xhtml', EpubBuilder::xhtml('Contents', $nav));
+
+        $issues = array_values(array_filter(
+            $this->open($book)->validate(),
+            static fn (ValidationIssue $issue): bool => $issue->code === 'CONTENT_FRAGMENT_MISSING'
+        ));
+
+        $this->assertCount(3, $issues);
+        $this->assertSame('EPUB/nav.xhtml', $issues[0]->location);
+        $this->assertStringContainsString('#toc-missing', $issues[0]->message);
+        $this->assertStringContainsString('#landmark-missing', $issues[1]->message);
+        $this->assertStringContainsString('#page-missing', $issues[2]->message);
     }
 
     public function testChecksTheModifiedDateSyntax(): void

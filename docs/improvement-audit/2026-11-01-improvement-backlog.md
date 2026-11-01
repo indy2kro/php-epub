@@ -45,7 +45,7 @@ Effort: S = one file, under 30 min · M = one class plus tests · L = cross-cutt
 The target was 30. Only 27 items held up after checking, and the list was not padded. No security vulnerabilities
 were found. ZIP extraction and directory import, `PathResolver`, `XmlParser`, the stream buffering cap, Dompdf's
 sandbox options, Calibre's shell-free process call and the pinned font downloads were re-checked. SEC-01 is
-hardening. Theme 1 (BUG-01 to BUG-04, UX-02) and Theme 2 (CONV-01, CONV-02, CONV-03, TEST-02) have been fully completed.
+hardening. Theme 1 (BUG-01 to BUG-04, UX-02), Theme 2 (CONV-01, CONV-02, CONV-03, TEST-02) and Theme 3 (SWEEP-01, FEAT-01, FEAT-02, FEAT-03) have been fully completed.
 
 ## Execution instructions
 
@@ -70,7 +70,7 @@ hardening. Theme 1 (BUG-01 to BUG-04, UX-02) and Theme 2 (CONV-01, CONV-02, CONV
 
 ### Sweeps
 
-- [ ] **SWEEP-01** Add the package and content rules EPUBCheck enforces to `validate()`: duplicate element ids in a document, no linear spine item, more than one `cover-image` item, invalid `rendition:*` values — `src/Validator.php`, `src/Util/Rendition.php`, `src/Metadata.php:189-230` — M · med
+- [x] **SWEEP-01** Add the package and content rules EPUBCheck enforces to `validate()`: duplicate element ids in a document, no linear spine item, more than one `cover-image` item, invalid `rendition:*` values — `src/Validator.php`, `src/Util/Rendition.php`, `src/Metadata.php:189-230` — M · med
   Probe: each of these four books validates clean, and `setProperty('rendition:layout', 'banana')` is accepted too. EPUBCheck rejects all four (RSC-005, OPF-033, cover-image cardinality, the rendition vocabulary).
 - [ ] **SWEEP-02** Name book-relative paths, not the private extraction directory, in exception messages, and let `php-epub validate` report an unreadable book as a problem (exit 1, an issue in `--json`) instead of a failure — `src/Parser.php:35-44`, `src/XmlParser.php:29-44`, `src/EpubFile.php:403-410`, `src/ContentManager.php:164-175`, `src/Cli/Application.php:191-240` — M · med
   Probe: `php-epub validate tests/fixtures/invalid.epub` exits 3 with `XML file not found: C:\…\Temp\epub_<hex>\META-INF\container.xml`, and a broken OPF reports the same temp path. A web service that echoes the message leaks its temp layout, and the user cannot tell which part of the book is wrong.
@@ -105,11 +105,11 @@ hardening. Theme 1 (BUG-01 to BUG-04, UX-02) and Theme 2 (CONV-01, CONV-02, CONV
 
 ### Features
 
-- [ ] **FEAT-01** Check references in stylesheets (`url()`, `@import`, `<style>`, `style` attributes) and the fragments of navigation links (TOC, landmarks, page list) in `validate()` — `src/Validator.php:334-377`, `src/Util/FragmentReferences.php`, `src/Cleanup/ReferenceGraph.php` — M · med
+- [x] **FEAT-01** Check references in stylesheets (`url()`, `@import`, `<style>`, `style` attributes) and the fragments of navigation links (TOC, landmarks, page list) in `validate()` — `src/Validator.php:334-377`, `src/Util/FragmentReferences.php`, `src/Cleanup/ReferenceGraph.php` — M · med
   Probe: a stylesheet with `url(../img/nope.png)` and a TOC entry pointing at `#nofrag` both validate clean, while EPUBCheck reports RSC-007 and RSC-012. `ReferenceGraph` already parses CSS references.
-- [ ] **FEAT-02** Validate manifest `fallback` and `media-overlay` references: unknown ids, fallback cycles, chains that never reach a content document, overlays that are not SMIL — `src/Validator.php:320-330`, `src/Validator.php:847-850`, `src/Manifest.php:224-237`, `src/Manifest.php:559-580` — M · med
+- [x] **FEAT-02** Validate manifest `fallback` and `media-overlay` references: unknown ids, fallback cycles, chains that never reach a content document, overlays that are not SMIL — `src/Validator.php:320-330`, `src/Validator.php:847-850`, `src/Manifest.php:224-237`, `src/Manifest.php:559-580` — M · med
   `hasFallback()` only checks that a `fallback` attribute exists, and `setFallback()`/`setMediaOverlay()` accept cycles. Books that EPUBCheck rejects (OPF-040/045, MED-xxx) pass `validate()`.
-- [ ] **FEAT-03** Add a `Repairer` fix for CONTENT_REFERENCE_MISSING: unwrap links and drop embeds that point at files missing from the book — `src/Repair/RepairFix.php:10-58`, `src/Repair/Repairer.php`, `src/Util/LinkRemover.php` — M · med
+- [x] **FEAT-03** Add a `Repairer` fix for CONTENT_REFERENCE_MISSING: unwrap links and drop embeds that point at files missing from the book — `src/Repair/RepairFix.php:10-58`, `src/Repair/Repairer.php`, `src/Util/LinkRemover.php` — M · med
   Probe: after deleting a chapter of `valid_4`, `repair()` applies 1 fix and 6 CONTENT_REFERENCE_MISSING errors remain. `FragmentLinks` handles missing `#fragments` only, although `LinkRemover` already does the unwrapping.
 - [ ] **FEAT-04** Add `TableOfContents::setPageList()`, which writes the nav `page-list` and the NCX `pageList` together (e.g. generated from `epub:type="pagebreak"` markers) — `src/TableOfContents.php:320-378`, `src/Validator.php:644-660` — M · med
   The page list is read-only, yet `validate()` warns ACCESSIBILITY_PAGE_LIST_MISSING for books with a print source, and the European Accessibility Act expects page navigation. Callers cannot fix a warning the library raises.

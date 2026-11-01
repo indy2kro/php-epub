@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace PhpEpub;
 
 use PhpEpub\Util\ContentDocumentProperties;
+use PhpEpub\Util\CssReferences;
 use PhpEpub\Util\FileSystemHelper;
 use PhpEpub\Util\FragmentReferences;
 use PhpEpub\Util\MetadataSyntax;
 use PhpEpub\Util\PackagePrefixes;
 use PhpEpub\Util\PathResolver;
+use PhpEpub\Util\Rendition;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 use SimpleXMLElement;
@@ -90,11 +92,14 @@ final readonly class Validator
             ...$this->checkEncryption(),
             ...$this->checkMetadata(),
             ...$this->checkMetadataSyntax(),
+            ...$this->checkRenditionValues(),
             ...$this->checkPrefixes(),
             ...$this->checkIds(),
             ...$this->checkManifest(),
+            ...$this->checkManifestReferences(),
             ...$this->checkSpine(),
             ...$this->checkContent(),
+            ...$this->checkStylesheets(),
             ...$this->checkNavigation(),
             ...$this->checkMediaTypes(),
             ...$this->checkManifestProperties(),
@@ -233,6 +238,35 @@ final readonly class Validator
     }
 
     /**
+     * The book-level rendition properties must use values from the EPUB rendition vocabulary.
+     *
+     * @return list<ValidationIssue>
+     */
+    private function checkRenditionValues(): array
+    {
+        if (! $this->isEpub3()) {
+            return [];
+        }
+
+        $issues = [];
+        foreach (Rendition::VALUES as $aspect => $allowedValues) {
+            $property = 'rendition:' . $aspect;
+            foreach ($this->metadata->getPropertyValues($property) as $value) {
+                $value = trim($value);
+                if (! in_array($value, $allowedValues, true)) {
+                    $issues[] = $this->error(
+                        'RENDITION_VALUE_INVALID',
+                        "\"{$value}\" is not a valid value for {$property}; expected one of " . implode(', ', $allowedValues) . '.',
+                        $property
+                    );
+                }
+            }
+        }
+
+        return $issues;
+    }
+
+    /**
      * The prefixes of the properties the package uses ("foo:bar" in a meta property, a manifest or spine item's
      * properties, a link's rel) must be reserved or declared in package@prefix (EPUBCheck OPF-028).
      *
@@ -304,6 +338,133 @@ final readonly class Validator
     /**
      * @return list<ValidationIssue>
      */
+    private function checkManifestReferences(): array
+    {
+        $itemsById = [];
+        foreach ($this->manifest->getItems() as $item) {
+            $itemsById[$item->id] ??= $item;
+        }
+
+        $issues = [];
+        $fallbacks = [];
+        foreach ($this->query('/opf:package/opf:manifest/opf:item[@fallback]') as $node) {
+            $id = (string) $node['id'];
+            $targetId = (string) $node['fallback'];
+            $item = $itemsById[$id] ?? null;
+            if ($targetId === '' || ! isset($itemsById[$targetId])) {
+                $issues[] = $this->error(
+                    'MANIFEST_FALLBACK_TARGET_MISSING',
+                    "Manifest item \"{$id}\" has a fallback to unknown item \"{$targetId}\".",
+                    $item?->path ?: $id
+                );
+            }
+
+            $fallbacks[$id] ??= $targetId;
+        }
+
+        $processed = [];
+        foreach ($fallbacks as $sourceId => $_targetId) {
+            if (isset($processed[$sourceId])) {
+                continue;
+            }
+
+            $path = [];
+            $visited = [];
+            $currentId = $sourceId;
+            while (true) {
+                if (isset($visited[$currentId])) {
+                    $source = $itemsById[$sourceId] ?? null;
+                    $issues[] = $this->error(
+                        'MANIFEST_FALLBACK_CYCLE',
+                        "The fallback chain starting at \"{$sourceId}\" contains a cycle.",
+                        $source?->path ?: $sourceId
+                    );
+                    break;
+                }
+
+                if (isset($processed[$currentId])) {
+                    break;
+                }
+
+                $visited[$currentId] = true;
+                $path[] = $currentId;
+                $targetId = $fallbacks[$currentId] ?? '';
+                if ($targetId === '' || ! isset($itemsById[$targetId])) {
+                    break;
+                }
+
+                $currentId = $targetId;
+            }
+
+            foreach ($path as $id) {
+                $processed[$id] = true;
+            }
+        }
+
+        // A spine item that is not a content document needs a fallback chain that reaches one. Each spine item is
+        // followed on its own, so a chain it shares with another item cannot hide it.
+        foreach ($this->spine->getItems() as $spineItem) {
+            $item = $spineItem->item;
+            if (! $item instanceof ManifestItem || in_array($item->mediaType, self::CONTENT_MEDIA_TYPES, true) || ! isset($fallbacks[$item->id])) {
+                continue;
+            }
+
+            $visited = [];
+            $currentId = $item->id;
+            $reachesContent = false;
+            while (! isset($visited[$currentId]) && isset($itemsById[$currentId])) {
+                $visited[$currentId] = true;
+                if (in_array($itemsById[$currentId]->mediaType, self::CONTENT_MEDIA_TYPES, true)) {
+                    $reachesContent = true;
+                    break;
+                }
+
+                $currentId = $fallbacks[$currentId] ?? '';
+            }
+
+            if (! $reachesContent) {
+                $issues[] = $this->error(
+                    'MANIFEST_FALLBACK_NOT_CONTENT',
+                    "Spine item \"{$item->id}\" is {$item->mediaType}, and its fallback chain never reaches a content document.",
+                    $item->path ?: $item->id
+                );
+            }
+        }
+
+        foreach ($this->query('/opf:package/opf:manifest/opf:item[@media-overlay]') as $node) {
+            $id = (string) $node['id'];
+            $overlayId = (string) $node['media-overlay'];
+            $item = $itemsById[$id] ?? null;
+            $overlay = $itemsById[$overlayId] ?? null;
+            if ($item instanceof ManifestItem && ! in_array($item->mediaType, ['application/xhtml+xml', 'image/svg+xml'], true)) {
+                $issues[] = $this->error(
+                    'MANIFEST_MEDIA_OVERLAY_SOURCE_INVALID',
+                    "Manifest item \"{$id}\" has a media overlay, but its media type is {$item->mediaType}; only XHTML and SVG content documents may have a media overlay.",
+                    $item->path ?: $id
+                );
+            }
+
+            if ($overlayId === '' || ! $overlay instanceof ManifestItem) {
+                $issues[] = $this->error(
+                    'MANIFEST_MEDIA_OVERLAY_TARGET_MISSING',
+                    "Manifest item \"{$id}\" has a media overlay reference to unknown item \"{$overlayId}\".",
+                    $item?->path ?: $id
+                );
+            } elseif ($overlay->mediaType !== 'application/smil+xml') {
+                $issues[] = $this->error(
+                    'MANIFEST_MEDIA_OVERLAY_NOT_SMIL',
+                    "Manifest item \"{$id}\" references media overlay \"{$overlayId}\", whose media type is {$overlay->mediaType}, not application/smil+xml.",
+                    $item?->path ?: $id
+                );
+            }
+        }
+
+        return $issues;
+    }
+
+    /**
+     * @return list<ValidationIssue>
+     */
     private function checkSpine(): array
     {
         $items = $this->spine->getItems();
@@ -312,6 +473,10 @@ final readonly class Validator
         }
 
         $issues = [];
+        if (array_filter($items, static fn (SpineItem $item): bool => $item->linear) === []) {
+            $issues[] = $this->error('SPINE_NO_LINEAR_ITEM', 'The spine has no linear item in its primary reading order.');
+        }
+
         $seen = [];
         foreach ($items as $spineItem) {
             if (isset($seen[$spineItem->idref])) {
@@ -356,6 +521,11 @@ final readonly class Validator
                 continue;
             }
 
+            if ($root instanceof \DOMElement) {
+                array_push($issues, ...$this->checkDuplicateIds($root, $item->path));
+                array_push($issues, ...$this->checkInlineCssReferences($root, $item->path));
+            }
+
             $directory = dirname($item->path) === '.' ? '' : dirname($item->path) . '/';
             $checked = [];
             foreach ($root instanceof \DOMElement ? $root->getElementsByTagName('*') : [] as $element) {
@@ -370,6 +540,137 @@ final readonly class Validator
 
             if ($root instanceof \DOMElement) {
                 array_push($issues, ...$this->checkFragments($fragments, $root, $item->path));
+            }
+        }
+
+        return $issues;
+    }
+
+    /**
+     * Checks local references in the stylesheets listed in the manifest.
+     *
+     * @return list<ValidationIssue>
+     */
+    private function checkStylesheets(): array
+    {
+        $issues = [];
+        foreach ($this->manifest->getItems() as $item) {
+            if (
+                $item->path === '' || isset($this->encrypted[$item->path])
+                || ($item->mediaType !== 'text/css' && strtolower(pathinfo($item->path, PATHINFO_EXTENSION)) !== 'css')
+            ) {
+                continue;
+            }
+
+            $css = $this->readLimitedFile($item->path);
+            if ($css === null) {
+                continue;
+            }
+
+            $directory = dirname($item->path) === '.' ? '' : dirname($item->path) . '/';
+            $checked = [];
+            array_push($issues, ...$this->checkCssReferences($item->path, $css, $directory, $checked));
+        }
+
+        return $issues;
+    }
+
+    /**
+     * Checks local CSS references relative to the document or stylesheet that contains the CSS.
+     *
+     * @param array<string, true> $checked
+     *
+     * @return list<ValidationIssue>
+     */
+    private function checkCssReferences(string $source, string $css, string $directory, array &$checked): array
+    {
+        $issues = [];
+        foreach (CssReferences::parse($css)[0] as $reference) {
+            if (str_starts_with(trim($reference), '//')) {
+                continue;
+            }
+
+            $target = $this->localReference('link', 'href', $reference, $directory);
+            if ($target !== null && ! isset($checked[$target])) {
+                $checked[$target] = true;
+                array_push($issues, ...$this->checkReference($source, $target));
+            }
+        }
+
+        return $issues;
+    }
+
+    /**
+     * Checks the CSS in style elements and style attributes of an XHTML document.
+     *
+     * @return list<ValidationIssue>
+     */
+    private function checkInlineCssReferences(\DOMElement $root, string $source): array
+    {
+        $directory = dirname($source) === '.' ? '' : dirname($source) . '/';
+        $checked = [];
+        $issues = [];
+        foreach (($root->ownerDocument ?? $root)->getElementsByTagName('*') as $element) {
+            foreach ($element->attributes ?? [] as $attribute) {
+                if (strtolower($attribute->localName ?? '') === 'style') {
+                    array_push($issues, ...$this->checkCssReferences($source, $attribute->value, $directory, $checked));
+                }
+            }
+
+            if (strtolower($element->localName ?? '') === 'style') {
+                foreach ($element->childNodes as $child) {
+                    if ($child instanceof \DOMText) {
+                        array_push($issues, ...$this->checkCssReferences($source, $child->data, $directory, $checked));
+                    }
+                }
+            }
+        }
+
+        return $issues;
+    }
+
+    /**
+     * Reads a file only up to the content-document size cap; larger or unreadable files are not judged.
+     */
+    private function readLimitedFile(string $path): ?string
+    {
+        $file = $this->paths->resolve($this->rootDirectory, $path);
+        if (! is_file($file) || (int) @filesize($file) > self::MAX_DOCUMENT_BYTES) {
+            return null;
+        }
+
+        error_clear_last();
+        $content = @file_get_contents($file, false, null, 0, self::MAX_DOCUMENT_BYTES + 1);
+        if ($content === false || error_get_last() !== null || strlen($content) > self::MAX_DOCUMENT_BYTES) {
+            return null;
+        }
+
+        return $content;
+    }
+
+    /**
+     * An XHTML document must not use the same element id more than once.
+     *
+     * @return list<ValidationIssue>
+     */
+    private function checkDuplicateIds(\DOMElement $root, string $document): array
+    {
+        $ids = [];
+        if ($root->hasAttribute('id')) {
+            $ids[$root->getAttribute('id')] = 1;
+        }
+
+        foreach ($root->getElementsByTagName('*') as $element) {
+            if ($element->hasAttribute('id')) {
+                $id = $element->getAttribute('id');
+                $ids[$id] = ($ids[$id] ?? 0) + 1;
+            }
+        }
+
+        $issues = [];
+        foreach ($ids as $id => $count) {
+            if ($count > 1) {
+                $issues[] = $this->error('CONTENT_DUPLICATE_ID', "The id \"{$id}\" is used {$count} times in this content document.", $document);
             }
         }
 
@@ -423,7 +724,7 @@ final readonly class Validator
         if ($target === '' || ! is_file($this->paths->resolve($this->rootDirectory, $target))) {
             $where = $target === '' ? 'a file outside the book' : "{$target}, which does not exist";
 
-            return [$this->error('CONTENT_REFERENCE_MISSING', "The content document refers to {$where}.", $document)];
+            return [$this->error('CONTENT_REFERENCE_MISSING', "The document refers to {$where}.", $document)];
         }
 
         return $this->manifest->findByPath($target) instanceof ManifestItem
@@ -493,10 +794,14 @@ final readonly class Validator
     private function checkManifestProperties(): array
     {
         $issues = [];
+        $coverImages = 0;
         foreach ($this->manifest->getItems() as $item) {
             $declared = preg_split('/\s+/', trim($item->properties), -1, PREG_SPLIT_NO_EMPTY) ?: [];
             if (in_array('cover-image', $declared, true) && ! str_starts_with($item->mediaType, 'image/')) {
                 $issues[] = $this->error('COVER_NOT_IMAGE', "Manifest item \"{$item->id}\" has the cover-image property but is {$item->mediaType}, not an image.", $item->path);
+            }
+            if ($this->isEpub3() && in_array('cover-image', $declared, true)) {
+                $coverImages++;
             }
 
             $needed = $this->isEpub3() ? $this->neededProperties($item) : null;
@@ -511,6 +816,10 @@ final readonly class Validator
                     $issues[] = $this->warning('MANIFEST_PROPERTY_UNNEEDED', "Manifest item \"{$item->id}\" has the \"{$property}\" property, but its content does not need it.", $item->path);
                 }
             }
+        }
+
+        if ($coverImages > 1) {
+            $issues[] = $this->error('COVER_IMAGE_MULTIPLE', "The manifest has {$coverImages} items with the cover-image property; only one is allowed.");
         }
 
         return $issues;
@@ -740,7 +1049,27 @@ final readonly class Validator
             return [$this->error('NCX_UID_MISMATCH', 'The NCX\'s dtb:uid differs from the package\'s unique identifier; save() corrects it.', $item->path)];
         }
 
-        return $isNav && $this->hasEmptyTocList($xml) ? [$this->error('NAV_EMPTY', 'The navigation document\'s toc has no list item.', $item->path)] : [];
+        if (! $isNav) {
+            return [];
+        }
+
+        $root = dom_import_simplexml($xml);
+        $issues = [];
+        if ($root instanceof \DOMElement) {
+            array_push($issues, ...$this->checkDuplicateIds($root, $item->path));
+            array_push($issues, ...$this->checkInlineCssReferences($root, $item->path));
+            array_push($issues, ...$this->checkFragments(
+                new FragmentReferences($this->rootDirectory, $this->paths, $this->xmlParser),
+                $root,
+                $item->path
+            ));
+        }
+
+        if ($this->hasEmptyTocList($xml)) {
+            $issues[] = $this->error('NAV_EMPTY', 'The navigation document\'s toc has no list item.', $item->path);
+        }
+
+        return $issues;
     }
 
     /**
