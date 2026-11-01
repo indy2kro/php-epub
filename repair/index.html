@@ -233,6 +233,11 @@ $epubFile-&gt;save('/path/to/repaired.epub');
 <td>Drops the <code>META-INF/encryption.xml</code> entries (font obfuscation) of files that are not in the book. A DRM-protected book and an entry that points outside the book are left alone</td>
 </tr>
 <tr>
+<td><code>ContentReferences</code></td>
+<td><code>CONTENT_REFERENCE_MISSING</code></td>
+<td>Unlinks links to files missing from the book (keeping their text) and removes embeds that refer to them. External links, same-document references, escaping paths and DRM-protected books are left alone</td>
+</tr>
+<tr>
 <td><code>FragmentLinks</code></td>
 <td><code>CONTENT_FRAGMENT_MISSING</code></td>
 <td>A link to a missing element of another document loses its <code>#fragment</code> and keeps pointing at the document; a link to a missing element of its own document is unlinked (its content stays as text; an anchor that is itself a target only loses its <code>href</code>)</td>
@@ -250,7 +255,7 @@ $epubFile-&gt;save('/path/to/repaired.epub');
 </tbody>
 </table>
 <p>Fixes that address manifest items by id (<code>MissingFiles</code>, <code>MediaTypes</code>, <code>Cover</code>, <code>ManifestProperties</code>, <code>UpgradeToEpub3</code>) are skipped while the manifest repeats an id and <code>DuplicateIds</code> is not selected: they could change the wrong item.</p>
-<p>Everything else <code>validate()</code> reports has no safe fix and stays (a missing title, XHTML that is not well-formed, content documents that refer to missing files, hrefs that point outside the book, unreadable navigation).</p>
+<p>Everything else <code>validate()</code> reports has no safe fix and stays (a missing title, XHTML that is not well-formed, content references in unsupported forms (such as CSS URLs), hrefs that point outside the book, unreadable navigation).</p>
 <h2 id="choosing-the-fixes">Choosing the fixes<a class="headerlink" href="#choosing-the-fixes" title="Permanent link">&para;</a></h2>
 <pre class="codehilite"><code class="language-php">use PhpEpub\Repair\RepairFix;
 use PhpEpub\Repair\RepairOptions;

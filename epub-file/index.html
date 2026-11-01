@@ -369,14 +369,34 @@ $epubFile-&gt;save();
 <td>A file of the publication is not listed in the manifest</td>
 </tr>
 <tr>
-<td><code>SPINE_EMPTY</code>, <code>SPINE_UNKNOWN_IDREF</code>, <code>SPINE_DUPLICATE_IDREF</code></td>
+<td><code>SPINE_EMPTY</code>, <code>SPINE_NO_LINEAR_ITEM</code>, <code>SPINE_UNKNOWN_IDREF</code>, <code>SPINE_DUPLICATE_IDREF</code></td>
 <td>error</td>
-<td>The reading order is empty, or refers to an unknown or repeated item</td>
+<td>The reading order is empty, has no linear item, or refers to an unknown or repeated item</td>
 </tr>
 <tr>
 <td><code>SPINE_NOT_CONTENT</code></td>
 <td>warning</td>
 <td>A spine item is not a content document and has no fallback</td>
+</tr>
+<tr>
+<td><code>MANIFEST_FALLBACK_TARGET_MISSING</code>, <code>MANIFEST_FALLBACK_CYCLE</code></td>
+<td>error</td>
+<td>A manifest <code>fallback</code> names an unknown item, or a fallback chain loops</td>
+</tr>
+<tr>
+<td><code>MANIFEST_FALLBACK_NOT_CONTENT</code></td>
+<td>error</td>
+<td>A spine item that is not a content document has a fallback chain that never reaches one</td>
+</tr>
+<tr>
+<td><code>MANIFEST_MEDIA_OVERLAY_SOURCE_INVALID</code></td>
+<td>error</td>
+<td>An item that is not an XHTML or SVG content document has a <code>media-overlay</code></td>
+</tr>
+<tr>
+<td><code>MANIFEST_MEDIA_OVERLAY_TARGET_MISSING</code>, <code>MANIFEST_MEDIA_OVERLAY_NOT_SMIL</code></td>
+<td>error</td>
+<td>A <code>media-overlay</code> names an unknown item, or one that is not <code>application/smil+xml</code></td>
 </tr>
 <tr>
 <td><code>CONTENT_ENCRYPTED</code></td>
@@ -392,6 +412,11 @@ $epubFile-&gt;save();
 <td><code>CONTENT_NOT_WELL_FORMED</code></td>
 <td>error</td>
 <td>An XHTML content document is not well-formed XML</td>
+</tr>
+<tr>
+<td><code>CONTENT_DUPLICATE_ID</code></td>
+<td>error</td>
+<td>An XHTML content or navigation document uses an element <code>id</code> more than once</td>
 </tr>
 <tr>
 <td><code>MEDIA_TYPE_MISMATCH</code></td>
@@ -414,14 +439,24 @@ $epubFile-&gt;save();
 <td>A manifest item with the <code>cover-image</code> property is not an image</td>
 </tr>
 <tr>
+<td><code>COVER_IMAGE_MULTIPLE</code></td>
+<td>error</td>
+<td>More than one manifest item has the <code>cover-image</code> property</td>
+</tr>
+<tr>
+<td><code>RENDITION_VALUE_INVALID</code></td>
+<td>error</td>
+<td>An EPUB 3 <code>rendition:layout</code>, <code>rendition:orientation</code>, <code>rendition:spread</code> or <code>rendition:flow</code> value is outside its vocabulary</td>
+</tr>
+<tr>
 <td><code>CONTENT_REFERENCE_MISSING</code>, <code>CONTENT_REFERENCE_NOT_IN_MANIFEST</code></td>
 <td>error</td>
-<td>A content document refers (<code>src</code>, <code>href</code>, <code>data</code>, <code>poster</code>) to a local file that is missing or outside the book, or that is not in the manifest; remote URLs and <code>data:</code> URIs are not checked</td>
+<td>A content document (<code>src</code>, <code>href</code>, <code>data</code>, <code>poster</code>) or a stylesheet (CSS <code>url()</code> and <code>@import</code> in CSS files, <code>&lt;style&gt;</code> elements and <code>style</code> attributes) refers to a local file that is missing or outside the book, or that is not in the manifest; remote URLs and <code>data:</code> URIs are not checked</td>
 </tr>
 <tr>
 <td><code>CONTENT_FRAGMENT_MISSING</code></td>
 <td>error</td>
-<td>A link (<code>a</code>, <code>area</code>, SVG <code>use</code> or <code>image</code>) names a <code>#fragment</code> that is not an element id of its target XHTML or SVG document, or of the document itself (<code>#top</code> and <code>#epubcfi(…)</code> are not judged)</td>
+<td>A link (<code>a</code>, <code>area</code>, SVG <code>use</code> or <code>image</code>, including the table of contents, landmarks and page list of the navigation document) names a <code>#fragment</code> that is not an element id of its target XHTML or SVG document, or of the document itself (<code>#top</code> and <code>#epubcfi(…)</code> are not judged)</td>
 </tr>
 <tr>
 <td><code>NAV_MISSING</code> / <code>NCX_MISSING</code></td>
