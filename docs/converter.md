@@ -2,36 +2,49 @@
 
 The `Converter` class converts an extracted EPUB into other formats by dispatching to format-specific adapters (PDF via Dompdf or TCPDF, MOBI/AZW3/… via Calibre).
 
+**Note**: For most use cases, we recommend using `EpubFile::convert()` directly (see the [Usage Example](#usage-example) below), as it automatically handles DRM protection checks, saves unsaved edits, and applies the book's limits to the converter.
+
 ## Key Methods
 
 - **`__construct(string $epubDirectory, array $adapters)`**: Initializes the `Converter` with the directory containing the extracted EPUB and a map of format => `ConverterInterface` adapter. Throws an exception if the directory does not exist.
 
-- **`convert(string $format, string $outputPath): void`**: Converts the EPUB with the adapter registered for `$format`. Throws an exception if the format is not supported or if the conversion fails.
+- **`convert(string $format, string $outputPath): void`**: Converts the EPUB with the adapter registered for `$format`. Throws an exception if the format is not supported or if the conversion fails. **Note**: This method bypasses DRM checks and the book's limits; use `EpubFile::convert()` for a safer alternative.
 
 Every adapter accepts the extracted directory. `CalibreAdapter` also accepts an `.epub` file; given a directory, it packages it into a temporary `.epub` first.
 
 ## Usage Example
 
+The recommended way to convert a book is through `EpubFile::convert()`. This ensures that:
+- DRM-protected books are refused
+- The book's unsaved edits are saved before conversion
+- The book's `Limits` are applied to the converter (for `LimitsAwareConverter` adapters)
+
 ```php
 use PhpEpub\ConversionException;
-use PhpEpub\Converter;
 use PhpEpub\Converters\CalibreAdapter;
 use PhpEpub\Converters\DompdfAdapter;
 use PhpEpub\EpubFile;
 
 $epubFile = EpubFile::open('/path/to/book.epub');
 
-$converter = new Converter($epubFile->getTempDir(), [
-    'pdf' => new DompdfAdapter(),
-    'mobi' => new CalibreAdapter(['calibre_path' => '/usr/bin/ebook-convert']),
-]);
-
 try {
-    $converter->convert('pdf', '/path/to/output.pdf');
-    $converter->convert('mobi', '/path/to/output.mobi');
+    $epubFile->convert(new DompdfAdapter(), '/path/to/output.pdf');
+    $epubFile->convert(new CalibreAdapter(['calibre_path' => '/usr/bin/ebook-convert']), '/path/to/output.mobi');
 } catch (ConversionException $e) {
     echo "Conversion failed: " . $e->getMessage();
 }
+```
+
+For more complex scenarios (multiple conversions with the same adapters), you can still use the `Converter` class with the extracted directory, but be aware that it bypasses the safety checks mentioned above:
+
+```php
+use PhpEpub\Converter;
+use PhpEpub\Converters\DompdfAdapter;
+use PhpEpub\EpubFile;
+
+$epubFile = EpubFile::open('/path/to/book.epub');
+$converter = new Converter($epubFile->getTempDir(), ['pdf' => new DompdfAdapter()]);
+$converter->convert('pdf', '/path/to/output.pdf');
 ```
 
 ## Limits and options for untrusted books
