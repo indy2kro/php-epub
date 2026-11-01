@@ -7,7 +7,13 @@ namespace PhpEpub\Build;
 /**
  * A small CommonMark-style Markdown to HTML converter for BookBuilder: ATX and setext headings, paragraphs, emphasis,
  * strong text, strikethrough, code spans, fenced and indented code, block quotes, nested lists, thematic breaks,
- * links, images, autolinks, hard breaks and GFM tables.
+ * links, images, autolinks, hard breaks, GFM tables and footnotes.
+ *
+ * Footnotes ("[^label]" in the text, "[^label]: note" on a line of its own, continued by indented lines) are numbered
+ * in the order they are first cited. A citation becomes <sup><a class="noteref" id="fnref-N" href="#fn-N">N</a></sup>
+ * and each cited note an <aside class="footnote" id="fn-N"> at the end, with a class="footnote-back" link back;
+ * BookBuilder places the notes and marks them up as EPUB 3 notes. Notes that are never cited are left out, and a
+ * citation of an undefined label stays as it is written.
  *
  * Raw HTML in the Markdown is not passed through: "<" and "&" are always escaped, so the output holds only the elements
  * this class writes. Link and image targets are written as given; BookBuilder's sanitiser decides which survive.
@@ -34,11 +40,101 @@ final class MarkdownParser
      */
     private array $slugs = [];
 
+    /**
+     * Footnote definitions: label => their Markdown lines.
+     *
+     * @var array<string, list<string>>
+     */
+    private array $notes = [];
+
+    /**
+     * The number of each cited footnote label, in citation order.
+     *
+     * @var array<string, int>
+     */
+    private array $noteNumbers = [];
+
+    /**
+     * How often each footnote has been cited, for the ids of the citations.
+     *
+     * @var array<string, int>
+     */
+    private array $citations = [];
+
     public function toHtml(string $markdown): string
     {
         $markdown = str_replace(["\r\n", "\r", "\t", "\x00", self::HOLD], ["\n", "\n", '    ', '', ''], $markdown);
+        $lines = $this->extractNotes(explode("\n", $markdown));
 
-        return $this->blocks(explode("\n", $markdown), 0, false);
+        return $this->blocks($lines, 0, false) . $this->renderNotes();
+    }
+
+    /**
+     * Takes the footnote definitions out of the lines (outside fenced code), keeping them in $notes.
+     *
+     * @param list<string> $lines
+     *
+     * @return list<string>
+     */
+    private function extractNotes(array $lines): array
+    {
+        $kept = [];
+        $fence = null;
+        $label = null;
+        foreach ($lines as $line) {
+            if ($fence === null && $label !== null && preg_match('/^ {4}(.*)$/', $line, $match) === 1) {
+                $this->notes[$label][] = $match[1];
+                continue;
+            }
+
+            $label = null;
+            if (preg_match('/^ {0,3}(`{3,}|~{3,})/', $line, $match) === 1) {
+                $fence = $fence === null ? $match[1][0] : ($match[1][0] === $fence ? null : $fence);
+            } elseif ($fence === null && preg_match('/^ {0,3}\[\^([^\]\s]{1,100})\]:[ \t]*(.*)$/', $line, $match) === 1) {
+                $label = $match[1];
+                $this->notes[$label] ??= [];
+                $this->notes[$label][] = $match[2];
+                continue;
+            }
+
+            $kept[] = $line;
+        }
+
+        return $kept;
+    }
+
+    /**
+     * The asides of the cited footnotes, in number order; a note may cite further notes, which follow.
+     */
+    private function renderNotes(): string
+    {
+        $html = '';
+        $labels = array_keys($this->noteNumbers);
+        for ($index = 0; $index < count($labels); $index++) {
+            $number = $index + 1;
+            $body = $this->blocks($this->notes[$labels[$index]] ?? [], 1, false);
+            $html .= '<aside class="footnote" id="fn-' . $number . '">' . "\n" . $body
+                . '<p><a class="footnote-back" href="#fnref-' . $number . '">↩</a></p>' . "</aside>\n";
+            $labels = array_keys($this->noteNumbers);
+        }
+
+        return $html;
+    }
+
+    /**
+     * A citation of a defined footnote, held as rendered HTML; the text as written for an undefined label.
+     */
+    private function citation(string $label, string $written): string
+    {
+        if (! isset($this->notes[$label])) {
+            return $written;
+        }
+
+        $number = $this->noteNumbers[$label] ??= count($this->noteNumbers) + 1;
+        $count = $this->citations[$label] = ($this->citations[$label] ?? 0) + 1;
+        $id = 'fnref-' . $number . ($count === 1 ? '' : '-' . $count);
+
+        return $this->hold('<sup><a class="noteref" id="' . $id . '" href="#fn-' . $number . '">' . $number . '</a></sup>');
     }
 
     /**
@@ -400,6 +496,9 @@ final class MarkdownParser
             },
             $text
         );
+
+        // Footnote citations, before anything could read the brackets as a link.
+        $text = self::replaceCallback('/\[\^([^\]\s]{1,100})\]/', fn (array $match): string => $this->citation($match[1], $match[0]), $text);
 
         // Hard line breaks and backslash escapes.
         $text = self::replaceCallback('/\\\\\n|\\\\([!-\/:-@\[-`{-~])/', fn (array $match): string => $this->hold(isset($match[1]) ? $this->escape($match[1]) : "<br/>\n"), $text);

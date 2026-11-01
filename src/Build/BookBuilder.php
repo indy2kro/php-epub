@@ -660,6 +660,8 @@ final readonly class BookBuilder
             $containers[] = $container;
         }
 
+        self::placeFootnotes($containers);
+
         /** @var array<string, int> $ids Id => index of the chapter that has it. */
         $ids = [];
         foreach ($containers as $index => $container) {
@@ -701,10 +703,56 @@ final readonly class BookBuilder
                 $xhtml .= (string) $container->ownerDocument?->saveXML($child);
             }
 
-            $documents[] = $xhtml;
+            $documents[] = self::markNotes($xhtml);
         }
 
         return $documents;
+    }
+
+    /**
+     * Moves each footnote (<aside class="footnote" id="...">) into the chapter of its first citation (<a class="noteref"
+     * href="#...">), at its end, so reading systems can show the note as a pop-up in that chapter.
+     *
+     * @param list<DOMElement> $containers
+     */
+    private static function placeFootnotes(array $containers): void
+    {
+        /** @var array<string, int> $cited Note id => index of the chapter that cites it first. */
+        $cited = [];
+        foreach ($containers as $index => $container) {
+            foreach ($container->getElementsByTagName('a') as $link) {
+                $href = $link->getAttribute('href');
+                if (self::hasClass($link, 'noteref') && str_starts_with($href, '#')) {
+                    $cited[substr($href, 1)] ??= $index;
+                }
+            }
+        }
+
+        foreach ($containers as $index => $container) {
+            foreach (iterator_to_array($container->getElementsByTagName('aside')) as $aside) {
+                $target = $cited[$aside->getAttribute('id')] ?? null;
+                if ($target !== null && $target !== $index && self::hasClass($aside, 'footnote')) {
+                    $containers[$target]->appendChild($aside);
+                }
+            }
+        }
+    }
+
+    /**
+     * Marks the footnotes up as EPUB 3 notes (epub:type, and the DPUB-ARIA role), which the sanitiser does not keep.
+     */
+    private static function markNotes(string $xhtml): string
+    {
+        return (string) preg_replace(
+            ['/<a((?: [a-z-]+="[^"]*")*?) class="noteref"/', '/<aside((?: [a-z-]+="[^"]*")*?) class="footnote"/', '/<a((?: [a-z-]+="[^"]*")*?) class="footnote-back"/'],
+            ['<a$1 class="noteref" epub:type="noteref" role="doc-noteref"', '<aside$1 class="footnote" epub:type="footnote" role="doc-footnote"', '<a$1 class="footnote-back" role="doc-backlink"'],
+            $xhtml
+        );
+    }
+
+    private static function hasClass(DOMElement $element, string $class): bool
+    {
+        return in_array($class, preg_split('/\s+/', trim($element->getAttribute('class'))) ?: [], true);
     }
 
     /**
