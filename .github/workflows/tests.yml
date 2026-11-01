@@ -244,14 +244,21 @@ jobs:
 
   epubcheck:
 
-    # Books saved by the library are checked with the W3C reference validator (tests/EpubCheckTest.php).
-    name: EPUBCheck
+    # Books saved by the library are checked with the W3C reference validator (tests/EpubCheckTest.php). Each check
+    # starts a JVM, so the cases are split over parallel jobs: EPUBCHECK_SHARD runs every third case in run order.
+    name: EPUBCheck (${{ matrix.shard }}/3)
 
     runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
 
     env:
       EPUBCHECK_VERSION: "5.4.0"
       EPUBCHECK_SHA256: "33350c61038e71dfb3d45a76aed04bf5481e6d5500cb780f6e98db8bbd15a28c"
+      EPUBCHECK_SHARD: "${{ matrix.shard }}/3"
 
     steps:
 

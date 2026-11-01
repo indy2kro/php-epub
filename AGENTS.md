@@ -114,7 +114,8 @@ Every byte of a book is treated as hostile. Preserve these invariants:
 - `tests/EpubCheckTest.php` (group `epubcheck`) saves edited EPUB 3 and EPUB 2 books and the real-world fixtures and,
   when `EPUBCHECK_JAR` points at `epubcheck.jar`, validates them with EPUBCheck (a fixture's saved copy may not add
   errors its original lacks) (`EPUBCHECK_JAVA` overrides the java binary). CI runs it
-  in the `epubcheck` job: `EPUBCHECK_JAR=/path/to/epubcheck.jar vendor/bin/phpunit --group epubcheck`
+  in the `epubcheck` job: `EPUBCHECK_JAR=/path/to/epubcheck.jar vendor/bin/phpunit --group epubcheck`. The job is a
+  matrix of three parallel shards: `EPUBCHECK_SHARD=2/3` runs every third case (in run order), the second of three.
 - `tests/DocumentationExamplesTest.php` extracts every fenced `php` block from `README.md` and `docs/**/*.md`, checks
   that it parses, that the `PhpEpub\...` classes it imports exist and that every method it calls is a public method
   of a class in `src/`. Blocks that are API signatures (starting with `public`) are wrapped automatically; a block
