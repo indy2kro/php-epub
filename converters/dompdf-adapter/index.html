@@ -142,6 +142,7 @@
               
                 <h1 id="dompdfadapter">DompdfAdapter<a class="headerlink" href="#dompdfadapter" title="Permanent link">&para;</a></h1>
 <p>The <code>DompdfAdapter</code> class converts EPUB content into PDF using the Dompdf library (<code>composer require dompdf/dompdf</code>).</p>
+<p>Dompdf needs the <code>gd</code> extension to embed PNG, GIF and WebP images; without it, converting a book that has such images throws a <code>ConversionException</code> ("The PHP GD extension is required"). TCPDF needs <code>gd</code> as well for PNG images with an alpha channel.</p>
 <h2 id="key-methods">Key Methods<a class="headerlink" href="#key-methods" title="Permanent link">&para;</a></h2>
 <ul>
 <li>

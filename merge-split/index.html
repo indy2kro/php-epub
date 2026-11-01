@@ -302,6 +302,7 @@ public function withClock(\Closure $clock): self;
 public function withMaxParts(int $maxParts): self;
 </code></pre>
 
+<p>A plan's public <code>kind</code> property, a <code>PhpEpub\Split\SplitKind</code>, says which factory made it: <code>SplitKind::Toc</code> (<code>byToc()</code>, with <code>level</code>), <code>SplitKind::Count</code> (<code>everySpineItems()</code>, with <code>count</code>), <code>SplitKind::Ranges</code> (<code>bySpineRanges()</code>, with <code>ranges</code>) or <code>SplitKind::Bytes</code> (<code>byMaxBytes()</code>, with <code>maxBytes</code>). The other properties are read-only too; change a plan with the <code>with...()</code> methods.</p>
 <p><code>split()</code> creates the directory when needed, writes <code>part-01.epub</code>, <code>part-02.epub</code>, … (the prefix is configurable) and returns their paths in order.</p>
 <p><code>splitWithReport()</code> does the same and returns a <code>SplitReport</code> with the <code>paths</code> and the <code>warnings</code>: what could not be read from the book (its table of contents, landmarks or font obfuscation) and was left out of the parts or kept as it was.</p>
 <pre class="codehilite"><code class="language-php">public function splitWithReport(EpubFile $book, SplitPlan $plan, string $outputDirectory): SplitReport;

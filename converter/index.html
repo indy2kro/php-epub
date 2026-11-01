@@ -100,6 +100,8 @@
     </li>
     <li class="toctree-l2"><a class="reference internal" href="#limits-and-options-for-untrusted-books">Limits and options for untrusted books</a>
     </li>
+    <li class="toctree-l2"><a class="reference internal" href="#reading-a-book-for-your-own-renderer">Reading a book for your own renderer</a>
+    </li>
     <li class="toctree-l2"><a class="reference internal" href="#how-the-pdf-adapters-read-a-book">How the PDF adapters read a book</a>
     </li>
     </ul>
@@ -271,6 +273,18 @@ try {
 
 <p>Pass <code>new PdfConversionOptions(allowFixedLayout: true)</code> to convert a fixed-layout book anyway.</p>
 <p>Other adapters export plain text, a single HTML file and Markdown: see <a href="../exporters/">Exporters</a>.</p>
+<h2 id="reading-a-book-for-your-own-renderer">Reading a book for your own renderer<a class="headerlink" href="#reading-a-book-for-your-own-renderer" title="Permanent link">&para;</a></h2>
+<p><code>EpubDocumentLoader::load()</code> is what the PDF adapters and the exporters use to read a book safely (see below). A custom adapter can use it too: it returns a <code>PhpEpub\Converters\EpubDocument</code>, a read-only value with the book's <code>title</code>, <code>authors</code>, <code>language</code> and <code>rightToLeft</code>; <code>chapters</code> (the sanitised <code>&lt;body&gt;</code> HTML of each spine document, in reading order) with the parallel lists <code>chapterTitles</code>, <code>chapterPaths</code>, <code>chapterLinear</code> and <code>tocTitles</code>; <code>styles</code> (the book's CSS, confined to the book); <code>coverImage</code> (an absolute path inside the book, or <code>""</code>); <code>contents</code> (a generated contents page when <code>PdfConversionOptions::$includeToc</code> asks for one); <code>outline</code> (the table of contents as nested <code>TocEntry</code> objects); and <code>directory</code>, the only directory a renderer may read files from.</p>
+<pre class="codehilite"><code class="language-php">use PhpEpub\Converters\EpubDocumentLoader;
+use PhpEpub\Converters\PdfConversionOptions;
+
+$document = (new EpubDocumentLoader())-&gt;load('/path/to/extracted/epub', new PdfConversionOptions(maxChapters: 300));
+
+foreach ($document-&gt;chapters as $index =&gt; $html) {
+    echo $document-&gt;chapterTitles[$index], ': ', strlen($html), &quot; bytes\n&quot;;
+}
+</code></pre>
+
 <h2 id="how-the-pdf-adapters-read-a-book">How the PDF adapters read a book<a class="headerlink" href="#how-the-pdf-adapters-read-a-book" title="Permanent link">&para;</a></h2>
 <p><code>DompdfAdapter</code> and <code>TCPDFAdapter</code> render every XHTML document in the <strong>spine</strong>, in reading order, each starting on a new page, and take the PDF title and author from the EPUB metadata. A directory that only contains a <code>content.xhtml</code> file (the layout older versions required) is still accepted.</p>
 <ul>
