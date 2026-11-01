@@ -4,8 +4,91 @@ declare(strict_types=1);
 
 namespace PhpEpub\Traits;
 
+use PhpEpub\Exception;
+use PhpEpub\Util\XmlText;
+use SimpleXMLElement;
+
 trait InteractsWithTitle
 {
+    /**
+     * Gets the subtitle: the first dc:title with the EPUB 3 title-type "subtitle"; null when there is none.
+     */
+    public function getSubtitle(): ?string
+    {
+        $subtitle = $this->subtitleElement();
+
+        return $subtitle instanceof SimpleXMLElement ? trim((string) $subtitle) : null;
+    }
+
+    /**
+     * Sets the subtitle: a dc:title refined with title-type "subtitle", which replaces every previous subtitle;
+     * null removes them all. The main title is refined as "main" when no title is, so reading systems can tell
+     * the two apart. Subtitles need EPUB 3 refinements: upgrade an EPUB 2 book with upgradeToEpub3() first.
+     *
+     * @throws Exception If the book is EPUB 2, the subtitle is empty or not valid XML text, or removing the subtitles
+     *                   would leave the book without a title.
+     */
+    public function setSubtitle(?string $subtitle): void
+    {
+        $this->isEpub3() || throw new Exception('Subtitles need EPUB 3 title-type refinements: call upgradeToEpub3() first');
+        $existing = $this->subtitleElements();
+
+        if ($subtitle === null) {
+            // A loaded package can hold a blank title the setters would refuse: it does not count as one.
+            array_filter(
+                $this->dcElements('title'),
+                fn (SimpleXMLElement $element): bool => $this->refinementValue($element, 'title-type') !== 'subtitle' && trim((string) $element) !== ''
+            ) !== [] || throw new Exception('dc:title cannot be empty: every EPUB package needs one, so the only titles cannot be removed');
+            foreach ($existing as $element) {
+                $this->removeElement($element);
+                $this->modified = true;
+            }
+
+            return;
+        }
+
+        trim($subtitle) !== '' || throw new Exception('The subtitle cannot be empty: pass null to remove it');
+        XmlText::assertValid($subtitle);
+
+        if ($existing !== []) {
+            $first = array_shift($existing);
+            $this->setText($first, $subtitle);
+            $this->removeProperties($first, ['file-as']);
+            foreach ($existing as $element) {
+                $this->removeElement($element);
+            }
+
+            $this->modified = true;
+
+            return;
+        }
+
+        $titles = $this->dcElements('title');
+        $main = $titles[$this->mainTitleIndex()] ?? null;
+        if ($main instanceof SimpleXMLElement && $this->refinementValue($main, 'title-type') === null) {
+            $this->addRefinement($main, 'title-type', 'main');
+        }
+
+        $this->addRefinement($this->addDcElement('title', $subtitle), 'title-type', 'subtitle');
+        $this->modified = true;
+    }
+
+    private function subtitleElement(): ?SimpleXMLElement
+    {
+        return $this->subtitleElements()[0] ?? null;
+    }
+
+    /**
+     * @return list<SimpleXMLElement>
+     */
+    private function subtitleElements(): array
+    {
+        return array_values(array_filter(
+            $this->dcElements('title'),
+            fn (SimpleXMLElement $element): bool => $this->refinementValue($element, 'title-type') === 'subtitle'
+        ));
+    }
+
     /**
      * Gets the main title of the EPUB: the dc:title refined with the EPUB 3
      * title-type "main", or else the first dc:title.

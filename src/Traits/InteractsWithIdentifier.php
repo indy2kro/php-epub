@@ -139,6 +139,44 @@ trait InteractsWithIdentifier
         return null;
     }
 
+    /**
+     * Sets the ISBN of the book, stored without hyphens or spaces. The first ISBN identifier (see
+     * getTypedIdentifiers()) gets the new value; without one, a dc:identifier is added. Either way it is typed as
+     * an ISBN: opf:scheme="ISBN" in EPUB 2, an identifier-type refinement in EPUB 3 (ONIX code 15 for an ISBN-13,
+     * 02 for an ISBN-10). When the ISBN is the unique identifier, that changes too (see setIdentifiers()).
+     *
+     * @throws Exception If $isbn is not an ISBN-10, or an ISBN-13 starting with 978 or 979, with a valid check digit.
+     */
+    public function setIsbn(string $isbn): void
+    {
+        $value = strtoupper((string) preg_replace(['/^\s*(?:urn:)?isbn:/i', '/[\s-]+/'], '', $isbn));
+        (self::isIsbn($value) && (strlen($value) === 10 || str_starts_with($value, '978') || str_starts_with($value, '979')))
+            || throw new Exception("Not a valid ISBN: {$isbn}");
+
+        $element = null;
+        foreach ($this->dcElements('identifier') as $identifier) {
+            if ($this->identifierScheme($identifier) === 'ISBN') {
+                $element = $identifier;
+                break;
+            }
+        }
+
+        if ($element instanceof SimpleXMLElement) {
+            $this->setText($element, $value);
+            $this->removeProperties($element, ['scheme', 'identifier-type']);
+        } else {
+            $element = $this->addDcElement('identifier', $value);
+        }
+
+        if ($this->isEpub3()) {
+            $this->addRefinement($element, 'identifier-type', strlen($value) === 10 ? '02' : '15', 'onix:codelist5');
+        } else {
+            $element->addAttribute('opf:scheme', 'ISBN', Metadata::OPF_NAMESPACE);
+        }
+
+        $this->modified = true;
+    }
+
     private function identifierScheme(SimpleXMLElement $element): ?string
     {
         $attributes = $element->attributes(Metadata::OPF_NAMESPACE);

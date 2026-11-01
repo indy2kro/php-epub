@@ -54,6 +54,9 @@ enum RepairFix: string
     /** Removes the fragment of links to a missing element of another document, and unlinks a link to a missing element of its own document (CONTENT_FRAGMENT_MISSING). */
     case FragmentLinks = 'fragment-links';
 
+    /** Removes links and embeds that refer to files missing from the book (CONTENT_REFERENCE_MISSING). */
+    case ContentReferences = 'content-references';
+
     /** Declares the property prefixes of known vocabularies (ibooks, prism) that the package uses without declaring (OPF_PREFIX_UNDECLARED). */
     case Prefixes = 'prefixes';
 

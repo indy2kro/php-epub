@@ -16,6 +16,7 @@ class Metadata
     use Traits\InteractsWithAuthors;
     use Traits\InteractsWithContributors;
     use Traits\InteractsWithPublisher;
+    use Traits\InteractsWithRights;
     use Traits\InteractsWithLanguage;
     use Traits\InteractsWithSubject;
     use Traits\InteractsWithIdentifier;

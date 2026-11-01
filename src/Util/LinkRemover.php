@@ -14,7 +14,7 @@ use PhpEpub\XmlParser;
  * replaced by its content, a <link> is removed, and elements with src/xlink:href/data/poster attributes
  * pointing to removed files are removed or the attribute is cleared.
  *
- * @internal Used by Merge\Merger and Split\Splitter.
+ * @internal Used by Repair\Repairer, Merge\Merger and Split\Splitter.
  */
 final readonly class LinkRemover
 {
@@ -37,10 +37,15 @@ final readonly class LinkRemover
      */
     public function remove(string $path, string $content, array $removed, bool $failOnMalformed = false): ?string
     {
-        $mentioned = false;
-        foreach ($removed as $removedPath => $unused) {
+        // A quick check before parsing. Attribute values reach target() with their character references and
+        // percent-encoding decoded (g&#111;ne.png, g%6Fne.png), so the decoded content is searched as well. A UTF-16
+        // document interleaves zero bytes with the names, so it is always parsed.
+        $isUtf16 = str_starts_with($content, "\xFF\xFE") || str_starts_with($content, "\xFE\xFF") || str_contains(substr($content, 0, 4), "\0");
+        $decoded = rawurldecode(html_entity_decode($content, ENT_QUOTES | ENT_XML1, 'UTF-8'));
+        $mentioned = $isUtf16;
+        foreach ($mentioned ? [] : $removed as $removedPath => $unused) {
             $name = basename($removedPath);
-            if (str_contains($content, $name) || str_contains($content, rawurlencode($name))) {
+            if (str_contains($content, $name) || str_contains($content, rawurlencode($name)) || str_contains($decoded, $name)) {
                 $mentioned = true;
                 break;
             }
@@ -61,10 +66,18 @@ final readonly class LinkRemover
         }
 
         $document = $root->ownerDocument ?? new DOMDocument();
+
+        // An HTML <base href> resolves every reference of the document against another location, which target() does
+        // not follow: such a document is left as it is rather than risk removing references that are valid.
+        if (self::hasBaseUrl($document)) {
+            return null;
+        }
+
+        // xml:base does the same for its own subtree only: those elements are left alone, the rest is handled.
         $changed = false;
 
-        // Elements with href attribute (a, area, link, base)
-        $hrefElements = ['a', 'area', 'link', 'base'];
+        // Elements with href attribute (a, area, link, base, and SVG 2 image and use)
+        $hrefElements = ['a', 'area', 'link', 'base', 'image', 'use'];
 
         // Elements with src attribute (img, script, iframe, embed, source, audio, video, track, input)
         $srcElements = ['img', 'script', 'iframe', 'embed', 'source', 'audio', 'video', 'track', 'input'];
@@ -79,7 +92,7 @@ final readonly class LinkRemover
         $posterElements = ['video'];
 
         foreach (iterator_to_array($document->getElementsByTagName('*')) as $element) {
-            if (! $element->parentNode instanceof \DOMNode) {
+            if (! $element->parentNode instanceof \DOMNode || self::isUnderXmlBase($element)) {
                 continue;
             }
 
@@ -92,14 +105,21 @@ final readonly class LinkRemover
                 if ($href !== '') {
                     $target = $this->target($href, $path);
                     if ($target !== null && isset($removed[$target])) {
-                        if ($name === 'a' || $name === 'area') {
-                            while ($element->firstChild instanceof \DOMNode) {
-                                $element->parentNode->insertBefore($element->firstChild, $element);
+                        if (($name === 'a' || $name === 'area') && ($element->hasAttribute('id') || ($name === 'a' && $element->hasAttribute('name')))) {
+                            // SVG falls back to xlink:href without href: clear both, or another link would take over.
+                            $element->removeAttribute('href');
+                            $element->removeAttributeNS(self::XLINK, 'href');
+                            $changed = true;
+                        } else {
+                            if ($name === 'a' || $name === 'area') {
+                                while ($element->firstChild instanceof \DOMNode) {
+                                    $element->parentNode->insertBefore($element->firstChild, $element);
+                                }
                             }
+                            $element->parentNode->removeChild($element);
+                            $changed = true;
+                            continue;
                         }
-                        $element->parentNode->removeChild($element);
-                        $changed = true;
-                        continue;
                     }
                 }
             }
@@ -123,14 +143,19 @@ final readonly class LinkRemover
                 if ($xlinkHref !== '') {
                     $target = $this->target($xlinkHref, $path);
                     if ($target !== null && isset($removed[$target])) {
-                        if ($name === 'a') {
-                            while ($element->firstChild instanceof \DOMNode) {
-                                $element->parentNode->insertBefore($element->firstChild, $element);
+                        if ($name === 'a' && ($element->hasAttribute('id') || $element->hasAttribute('name'))) {
+                            $element->removeAttributeNS(self::XLINK, 'href');
+                            $changed = true;
+                        } else {
+                            if ($name === 'a') {
+                                while ($element->firstChild instanceof \DOMNode) {
+                                    $element->parentNode->insertBefore($element->firstChild, $element);
+                                }
                             }
+                            $element->parentNode->removeChild($element);
+                            $changed = true;
+                            continue;
                         }
-                        $element->parentNode->removeChild($element);
-                        $changed = true;
-                        continue;
                     }
                 }
             }
@@ -236,6 +261,29 @@ final readonly class LinkRemover
         }
 
         return $changed ? implode(', ', $kept) : null;
+    }
+
+    /**
+     * Whether the document has an HTML <base href>, which changes how every relative reference in it resolves.
+     */
+    public static function hasBaseUrl(DOMDocument $document): bool
+    {
+        return (new \DOMXPath($document))->evaluate("count(//*[local-name() = 'base'][@href])") > 0;
+    }
+
+    /**
+     * Whether the element or one of its ancestors has an xml:base: its references resolve against that base, which
+     * target() does not follow.
+     */
+    public static function isUnderXmlBase(\DOMElement $element): bool
+    {
+        for ($node = $element; $node instanceof \DOMElement; $node = $node->parentNode) {
+            if ($node->hasAttributeNS('http://www.w3.org/XML/1998/namespace', 'base')) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

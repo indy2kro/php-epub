@@ -103,6 +103,33 @@ try {
 }
 ```
 
+### Streaming a file
+
+`copyContentTo()` writes a file of the book into a writable stream chunk by chunk, so a large image or the audio of a read-aloud book never has to fit in a PHP string. It applies the same limits as `getContent()` and returns the number of bytes copied. When a limit is exceeded part-way, the bytes copied so far stay in the stream, so write into a temporary stream (or buffer the response) if a partial file must not reach the client.
+
+```php
+public function copyContentTo(string $path, $stream, ?int $maxBytes = null): int
+```
+
+```php
+use PhpEpub\EpubReader;
+use PhpEpub\Limits;
+
+$reader = EpubReader::open($uploadedPath, Limits::web());
+$cover = $reader->getCoverImage();
+// The media type is what the book declares. Serve only raster images: an SVG "cover" can carry a script.
+if ($cover !== null && in_array($cover->mediaType, ['image/jpeg', 'image/png', 'image/gif', 'image/webp'], true)) {
+    header('Content-Type: ' . $cover->mediaType);
+    header('X-Content-Type-Options: nosniff');
+    header("Content-Security-Policy: default-src 'none'; sandbox");
+    $output = fopen('php://output', 'wb');
+    $reader->copyContentTo($cover->path, $output, 5 * 1024 * 1024);
+    fclose($output);
+}
+```
+
+Everything in an uploaded book is untrusted, including the media types its manifest declares. When you serve its files from your own origin, serve only types that cannot run script (or re-encode images), send `X-Content-Type-Options: nosniff` and a restrictive `Content-Security-Policy`, or use a separate origin for book files.
+
 ## Read-only
 
 There is no `save()`, content manager, validator or conversion. The `Metadata` and `TableOfContents` objects are the ones `EpubFile` uses, so they have setters; in a reader, `Metadata::save()` and every table of contents change throw a `ReadOnlyException` (a `PhpEpub\Exception`), and edits made to the metadata, manifest or spine in memory are never written anywhere. To edit, validate or convert a book, open it with `EpubFile`.

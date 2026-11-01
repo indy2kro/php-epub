@@ -46,13 +46,21 @@ public function getTitle(): string
 public function setTitle(string $title): void
 public function getTitles(): array
 public function setTitles(array $titles): void
+public function getSubtitle(): ?string
+public function setSubtitle(?string $subtitle): void
 ```
 
 The name given to the resource (dc:title). A book can have several titles; in EPUB 3 a `title-type` refinement says which is the `main` title and which are subtitles, collection titles, and so on.
 
 - `getTitle()`/`setTitle()` work on the main title: the one refined as `main`, or else the first. Other titles are kept.
 - `getTitles()`/`setTitles()` read and replace all titles in document order. Existing titles are reused in order, so their `title-type` refinements stay with their position; a title whose text changes loses its `file-as` sort key.
+- `getSubtitle()` returns the first title refined as `subtitle`, or `null`. `setSubtitle()` replaces it (and drops any further subtitles), or adds a title refined as `subtitle` and refines the main title as `main` when no title is refined yet; `null` removes every subtitle. Subtitles need EPUB 3 refinements, so on an EPUB 2 book `setSubtitle()` throws an `Exception` (call `upgradeToEpub3()` first), as it does for an empty subtitle.
 - A book needs a title: `setTitles([])` and empty values throw an `Exception`.
+
+```php
+$metadata->setTitle('The Long Way');
+$metadata->setSubtitle('A Novel');
+```
 
 ### Authors
 
@@ -236,6 +244,7 @@ public function getUniqueIdentifier(): ?string
 public function setIdentifiers(array<int, string> $identifiers): void
 public function getTypedIdentifiers(): array<int, Identifier>
 public function getIsbn(): ?string
+public function setIsbn(string $isbn): void
 ```
 
 Unambiguous references to the resource (dc:identifier), such as an ISBN or UUID.
@@ -250,6 +259,26 @@ Obfuscated fonts (listed in `META-INF/encryption.xml`) are keyed with the unique
 foreach ($metadata->getTypedIdentifiers() as $identifier) {
     echo $identifier->scheme ?? 'unknown', ': ', $identifier->value, "\n";
 }
+```
+
+`setIsbn()` stores an ISBN-10 or ISBN-13 without prefix, hyphens or spaces, and throws an `Exception` when its check digit is wrong or an ISBN-13 does not start with `978` or `979`. The first ISBN identifier gets the new value; a book without one gets a new `dc:identifier`. Either way the identifier is typed as an ISBN, with `opf:scheme="ISBN"` in EPUB 2 and an `identifier-type` refinement in EPUB 3 (ONIX code `15` for an ISBN-13, `02` for an ISBN-10), so stores and `getIsbn()` recognise it. The unique identifier is left as it is, unless it is the ISBN being replaced.
+
+```php
+$metadata->setIsbn('978-0-306-40615-7');
+echo $metadata->getIsbn(); // 9780306406157
+```
+
+### Rights
+
+```php
+public function getRights(): ?string
+public function setRights(?string $rights): void
+```
+
+The rights statement (dc:rights), such as a copyright line or a licence. `getRights()` returns the first non-empty one, or `null`. `setRights()` replaces every `dc:rights`; `null` or `''` removes them.
+
+```php
+$metadata->setRights('© 2026 The Author. All rights reserved.');
 ```
 
 ### Other Dublin Core Elements

@@ -77,7 +77,10 @@ final class LandmarksTest extends TestCase
 
     public function testSetLandmarksCreatesTheLandmarksNavAndKeepsTheToc(): void
     {
-        $epubFile = $this->open(EpubBuilder::epub3());
+        $epubFile = $this->open(EpubBuilder::epub3()->withFile(
+            'EPUB/text/chapter.xhtml',
+            EpubBuilder::xhtml('Chapter', '<h1 id="a b">Chapter</h1>', '../css/style.css')
+        ));
         $landmarks = [
             new Landmark('cover', 'Cover', 'EPUB/text/chapter.xhtml'),
             new Landmark('bodymatter', 'Start <here>', 'EPUB/text/chapter.xhtml', 'a b'),
