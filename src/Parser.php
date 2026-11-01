@@ -46,6 +46,8 @@ class Parser
     /**
      * The path of the package document named by a parsed META-INF/container.xml, normalized with "/" separators.
      *
+     * @internal Used by Parser::parse() and EpubReader.
+     *
      * @throws InvalidEpubException If the container names no package document or a path outside the book.
      */
     public function locatePackage(SimpleXMLElement $container): string

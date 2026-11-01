@@ -62,6 +62,11 @@ final readonly class CleanupReport
         return $this->bytesBefore - $this->bytesAfter;
     }
 
+    /**
+     * The same report with the archive sizes before and after (null when unknown).
+     *
+     * @internal Set by EpubFile::compress(), which writes the archive.
+     */
     public function withArchiveSizes(?int $before, ?int $after): self
     {
         return new self($this->actions, $this->bytesBefore, $this->bytesAfter, $this->dryRun, $before, $after);

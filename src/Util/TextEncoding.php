@@ -10,6 +10,8 @@ namespace PhpEpub\Util;
  * EPUB content documents are UTF-8 or UTF-16, so the encoding is taken from the byte order mark,
  * else from the XML declaration. The conversion needs mbstring or iconv, both optional; without
  * either (or for an encoding neither knows) the bytes are returned as they are, as if they were UTF-8.
+ *
+ * @internal
  */
 final class TextEncoding
 {

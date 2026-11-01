@@ -58,7 +58,7 @@ $options = new CleanupOptions(
 - **`removeUnusedFonts`**: removes font files no reachable document or stylesheet refers to (and their `encryption.xml` entries).
 - **`recompressImages`** with `maxImageWidth`, `maxImageHeight`, `jpegQuality` and `convertOpaquePngToJpeg`: images are never scaled up, and the original is kept when the result is not smaller. Animated PNG, GIF, SVG, CMYK JPEG and JPEG with an EXIF orientation are left alone. Converting a PNG renames the file and updates the manifest and every reference (`src`, `href`, `srcset`, CSS `url()`); it is not done when a document cannot be parsed, since its references could not be rewritten. The displayed size of an image is set by the document, so scaling an image down does not change the layout.
 - **`maxDeflate`**: `compress()` writes the archive at deflate level 9 without directory entries.
-- **`dryRun`**: nothing is changed or written; the report says what would happen.
+- **`dryRun`**: nothing is changed or written; the report says what would happen. `$options->withDryRun()` returns a copy of any options (a preset, say) with it set.
 
 The actions run in this order: scripts, remote references, unused fonts, unreferenced files, stray files, images.
 

@@ -60,6 +60,8 @@ final readonly class EpubDocument
      * is attached to the chapter of the next entry that has one, so it still precedes its children; trailing
      * ones are dropped. Chapters the table of contents does not list have no key.
      *
+     * @internal Used by TCPDFAdapter for its bookmarks.
+     *
      * @return array<int, list<array{string, int}>>
      */
     public function outlineByChapter(): array

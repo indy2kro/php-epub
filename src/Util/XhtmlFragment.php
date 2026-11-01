@@ -10,6 +10,8 @@ use DOMNode;
 /**
  * Turns HTML-ish markup (named entities such as &nbsp;, void tags such as <br>, unclosed
  * tags) into well-formed XHTML.
+ *
+ * @internal
  */
 final class XhtmlFragment
 {

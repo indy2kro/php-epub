@@ -82,6 +82,8 @@ final readonly class PdfConversionOptions
 
     /**
      * The microtime() at which the time budget runs out when started now; null without a budget.
+     *
+     * @internal Used by EpubDocumentLoader and the PDF adapters.
      */
     public function deadline(): ?float
     {
