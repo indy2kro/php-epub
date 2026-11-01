@@ -58,7 +58,8 @@ final class TableOfContentsTest extends TestCase
                 . '<navList><navLabel><text>Figures</text></navLabel><navTarget id="f1" playOrder="7"><navLabel><text>Figure 1</text></navLabel><content src="text/two.xhtml"/></navTarget>'
                 . '<navTarget id="f2"><navLabel><text>Figure 2</text></navLabel><content src="text/two.xhtml#f2"/></navTarget>'
                 . '<navTarget id="f3" playOrder="8"><navLabel><text>Figure 3</text></navLabel><content src="text/two.xhtml#p2"/></navTarget>'
-                . '<navTarget id="f4" playOrder="11"><navLabel><text>Figure 4</text></navLabel><content src="text/two.xhtml#f4"/></navTarget></navList>',
+                . '<navTarget id="f4" playOrder="11"><navLabel><text>Figure 4</text></navLabel><content src="text/two.xhtml#f4"/></navTarget>'
+                . '<navTarget id="f5" playOrder="12"><navLabel><text>Figure 5</text></navLabel></navTarget></navList>',
             (string) $builder->getFile('OEBPS/toc.ncx')
         );
         $epubFile = $this->open($builder->withFile('OEBPS/toc.ncx', $ncx));
@@ -74,6 +75,7 @@ final class TableOfContentsTest extends TestCase
         $this->assertStringContainsString('<navTarget id="f2">', $written, 'a target without a playOrder gets none');
         $this->assertStringContainsString('<navTarget id="f3" playOrder="3">', $written);
         $this->assertStringContainsString('<navTarget id="f4" playOrder="4">', $written);
+        $this->assertStringContainsString('<navTarget id="f5" playOrder="5">', $written, 'a target without content takes the next playOrder');
     }
 
     public function testReadsTheEpub2Ncx(): void
