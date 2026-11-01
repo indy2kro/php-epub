@@ -173,7 +173,13 @@
 <p><strong><code>getLandmarks(): array</code></strong> and <strong><code>setLandmarks(array $landmarks): void</code></strong>: Read and replace the book's landmarks (<code>PhpEpub\Landmark</code>: <code>type</code>, <code>title</code>, <code>path</code>, <code>fragment</code>) in the navigation document's <code>landmarks</code> nav and the EPUB 2 <code>&lt;guide&gt;</code>. See <a href="../epub3-features/#landmarks-and-the-page-list">EPUB 3 Features</a>.</p>
 </li>
 <li>
-<p><strong><code>getPageList(): array</code></strong>: The print page numbers of the navigation document's <code>page-list</code> nav or the NCX <code>pageList</code>, as <code>TocEntry</code> objects; <code>[]</code> when the book has none. Read-only.</p>
+<p><strong><code>getPageList(): array</code></strong>: The print page numbers of the navigation document's <code>page-list</code> nav or the NCX <code>pageList</code>, as <code>TocEntry</code> objects; <code>[]</code> when the book has none.</p>
+</li>
+<li>
+<p><strong><code>setPageList(array $pages): void</code></strong>: Replaces the page list. Each page is a <code>TocEntry</code> whose <code>title</code> is the print page number (<code>"12"</code>, <code>"iv"</code>) and whose <code>path</code> and <code>fragment</code> locate where the page begins. It is written to the navigation document's <code>page-list</code> nav (created hidden when missing) and to the NCX <code>pageList</code>, whichever the book has. In the NCX, arabic numbers become <code>normal</code> page targets, roman numerals <code>front</code> and anything else <code>special</code>; the targets are numbered after the <code>navMap</code>, and <code>dtb:totalPageCount</code> and <code>dtb:maxPageNumber</code> are updated. <code>[]</code> removes the page list. Throws an <code>Exception</code> when a page has no number, no path or children, points outside the book or is not valid XML text, when the book has neither file, or when a file cannot be written.</p>
+</li>
+<li>
+<p><strong><code>generatePageList(): array</code></strong>: Builds the page list from the page break markers of the spine documents, in reading order (elements with <code>epub:type="pagebreak"</code> or <code>role="doc-pagebreak"</code>), sets it with <code>setPageList()</code> and returns the pages. A marker's page number is its <code>title</code> attribute, else its <code>aria-label</code>, else its text. A marker without an <code>id</code> gets one (<code>page-1</code>, <code>page-2</code>, ..., unique in its document), which rewrites that document. A book without markers is left as it is and <code>[]</code> is returned. This fixes the <code>ACCESSIBILITY_PAGE_LIST_MISSING</code> warning of <code>EpubFile::validate()</code> for books whose content marks the print pages.</p>
 </li>
 <li>
 <p><strong><code>isAvailable(): bool</code></strong>: Whether the book has a navigation document or an NCX that can hold a table of contents, i.e. whether <code>setEntries()</code> can work.</p>
@@ -201,6 +207,9 @@ $epubFile-&gt;getTableOfContents()-&gt;addEntry(new TocEntry('Epilogue', 'EPUB/t
 
 // Or build the whole table of contents from the chapters' h1 to h3 headings.
 $epubFile-&gt;getTableOfContents()-&gt;generateFromHeadings();
+
+// Build the page list from the epub:type=&quot;pagebreak&quot; markers of the chapters.
+$epubFile-&gt;getTableOfContents()-&gt;generatePageList();
 
 $epubFile-&gt;save();
 </code></pre>

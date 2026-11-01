@@ -219,6 +219,23 @@ $contentManager = $epubFile-&gt;getContentManager();
 </code></pre>
 
 <p>Returns an XHTML or HTML document that is about to be parsed as markup, refusing one larger than <code>Limits::$maxHtmlBytes</code> before it is read. Use it instead of <code>getContent()</code> when the result goes to a DOM parser. Throws <code>InvalidEpubException</code> if the document is larger than the limit, and an exception if the file cannot be read.</p>
+<pre class="codehilite"><code class="language-php">public function transform(callable $change, ?array $paths = null): array
+</code></pre>
+
+<p>Runs a DOM edit over the XHTML documents and writes back only those it changed. <code>$change</code> receives each document as a <code>DOMDocument</code> with its path, edits it in place and returns <code>true</code> when it changed something; only then is the document saved (through <code>updateContent()</code>, so the manifest properties follow). The documents are the manifest's <code>application/xhtml+xml</code> items, the navigation document included (or, without a manifest, the <code>.xhtml</code>, <code>.html</code> and <code>.htm</code> files), in path order; <code>$paths</code> limits the run to some of them. Documents that are not well-formed XML are skipped. It returns the paths it wrote. A DRM-protected book is refused with an <code>Exception</code>, so encrypted documents are never rewritten. Throws <code>InvalidEpubException</code> for a document larger than <code>Limits::$maxHtmlBytes</code> or the XML size cap; an exception thrown by <code>$change</code> stops the run, and the documents changed before it stay changed.</p>
+<pre class="codehilite"><code class="language-php">$changed = $epubFile-&gt;getContentManager()-&gt;transform(static function (DOMDocument $document, string $path): bool {
+    $changed = false;
+    foreach ($document-&gt;getElementsByTagName('p') as $paragraph) {
+        if ($paragraph-&gt;getAttribute('class') === 'calibre1') {
+            $paragraph-&gt;setAttribute('class', 'body');
+            $changed = true;
+        }
+    }
+
+    return $changed;
+});
+</code></pre>
+
 <pre class="codehilite"><code class="language-php">public function getText(string $filePath): string
 </code></pre>
 

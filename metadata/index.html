@@ -112,6 +112,8 @@
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#identifiers">Identifiers</a>
     </li>
+    <li class="toctree-l3"><a class="reference internal" href="#rights">Rights</a>
+    </li>
     <li class="toctree-l3"><a class="reference internal" href="#other-dublin-core-elements">Other Dublin Core Elements</a>
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#series">Series</a>
@@ -214,14 +216,21 @@ public function isModified(): bool
 public function setTitle(string $title): void
 public function getTitles(): array
 public function setTitles(array $titles): void
+public function getSubtitle(): ?string
+public function setSubtitle(?string $subtitle): void
 </code></pre>
 
 <p>The name given to the resource (dc:title). A book can have several titles; in EPUB 3 a <code>title-type</code> refinement says which is the <code>main</code> title and which are subtitles, collection titles, and so on.</p>
 <ul>
 <li><code>getTitle()</code>/<code>setTitle()</code> work on the main title: the one refined as <code>main</code>, or else the first. Other titles are kept.</li>
 <li><code>getTitles()</code>/<code>setTitles()</code> read and replace all titles in document order. Existing titles are reused in order, so their <code>title-type</code> refinements stay with their position; a title whose text changes loses its <code>file-as</code> sort key.</li>
+<li><code>getSubtitle()</code> returns the first title refined as <code>subtitle</code>, or <code>null</code>. <code>setSubtitle()</code> replaces it (and drops any further subtitles), or adds a title refined as <code>subtitle</code> and refines the main title as <code>main</code> when no title is refined yet; <code>null</code> removes every subtitle. Subtitles need EPUB 3 refinements, so on an EPUB 2 book <code>setSubtitle()</code> throws an <code>Exception</code> (call <code>upgradeToEpub3()</code> first), as it does for an empty subtitle.</li>
 <li>A book needs a title: <code>setTitles([])</code> and empty values throw an <code>Exception</code>.</li>
 </ul>
+<pre class="codehilite"><code class="language-php">$metadata-&gt;setTitle('The Long Way');
+$metadata-&gt;setSubtitle('A Novel');
+</code></pre>
+
 <h3 id="authors">Authors<a class="headerlink" href="#authors" title="Permanent link">&para;</a></h3>
 <pre class="codehilite"><code class="language-php">public function getAuthors(): array&lt;int, string&gt;
 public function setAuthors(array&lt;int, string&gt; $authors): void
@@ -402,6 +411,7 @@ public function getUniqueIdentifier(): ?string
 public function setIdentifiers(array&lt;int, string&gt; $identifiers): void
 public function getTypedIdentifiers(): array&lt;int, Identifier&gt;
 public function getIsbn(): ?string
+public function setIsbn(string $isbn): void
 </code></pre>
 
 <p>Unambiguous references to the resource (dc:identifier), such as an ISBN or UUID.</p>
@@ -411,6 +421,20 @@ public function getIsbn(): ?string
 <pre class="codehilite"><code class="language-php">foreach ($metadata-&gt;getTypedIdentifiers() as $identifier) {
     echo $identifier-&gt;scheme ?? 'unknown', ': ', $identifier-&gt;value, &quot;\n&quot;;
 }
+</code></pre>
+
+<p><code>setIsbn()</code> stores an ISBN-10 or ISBN-13 without prefix, hyphens or spaces, and throws an <code>Exception</code> when its check digit is wrong or an ISBN-13 does not start with <code>978</code> or <code>979</code>. The first ISBN identifier gets the new value; a book without one gets a new <code>dc:identifier</code>. Either way the identifier is typed as an ISBN, with <code>opf:scheme="ISBN"</code> in EPUB 2 and an <code>identifier-type</code> refinement in EPUB 3 (ONIX code <code>15</code> for an ISBN-13, <code>02</code> for an ISBN-10), so stores and <code>getIsbn()</code> recognise it. The unique identifier is left as it is, unless it is the ISBN being replaced.</p>
+<pre class="codehilite"><code class="language-php">$metadata-&gt;setIsbn('978-0-306-40615-7');
+echo $metadata-&gt;getIsbn(); // 9780306406157
+</code></pre>
+
+<h3 id="rights">Rights<a class="headerlink" href="#rights" title="Permanent link">&para;</a></h3>
+<pre class="codehilite"><code class="language-php">public function getRights(): ?string
+public function setRights(?string $rights): void
+</code></pre>
+
+<p>The rights statement (dc:rights), such as a copyright line or a licence. <code>getRights()</code> returns the first non-empty one, or <code>null</code>. <code>setRights()</code> replaces every <code>dc:rights</code>; <code>null</code> or <code>''</code> removes them.</p>
+<pre class="codehilite"><code class="language-php">$metadata-&gt;setRights('© 2026 The Author. All rights reserved.');
 </code></pre>
 
 <h3 id="other-dublin-core-elements">Other Dublin Core Elements<a class="headerlink" href="#other-dublin-core-elements" title="Permanent link">&para;</a></h3>
