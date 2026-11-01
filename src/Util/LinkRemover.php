@@ -37,10 +37,13 @@ final readonly class LinkRemover
      */
     public function remove(string $path, string $content, array $removed, bool $failOnMalformed = false): ?string
     {
+        // A quick check before parsing. Attribute values reach target() with their character references and
+        // percent-encoding decoded (g&#111;ne.png, g%6Fne.png), so the decoded content is searched as well.
+        $decoded = rawurldecode(html_entity_decode($content, ENT_QUOTES | ENT_XML1, 'UTF-8'));
         $mentioned = false;
         foreach ($removed as $removedPath => $unused) {
             $name = basename($removedPath);
-            if (str_contains($content, $name) || str_contains($content, rawurlencode($name))) {
+            if (str_contains($content, $name) || str_contains($content, rawurlencode($name)) || str_contains($decoded, $name)) {
                 $mentioned = true;
                 break;
             }
@@ -93,7 +96,9 @@ final readonly class LinkRemover
                     $target = $this->target($href, $path);
                     if ($target !== null && isset($removed[$target])) {
                         if (($name === 'a' || $name === 'area') && ($element->hasAttribute('id') || ($name === 'a' && $element->hasAttribute('name')))) {
+                            // SVG falls back to xlink:href without href: clear both, or another link would take over.
                             $element->removeAttribute('href');
+                            $element->removeAttributeNS(self::XLINK, 'href');
                             $changed = true;
                         } else {
                             if ($name === 'a' || $name === 'area') {

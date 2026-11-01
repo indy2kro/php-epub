@@ -853,6 +853,47 @@ final class RepairerTest extends TestCase
         $this->assertSame([], array_values(array_filter($this->codes($epub->validate()), static fn (string $code): bool => $code === 'CONTENT_REFERENCE_MISSING')));
     }
 
+    public function testLeavesDocumentsThatUseXmlBaseAlone(): void
+    {
+        $body = '<svg xmlns="http://www.w3.org/2000/svg" xml:base="../images/"><image href="cover.png" width="10" height="10"/></svg>'
+            . '<p><a href="gone.xhtml">Missing</a></p>';
+        $book = EpubBuilder::epub3()
+            ->withFile('EPUB/images/cover.png', 'png')
+            ->withFile('EPUB/text/chapter.xhtml', EpubBuilder::xhtml('Chapter', $body));
+        $epub = $this->open($book);
+        $before = $epub->getContentManager()->getContent('EPUB/text/chapter.xhtml');
+
+        $this->assertSame([], $epub->repair(RepairOptions::only(RepairFix::ContentReferences)));
+        $this->assertSame($before, $epub->getContentManager()->getContent('EPUB/text/chapter.xhtml'));
+    }
+
+    public function testRemovesReferencesWhosePathIsEncoded(): void
+    {
+        $epub = $this->open(EpubBuilder::epub3()->withFile('EPUB/text/chapter.xhtml', EpubBuilder::xhtml(
+            'Chapter',
+            '<p><img src="g%6Fne.png" alt="encoded"/><img src="g&#111;ne2.png" alt="referenced"/></p>'
+        )));
+
+        $this->assertSame(
+            ['CONTENT_REFERENCE_MISSING', 'CONTENT_REFERENCE_MISSING'],
+            $this->fixCodes($epub->repair(RepairOptions::only(RepairFix::ContentReferences)))
+        );
+        $this->assertStringNotContainsString('<img', $epub->getContentManager()->getContent('EPUB/text/chapter.xhtml'));
+    }
+
+    public function testAKeptSvgAnchorLosesBothLinkAttributes(): void
+    {
+        $svg = '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">'
+            . '<a id="kept" href="gone.xhtml" xlink:href="https://example.com/"><text>Kept</text></a></svg>';
+        $epub = $this->open(EpubBuilder::epub3()->withFile('EPUB/text/chapter.xhtml', EpubBuilder::xhtml('Chapter', $svg . '<p><a href="#kept">Jump</a></p>')));
+
+        $epub->repair(RepairOptions::only(RepairFix::ContentReferences));
+
+        $chapter = $epub->getContentManager()->getContent('EPUB/text/chapter.xhtml');
+        $this->assertStringContainsString('<a id="kept"><text>Kept</text></a>', $chapter);
+        $this->assertStringNotContainsString('example.com', $chapter);
+    }
+
     public function testSkipsOversizedDocumentsWhileRepairingMissingReferences(): void
     {
         $body = '<a href="gone.xhtml">Missing</a><p>' . bin2hex(random_bytes(4_200_000)) . '</p>';
