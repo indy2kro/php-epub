@@ -63,8 +63,8 @@ final readonly class LinkRemover
         $document = $root->ownerDocument ?? new DOMDocument();
         $changed = false;
 
-        // Elements with href attribute (a, area, link, base)
-        $hrefElements = ['a', 'area', 'link', 'base'];
+        // Elements with href attribute (a, area, link, base, and SVG 2 image and use)
+        $hrefElements = ['a', 'area', 'link', 'base', 'image', 'use'];
 
         // Elements with src attribute (img, script, iframe, embed, source, audio, video, track, input)
         $srcElements = ['img', 'script', 'iframe', 'embed', 'source', 'audio', 'video', 'track', 'input'];

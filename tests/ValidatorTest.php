@@ -64,7 +64,37 @@ final class ValidatorTest extends TestCase
         $this->assertContains('MANIFEST_FALLBACK_CYCLE', $this->codes($this->open($book)->validate()));
     }
 
-    public function testReportsAManifestFallbackChainThatEndsAtANonContentItem(): void
+    public function testReportsASpineFallbackChainThatNeverReachesAContentDocument(): void
+    {
+        $this->assertContains('MANIFEST_FALLBACK_NOT_CONTENT', $this->codes($this->open($this->spineFallbackBook(
+            '<item id="first" href="first.bin" media-type="application/x-first" fallback="second"/>'
+                . '<item id="second" href="second.bin" media-type="application/x-second"/>'
+        ))->validate()));
+    }
+
+    public function testReportsASpineFallbackChainThatLoopsWithoutAContentDocument(): void
+    {
+        $codes = $this->codes($this->open($this->spineFallbackBook(
+            '<item id="first" href="first.bin" media-type="application/x-first" fallback="second"/>'
+                . '<item id="second" href="second.bin" media-type="application/x-second" fallback="first"/>'
+        ))->validate());
+
+        $this->assertContains('MANIFEST_FALLBACK_CYCLE', $codes);
+        $this->assertContains('MANIFEST_FALLBACK_NOT_CONTENT', $codes);
+    }
+
+    public function testAcceptsASpineFallbackChainThatReachesAContentDocument(): void
+    {
+        $codes = $this->codes($this->open($this->spineFallbackBook(
+            '<item id="first" href="first.bin" media-type="application/x-first" fallback="second"/>'
+                . '<item id="second" href="second.bin" media-type="application/x-second" fallback="chapter"/>'
+        ))->validate());
+
+        $this->assertNotContains('MANIFEST_FALLBACK_NOT_CONTENT', $codes);
+        $this->assertNotContains('SPINE_NOT_CONTENT', $codes);
+    }
+
+    public function testDoesNotRequireAContentDocumentInTheFallbackChainOfANonSpineItem(): void
     {
         $opf = str_replace(
             '<item id="style" href="css/style.css" media-type="text/css"/>',
@@ -76,7 +106,50 @@ final class ValidatorTest extends TestCase
             ->withFile('EPUB/package.opf', $opf)
             ->withFile('EPUB/alternate.bin', 'alternate');
 
-        $this->assertContains('MANIFEST_FALLBACK_NOT_CONTENT', $this->codes($this->open($book)->validate()));
+        $this->assertNotContains('MANIFEST_FALLBACK_NOT_CONTENT', $this->codes($this->open($book)->validate()));
+    }
+
+    public function testFallbackChainsThatShareATargetAreNotACycle(): void
+    {
+        $codes = $this->codes($this->open($this->spineFallbackBook(
+            '<item id="first" href="first.bin" media-type="application/x-first" fallback="chapter"/>'
+                . '<item id="second" href="second.bin" media-type="application/x-second" fallback="chapter"/>'
+        ))->validate());
+
+        $this->assertNotContains('MANIFEST_FALLBACK_CYCLE', $codes);
+        $this->assertNotContains('MANIFEST_FALLBACK_NOT_CONTENT', $codes);
+    }
+
+    public function testDoesNotCheckProtocolRelativeStylesheetUrls(): void
+    {
+        $book = EpubBuilder::epub3()->withFile('EPUB/css/style.css', 'p { background: url(//example.com/paper.png); }');
+
+        $this->assertNotContains('CONTENT_REFERENCE_MISSING', $this->codes($this->open($book)->validate()));
+    }
+
+    public function testReportsAnIdOfTheRootElementThatIsRepeated(): void
+    {
+        $chapter = str_replace('<html ', '<html id="dup" ', EpubBuilder::xhtml('Chapter', '<p id="dup">Text</p>'));
+        $book = EpubBuilder::epub3()->withFile('EPUB/text/chapter.xhtml', $chapter);
+
+        $this->assertContains('CONTENT_DUPLICATE_ID', $this->codes($this->open($book)->validate()));
+    }
+
+    /**
+     * A book whose spine starts with the item "first" from $items (manifest XML), before the chapter.
+     */
+    private function spineFallbackBook(string $items): EpubBuilder
+    {
+        $opf = str_replace(
+            ['</manifest>', '<itemref idref="chapter"/>'],
+            [$items . '</manifest>', '<itemref idref="first"/><itemref idref="chapter"/>'],
+            (string) EpubBuilder::epub3()->getFile('EPUB/package.opf')
+        );
+
+        return EpubBuilder::epub3()
+            ->withFile('EPUB/package.opf', $opf)
+            ->withFile('EPUB/first.bin', 'first')
+            ->withFile('EPUB/second.bin', 'second');
     }
 
     public function testReportsAMediaOverlayReferenceToAnUnknownId(): void

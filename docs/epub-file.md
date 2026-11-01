@@ -185,6 +185,10 @@ Checks the book, including unsaved changes, and returns a list of `PhpEpub\Valid
 | `FILE_NOT_IN_MANIFEST` | warning | A file of the publication is not listed in the manifest |
 | `SPINE_EMPTY`, `SPINE_NO_LINEAR_ITEM`, `SPINE_UNKNOWN_IDREF`, `SPINE_DUPLICATE_IDREF` | error | The reading order is empty, has no linear item, or refers to an unknown or repeated item |
 | `SPINE_NOT_CONTENT` | warning | A spine item is not a content document and has no fallback |
+| `MANIFEST_FALLBACK_TARGET_MISSING`, `MANIFEST_FALLBACK_CYCLE` | error | A manifest `fallback` names an unknown item, or a fallback chain loops |
+| `MANIFEST_FALLBACK_NOT_CONTENT` | error | A spine item that is not a content document has a fallback chain that never reaches one |
+| `MANIFEST_MEDIA_OVERLAY_SOURCE_INVALID` | error | An item that is not an XHTML or SVG content document has a `media-overlay` |
+| `MANIFEST_MEDIA_OVERLAY_TARGET_MISSING`, `MANIFEST_MEDIA_OVERLAY_NOT_SMIL` | error | A `media-overlay` names an unknown item, or one that is not `application/smil+xml` |
 | `CONTENT_ENCRYPTED` | error | The book is DRM-protected (see [DRM-protected books](#drm-protected-books)). This is the only issue reported for its encrypted resources: they are not checked for well-formedness, media type or manifest properties |
 | `ENCRYPTION_ENTRY_MISSING` | error | `META-INF/encryption.xml` lists a resource (an obfuscated font) that is not in the book; not reported for a DRM-protected book |
 | `CONTENT_NOT_WELL_FORMED` | error | An XHTML content document is not well-formed XML |
@@ -195,8 +199,8 @@ Checks the book, including unsaved changes, and returns a list of `PhpEpub\Valid
 | `COVER_NOT_IMAGE` | error | A manifest item with the `cover-image` property is not an image |
 | `COVER_IMAGE_MULTIPLE` | error | More than one manifest item has the `cover-image` property |
 | `RENDITION_VALUE_INVALID` | error | An EPUB 3 `rendition:layout`, `rendition:orientation`, `rendition:spread` or `rendition:flow` value is outside its vocabulary |
-| `CONTENT_REFERENCE_MISSING`, `CONTENT_REFERENCE_NOT_IN_MANIFEST` | error | A content document refers (`src`, `href`, `data`, `poster`) to a local file that is missing or outside the book, or that is not in the manifest; remote URLs and `data:` URIs are not checked |
-| `CONTENT_FRAGMENT_MISSING` | error | A link (`a`, `area`, SVG `use` or `image`) names a `#fragment` that is not an element id of its target XHTML or SVG document, or of the document itself (`#top` and `#epubcfi(…)` are not judged) |
+| `CONTENT_REFERENCE_MISSING`, `CONTENT_REFERENCE_NOT_IN_MANIFEST` | error | A content document (`src`, `href`, `data`, `poster`) or a stylesheet (CSS `url()` and `@import` in CSS files, `<style>` elements and `style` attributes) refers to a local file that is missing or outside the book, or that is not in the manifest; remote URLs and `data:` URIs are not checked |
+| `CONTENT_FRAGMENT_MISSING` | error | A link (`a`, `area`, SVG `use` or `image`, including the table of contents, landmarks and page list of the navigation document) names a `#fragment` that is not an element id of its target XHTML or SVG document, or of the document itself (`#top` and `#epubcfi(…)` are not judged) |
 | `NAV_MISSING` / `NCX_MISSING` | error | An EPUB 3 book has no navigation document / an EPUB 2 book has no NCX |
 | `NCX_UID_MISMATCH` | error | The NCX `dtb:uid` differs from the package's unique identifier (`save()` corrects it) |
 | `NAV_INVALID` / `NCX_INVALID` | error | The navigation document is not well-formed / the NCX is not well-formed or has no NCX namespace or `navMap` |

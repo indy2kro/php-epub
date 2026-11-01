@@ -227,7 +227,8 @@ final class Repairer
             $file = $this->paths->resolve($root, $path);
             $size = @filesize($file);
             if (! is_int($size) || $size > self::MAX_DOCUMENT_BYTES) {
-                throw new Exception("Cannot repair references in unreadable or oversized content document: {$path}");
+                // Like parseDocument(): skipped, and validate() keeps reporting it.
+                continue;
             }
 
             $content = $this->epub->getContentManager()->getContent($path);

@@ -388,25 +388,7 @@ final readonly class Validator
 
                 $visited[$currentId] = true;
                 $path[] = $currentId;
-                $item = $itemsById[$currentId] ?? null;
-                if (! $item instanceof ManifestItem) {
-                    break;
-                }
-
-                if (! array_key_exists($currentId, $fallbacks)) {
-                    if (! in_array($item->mediaType, self::CONTENT_MEDIA_TYPES, true)) {
-                        $source = $itemsById[$sourceId] ?? $item;
-                        $issues[] = $this->error(
-                            'MANIFEST_FALLBACK_NOT_CONTENT',
-                            "The fallback chain starting at \"{$sourceId}\" ends at \"{$currentId}\", which is not a content document.",
-                            $source->path ?: $sourceId
-                        );
-                    }
-
-                    break;
-                }
-
-                $targetId = $fallbacks[$currentId];
+                $targetId = $fallbacks[$currentId] ?? '';
                 if ($targetId === '' || ! isset($itemsById[$targetId])) {
                     break;
                 }
@@ -416,6 +398,36 @@ final readonly class Validator
 
             foreach ($path as $id) {
                 $processed[$id] = true;
+            }
+        }
+
+        // A spine item that is not a content document needs a fallback chain that reaches one. Each spine item is
+        // followed on its own, so a chain it shares with another item cannot hide it.
+        foreach ($this->spine->getItems() as $spineItem) {
+            $item = $spineItem->item;
+            if (! $item instanceof ManifestItem || in_array($item->mediaType, self::CONTENT_MEDIA_TYPES, true) || ! isset($fallbacks[$item->id])) {
+                continue;
+            }
+
+            $visited = [];
+            $currentId = $item->id;
+            $reachesContent = false;
+            while (! isset($visited[$currentId]) && isset($itemsById[$currentId])) {
+                $visited[$currentId] = true;
+                if (in_array($itemsById[$currentId]->mediaType, self::CONTENT_MEDIA_TYPES, true)) {
+                    $reachesContent = true;
+                    break;
+                }
+
+                $currentId = $fallbacks[$currentId] ?? '';
+            }
+
+            if (! $reachesContent) {
+                $issues[] = $this->error(
+                    'MANIFEST_FALLBACK_NOT_CONTENT',
+                    "Spine item \"{$item->id}\" is {$item->mediaType}, and its fallback chain never reaches a content document.",
+                    $item->path ?: $item->id
+                );
             }
         }
 
