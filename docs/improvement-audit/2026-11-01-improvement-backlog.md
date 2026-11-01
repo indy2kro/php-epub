@@ -35,17 +35,17 @@ BUG-01 to BUG-04, CONV-01, FEAT-01 and SWEEP-01/02.
 | FEAT — new capability | 8 | 0 | 5 | 3 |
 | UX — public API | 3 | 0 | 0 | 2 |
 | DOC — documentation | 1 | 0 | 0 | 1 |
-| TEST — tests | 3 | 0 | 2 | 1 |
+| TEST — tests | 3 | 0 | 1 | 1 |
 | CI — pipeline | 1 | 0 | 0 | 1 |
 | SWEEP — cross-cutting | 3 | 0 | 2 | 1 |
-| **Total** | **27** | **0** | **9** | **10** |
+| **Total** | **27** | **0** | **8** | **10** |
 
 Effort: S = one file, under 30 min · M = one class plus tests · L = cross-cutting.
 
 The target was 30. Only 27 items held up after checking, and the list was not padded. No security vulnerabilities
 were found. ZIP extraction and directory import, `PathResolver`, `XmlParser`, the stream buffering cap, Dompdf's
 sandbox options, Calibre's shell-free process call and the pinned font downloads were re-checked. SEC-01 is
-hardening. Theme 1 (BUG-01 to BUG-04, UX-02) and Theme 2 (CONV-01, CONV-02, CONV-03) have been completed. Theme 2 has TEST-02 remaining.
+hardening. Theme 1 (BUG-01 to BUG-04, UX-02) and Theme 2 (CONV-01, CONV-02, CONV-03, TEST-02) have been fully completed.
 
 ## Execution instructions
 
@@ -103,6 +103,8 @@ hardening. Theme 1 (BUG-01 to BUG-04, UX-02) and Theme 2 (CONV-01, CONV-02, CONV
   The headline example passes `$epubFile->getTempDir()` to `Converter`. That skips `EpubFile::convert()`'s DRM refusal, the book's `Limits` (`LimitsAwareConverter`) and `writePackage()`, so unsaved edits are not converted and an untrusted book is rendered without its caps.
 - [x] **CONV-03** Plan for TCPDF 7's deprecation: mark `TCPDFAdapter` as legacy in the docs and evaluate an adapter on `tecnickcom/tc-lib-pdf`, or recommend Dompdf as the default PDF engine — `src/Converters/TCPDFAdapter.php`, `composer.json` (`suggest`), `docs/converters/tcpdf-adapter.md` — M · low
   Packagist now describes `tecnickcom/tcpdf` 7.0.20 as "Deprecated legacy PDF engine for PHP. Use instead tecnickcom/tc-lib-pdf". Its compatibility shim is where the CONV-01 regression appeared.
+- [x] **TEST-02** Convert every real-world fixture with each adapter (Text, HTML, Markdown, Dompdf, TCPDF) in the test suite — `tests/Converters/`, `tests/fixtures/valid*.epub` — S · med
+  CONV-01 (TCPDF fails on 2 of 3 real books) passes CI because the converter tests only use synthetic books. A smoke test over `tests/fixtures` would have caught it when `tc-lib-pdf` changed.
 
 ### Features
 
