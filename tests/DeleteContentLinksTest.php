@@ -193,6 +193,78 @@ XML;
         }
     }
 
+    public function testDeleteContentRemovesMediaReferencesUsingResolvedPaths(): void
+    {
+        $opf = <<<XML
+<?xml version="1.0" encoding="UTF-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="uid">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:identifier id="uid">urn:uuid:test-media-references</dc:identifier>
+    <dc:title>Test Book</dc:title>
+    <dc:language>en</dc:language>
+  </metadata>
+  <manifest>
+    <item id="chapter" href="text/chapter.xhtml" media-type="application/xhtml+xml"/>
+    <item id="image" href="images/deleted.png" media-type="image/png"/>
+    <item id="same-name" href="other/deleted.png" media-type="image/png"/>
+    <item id="object" href="objects/deleted.svg" media-type="image/svg+xml"/>
+    <item id="poster" href="images/poster.png" media-type="image/png"/>
+    <item id="source" href="audio/source.mp3" media-type="audio/mpeg"/>
+    <item id="icon" href="icons/deleted.svg" media-type="image/svg+xml"/>
+  </manifest>
+  <spine>
+    <itemref idref="chapter"/>
+  </spine>
+</package>
+XML;
+        $chapter = '<html xmlns="http://www.w3.org/1999/xhtml" xmlns:svg="http://www.w3.org/2000/svg"'
+            . ' xmlns:xlink="http://www.w3.org/1999/xlink"><body>'
+            . '<img src="../images/deleted.png?download=1#cover" alt="Deleted"/>'
+            . '<img src="../other/deleted.png" alt="Keep same basename"/>'
+            . '<object data="../objects/deleted.svg"></object>'
+            . '<video poster="../images/poster.png"><source src="../audio/source.mp3"/></video>'
+            . '<svg:svg><svg:a xlink:href="../icons/deleted.svg"><svg:text>Keep SVG label</svg:text></svg:a>'
+            . '<svg:image xlink:href="../icons/deleted.svg"/></svg:svg>'
+            . '</body></html>';
+
+        $path = sys_get_temp_dir() . '/test_delete_media_references.epub';
+        (new EpubBuilder())
+            ->withFile('mimetype', 'application/epub+zip')
+            ->withContainer('EPUB/package.opf')
+            ->withFile('EPUB/package.opf', $opf)
+            ->withFile('EPUB/text/chapter.xhtml', $chapter)
+            ->withFile('EPUB/images/deleted.png', 'deleted image')
+            ->withFile('EPUB/other/deleted.png', 'same basename in another directory')
+            ->withFile('EPUB/objects/deleted.svg', '<svg/>')
+            ->withFile('EPUB/images/poster.png', 'poster')
+            ->withFile('EPUB/audio/source.mp3', 'audio')
+            ->withFile('EPUB/icons/deleted.svg', '<svg/>')
+            ->buildEpub($path);
+
+        $epub = null;
+        try {
+            $epub = EpubFile::open($path);
+            $epub->getContentManager()->deleteContent('EPUB/text/../images/deleted.png');
+            $epub->getContentManager()->deleteContent('EPUB/objects/deleted.svg');
+            $epub->getContentManager()->deleteContent('EPUB/images/poster.png');
+            $epub->getContentManager()->deleteContent('EPUB/audio/source.mp3');
+            $epub->getContentManager()->deleteContent('EPUB/icons/deleted.svg');
+
+            $content = $epub->getContentManager()->getContent('EPUB/text/chapter.xhtml');
+            $this->assertStringNotContainsString('images/deleted.png', $content);
+            $this->assertStringContainsString('../other/deleted.png', $content);
+            $this->assertStringNotContainsString('objects/deleted.svg', $content);
+            $this->assertStringNotContainsString('poster="../images/poster.png"', $content);
+            $this->assertStringNotContainsString('audio/source.mp3', $content);
+            $this->assertStringNotContainsString('xlink:href="../icons/deleted.svg', $content);
+            $this->assertStringContainsString('Keep SVG label', $content);
+            $this->assertStringNotContainsString('<svg:image', $content);
+        } finally {
+            $epub?->close();
+            @unlink($path);
+        }
+    }
+
     public function testDeleteContentSkipsMalformedDocument(): void
     {
         $opf = <<<XML
@@ -239,6 +311,7 @@ XML;
             // Check that chapter1 no longer has a reference to the image
             $chapter1Content = $epub->getContentManager()->getContent('EPUB/text/chapter1.xhtml');
             $this->assertStringNotContainsString('src="../images/image1.png"', $chapter1Content);
+            $this->assertFileDoesNotExist($epub->getTempDir() . '/EPUB/images/image1.png');
         } finally {
             $epub?->close();
             @unlink($path);
