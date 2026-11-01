@@ -32,7 +32,6 @@
         }
     },
     "require-dev": {
-        "ext-curl": "*",
         "ext-gd": "*",
         "ext-json": "*",
         "squizlabs/php_codesniffer" : ">=3.7",
@@ -45,6 +44,8 @@
     },
     "suggest": {
         "ext-gd": "Lets EpubFile::compress() recompress images.",
+        "ext-intl": "Lets ZipHandler compare entry names in Unicode normal form (NFC) when it looks for names that collide.",
+        "ext-iconv": "Reads content documents in encodings that mbstring does not know.",
         "dompdf/dompdf": "Required for PDF generation using Dompdf. Recommended for new projects.",
         "tecnickcom/tcpdf": "Required for PDF generation using TCPDF (legacy, deprecated upstream)."
     },

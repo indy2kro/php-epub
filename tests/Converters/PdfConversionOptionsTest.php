@@ -146,6 +146,7 @@ final class PdfConversionOptionsTest extends TestCase
     #[DataProvider('adapters')]
     public function testImageLimitAtTheBoundary(Closure $adapter): void
     {
+        \PhpEpub\Test\Support\RequiresGd::check('for the PDF engines to render raster images');
         $png = (string) base64_decode(EpubBuilder::PNG, true);
         $book = $this->book(
             2,

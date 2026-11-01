@@ -2,6 +2,8 @@
 
 The `DompdfAdapter` class converts EPUB content into PDF using the Dompdf library (`composer require dompdf/dompdf`).
 
+Dompdf needs the `gd` extension to embed PNG, GIF and WebP images; without it, converting a book that has such images throws a `ConversionException` ("The PHP GD extension is required"). TCPDF needs `gd` as well for PNG images with an alpha channel.
+
 ## Key Methods
 
 - **`__construct(array $styles = [], EpubDocumentLoader $loader = new EpubDocumentLoader(), ?PdfConversionOptions $options = null)`**: Optional styling parameters (the options, such as limits, a contents page and a custom page size, are described in [Converter](../converter.md#limits-and-options-for-untrusted-books); without options the adapter behaves as before, and with options fixed-layout books are refused unless `allowFixedLayout` is set):

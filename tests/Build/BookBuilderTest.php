@@ -602,11 +602,15 @@ MD;
             return (string) base64_decode(EpubBuilder::PNG, true);
         }
 
+        \PhpEpub\Test\Support\RequiresGd::check('to draw test images');
+
         return self::image($width, $height, imagepng(...));
     }
 
     private static function jpeg(int $width, int $height): string
     {
+        \PhpEpub\Test\Support\RequiresGd::check('to draw test images');
+
         return self::image($width, $height, imagejpeg(...));
     }
 

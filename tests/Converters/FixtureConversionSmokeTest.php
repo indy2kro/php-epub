@@ -163,6 +163,7 @@ final class FixtureConversionSmokeTest extends TestCase
     #[DataProvider('pdfFixtureProvider')]
     public function testDompdfAdapterWithFixture(string $fixturePath): void
     {
+        \PhpEpub\Test\Support\RequiresGd::check('for Dompdf to render the raster images of the fixtures');
         if (! class_exists(\Dompdf\Dompdf::class)) {
             $this->markTestSkipped('Dompdf is not installed');
         }

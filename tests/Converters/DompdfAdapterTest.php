@@ -93,6 +93,7 @@ final class DompdfAdapterTest extends TestCase
 
     public function testSvgImagesAreRenderedWithTheImagesTheyReference(): void
     {
+        \PhpEpub\Test\Support\RequiresGd::check('for Dompdf to render raster images');
         $directory = TCPDFAdapterTest::svgBook()->writeTo($this->epubDirectory . '-svg');
 
         try {
@@ -166,6 +167,7 @@ final class DompdfAdapterTest extends TestCase
     }
     public function testACoverOutsideTheSpineBecomesTheFirstPage(): void
     {
+        \PhpEpub\Test\Support\RequiresGd::check('for Dompdf to render raster images');
         $directory = TCPDFAdapterTest::coverBook()->writeTo($this->epubDirectory . '-cover');
 
         try {

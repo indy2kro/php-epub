@@ -84,6 +84,7 @@ final class TCPDFAdapterTest extends TestCase
 
     public function testSvgImagesAreRenderedWithTheImagesTheyReference(): void
     {
+        \PhpEpub\Test\Support\RequiresGd::check('for TCPDF to embed the PNG the SVG references');
         $directory = self::svgBook()->writeTo($this->epubDirectory . '-svg');
         $svgFiles = glob(sys_get_temp_dir() . '/epub_pdf_*') ?: [];
 
@@ -100,6 +101,7 @@ final class TCPDFAdapterTest extends TestCase
 
     public function testImagesOfABookOutsideTcpdfsDefaultPathsAreRendered(): void
     {
+        \PhpEpub\Test\Support\RequiresGd::check('for TCPDF to embed PNG images');
         // TCPDF 7 reads only from its allowlist; by default the system temp dir, the working
         // directory and the script directory. This book is in none of them.
         $directory = EpubBuilder::minimal()
@@ -148,6 +150,7 @@ final class TCPDFAdapterTest extends TestCase
      */
     public function testACoverOutsideTheSpineBecomesTheFirstPage(): void
     {
+        \PhpEpub\Test\Support\RequiresGd::check('for TCPDF to embed a PNG cover');
         $directory = self::coverBook()->writeTo($this->epubDirectory . '-cover');
 
         try {
