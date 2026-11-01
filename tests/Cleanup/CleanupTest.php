@@ -303,7 +303,11 @@ XML,
             chmod($file, 0644);
         }
 
-        $this->assertSame([], $report->getAction(CleanupAction::UNUSED_FONTS)->files ?? []);
+        $action = $report->getAction(CleanupAction::UNUSED_FONTS);
+        $this->assertInstanceOf(CleanupAction::class, $action);
+        $this->assertSame([], $action->files);
+        $this->assertTrue($action->skipped, 'nothing could be removed');
+        $this->assertSame('Kept because META-INF/encryption.xml could not be updated: EPUB/fonts/unused.otf', $action->note);
         $this->assertSame($encryption, $this->read('META-INF/encryption.xml'));
         $this->assertTrue($this->has('EPUB/fonts/unused.otf'));
         $this->assertInstanceOf(ManifestItem::class, $book->getManifest()->findByPath('EPUB/fonts/unused.otf'));

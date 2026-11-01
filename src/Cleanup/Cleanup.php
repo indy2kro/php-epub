@@ -176,10 +176,12 @@ final readonly class Cleanup
         $directory = $this->directory();
         $manifest = $this->book->getManifest();
         $files = [];
+        $kept = [];
         $before = 0;
         foreach ($paths as $path) {
             if (! $this->forgetEncryption($path)) {
                 // Removing the file would leave encryption.xml naming a file that is not there.
+                $kept[] = $path;
                 continue;
             }
 
@@ -201,8 +203,10 @@ final readonly class Cleanup
         }
 
         sort($files, SORT_STRING);
+        sort($kept, SORT_STRING);
+        $note = $kept === [] ? '' : 'Kept because META-INF/encryption.xml could not be updated: ' . implode(', ', $kept);
 
-        return new CleanupAction($name, $files, $before, 0);
+        return new CleanupAction($name, $files, $before, 0, $files === [] && $kept !== [], $note);
     }
 
     private function removeStrayFiles(ReferenceAnalysis $analysis): CleanupAction
