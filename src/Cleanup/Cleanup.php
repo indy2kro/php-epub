@@ -189,8 +189,9 @@ final readonly class Cleanup
             $file = $this->paths->resolve($directory, $path);
             $size = is_file($file) ? (int) filesize($file) : 0;
             if (is_file($file) && ! @unlink($file)) {
-                // The file is locked (or vanished) between the check and the delete: it stays, and so does its entry.
-                $this->restoreEncryption($path, $algorithm);
+                // The file cannot be deleted (locked, read-only): it stays, so it is listed in encryption.xml again and
+                // still read de-obfuscated. Should that write fail too, its exception is the one reported.
+                is_string($algorithm) && (new FontObfuscation($directory, $this->xmlParser))->setAlgorithm($path, $algorithm);
 
                 throw new Exception("Failed to delete: {$path}");
             }
@@ -357,7 +358,7 @@ final readonly class Cleanup
     /**
      * Removes the encryption.xml entry of a file that is about to be removed.
      *
-     * @return string|false|null The obfuscation algorithm whose entry was removed (see restoreEncryption()), null
+     * @return string|false|null The obfuscation algorithm whose entry was removed (to list the file again if it cannot be deleted), null
      *                           when the file had none, or false when the entry exists but cannot be removed
      *                           (encryption.xml cannot be read or written): the file must then stay, and
      *                           encryption.xml is left as it is.
@@ -375,22 +376,6 @@ final readonly class Cleanup
         }
 
         return $algorithm;
-    }
-
-    /**
-     * Lists a file in encryption.xml again after its removal failed, so that it is still read de-obfuscated.
-     */
-    private function restoreEncryption(string $path, ?string $algorithm): void
-    {
-        if ($algorithm === null) {
-            return;
-        }
-
-        try {
-            (new FontObfuscation($this->directory(), $this->xmlParser))->setAlgorithm($path, $algorithm);
-        } catch (Exception) {
-            // The failed removal is what the caller reports; encryption.xml just could be written a moment ago.
-        }
     }
 
     private function pruneEmptyDirectories(string $directory): void
