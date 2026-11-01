@@ -70,7 +70,7 @@ hardening. Theme 1 (BUG-01 to BUG-04, UX-02) and Theme 2 (CONV-01, CONV-02, CONV
 
 ### Sweeps
 
-- [ ] **SWEEP-01** Add the package and content rules EPUBCheck enforces to `validate()`: duplicate element ids in a document, no linear spine item, more than one `cover-image` item, invalid `rendition:*` values — `src/Validator.php`, `src/Util/Rendition.php`, `src/Metadata.php:189-230` — M · med
+- [x] **SWEEP-01** Add the package and content rules EPUBCheck enforces to `validate()`: duplicate element ids in a document, no linear spine item, more than one `cover-image` item, invalid `rendition:*` values — `src/Validator.php`, `src/Util/Rendition.php`, `src/Metadata.php:189-230` — M · med
   Probe: each of these four books validates clean, and `setProperty('rendition:layout', 'banana')` is accepted too. EPUBCheck rejects all four (RSC-005, OPF-033, cover-image cardinality, the rendition vocabulary).
 - [ ] **SWEEP-02** Name book-relative paths, not the private extraction directory, in exception messages, and let `php-epub validate` report an unreadable book as a problem (exit 1, an issue in `--json`) instead of a failure — `src/Parser.php:35-44`, `src/XmlParser.php:29-44`, `src/EpubFile.php:403-410`, `src/ContentManager.php:164-175`, `src/Cli/Application.php:191-240` — M · med
   Probe: `php-epub validate tests/fixtures/invalid.epub` exits 3 with `XML file not found: C:\…\Temp\epub_<hex>\META-INF\container.xml`, and a broken OPF reports the same temp path. A web service that echoes the message leaks its temp layout, and the user cannot tell which part of the book is wrong.

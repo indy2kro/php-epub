@@ -35,6 +35,129 @@ final class ValidatorTest extends TestCase
         $this->assertSame([], $this->open(EpubBuilder::epub3())->validate());
     }
 
+    public function testReportsDuplicateIdsInOneContentDocument(): void
+    {
+        $book = EpubBuilder::epub3()->withFile(
+            'EPUB/text/chapter.xhtml',
+            EpubBuilder::xhtml('Chapter', '<p id="repeated">One</p><p id="repeated">Two</p>', '../css/style.css')
+        );
+
+        $issues = array_values(array_filter(
+            $this->open($book)->validate(),
+            static fn (ValidationIssue $issue): bool => $issue->code === 'CONTENT_DUPLICATE_ID'
+        ));
+
+        $this->assertCount(1, $issues);
+        $this->assertSame(ValidationIssue::ERROR, $issues[0]->severity);
+        $this->assertSame('EPUB/text/chapter.xhtml', $issues[0]->location);
+    }
+
+    public function testReportsDuplicateIdsInTheNavigationDocument(): void
+    {
+        $book = EpubBuilder::epub3()->withFile(
+            'EPUB/nav.xhtml',
+            EpubBuilder::xhtml(
+                'Contents',
+                '<nav epub:type="toc"><ol><li><a href="text/chapter.xhtml">Chapter</a></li></ol></nav>'
+                    . '<p id="repeated">One</p><p id="repeated">Two</p>'
+            )
+        );
+
+        $issues = array_values(array_filter(
+            $this->open($book)->validate(),
+            static fn (ValidationIssue $issue): bool => $issue->code === 'CONTENT_DUPLICATE_ID'
+        ));
+
+        $this->assertCount(1, $issues);
+        $this->assertSame('EPUB/nav.xhtml', $issues[0]->location);
+    }
+
+    public function testReportsASpineWithNoLinearItems(): void
+    {
+        $opf = str_replace('<itemref idref="chapter"/>', '<itemref idref="chapter" linear="no"/>', (string) EpubBuilder::epub3()->getFile('EPUB/package.opf'));
+
+        $this->assertSame(
+            ['SPINE_NO_LINEAR_ITEM'],
+            $this->codes($this->open(EpubBuilder::epub3()->withFile('EPUB/package.opf', $opf))->validate())
+        );
+    }
+
+    public function testAllowsANonLinearSpineItemWhenAnotherIsLinear(): void
+    {
+        $opf = str_replace(
+            ['</manifest>', '<itemref idref="chapter"/>'],
+            ['<item id="appendix" href="text/appendix.xhtml" media-type="application/xhtml+xml"/></manifest>', '<itemref idref="chapter"/><itemref idref="appendix" linear="no"/>'],
+            (string) EpubBuilder::epub3()->getFile('EPUB/package.opf')
+        );
+        $book = EpubBuilder::epub3()
+            ->withFile('EPUB/package.opf', $opf)
+            ->withFile('EPUB/text/appendix.xhtml', EpubBuilder::xhtml('Appendix', '<p>Notes.</p>'));
+
+        $this->assertSame([], $this->codes($this->open($book)->validate()));
+    }
+
+    public function testReportsMultipleCoverImageItems(): void
+    {
+        $opf = str_replace(
+            '</manifest>',
+            '<item id="cover-one" href="cover-one.png" media-type="image/png" properties="cover-image"/>'
+                . '<item id="cover-two" href="cover-two.png" media-type="image/png" properties="cover-image"/></manifest>',
+            (string) EpubBuilder::epub3()->getFile('EPUB/package.opf')
+        );
+        $png = (string) base64_decode(EpubBuilder::PNG, true);
+        $book = EpubBuilder::epub3()
+            ->withFile('EPUB/package.opf', $opf)
+            ->withFile('EPUB/cover-one.png', $png)
+            ->withFile('EPUB/cover-two.png', $png);
+
+        $this->assertSame(['COVER_IMAGE_MULTIPLE'], $this->codes($this->open($book)->validate()));
+    }
+
+    public function testAllowsASingleCoverImageItem(): void
+    {
+        $opf = str_replace(
+            '</manifest>',
+            '<item id="cover" href="cover.png" media-type="image/png" properties="cover-image"/></manifest>',
+            (string) EpubBuilder::epub3()->getFile('EPUB/package.opf')
+        );
+        $book = EpubBuilder::epub3()
+            ->withFile('EPUB/package.opf', $opf)
+            ->withFile('EPUB/cover.png', (string) base64_decode(EpubBuilder::PNG, true));
+
+        $this->assertSame([], $this->codes($this->open($book)->validate()));
+    }
+
+    public function testReportsInvalidRenditionValuesWithoutTighteningGenericSetter(): void
+    {
+        foreach (
+            [
+                'rendition:layout' => 'banana',
+                'rendition:orientation' => 'sideways',
+                'rendition:spread' => 'banana',
+                'rendition:flow' => 'banana',
+            ] as $property => $value
+        ) {
+            $epubFile = $this->open(EpubBuilder::epub3());
+            $metadata = $epubFile->getMetadata();
+            $metadata->setProperty($property, $value);
+
+            $this->assertSame($value, $metadata->getProperty($property));
+            $this->assertSame(['RENDITION_VALUE_INVALID'], $this->codes($epubFile->validate()));
+        }
+    }
+
+    public function testAllowsValidRenditionValues(): void
+    {
+        $epubFile = $this->open(EpubBuilder::epub3());
+        $metadata = $epubFile->getMetadata();
+        $metadata->setProperty('rendition:layout', 'pre-paginated');
+        $metadata->setProperty('rendition:orientation', 'landscape');
+        $metadata->setProperty('rendition:spread', 'both');
+        $metadata->setProperty('rendition:flow', 'scrolled-doc');
+
+        $this->assertSame([], $epubFile->validate());
+    }
+
     public function testABookCreatedFromScratchIsValidOnceItHasAChapterAndAccessibilityMetadata(): void
     {
         $epubFile = EpubFile::create($this->tmpDir . '/new.epub', 'New');
@@ -264,10 +387,9 @@ final class ValidatorTest extends TestCase
 
     public function testACoverImagePropertyNeedsAnImage(): void
     {
-        $opf = str_replace('media-type="text/css"/>', 'media-type="text/css" properties="cover-image"/><item id="cover" href="cover.png" media-type="image/png" properties="cover-image"/>', (string) EpubBuilder::epub3()->getFile('EPUB/package.opf'));
+        $opf = str_replace('media-type="text/css"/>', 'media-type="text/css" properties="cover-image"/>', (string) EpubBuilder::epub3()->getFile('EPUB/package.opf'));
         $book = EpubBuilder::epub3()
-            ->withFile('EPUB/package.opf', $opf)
-            ->withFile('EPUB/cover.png', (string) base64_decode(EpubBuilder::PNG, true));
+            ->withFile('EPUB/package.opf', $opf);
 
         $issues = $this->open($book)->validate();
 

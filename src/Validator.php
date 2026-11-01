@@ -10,6 +10,7 @@ use PhpEpub\Util\FragmentReferences;
 use PhpEpub\Util\MetadataSyntax;
 use PhpEpub\Util\PackagePrefixes;
 use PhpEpub\Util\PathResolver;
+use PhpEpub\Util\Rendition;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 use SimpleXMLElement;
@@ -90,6 +91,7 @@ final readonly class Validator
             ...$this->checkEncryption(),
             ...$this->checkMetadata(),
             ...$this->checkMetadataSyntax(),
+            ...$this->checkRenditionValues(),
             ...$this->checkPrefixes(),
             ...$this->checkIds(),
             ...$this->checkManifest(),
@@ -233,6 +235,35 @@ final readonly class Validator
     }
 
     /**
+     * The book-level rendition properties must use values from the EPUB rendition vocabulary.
+     *
+     * @return list<ValidationIssue>
+     */
+    private function checkRenditionValues(): array
+    {
+        if (! $this->isEpub3()) {
+            return [];
+        }
+
+        $issues = [];
+        foreach (Rendition::VALUES as $aspect => $allowedValues) {
+            $property = 'rendition:' . $aspect;
+            foreach ($this->metadata->getPropertyValues($property) as $value) {
+                $value = trim($value);
+                if (! in_array($value, $allowedValues, true)) {
+                    $issues[] = $this->error(
+                        'RENDITION_VALUE_INVALID',
+                        "\"{$value}\" is not a valid value for {$property}; expected one of " . implode(', ', $allowedValues) . '.',
+                        $property
+                    );
+                }
+            }
+        }
+
+        return $issues;
+    }
+
+    /**
      * The prefixes of the properties the package uses ("foo:bar" in a meta property, a manifest or spine item's
      * properties, a link's rel) must be reserved or declared in package@prefix (EPUBCheck OPF-028).
      *
@@ -312,6 +343,10 @@ final readonly class Validator
         }
 
         $issues = [];
+        if (array_filter($items, static fn (SpineItem $item): bool => $item->linear) === []) {
+            $issues[] = $this->error('SPINE_NO_LINEAR_ITEM', 'The spine has no linear item in its primary reading order.');
+        }
+
         $seen = [];
         foreach ($items as $spineItem) {
             if (isset($seen[$spineItem->idref])) {
@@ -356,6 +391,10 @@ final readonly class Validator
                 continue;
             }
 
+            if ($root instanceof \DOMElement) {
+                array_push($issues, ...$this->checkDuplicateIds($root, $item->path));
+            }
+
             $directory = dirname($item->path) === '.' ? '' : dirname($item->path) . '/';
             $checked = [];
             foreach ($root instanceof \DOMElement ? $root->getElementsByTagName('*') : [] as $element) {
@@ -370,6 +409,35 @@ final readonly class Validator
 
             if ($root instanceof \DOMElement) {
                 array_push($issues, ...$this->checkFragments($fragments, $root, $item->path));
+            }
+        }
+
+        return $issues;
+    }
+
+    /**
+     * An XHTML document must not use the same element id more than once.
+     *
+     * @return list<ValidationIssue>
+     */
+    private function checkDuplicateIds(\DOMElement $root, string $document): array
+    {
+        $ids = [];
+        if ($root->hasAttribute('id')) {
+            $ids[$root->getAttribute('id')] = 1;
+        }
+
+        foreach ($root->getElementsByTagName('*') as $element) {
+            if ($element->hasAttribute('id')) {
+                $id = $element->getAttribute('id');
+                $ids[$id] = ($ids[$id] ?? 0) + 1;
+            }
+        }
+
+        $issues = [];
+        foreach ($ids as $id => $count) {
+            if ($count > 1) {
+                $issues[] = $this->error('CONTENT_DUPLICATE_ID', "The id \"{$id}\" is used {$count} times in this content document.", $document);
             }
         }
 
@@ -493,10 +561,14 @@ final readonly class Validator
     private function checkManifestProperties(): array
     {
         $issues = [];
+        $coverImages = 0;
         foreach ($this->manifest->getItems() as $item) {
             $declared = preg_split('/\s+/', trim($item->properties), -1, PREG_SPLIT_NO_EMPTY) ?: [];
             if (in_array('cover-image', $declared, true) && ! str_starts_with($item->mediaType, 'image/')) {
                 $issues[] = $this->error('COVER_NOT_IMAGE', "Manifest item \"{$item->id}\" has the cover-image property but is {$item->mediaType}, not an image.", $item->path);
+            }
+            if ($this->isEpub3() && in_array('cover-image', $declared, true)) {
+                $coverImages++;
             }
 
             $needed = $this->isEpub3() ? $this->neededProperties($item) : null;
@@ -511,6 +583,10 @@ final readonly class Validator
                     $issues[] = $this->warning('MANIFEST_PROPERTY_UNNEEDED', "Manifest item \"{$item->id}\" has the \"{$property}\" property, but its content does not need it.", $item->path);
                 }
             }
+        }
+
+        if ($coverImages > 1) {
+            $issues[] = $this->error('COVER_IMAGE_MULTIPLE', "The manifest has {$coverImages} items with the cover-image property; only one is allowed.");
         }
 
         return $issues;
@@ -740,7 +816,17 @@ final readonly class Validator
             return [$this->error('NCX_UID_MISMATCH', 'The NCX\'s dtb:uid differs from the package\'s unique identifier; save() corrects it.', $item->path)];
         }
 
-        return $isNav && $this->hasEmptyTocList($xml) ? [$this->error('NAV_EMPTY', 'The navigation document\'s toc has no list item.', $item->path)] : [];
+        if (! $isNav) {
+            return [];
+        }
+
+        $root = dom_import_simplexml($xml);
+        $issues = $root instanceof \DOMElement ? $this->checkDuplicateIds($root, $item->path) : [];
+        if ($this->hasEmptyTocList($xml)) {
+            $issues[] = $this->error('NAV_EMPTY', 'The navigation document\'s toc has no list item.', $item->path);
+        }
+
+        return $issues;
     }
 
     /**
