@@ -174,6 +174,9 @@ class ContentManager
             throw new Exception("Failed to delete content from: {$fullPath}");
         }
 
+        // Remove links to the deleted file from other documents
+        $this->removeReferencesTo($filePath);
+
         $item = $this->manifest?->findByPath($filePath);
         if ($item instanceof ManifestItem) {
             if ($this->spine?->contains($item->id) === true) {
@@ -185,6 +188,58 @@ class ContentManager
 
         $this->removeTableOfContentsEntries($this->paths->normalize($filePath));
         $this->removeEncryptionEntry($this->paths->normalize($filePath));
+    }
+
+    /**
+     * Removes links to a deleted file from other documents in the book.
+     */
+    private function removeReferencesTo(string $deletedPath): void
+    {
+        $linkRemover = new \PhpEpub\Util\LinkRemover($this->paths, $this->xmlParser);
+
+        // Iterate through all content documents that might reference the deleted file
+        foreach ($this->getContentPaths() as $contentPath) {
+            $item = $this->manifest?->findByPath($contentPath);
+            if ($item === null) {
+                continue;
+            }
+
+            // Skip navigation documents (EPUB 3) and NCX (EPUB 2)
+            // These are handled separately by removeTableOfContentsEntries
+            $properties = $item->properties;
+            if (str_contains($properties, 'nav') || $item->mediaType === 'application/x-dtbncx+xml') {
+                continue;
+            }
+
+            // Only process XHTML, HTML, SVG, and SMIL documents
+            $mediaType = $item->mediaType;
+            if (
+                ! str_starts_with($mediaType, 'application/xhtml+xml') &&
+                ! str_starts_with($mediaType, 'text/html') &&
+                ! str_starts_with($mediaType, 'image/svg+xml') &&
+                $mediaType !== 'application/smil+xml'
+            ) {
+                continue;
+            }
+
+            // Skip the deleted file itself
+            if ($contentPath === $deletedPath) {
+                continue;
+            }
+
+            try {
+                $content = $this->getContent($contentPath);
+                $removed = [$deletedPath => true];
+                $updated = $linkRemover->remove($contentPath, $content, $removed);
+
+                if ($updated !== null) {
+                    $this->updateContent($contentPath, $updated);
+                }
+            } catch (\PhpEpub\Exception) {
+                // If we can't read or process the content, skip it
+                continue;
+            }
+        }
     }
 
     /**

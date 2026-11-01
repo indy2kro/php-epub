@@ -151,14 +151,24 @@ class Manifest
             throw new Exception("Manifest id is already in use: {$id}");
         }
 
+        $id ??= $this->uniqueId($path);
+        $href = $this->pathToHref($path);
+        $mediaType ??= $this->guessMediaType($path);
+
         $item = $this->manifestNode->addChild('item', null, Metadata::OPF_NAMESPACE);
-        $item->addAttribute('id', $id ?? $this->uniqueId($path));
-        $item->addAttribute('href', $this->pathToHref($path));
-        $item->addAttribute('media-type', $mediaType ?? $this->guessMediaType($path));
+        $item->addAttribute('id', $id);
+        $item->addAttribute('href', $href);
+        $item->addAttribute('media-type', $mediaType);
         $this->modified = true;
 
+        // Re-query the node we just added to work around SimpleXML's namespace prefix handling.
+        // When the OPF uses xmlns:opf="...", addChild() creates <opf:item> and the attributes
+        // are added without a namespace. Re-querying gives us a node that can be properly indexed.
+        $nodes = $this->query("/opf:package/opf:manifest/opf:item[@id='{$id}']");
+        $node = end($nodes) ?: $item;
+
         // A new item goes last, so the index only needs extending.
-        return $this->items === null ? $this->toItem($item) : $this->indexItem($item);
+        return $this->items === null ? $this->toItem($node) : $this->indexItem($node);
     }
 
     /**
@@ -207,6 +217,10 @@ class Manifest
             if ($properties !== '') {
                 $node->addAttribute('properties', $properties);
             }
+
+            // Re-query the node to work around SimpleXML's namespace prefix handling.
+            $nodes = $this->query("/opf:package/opf:manifest/opf:item[@id='{$id}']");
+            $node = end($nodes) ?: $node;
 
             $this->modified = true;
             $this->items();

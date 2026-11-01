@@ -684,7 +684,8 @@ class EpubFile
 
         $manifest = $this->getManifest();
         $metadata = $this->getMetadata();
-        $previous = $deletePrevious ? $this->getCoverImage() : null;
+        $contentManager = $this->getContentManager();
+        $previous = $this->getCoverImage();
 
         if ($path === null) {
             $opfDirectory = dirname($manifest->getOpfPath());
@@ -696,7 +697,7 @@ class EpubFile
         }
 
         $cover = $manifest->findByPath($path) ?? $manifest->add($path, $mediaType);
-        $this->getContentManager()->addContent($path, $imageData);
+        $contentManager->addContent($path, $imageData);
         // The path may have held another format before.
         $manifest->setMediaType($cover->id, $mediaType);
 
@@ -707,8 +708,17 @@ class EpubFile
         // EPUB 2 readers (and many EPUB 3 ones) look for this meta.
         $metadata->setMeta('cover', $cover->id);
 
+        // Update references to the previous cover in cover pages and delete it if requested
         if ($previous instanceof ManifestItem && $previous->id !== $cover->id) {
-            $this->deleteItem($previous);
+            // Only update references if the path changed
+            if ($previous->path !== $cover->path) {
+                $this->updateCoverPageReferences($previous->path, $cover->path);
+            }
+
+            // Only delete the previous cover if requested and it's not referenced by any content
+            if ($deletePrevious && ! $this->isPathReferenced($previous->path)) {
+                $this->deleteItem($previous);
+            }
         }
 
         return $manifest->get($cover->id) ?? $cover;
@@ -816,6 +826,108 @@ class EpubFile
     public function toArray(): array
     {
         return BookSummary::of($this);
+    }
+
+    /**
+     * Updates references to the old cover path in cover pages (guide cover or first spine page) to point to the new cover path.
+     */
+    private function updateCoverPageReferences(string $oldCoverPath, string $newCoverPath): void
+    {
+        $manifest = $this->getManifest();
+        $contentManager = $this->getContentManager();
+        $rewriter = new \PhpEpub\Util\ReferenceRewriter();
+
+        // Find cover pages: guide cover reference and first spine page
+        $coverPages = [];
+
+        // Check guide cover reference
+        foreach ($manifest->getGuideReferences() as $reference) {
+            if ($reference->type === 'cover' && $reference->path !== '') {
+                $item = $manifest->findByPath($reference->path);
+                if ($item instanceof ManifestItem) {
+                    $coverPages[$item->path] = true;
+                }
+            }
+        }
+
+        // Check first spine page
+        $spine = $this->getSpine();
+        $firstSpineId = $spine->get()[0] ?? null;
+        if ($firstSpineId !== null) {
+            $firstItem = $manifest->get($firstSpineId);
+            if ($firstItem instanceof ManifestItem && $firstItem->mediaType === 'application/xhtml+xml') {
+                $coverPages[$firstItem->path] = true;
+            }
+        }
+
+        // Update references in each cover page
+        foreach (array_keys($coverPages) as $pagePath) {
+            $content = $contentManager->getContent($pagePath);
+            $updated = $rewriter->rewriteXml($content, $pagePath, $pagePath, $oldCoverPath, $newCoverPath);
+            if ($updated !== null) {
+                $contentManager->updateContent($pagePath, $updated);
+            }
+        }
+    }
+
+    /**
+     * Checks if a path is referenced by any content in the book.
+     */
+    private function isPathReferenced(string $path): bool
+    {
+        // Check if any content document references this path
+        $pathResolver = new \PhpEpub\Util\PathResolver();
+        $basename = basename($path);
+        $dirname = dirname($path);
+
+        foreach ($this->getContentManager()->getContentPaths() as $contentPath) {
+            $item = $this->getManifest()->findByPath($contentPath);
+            if ($item === null) {
+                continue;
+            }
+
+            // Skip XML documents that might be in the manifest (like NCX)
+            if (
+                ! str_starts_with($item->mediaType, 'application/xhtml+xml') &&
+                ! str_starts_with($item->mediaType, 'text/html')
+            ) {
+                continue;
+            }
+
+            try {
+                $content = $this->getContentManager()->getContent($contentPath);
+
+                // Check for various forms of the path in reference attributes
+                // Match src, href, poster, data attributes that reference the exact path
+                // Use path boundaries to avoid matching substrings like "cover.png" in "new-cover.png"
+                $escapedPath = preg_quote($path, '/');
+                $escapedBasename = preg_quote($basename, '/');
+                $escapedUrlPath = preg_quote(rawurlencode($path), '/');
+                $escapedUrlBasename = preg_quote(rawurlencode($basename), '/');
+
+                $patterns = [
+                    // Exact path match
+                    '/(?:src|href|poster|data)\s*=\s*["\']' . $escapedPath . '(?:\?[^"\']*)?(?:#[^"\']*)?["\']/',
+                    // Path ending with basename (basename must be at end or preceded by /)
+                    '/(?:src|href|poster|data)\s*=\s*["\'](?:[^"\']*\/)?' . $escapedBasename . '(?:\?[^"\']*)?(?:#[^"\']*)?["\']/',
+                    // URL-encoded exact path
+                    '/(?:src|href|poster|data)\s*=\s*["\']' . $escapedUrlPath . '(?:\?[^"\']*)?(?:#[^"\']*)?["\']/',
+                    // URL-encoded path ending with basename
+                    '/(?:src|href|poster|data)\s*=\s*["\'](?:[^"\']*\/)?' . $escapedUrlBasename . '(?:\?[^"\']*)?(?:#[^"\']*)?["\']/',
+                ];
+
+                foreach ($patterns as $pattern) {
+                    if (preg_match($pattern, $content)) {
+                        return true;
+                    }
+                }
+            } catch (\PhpEpub\Exception) {
+                // If we can't read the content, assume it's referenced
+                continue;
+            }
+        }
+
+        return false;
     }
 
     /**
