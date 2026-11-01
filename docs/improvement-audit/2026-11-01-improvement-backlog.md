@@ -74,12 +74,12 @@ hardening. Theme 1 (BUG-01 to BUG-04, UX-02), Theme 2 (CONV-01, CONV-02, CONV-03
   Probe: each of these four books validates clean, and `setProperty('rendition:layout', 'banana')` is accepted too. EPUBCheck rejects all four (RSC-005, OPF-033, cover-image cardinality, the rendition vocabulary).
 - [ ] **SWEEP-02** Name book-relative paths, not the private extraction directory, in exception messages, and let `php-epub validate` report an unreadable book as a problem (exit 1, an issue in `--json`) instead of a failure — `src/Parser.php:35-44`, `src/XmlParser.php:29-44`, `src/EpubFile.php:403-410`, `src/ContentManager.php:164-175`, `src/Cli/Application.php:191-240` — M · med
   Probe: `php-epub validate tests/fixtures/invalid.epub` exits 3 with `XML file not found: C:\…\Temp\epub_<hex>\META-INF\container.xml`, and a broken OPF reports the same temp path. A web service that echoes the message leaks its temp layout, and the user cannot tell which part of the book is wrong.
-- [ ] **SWEEP-03** Cover the remaining uncovered lines: NCX `navList` renumbering, `Cleanup` dropping a removed font's encryption entry, `EpubDocumentLoader` with a damaged `encryption.xml`, the `saveToDirectory()` rollback — `src/TableOfContents.php:889`, `src/Cleanup/Cleanup.php:353`, `src/Converters/EpubDocumentLoader.php:447-448`, `src/EpubFile.php:470-475` — S · low
+- [x] **SWEEP-03** Cover the remaining uncovered lines: NCX `navList` renumbering, `Cleanup` dropping a removed font's encryption entry, `EpubDocumentLoader` with a damaged `encryption.xml`, the `saveToDirectory()` rollback — `src/TableOfContents.php:889`, `src/Cleanup/Cleanup.php:353`, `src/Converters/EpubDocumentLoader.php:447-448`, `src/EpubFile.php:470-475` — S · low
   Apart from the symlink-only branches, these are round-5 behaviours (ed9f611's `navList` renumbering among them) that no test exercises.
 
 ### Security hardening
 
-- [ ] **SEC-01** Remove (or make private) the unused public `FileSystemHelper::exec()`, which runs a string through the shell — `src/Util/FileSystemHelper.php:16-26`, `tests/Util/FileSystemHelperTest.php:209` — S · low
+- [x] **SEC-01** Remove (or make private) the unused public `FileSystemHelper::exec()`, which runs a string through the shell — `src/Util/FileSystemHelper.php:16-26`, `tests/Util/FileSystemHelperTest.php:209` — S · low
   Nothing in `src/` has called it since `CalibreAdapter` moved to `runProcess()`. A public shell-exec helper in a library that handles hostile input is a foot-gun for callers. This is hardening, not a vulnerability.
 
 ### Bugs
@@ -133,19 +133,19 @@ hardening. Theme 1 (BUG-01 to BUG-04, UX-02), Theme 2 (CONV-01, CONV-02, CONV-03
 
 ### Documentation
 
-- [ ] **DOC-01** Document `SplitKind` and `EpubDocument` (both appear in public signatures), mark `TextEncoding` and `XhtmlFragment` `@internal`, and document or mark `@internal` the remaining public methods `CleanupOptions::withDryRun()`, `CleanupReport::withArchiveSizes()`, `PdfConversionOptions::deadline()`, `EpubDocument::outlineByChapter()`, `EpubDocumentLoader::anchorId()` and `Parser::locatePackage()` — `src/Split/SplitKind.php`, `src/Converters/EpubDocument.php`, `src/Util/TextEncoding.php`, `src/Util/XhtmlFragment.php`, `docs/split.md`, `docs/converter.md` — S · low
+- [x] **DOC-01** Document `SplitKind` and `EpubDocument` (both appear in public signatures), mark `TextEncoding` and `XhtmlFragment` `@internal`, and document or mark `@internal` the remaining public methods `CleanupOptions::withDryRun()`, `CleanupReport::withArchiveSizes()`, `PdfConversionOptions::deadline()`, `EpubDocument::outlineByChapter()`, `EpubDocumentLoader::anchorId()` and `Parser::locatePackage()` — `src/Split/SplitKind.php`, `src/Converters/EpubDocument.php`, `src/Util/TextEncoding.php`, `src/Util/XhtmlFragment.php`, `docs/split.md`, `docs/converter.md` — S · low
   These are the only public classes and methods that are neither named in `docs/` or `README.md` nor `@internal`, so it is unclear whether semver covers them.
 
 ### Tests
 
 - [ ] **TEST-01** Add real-world fixtures (e.g. the IDPF epub3-samples, CC BY-SA) for fixed layout, media overlays, RTL and CJK vertical text, obfuscated fonts and SVG, and run them through the EPUBCheck round-trip — `tests/fixtures/`, `tests/EpubCheckTest.php` — M · med
   Carried over: round-5 TEST-01 is still open. All 7 committed books are reflowable Latin-script books without fonts, overlays, SVG or a page-progression direction. The EPUB 3 features most likely to break on save are only exercised by synthetic `EpubBuilder` books, and neither of the two OPF namespace layouts behind BUG-01 is covered by a test.
-- [ ] **TEST-02** Convert every real-world fixture with each adapter (Text, HTML, Markdown, Dompdf, TCPDF) in the test suite — `tests/Converters/`, `tests/fixtures/valid*.epub` — S · med
+- [x] **TEST-02** Convert every real-world fixture with each adapter (Text, HTML, Markdown, Dompdf, TCPDF) in the test suite — `tests/Converters/`, `tests/fixtures/valid*.epub` — S · med
   CONV-01 (TCPDF fails on 2 of 3 real books) passes CI because the converter tests only use synthetic books. A smoke test over `tests/fixtures` would have caught it when `tc-lib-pdf` changed.
 - [x] **TEST-03** Replace the wall-clock assertion in `MergerTest::testMergingThousandsOfFilesStaysFast` with an operation count, or a budget that allows for coverage — `tests/Merge/MergerTest.php:557-580` — S · low
   Under Xdebug coverage the test took 13.7 s against an 8 s budget and failed. A local coverage run, or any slow CI runner, reports a false regression.
 
 ### CI
 
-- [ ] **CI-01** Add a CI job without the optional extensions (`gd`, `intl`, `iconv`), drop the unused `ext-curl` from `require-dev`, and suggest `ext-intl` — `.github/workflows/tests.yml:45-50`, `composer.json` (`require-dev`, `suggest`), `src/ZipHandler.php:332-339`, `src/Util/TextEncoding.php:57-60`, `src/Cleanup/ImageRecompressor.php:34` — S · low
+- [x] **CI-01** Add a CI job without the optional extensions (`gd`, `intl`, `iconv`), drop the unused `ext-curl` from `require-dev`, and suggest `ext-intl` — `.github/workflows/tests.yml:45-50`, `composer.json` (`require-dev`, `suggest`), `src/ZipHandler.php:332-339`, `src/Util/TextEncoding.php:57-60`, `src/Cleanup/ImageRecompressor.php:34` — S · low
   Every job installs `gd`, and `intl` comes with the runners. The no-GD `compress()` path, the ASCII case-folding fallback and the `iconv` fallback therefore never run in CI, while nothing in `src/` or `tests/` calls `curl`.
