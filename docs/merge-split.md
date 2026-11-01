@@ -29,7 +29,13 @@ foreach ($report->warnings as $warning) {
 ```
 
 ```php
-public function merge(array $books, MergeOptions $options, string $outputPath): MergeReport;
+public function merge(array $books, ?MergeOptions $options, string $outputPath): MergeReport;
+```
+
+`merge()` always returns its report, as `Splitter::splitWithReport()` does. Pass `null` as `$options` for the defaults:
+
+```php
+$report = (new Merger())->merge($books, null, '/path/to/series.epub');
 ```
 
 ### Options

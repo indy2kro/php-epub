@@ -67,13 +67,17 @@ final readonly class Merger
     /**
      * Merges the books and saves the result as $outputPath.
      *
+     * Like Splitter::splitWithReport(), it returns a report of what was done.
+     *
      * @param list<EpubFile> $books Loaded books, in reading order: at least two, within the limits of $options.
+     * @param MergeOptions|null $options null for the defaults (new MergeOptions()).
      *
      * @throws Exception If there are too few or too many books, they are too large or DRM-protected, a book is not
      *                   loaded, a value is not valid XML text, or the merged book cannot be built or written.
      */
-    public function merge(array $books, MergeOptions $options, string $outputPath): MergeReport
+    public function merge(array $books, ?MergeOptions $options, string $outputPath): MergeReport
     {
+        $options ??= new MergeOptions();
         $bytes = $this->assertInputs($books, $options);
         $first = $books[0];
         $identifier = $options->identifier ?? BookTemplate::uuidUrn();
