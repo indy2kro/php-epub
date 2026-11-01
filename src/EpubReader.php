@@ -474,6 +474,43 @@ final class EpubReader
     }
 
     /**
+     * Copies a file of the book into a writable stream chunk by chunk, e.g. to serve an image or an audio file
+     * without holding it in memory. The same limits as getContent() apply to the bytes read.
+     *
+     * When a limit is exceeded part-way, the bytes copied so far stay in $stream.
+     *
+     * @param string $path The path relative to the book root.
+     * @param resource $stream A stream opened for writing.
+     * @param int|null $maxBytes Refuse a file larger than this.
+     *
+     * @return int The number of bytes copied.
+     *
+     * @throws InvalidEpubException If the file does not exist, is larger than $maxBytes or the path leaves the book.
+     * @throws ZipException If the file exceeds the limits while it is read.
+     * @throws Exception If $stream is not a stream, or writing to it fails.
+     */
+    public function copyContentTo(string $path, $stream, ?int $maxBytes = null): int
+    {
+        $this->assertOpen();
+        is_resource($stream) && get_resource_type($stream) === 'stream' || throw new Exception('copyContentTo() needs an open stream.');
+
+        $copied = 0;
+        $this->read(
+            $path,
+            $maxBytes ?? PHP_INT_MAX,
+            static fn (string $name, int $cap): InvalidEpubException => new InvalidEpubException("File is larger than {$cap} bytes: {$name}"),
+            static fn (string $name): InvalidEpubException => new InvalidEpubException("Content file does not exist: {$name}"),
+            static function (string $chunk) use ($stream, $path, &$copied): void {
+                $written = @fwrite($stream, $chunk);
+                $written === strlen($chunk) || throw new Exception("Failed to write {$path} to the stream.");
+                $copied += $written;
+            }
+        );
+
+        return $copied;
+    }
+
+    /**
      * @throws Exception If the reader is closed.
      */
     private function assertOpen(): void
@@ -598,10 +635,11 @@ final class EpubReader
      *
      * @param \Closure(string, int): \Throwable $tooLarge The exception for an entry over $cap bytes.
      * @param \Closure(string): \Throwable $missing The exception for a path that is not in the book.
+     * @param (\Closure(string): void)|null $sink Receives each chunk instead of collecting them; '' is returned then.
      *
      * @throws \Throwable The exceptions made by the closures, and ZipException.
      */
-    private function read(string $path, int $cap, \Closure $tooLarge, \Closure $missing): string
+    private function read(string $path, int $cap, \Closure $tooLarge, \Closure $missing, ?\Closure $sink = null): string
     {
         $zip = $this->zip ?? throw new Exception('The EPUB reader is closed.');
         $name = $this->paths->normalize($path);
@@ -636,7 +674,11 @@ final class EpubReader
                     throw new ZipException("ZIP entry exceeds the maximum compression ratio of {$this->limits->maxCompressionRatio}: {$name}");
                 }
 
-                $content .= $chunk;
+                if ($sink instanceof \Closure) {
+                    $sink($chunk);
+                } else {
+                    $content .= $chunk;
+                }
             }
         } finally {
             fclose($input);

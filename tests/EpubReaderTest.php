@@ -348,6 +348,76 @@ final class EpubReaderTest extends TestCase
         $reader->getContent('EPUB/data.txt', 99);
     }
 
+    public function testCopiesContentToAStream(): void
+    {
+        $content = random_bytes(300_000);
+        $path = EpubBuilder::epub3()->withFile('EPUB/audio/track.mp3', $content)->buildEpub($this->workDir . '/book.epub');
+        $reader = EpubReader::open($path);
+        $stream = fopen('php://memory', 'w+b');
+        $this->assertIsResource($stream);
+
+        $this->assertSame(300_000, $reader->copyContentTo('EPUB/audio/track.mp3', $stream));
+
+        rewind($stream);
+        $this->assertSame($content, stream_get_contents($stream));
+        fclose($stream);
+    }
+
+    public function testCopyingContentToAStreamAppliesTheSizeCapAndTheRatioLimit(): void
+    {
+        $path = EpubBuilder::epub3()->withFile('EPUB/big.bin', str_repeat("\0", 2 * 1024 * 1024))->buildEpub($this->workDir . '/book.epub');
+        $stream = fopen('php://memory', 'w+b');
+        $this->assertIsResource($stream);
+
+        try {
+            EpubReader::open($path)->copyContentTo('EPUB/big.bin', $stream, 1024);
+            $this->fail('The size cap was not applied.');
+        } catch (InvalidEpubException) {
+        }
+
+        $this->expectException(ZipException::class);
+        EpubReader::open($path, new Limits(maxCompressionRatio: 2))->copyContentTo('EPUB/big.bin', $stream);
+    }
+
+    public function testCopyingAMissingFileToAStreamThrows(): void
+    {
+        $reader = EpubReader::open(EpubBuilder::epub3()->buildEpub($this->workDir . '/book.epub'));
+        $stream = fopen('php://memory', 'w+b');
+        $this->assertIsResource($stream);
+
+        $this->expectException(InvalidEpubException::class);
+        $reader->copyContentTo('EPUB/missing.png', $stream);
+    }
+
+    public function testCopyingContentNeedsAWritableStream(): void
+    {
+        $reader = EpubReader::open(EpubBuilder::epub3()->buildEpub($this->workDir . '/book.epub'));
+        $readOnly = fopen('php://memory', 'rb');
+        $this->assertIsResource($readOnly);
+
+        try {
+            $reader->copyContentTo('EPUB/text/chapter.xhtml', $readOnly);
+            $this->fail('Writing to a read-only stream did not fail.');
+        } catch (Exception $exception) {
+            $this->assertStringContainsString('Failed to write', $exception->getMessage());
+        }
+
+        fclose($readOnly);
+        $this->expectException(Exception::class);
+        $reader->copyContentTo('EPUB/text/chapter.xhtml', $readOnly);
+    }
+
+    public function testCopyingContentFailsOnceTheReaderIsClosed(): void
+    {
+        $reader = EpubReader::open(EpubBuilder::epub3()->buildEpub($this->workDir . '/book.epub'));
+        $reader->close();
+        $stream = fopen('php://memory', 'w+b');
+        $this->assertIsResource($stream);
+
+        $this->expectException(Exception::class);
+        $reader->copyContentTo('EPUB/text/chapter.xhtml', $stream);
+    }
+
     public function testXmlSizeBoundary(): void
     {
         $builder = EpubBuilder::epub3();
