@@ -92,16 +92,17 @@ final class BookBuilderTest extends TestCase
         $book->cleanup();
     }
 
-    public function testHeadingSyntaxInANoteIsTextAndStartsNoChapter(): void
+    public function testAHeadingInANoteIsAParagraphAndStartsNoChapter(): void
     {
-        $markdown = "# One\n\nCited.[^a]\n\n[^a]: # Not a heading\n    Text\n    ===\n";
+        $markdown = "# One\n\nCited.[^a]\n\n[^a]: # Not a heading\n    Text\n    ===\n    > ## Quoted\n    ```\n    # comment\n    ```\n";
 
         $built = (new BookBuilder(new BookOptions(title: 'Headings')))->fromMarkdown($markdown);
         $one = $this->chapterHtml($built, 1);
 
         $this->assertSame(1, $built->chapterCount);
-        $this->assertMatchesRegularExpression('#<aside class="footnote"[^>]*>.*\# Not a heading.*</aside>#s', $one);
-        $this->assertStringNotContainsString('<h1>Not a heading', $one);
+        $this->assertMatchesRegularExpression('#<aside class="footnote"[^>]*>.*<p>Not a heading</p>.*<p>Text</p>.*<blockquote>\s*<p>Quoted</p>.*</aside>#s', $one);
+        $this->assertStringContainsString('<code># comment</code>', $one, 'fenced code in a note is kept as written');
+        $this->assertDoesNotMatchRegularExpression('#<h[1-6][ >]#', substr($one, (int) strpos($one, '<aside')));
     }
 
     public function testANoteCitedByANoteFollowsItIntoItsChapter(): void

@@ -61,6 +61,11 @@ final class MarkdownParser
      */
     private array $citations = [];
 
+    /**
+     * Whether a footnote is being rendered: its headings (ATX or setext, also in quotes and lists) become paragraphs.
+     */
+    private bool $inNote = false;
+
     public function toHtml(string $markdown): string
     {
         $markdown = str_replace(["\r\n", "\r", "\t", "\x00", self::HOLD], ["\n", "\n", '    ', '', ''], $markdown);
@@ -119,7 +124,7 @@ final class MarkdownParser
 
     /**
      * The asides of the cited footnotes, in number order; a note may cite further notes, which follow. A note has no
-     * headings: BookBuilder starts chapters at headings, so heading syntax in a note stays text.
+     * headings: BookBuilder starts chapters at headings, so a heading in a note becomes a paragraph.
      */
     private function renderNotes(): string
     {
@@ -127,11 +132,13 @@ final class MarkdownParser
         $labels = array_keys($this->noteNumbers);
         for ($index = 0; $index < count($labels); $index++) {
             $number = $index + 1;
-            $lines = array_map(
-                static fn (string $line): string => self::replace('/^( {0,3})(#{1,6}(?:[ \t]|$)|=+[ \t]*$|-+[ \t]*$)/', '$1\\\\$2', $line),
-                $this->notes[$labels[$index]] ?? []
-            );
-            $body = $this->blocks($lines, 1, false);
+            $this->inNote = true;
+            try {
+                $body = $this->blocks($this->notes[$labels[$index]] ?? [], 1, false);
+            } finally {
+                $this->inNote = false;
+            }
+
             $html .= '<aside class="footnote" id="fn-' . $number . '">' . "\n" . $body
                 . '<p><a class="footnote-back" href="#fnref-' . $number . '">↩</a></p>' . "</aside>\n";
             $labels = array_keys($this->noteNumbers);
@@ -459,6 +466,10 @@ final class MarkdownParser
      */
     private function heading(int $level, string $text): string
     {
+        if ($this->inNote) {
+            return '<p>' . $this->inline($text) . "</p>\n";
+        }
+
         $id = '';
         if (preg_match('/^(.*?)\s*\{#([A-Za-z][A-Za-z0-9_.-]*)\}\s*$/', $text, $match) === 1) {
             [$text, $id] = [$match[1], $match[2]];
