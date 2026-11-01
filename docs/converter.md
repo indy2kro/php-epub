@@ -12,6 +12,8 @@ The `Converter` class converts an extracted EPUB into other formats by dispatchi
 
 Every adapter accepts the extracted directory. `CalibreAdapter` also accepts an `.epub` file; given a directory, it packages it into a temporary `.epub` first.
 
+**Note on TCPDF:** TCPDF 7 is now deprecated by its maintainer on Packagist ("Deprecated legacy PDF engine for PHP. Use instead tecnickcom/tc-lib-pdf"). For new projects, we recommend using `DompdfAdapter` instead, which supports modern CSS features, embedded fonts via `@font-face`, and has active maintenance. TCPDFAdapter is kept for backwards compatibility. See [TCPDFAdapter documentation](converters/tcpdf-adapter.md) for details.
+
 ## Usage Example
 
 The recommended way to convert a book is through `EpubFile::convert()`. This ensures that:

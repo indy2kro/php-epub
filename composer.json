@@ -45,8 +45,8 @@
     },
     "suggest": {
         "ext-gd": "Lets EpubFile::compress() recompress images.",
-        "dompdf/dompdf": "Required for PDF generation using Dompdf.",
-        "tecnickcom/tcpdf": "Required for PDF generation using TCPDF."
+        "dompdf/dompdf": "Required for PDF generation using Dompdf. Recommended for new projects.",
+        "tecnickcom/tcpdf": "Required for PDF generation using TCPDF (legacy, deprecated upstream)."
     },
     "minimum-stability": "stable",
     "prefer-stable": true,

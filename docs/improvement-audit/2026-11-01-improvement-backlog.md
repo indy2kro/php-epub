@@ -31,21 +31,21 @@ BUG-01 to BUG-04, CONV-01, FEAT-01 and SWEEP-01/02.
 |---|---:|---:|---:|---:|
 | SEC — untrusted input | 1 | 0 | 0 | 1 |
 | BUG — wrong behaviour | 4 | 0 | 0 | 0 |
-| CONV — converters | 3 | 0 | 0 | 1 |
+| CONV — converters | 3 | 0 | 0 | 0 |
 | FEAT — new capability | 8 | 0 | 5 | 3 |
 | UX — public API | 3 | 0 | 0 | 2 |
 | DOC — documentation | 1 | 0 | 0 | 1 |
 | TEST — tests | 3 | 0 | 2 | 1 |
 | CI — pipeline | 1 | 0 | 0 | 1 |
 | SWEEP — cross-cutting | 3 | 0 | 2 | 1 |
-| **Total** | **27** | **0** | **9** | **11** |
+| **Total** | **27** | **0** | **9** | **10** |
 
 Effort: S = one file, under 30 min · M = one class plus tests · L = cross-cutting.
 
 The target was 30. Only 27 items held up after checking, and the list was not padded. No security vulnerabilities
 were found. ZIP extraction and directory import, `PathResolver`, `XmlParser`, the stream buffering cap, Dompdf's
 sandbox options, Calibre's shell-free process call and the pinned font downloads were re-checked. SEC-01 is
-hardening. Theme 1 (BUG-01 to BUG-04, UX-02) and Theme 2 (CONV-01, CONV-02) have been completed. Theme 2 has CONV-03 and TEST-02 remaining.
+hardening. Theme 1 (BUG-01 to BUG-04, UX-02) and Theme 2 (CONV-01, CONV-02, CONV-03) have been completed. Theme 2 has TEST-02 remaining.
 
 ## Execution instructions
 
@@ -101,7 +101,7 @@ hardening. Theme 1 (BUG-01 to BUG-04, UX-02) and Theme 2 (CONV-01, CONV-02) have
   With fresh dependencies (`tecnickcom/tcpdf` 7.0.20, `tc-lib-pdf` 8.82.2), converting `valid_4` and `valid_6` throws `Invalid value: auto` from `HTML::parseHTMLStyleWidthProperty`. A one-chapter book with `<p style="width:auto">` fails as well. Dompdf renders the same books.
 - [x] **CONV-02** Route the `Converter` class through `EpubFile::convert()` (accept an `EpubFile`, or deprecate the directory form), and make the first example in `docs/converter.md` use `$epub->convert()` — `src/Converter.php:19-44`, `docs/converter.md:15-36` — S · med
   The headline example passes `$epubFile->getTempDir()` to `Converter`. That skips `EpubFile::convert()`'s DRM refusal, the book's `Limits` (`LimitsAwareConverter`) and `writePackage()`, so unsaved edits are not converted and an untrusted book is rendered without its caps.
-- [ ] **CONV-03** Plan for TCPDF 7's deprecation: mark `TCPDFAdapter` as legacy in the docs and evaluate an adapter on `tecnickcom/tc-lib-pdf`, or recommend Dompdf as the default PDF engine — `src/Converters/TCPDFAdapter.php`, `composer.json` (`suggest`), `docs/converters/tcpdf-adapter.md` — M · low
+- [x] **CONV-03** Plan for TCPDF 7's deprecation: mark `TCPDFAdapter` as legacy in the docs and evaluate an adapter on `tecnickcom/tc-lib-pdf`, or recommend Dompdf as the default PDF engine — `src/Converters/TCPDFAdapter.php`, `composer.json` (`suggest`), `docs/converters/tcpdf-adapter.md` — M · low
   Packagist now describes `tecnickcom/tcpdf` 7.0.20 as "Deprecated legacy PDF engine for PHP. Use instead tecnickcom/tc-lib-pdf". Its compatibility shim is where the CONV-01 regression appeared.
 
 ### Features
