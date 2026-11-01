@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace PhpEpub\Cli;
 
+use PhpEpub\Build\BookBuilder;
+use PhpEpub\Build\BookOptions;
+use PhpEpub\Build\BuildLimits;
 use PhpEpub\Cleanup\CleanupOptions;
 use PhpEpub\Cleanup\CleanupPreset;
 use PhpEpub\Cleanup\CleanupReport;
@@ -16,6 +19,7 @@ use PhpEpub\Converters\TextAdapter;
 use PhpEpub\EpubFile;
 use PhpEpub\EpubReader;
 use PhpEpub\Exception;
+use PhpEpub\InvalidEpubException;
 use PhpEpub\Limits;
 use PhpEpub\Merge\MergeOptions;
 use PhpEpub\Merge\Merger;
@@ -26,6 +30,7 @@ use PhpEpub\Split\SplitPlan;
 use PhpEpub\Util\FileSystemHelper;
 use PhpEpub\ValidationIssue;
 use PhpEpub\ValidationProfile;
+use PhpEpub\ZipException;
 
 /**
  * The php-epub command line: a thin layer over the library's entry points (EpubReader, EpubFile, Merger, Splitter).
@@ -45,6 +50,16 @@ final class Application
 
     public const int FAILURE = 3;
 
+    /**
+     * Source file extensions build understands, and the format each means.
+     */
+    private const array SOURCE_FORMATS = ['md' => 'markdown', 'markdown' => 'markdown', 'txt' => 'text', 'text' => 'text', 'html' => 'html', 'htm' => 'html', 'xhtml' => 'html'];
+
+    /**
+     * The image files build takes from an --images directory.
+     */
+    private const array IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+
     private const string USAGE_TEXT = <<<'TEXT'
         Usage: php-epub <command> [options] <arguments>
 
@@ -56,6 +71,8 @@ final class Application
           convert <book> -o <out>           Export the book as txt, html, md or pdf
           split <book> -d <dir>             Cut the book into parts
           merge <book> <book>... -o <out>   Join books into one
+          build <source> -o <out>           Make a book from Markdown, text or HTML
+          meta <book> [-o <out>]            Print the metadata, or save a copy with changed metadata
 
         A <book> is an .epub file or an expanded (unzipped) book directory.
 
@@ -71,6 +88,9 @@ final class Application
         convert:   --to=txt|html|md|pdf (default: from the output's extension)  --engine=dompdf|tcpdf (pdf only)
         split:     -d, --directory <dir>  --toc [--level=<n>] | --every=<items> | --max-bytes=<bytes>  --prefix=<name>
         merge:     --title=<title>  --author=<name> (repeatable)  --language=<tag>  --flat (no section per book)
+        build:     --from=markdown|text|html (default: from the extension)  --title=  --author= (repeatable)
+                   --language=  --identifier=  --cover=<image>  --images=<dir>  --css=<file>  --split-level=<1-6>
+        meta:      --title=  --author= (repeatable)  --language=  --identifier=  --cover=<image>  (need -o)
 
         Exit codes: 0 success, 1 problems found, 2 wrong usage, 3 the operation failed.
 
@@ -147,6 +167,8 @@ final class Application
             'convert' => $this->convert($rest),
             'split' => $this->split($rest),
             'merge' => $this->merge($rest),
+            'build' => $this->build($rest),
+            'meta' => $this->meta($rest),
             default => throw new UsageException("Unknown command: {$command}"),
         };
     }
@@ -198,11 +220,22 @@ final class Application
             default => throw new UsageException('Unknown profile: ' . $input->value('profile') . ' (known: kindle)'),
         };
 
-        $book = $this->open($path, $this->limits($input));
+        // A book that cannot be read at all is a problem of the book (exit 1), not a failure; a missing input is.
+        $book = null;
+        $issues = [];
         try {
-            $issues = $book->validate($profile);
-        } finally {
-            $book->close();
+            $book = $this->open($path, $this->limits($input));
+        } catch (InvalidEpubException | ZipException $exception) {
+            file_exists($path) || throw $exception;
+            $issues = [new ValidationIssue(ValidationIssue::ERROR, 'EPUB_UNREADABLE', "The book cannot be read: {$exception->getMessage()}")];
+        }
+
+        if ($book instanceof EpubFile) {
+            try {
+                $issues = $book->validate($profile);
+            } finally {
+                $book->close();
+            }
         }
 
         $errors = count(array_filter($issues, static fn (ValidationIssue $issue): bool => $issue->severity === ValidationIssue::ERROR));
@@ -454,6 +487,186 @@ final class Application
             'tcpdf' => class_exists(\TCPDF::class) ? new TCPDFAdapter() : throw new Exception('PDF output with tcpdf needs tecnickcom/tcpdf (composer require tecnickcom/tcpdf)'),
             default => throw new UsageException("Unknown engine: {$engine} (known: dompdf, tcpdf)"),
         };
+    }
+
+    /**
+     * @param list<string> $arguments
+     *
+     * @throws Exception
+     */
+    private function build(array $arguments): int
+    {
+        $input = Arguments::parse(
+            $arguments,
+            ['output', 'from', 'title', 'author', 'language', 'identifier', 'cover', 'images', 'css', 'split-level'],
+            ['trusted', 'force']
+        );
+        $source = $this->single($input, 'a Markdown, text or HTML file');
+        $output = $this->output($input, [$source]);
+        $extension = strtolower(pathinfo($source, PATHINFO_EXTENSION));
+        $from = $input->value('from')
+            ?? self::SOURCE_FORMATS[$extension]
+            ?? throw new UsageException("Cannot tell the format of {$source}: give --from=markdown|text|html");
+        in_array($from, ['markdown', 'text', 'html'], true) || throw new UsageException("Unknown format: {$from} (known: markdown, text, html)");
+        $splitLevel = $this->integer($input->value('split-level'), 'split-level', 1);
+        ($splitLevel >= 1 && $splitLevel <= 6) || throw new UsageException("The option --split-level needs 1 to 6, got: {$splitLevel}");
+
+        $limits = new BuildLimits();
+        $images = [];
+        $directory = $input->value('images');
+        if ($directory !== null) {
+            is_dir($directory) || throw new UsageException("Not a directory: {$directory}");
+            foreach (scandir($directory) ?: [] as $name) {
+                $file = $directory . DIRECTORY_SEPARATOR . $name;
+                if (in_array(strtolower(pathinfo($name, PATHINFO_EXTENSION)), self::IMAGE_EXTENSIONS, true) && is_file($file)) {
+                    $images[$name] = $this->readFile($file, $limits->maxImageBytes);
+                }
+            }
+        }
+
+        $cover = $input->value('cover');
+        $css = $input->value('css');
+        $title = $input->value('title') ?? pathinfo($source, PATHINFO_FILENAME);
+        $options = new BookOptions(
+            title: $title === '' ? 'Untitled' : $title,
+            authors: $input->values('author'),
+            language: $input->value('language') ?? 'en',
+            identifier: $input->value('identifier'),
+            coverImage: $cover === null ? null : $this->readFile($this->optionFile($cover, 'cover'), $limits->maxImageBytes),
+            css: $css === null ? '' : $this->readFile($this->optionFile($css, 'css'), $limits->maxTotalBytes),
+            images: $images,
+            splitLevel: $splitLevel,
+            limits: $limits
+        );
+
+        $text = $this->readFile($source, $limits->maxTotalBytes);
+        $builder = new BookBuilder($options);
+        $book = match ($from) {
+            'markdown' => $builder->fromMarkdown($text),
+            'text' => $builder->fromText($text),
+            default => $builder->fromHtml($text),
+        };
+
+        foreach ($book->warnings as $warning) {
+            $this->write($this->stderr, "php-epub: warning: {$warning}\n");
+        }
+
+        $book->save($output);
+        $this->write($this->stdout, "Saved: {$output} ({$book->chapterCount} chapters)\n");
+
+        return self::SUCCESS;
+    }
+
+    /**
+     * @param list<string> $arguments
+     *
+     * @throws Exception
+     */
+    private function meta(array $arguments): int
+    {
+        $input = Arguments::parse($arguments, ['output', 'title', 'author', 'language', 'identifier', 'cover'], ['trusted', 'force', 'compact']);
+        $path = $this->single($input, 'a book');
+        $changes = array_filter(['title', 'author', 'language', 'identifier', 'cover'], static fn (string $name): bool => $input->values($name) !== []);
+
+        if ($changes === []) {
+            $input->value('output') === null || throw new UsageException('Give the metadata to change: --title, --author, --language, --identifier or --cover');
+            $this->json($this->metadataSummary($path, $this->limits($input)), $input->flag('compact'));
+
+            return self::SUCCESS;
+        }
+
+        $output = $this->output($input, [$path]);
+        foreach (['title', 'language', 'identifier'] as $name) {
+            $value = $input->value($name);
+            $value === null || trim($value) !== '' || throw new UsageException("The option --{$name} must not be empty");
+        }
+
+        $cover = null;
+        $coverPath = $input->value('cover');
+        if ($coverPath !== null) {
+            $bytes = $this->readFile($this->optionFile($coverPath, 'cover'), (new BuildLimits())->maxImageBytes);
+            $info = @getimagesizefromstring($bytes);
+            $type = $info === false ? '' : $info['mime'];
+            in_array($type, ['image/jpeg', 'image/png', 'image/gif', 'image/webp'], true)
+                || throw new UsageException("The cover must be a JPEG, PNG, GIF or WebP image: {$coverPath}");
+            $cover = [$bytes, $type];
+        }
+
+        $book = $this->open($path, $this->limits($input));
+        try {
+            $metadata = $book->getMetadata();
+            $input->value('title') === null || $metadata->setTitle((string) $input->value('title'));
+            $input->values('author') === [] || $metadata->setAuthors($input->values('author'));
+            $input->value('language') === null || $metadata->setLanguage((string) $input->value('language'));
+            $identifier = $input->value('identifier');
+            if ($identifier !== null) {
+                $unique = $metadata->getUniqueIdentifier();
+                $others = array_values(array_filter($metadata->getIdentifiers(), static fn (string $id): bool => $id !== $unique && $id !== $identifier));
+                $metadata->setIdentifiers([$identifier, ...$others]);
+            }
+
+            $cover === null || $book->setCoverImage($cover[0], $cover[1]);
+            $book->save($output);
+        } finally {
+            $book->close();
+        }
+
+        $this->write($this->stdout, "Saved: {$output}\n");
+
+        return self::SUCCESS;
+    }
+
+    /**
+     * The metadata the meta command prints.
+     *
+     * @return array<string, mixed>
+     *
+     * @throws Exception
+     */
+    private function metadataSummary(string $path, Limits $limits): array
+    {
+        $book = is_dir($path) ? EpubFile::openDirectory($path, limits: $limits) : EpubReader::open($path, $limits);
+        try {
+            $metadata = $book->getMetadata();
+
+            return [
+                'title' => $metadata->getTitle(),
+                'authors' => $metadata->getAuthors(),
+                'language' => $metadata->getLanguage(),
+                'identifier' => $metadata->getUniqueIdentifier(),
+                'isbn' => $metadata->getIsbn(),
+                'publisher' => $metadata->getPublisher(),
+                'description' => $metadata->getDescription(),
+                'date' => $metadata->getDate(),
+                'cover' => $book->getCoverImage()?->path,
+            ];
+        } finally {
+            $book->close();
+        }
+    }
+
+    /**
+     * A file named by an option, which must exist.
+     *
+     * @throws UsageException
+     */
+    private function optionFile(string $path, string $option): string
+    {
+        return is_file($path) ? $path : throw new UsageException("The file for --{$option} does not exist: {$path}");
+    }
+
+    /**
+     * Reads a file the user named, refusing one larger than $maxBytes before reading it.
+     *
+     * @throws Exception If the file does not exist, is too large or cannot be read.
+     */
+    private function readFile(string $path, int $maxBytes): string
+    {
+        is_file($path) || throw new Exception("The file does not exist: {$path}");
+        $size = @filesize($path);
+        ($size !== false && $size <= $maxBytes) || throw new Exception("The file is larger than {$maxBytes} bytes: {$path}");
+
+        return FileSystemHelper::readFile($path) ?? throw new Exception("Failed to read: {$path}");
     }
 
     /**

@@ -107,7 +107,33 @@ final class ApplicationTest extends TestCase
         $this->assertStringContainsString('does not exist', $err);
 
         file_put_contents($this->workDir . '/junk.epub', 'not a zip');
-        $this->assertSame(3, $this->cli(['validate', $this->workDir . '/junk.epub'])[0]);
+        $this->assertSame(3, $this->cli(['info', $this->workDir . '/junk.epub'])[0]);
+        $this->assertSame(3, $this->cli(['validate', $this->workDir . '/missing.epub'])[0], 'a missing input is a failure, not a problem of the book');
+    }
+
+    public function testValidateReportsAnUnreadableBookAsAProblem(): void
+    {
+        file_put_contents($this->workDir . '/junk.epub', 'not a zip');
+        foreach ([$this->workDir . '/junk.epub', __DIR__ . '/../fixtures/invalid.epub'] as $path) {
+            [$code, $out, $err] = $this->cli(['validate', $path]);
+            $this->assertSame(1, $code, $path);
+            $this->assertStringContainsString('error EPUB_UNREADABLE', $out);
+            $this->assertSame('', $err);
+
+            [$code, $json] = $this->cli(['validate', '--json', $path]);
+            $this->assertSame(1, $code);
+            $decoded = json_decode($json, true, flags: JSON_THROW_ON_ERROR);
+            $this->assertIsArray($decoded);
+            $this->assertFalse($decoded['valid']);
+            $this->assertSame(1, $decoded['errors']);
+            $this->assertIsArray($decoded['issues']);
+            $this->assertIsArray($decoded['issues'][0]);
+            $this->assertSame('EPUB_UNREADABLE', $decoded['issues'][0]['code']);
+        }
+
+        [, $out] = $this->cli(['validate', __DIR__ . '/../fixtures/invalid.epub']);
+        $this->assertStringContainsString('META-INF/container.xml', $out);
+        $this->assertStringNotContainsString(sys_get_temp_dir(), $out);
     }
 
     public function testValidateExitsWithOneOnErrorsAndZeroOtherwise(): void
@@ -339,9 +365,137 @@ final class ApplicationTest extends TestCase
         $this->assertSame(3, $code);
         $this->assertStringContainsString('too many entries', $err);
 
-        $this->assertSame(3, $this->cli(['validate', $book])[0]);
+        // validate reports a book it cannot read within the limits as a problem of the book.
+        [$code, $out] = $this->cli(['validate', $book]);
+        $this->assertSame(1, $code);
+        $this->assertStringContainsString('EPUB_UNREADABLE', $out);
+        $this->assertStringContainsString('too many entries', $out);
         $this->assertSame(0, $this->cli(['info', '--trusted', $book])[0]);
         $this->assertSame(0, $this->cli(['validate', '--trusted', '--json', $book])[0]);
+    }
+
+    public function testBuildMakesABookFromMarkdownWithImagesAndACover(): void
+    {
+        $png = (string) base64_decode(EpubBuilder::PNG, true);
+        mkdir($this->workDir . '/images');
+        file_put_contents($this->workDir . '/images/pic.png', $png);
+        file_put_contents($this->workDir . '/cover.png', $png);
+        file_put_contents($this->workDir . '/novel.md', "# One\n\nText.\n\n# Two\n\n![A picture](images/pic.png)\n");
+        $output = $this->workDir . '/novel.epub';
+
+        [$code, $out, $err] = $this->cli([
+            'build', $this->workDir . '/novel.md', '-o', $output, '--title=The Novel', '--author=Ann', '--author=Bob',
+            '--language=fr', '--images=' . $this->workDir . '/images', '--cover=' . $this->workDir . '/cover.png',
+        ]);
+
+        $this->assertSame(0, $code, $err);
+        $this->assertStringContainsString("Saved: {$output} (2 chapters)", $out);
+        $book = EpubFile::open($output);
+        $this->assertSame('The Novel', $book->getMetadata()->getTitle());
+        $this->assertSame(['Ann', 'Bob'], $book->getMetadata()->getAuthors());
+        $this->assertSame('fr', $book->getMetadata()->getLanguage());
+        $this->assertInstanceOf(\PhpEpub\ManifestItem::class, $book->getCoverImage());
+        $pngs = array_filter($book->getManifest()->getItems(), static fn (\PhpEpub\ManifestItem $item): bool => $item->mediaType === 'image/png');
+        $this->assertCount(2, $pngs, 'the cover and the picture from --images');
+        $this->assertSame([], array_filter($book->validate(), static fn ($issue): bool => $issue->severity === 'error'));
+    }
+
+    public function testBuildReadsTextAndHtml(): void
+    {
+        file_put_contents($this->workDir . '/story.txt', "Chapter One\n\nIt began.\n\nChapter Two\n\nIt ended.\n");
+        file_put_contents($this->workDir . '/page.data', '<h1>Only</h1><p>Body</p>');
+
+        [$code, $out] = $this->cli(['build', $this->workDir . '/story.txt', '-o', $this->workDir . '/story.epub']);
+        $this->assertSame(0, $code);
+        $this->assertStringContainsString('(2 chapters)', $out);
+
+        [$code, $out] = $this->cli(['build', '--from=html', $this->workDir . '/page.data', '-o', $this->workDir . '/page.epub', '--title=Page']);
+        $this->assertSame(0, $code);
+        $this->assertSame('Page', EpubFile::open($this->workDir . '/page.epub')->getMetadata()->getTitle());
+    }
+
+    public function testBuildUsageErrorsAndFailures(): void
+    {
+        file_put_contents($this->workDir . '/notes.rtf', 'x');
+        file_put_contents($this->workDir . '/a.md', '# A');
+        file_put_contents($this->workDir . '/exists.epub', 'x');
+
+        $usageErrors = [
+            ['build', $this->workDir . '/a.md'],
+            ['build', $this->workDir . '/notes.rtf', '-o', $this->workDir . '/x.epub'],
+            ['build', '--from=pdf', $this->workDir . '/a.md', '-o', $this->workDir . '/x.epub'],
+            ['build', $this->workDir . '/a.md', '-o', $this->workDir . '/exists.epub'],
+            ['build', $this->workDir . '/a.md', '-o', $this->workDir . '/x.epub', '--split-level=9'],
+            ['build', $this->workDir . '/a.md', '-o', $this->workDir . '/x.epub', '--images=' . $this->workDir . '/nope'],
+        ];
+        foreach ($usageErrors as $arguments) {
+            $this->assertSame(2, $this->cli($arguments)[0], implode(' ', $arguments));
+        }
+
+        [$code, , $err] = $this->cli(['build', $this->workDir . '/missing.md', '-o', $this->workDir . '/x.epub']);
+        $this->assertSame(3, $code);
+        $this->assertStringContainsString('does not exist', $err);
+
+        file_put_contents($this->workDir . '/empty.md', '');
+        $this->assertSame(3, $this->cli(['build', $this->workDir . '/empty.md', '-o', $this->workDir . '/x.epub'])[0]);
+        $this->assertFileDoesNotExist($this->workDir . '/x.epub');
+    }
+
+    public function testMetaPrintsTheMetadata(): void
+    {
+        [$code, $out] = $this->cli(['meta', __DIR__ . '/../fixtures/valid.epub']);
+
+        $this->assertSame(0, $code);
+        $meta = json_decode($out, true, flags: JSON_THROW_ON_ERROR);
+        $this->assertIsArray($meta);
+        $book = EpubFile::open(__DIR__ . '/../fixtures/valid.epub');
+        $this->assertSame($book->getMetadata()->getTitle(), $meta['title']);
+        $this->assertSame($book->getMetadata()->getAuthors(), $meta['authors']);
+        $this->assertSame($book->getMetadata()->getLanguage(), $meta['language']);
+        $this->assertSame($book->getMetadata()->getUniqueIdentifier(), $meta['identifier']);
+        $this->assertSame($book->getCoverImage()?->path, $meta['cover']);
+        $this->assertSame(['title', 'authors', 'language', 'identifier', 'isbn', 'publisher', 'description', 'date', 'cover'], array_keys($meta));
+    }
+
+    public function testMetaWritesAnEditedCopy(): void
+    {
+        $source = $this->book();
+        $before = (string) file_get_contents($source);
+        file_put_contents($this->workDir . '/cover.png', (string) base64_decode(EpubBuilder::PNG, true));
+        $output = $this->workDir . '/edited.epub';
+
+        [$code, $out, $err] = $this->cli([
+            'meta', $source, '-o', $output, '--title=New Title', '--author=Zoe', '--language=de',
+            '--identifier=urn:uuid:11111111-2222-4333-8444-555555555555', '--cover=' . $this->workDir . '/cover.png',
+        ]);
+
+        $this->assertSame(0, $code, $err);
+        $this->assertStringContainsString("Saved: {$output}", $out);
+        $this->assertSame($before, (string) file_get_contents($source), 'the input is untouched');
+        $book = EpubFile::open($output);
+        $this->assertSame('New Title', $book->getMetadata()->getTitle());
+        $this->assertSame(['Zoe'], $book->getMetadata()->getAuthors());
+        $this->assertSame('de', $book->getMetadata()->getLanguage());
+        $this->assertSame('urn:uuid:11111111-2222-4333-8444-555555555555', $book->getMetadata()->getUniqueIdentifier());
+        $this->assertSame('image/png', $book->getCoverImage()?->mediaType);
+        $this->assertSame([], array_filter($book->validate(), static fn ($issue): bool => $issue->severity === 'error'));
+    }
+
+    public function testMetaUsageErrors(): void
+    {
+        $source = $this->book();
+        file_put_contents($this->workDir . '/not-an-image.png', 'text');
+
+        $usageErrors = [
+            ['meta', $source, '--title=X'],
+            ['meta', $source, '-o', $this->workDir . '/x.epub'],
+            ['meta', $source, '-o', $this->workDir . '/x.epub', '--cover=' . $this->workDir . '/missing.png'],
+            ['meta', $source, '-o', $this->workDir . '/x.epub', '--cover=' . $this->workDir . '/not-an-image.png'],
+            ['meta', $source, '-o', $this->workDir . '/x.epub', '--title='],
+        ];
+        foreach ($usageErrors as $arguments) {
+            $this->assertSame(2, $this->cli($arguments)[0], implode(' ', $arguments));
+        }
     }
 
     public function testDrmBooksAreRefusedByConversionAndSplit(): void
