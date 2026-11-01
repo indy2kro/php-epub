@@ -18,6 +18,13 @@ final class TextEncoding
     private const string UTF8_BOM = "\xEF\xBB\xBF";
 
     /**
+     * mbstring's pseudo-encodings and their aliases (lower case): they are transfer encodings, not character sets.
+     * HTML-ENTITIES would decode escaped markup into elements before the document is parsed and sanitised, and
+     * PHP 8.2 deprecates most of them.
+     */
+    private const array PSEUDO_ENCODINGS = ['html-entities', 'html', 'base64', 'uuencode', 'quoted-printable', 'qprint', '7bit', '8bit', 'binary'];
+
+    /**
      * The content as UTF-8: without a byte order mark and, when it had to be converted, without the
      * XML declaration, which then names the wrong encoding.
      */
@@ -52,10 +59,15 @@ final class TextEncoding
     }
 
     /**
-     * @return string|null The UTF-8 text, or null when no extension can convert from $encoding.
+     * @return string|null The UTF-8 text, or null when no extension can convert from $encoding or it is not a
+     *                     character set (see PSEUDO_ENCODINGS).
      */
     private static function convert(string $content, string $encoding): ?string
     {
+        if (in_array(strtolower($encoding), self::PSEUDO_ENCODINGS, true)) {
+            return null;
+        }
+
         if (function_exists('mb_convert_encoding')) {
             try {
                 // mbstring knows the aliases (latin1) too; an encoding it does not know is a ValueError.
