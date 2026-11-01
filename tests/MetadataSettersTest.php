@@ -117,6 +117,14 @@ final class MetadataSettersTest extends TestCase
         $metadata->setSubtitle(null);
     }
 
+    public function testSetSubtitleDoesNotLeaveOnlyABlankTitle(): void
+    {
+        $metadata = $this->load('3.0', '', '<dc:title> </dc:title><dc:title id="s">Subtitle</dc:title><meta refines="#s" property="title-type">subtitle</meta>');
+
+        $this->expectException(Exception::class);
+        $metadata->setSubtitle(null);
+    }
+
     public function testSetSubtitleAddsARefinedTitleAndMarksTheMainTitle(): void
     {
         $metadata = $this->load('3.0');

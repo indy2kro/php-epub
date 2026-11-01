@@ -34,8 +34,11 @@ trait InteractsWithTitle
         $existing = $this->subtitleElements();
 
         if ($subtitle === null) {
-            count($this->dcElements('title')) > count($existing)
-                || throw new Exception('dc:title cannot be empty: every EPUB package needs one, so the only titles cannot be removed');
+            // A loaded package can hold a blank title the setters would refuse: it does not count as one.
+            array_filter(
+                $this->dcElements('title'),
+                fn (SimpleXMLElement $element): bool => $this->refinementValue($element, 'title-type') !== 'subtitle' && trim((string) $element) !== ''
+            ) !== [] || throw new Exception('dc:title cannot be empty: every EPUB package needs one, so the only titles cannot be removed');
             foreach ($existing as $element) {
                 $this->removeElement($element);
                 $this->modified = true;
