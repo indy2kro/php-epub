@@ -12,8 +12,26 @@ class XmlParser
     /**
      * @param int $maxBytes Largest document, in bytes, parse() and parseString() accept (no cap by default).
      */
+    /**
+     * The name error messages use for the file instead of its path (see withName()).
+     */
+    private ?string $name = null;
+
     public function __construct(public readonly int $maxBytes = PHP_INT_MAX)
     {
+    }
+
+    /**
+     * A copy of this parser (of the same class, with the same limit) whose parse() and save() name the file $name in
+     * their error messages instead of its path, e.g. the book-relative path of a file in an extracted book, so that
+     * messages do not reveal the extraction directory.
+     */
+    public function withName(string $name): static
+    {
+        $named = clone $this;
+        $named->name = $name;
+
+        return $named;
     }
 
     /**
@@ -23,14 +41,12 @@ class XmlParser
      * and the parser never touches the network (DOCTYPE references are not fetched).
      *
      * @param string $filePath The path to the XML file.
-     * @param string|null $name The name used in error messages instead of $filePath, e.g. the book-relative path of
-     *                          a file in an extracted book, so messages do not reveal the extraction directory.
      *
      * @throws XmlException If the XML file cannot be loaded or is larger than the size limit.
      */
-    public function parse(string $filePath, ?string $name = null): SimpleXMLElement
+    public function parse(string $filePath): SimpleXMLElement
     {
-        $name ??= $filePath;
+        $name = $this->name ?? $filePath;
         if (! file_exists($filePath)) {
             throw new XmlException("XML file not found: {$name}");
         }
@@ -102,15 +118,14 @@ class XmlParser
      *
      * @param SimpleXMLElement $xml The XML element to save.
      * @param string $filePath The path where the XML should be saved.
-     * @param string|null $name The name the error message uses for the file (e.g. its path inside the book), else $filePath.
      *
      * @throws Exception If the XML file cannot be saved.
      */
-    public function save(SimpleXMLElement $xml, string $filePath, ?string $name = null): void
+    public function save(SimpleXMLElement $xml, string $filePath): void
     {
         $result = @$xml->asXML($filePath);
         if ($result === false) {
-            throw new Exception('Failed to save XML file: ' . ($name ?? $filePath));
+            throw new Exception('Failed to save XML file: ' . ($this->name ?? $filePath));
         }
     }
 }

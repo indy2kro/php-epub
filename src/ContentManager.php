@@ -653,7 +653,7 @@ class ContentManager
         }
 
         if ($changed) {
-            $xmlParser->save($encryption, $file, 'META-INF/encryption.xml');
+            $xmlParser->withName('META-INF/encryption.xml')->save($encryption, $file);
         }
     }
 

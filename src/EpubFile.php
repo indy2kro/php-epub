@@ -507,7 +507,7 @@ class EpubFile
             $opfFilePath = $this->parser->parse($directory);
             $opfFileFullPath = $directory . DIRECTORY_SEPARATOR . $opfFilePath;
 
-            $this->opfXml = $this->xmlParser->parse($opfFileFullPath, $opfFilePath);
+            $this->opfXml = $this->xmlParser->withName($opfFilePath)->parse($opfFileFullPath);
 
             $this->metadata = new Metadata($this->opfXml, $opfFileFullPath);
             $this->fontKeyIdentifier = $this->metadata->getUniqueIdentifier();

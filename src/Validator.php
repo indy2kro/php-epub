@@ -515,7 +515,7 @@ final readonly class Validator
             }
 
             try {
-                $root = dom_import_simplexml($this->xmlParser->parse($this->paths->resolve($this->rootDirectory, $item->path), $item->path));
+                $root = dom_import_simplexml($this->xmlParser->withName($item->path)->parse($this->paths->resolve($this->rootDirectory, $item->path)));
             } catch (XmlException $exception) {
                 $issues[] = $this->error('CONTENT_NOT_WELL_FORMED', 'The content document is not well-formed XML: ' . $exception->getMessage(), $item->path);
                 continue;
@@ -1028,7 +1028,7 @@ final readonly class Validator
         }
 
         try {
-            $xml = $this->xmlParser->parse($this->paths->resolve($this->rootDirectory, $item->path), $item->path);
+            $xml = $this->xmlParser->withName($item->path)->parse($this->paths->resolve($this->rootDirectory, $item->path));
         } catch (XmlException $exception) {
             return [$isNav
                 ? $this->error('NAV_INVALID', 'The navigation document cannot be read: ' . $exception->getMessage(), $item->path)
