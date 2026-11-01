@@ -6,6 +6,7 @@ namespace PhpEpub\Test;
 
 use PhpEpub\EpubFile;
 use PhpEpub\Exception;
+use PhpEpub\FontObfuscation;
 use PhpEpub\Test\Support\EpubBuilder;
 use PhpEpub\Util\FileSystemHelper;
 use PhpEpub\ValidationIssue;
@@ -77,6 +78,21 @@ final class ErrorMessagePathsTest extends TestCase
         $this->assertNotEmpty(array_filter($messages, static fn (string $message): bool => str_contains($message, 'CONTENT_NOT_WELL_FORMED')));
         foreach ($messages as $message) {
             $this->assertNoExtractionPath($message);
+        }
+    }
+
+    public function testAnUnreadableEncryptionXmlIsNamedRelativeToTheBook(): void
+    {
+        $root = $this->tmpDir . DIRECTORY_SEPARATOR . 'extracted';
+        mkdir($root . DIRECTORY_SEPARATOR . 'META-INF', 0777, true);
+        file_put_contents($root . DIRECTORY_SEPARATOR . 'META-INF' . DIRECTORY_SEPARATOR . 'encryption.xml', '<encryption');
+
+        try {
+            (new FontObfuscation($root))->setAlgorithm('EPUB/fonts/font.ttf', FontObfuscation::IDPF);
+            $this->fail('No exception was thrown.');
+        } catch (Exception $exception) {
+            $this->assertStringContainsString('META-INF/encryption.xml', $exception->getMessage());
+            $this->assertStringNotContainsString($root, $exception->getMessage());
         }
     }
 
