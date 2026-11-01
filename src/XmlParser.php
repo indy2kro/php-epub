@@ -133,10 +133,20 @@ class XmlParser
     /**
      * Writes $content to a temporary file in $filePath's directory, checks that every byte was written and renames
      * it over $filePath, which keeps its permissions. A file that exists but is not writable is refused, as writing
-     * it in place would be (a rename only needs the directory to be writable).
+     * it in place would be (a rename only needs the directory to be writable). A symbolic link is followed, as a
+     * write in place would: the file it points to is replaced and the link stays; a dangling link is refused.
      */
     private static function replaceFile(string $filePath, string $content): bool
     {
+        if (is_link($filePath)) {
+            $target = realpath($filePath);
+            if ($target === false) {
+                return false;
+            }
+
+            $filePath = $target;
+        }
+
         $directory = dirname($filePath);
         if (! is_dir($directory) || is_dir($filePath) || (file_exists($filePath) && ! is_writable($filePath))) {
             return false;

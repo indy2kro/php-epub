@@ -242,6 +242,46 @@ final class XmlParserTest extends TestCase
         (new XmlParser())->save(new SimpleXMLElement('<root/>'), dirname($this->outputXmlFilePath));
     }
 
+    public function testSaveWritesThroughASymbolicLink(): void
+    {
+        $directory = dirname($this->outputXmlFilePath);
+        $target = $directory . DIRECTORY_SEPARATOR . 'target.xml';
+        $link = $directory . DIRECTORY_SEPARATOR . 'link.xml';
+        file_put_contents($target, '<root>old</root>');
+        if (! @symlink($target, $link)) {
+            unlink($target);
+            $this->markTestSkipped('Symbolic links cannot be created here.');
+        }
+
+        try {
+            (new XmlParser())->save(new SimpleXMLElement('<root>new</root>'), $link);
+
+            $this->assertTrue(is_link($link), 'the link stays a link');
+            $this->assertSame("<?xml version=\"1.0\"?>\n<root>new</root>\n", file_get_contents($target));
+            $this->assertSame([], glob($directory . DIRECTORY_SEPARATOR . '.xml-*') ?: [], 'no temporary file is left behind');
+        } finally {
+            @unlink($link);
+            @unlink($target);
+        }
+    }
+
+    public function testSaveRefusesADanglingSymbolicLink(): void
+    {
+        $link = dirname($this->outputXmlFilePath) . DIRECTORY_SEPARATOR . 'dangling.xml';
+        if (! @symlink(dirname($this->outputXmlFilePath) . DIRECTORY_SEPARATOR . 'missing.xml', $link)) {
+            $this->markTestSkipped('Symbolic links cannot be created here.');
+        }
+
+        try {
+            $this->expectException(Exception::class);
+            $this->expectExceptionMessage('Failed to save XML file:');
+            (new XmlParser())->save(new SimpleXMLElement('<root/>'), $link);
+        } finally {
+            @unlink($link);
+            $this->assertFileDoesNotExist(dirname($this->outputXmlFilePath) . DIRECTORY_SEPARATOR . 'missing.xml');
+        }
+    }
+
     public function testWithNameNamesTheFileInErrorsAndLeavesTheParserAsItIs(): void
     {
         $parser = new XmlParser(1000);
