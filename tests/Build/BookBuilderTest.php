@@ -92,6 +92,18 @@ final class BookBuilderTest extends TestCase
         $book->cleanup();
     }
 
+    public function testHeadingSyntaxInANoteIsTextAndStartsNoChapter(): void
+    {
+        $markdown = "# One\n\nCited.[^a]\n\n[^a]: # Not a heading\n    Text\n    ===\n";
+
+        $built = (new BookBuilder(new BookOptions(title: 'Headings')))->fromMarkdown($markdown);
+        $one = $this->chapterHtml($built, 1);
+
+        $this->assertSame(1, $built->chapterCount);
+        $this->assertMatchesRegularExpression('#<aside class="footnote"[^>]*>.*\# Not a heading.*</aside>#s', $one);
+        $this->assertStringNotContainsString('<h1>Not a heading', $one);
+    }
+
     public function testANoteCitedByANoteFollowsItIntoItsChapter(): void
     {
         $markdown = "# One\n\nA claim.[^a]\n\n# Two\n\nNothing cited.\n\n[^a]: See also.[^b]\n[^b]: The nested note.\n";

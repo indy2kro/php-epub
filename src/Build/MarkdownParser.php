@@ -118,7 +118,8 @@ final class MarkdownParser
     }
 
     /**
-     * The asides of the cited footnotes, in number order; a note may cite further notes, which follow.
+     * The asides of the cited footnotes, in number order; a note may cite further notes, which follow. A note has no
+     * headings: BookBuilder starts chapters at headings, so heading syntax in a note stays text.
      */
     private function renderNotes(): string
     {
@@ -126,7 +127,11 @@ final class MarkdownParser
         $labels = array_keys($this->noteNumbers);
         for ($index = 0; $index < count($labels); $index++) {
             $number = $index + 1;
-            $body = $this->blocks($this->notes[$labels[$index]] ?? [], 1, false);
+            $lines = array_map(
+                static fn (string $line): string => self::replace('/^( {0,3})(#{1,6}(?:[ \t]|$)|=+[ \t]*$|-+[ \t]*$)/', '$1\\\\$2', $line),
+                $this->notes[$labels[$index]] ?? []
+            );
+            $body = $this->blocks($lines, 1, false);
             $html .= '<aside class="footnote" id="fn-' . $number . '">' . "\n" . $body
                 . '<p><a class="footnote-back" href="#fnref-' . $number . '">↩</a></p>' . "</aside>\n";
             $labels = array_keys($this->noteNumbers);
