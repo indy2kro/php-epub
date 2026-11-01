@@ -277,6 +277,12 @@ public function open(): EpubFile;
 </table>
 <h2 id="markdown">Markdown<a class="headerlink" href="#markdown" title="Permanent link">&para;</a></h2>
 <p><code>fromMarkdown()</code> reads headings (ATX and setext), paragraphs, emphasis, strong text, <code>~~strikethrough~~</code>, code spans, fenced and indented code, block quotes, nested lists, thematic breaks, links, images, <code>&lt;autolinks&gt;</code>, hard line breaks and GFM tables. Headings get an id from their text (<code># Chapter One</code> is <code>chapter-one</code>, repeats are numbered) or the one written as <code>{#id}</code>, so <code>[see](#chapter-one)</code> works, including across chapters.</p>
+<p>Footnotes are written as in Pandoc and GFM: <code>[^label]</code> cites a note, and <code>[^label]: text</code> on a line of its own defines it (indented lines continue it). Notes are numbered in the order they are first cited and become EPUB 3 notes that reading systems show as pop-ups: each citation is a superscript <code>&lt;a epub:type="noteref" role="doc-noteref"&gt;</code> link, and each note an <code>&lt;aside epub:type="footnote" role="doc-footnote"&gt;</code> at the end of the chapter that first cites it, with a link back. A later citation in another chapter links to that note. Notes that are never cited are left out, and <code>[^label]</code> without a definition stays as text.</p>
+<pre class="codehilite"><code class="language-markdown">Darwin sailed in 1831.[^voyage]
+
+[^voyage]: On HMS *Beagle*, which returned in 1836.
+</code></pre>
+
 <p>Raw HTML in Markdown is <strong>not</strong> passed through: <code>&lt;</code> and <code>&amp;</code> are escaped, so <code>&lt;script&gt;</code> shows up as text. Use <code>fromHtml()</code> for HTML.</p>
 <p>Chapters start at headings up to <code>splitLevel</code>. Text before the first heading becomes a first chapter named after the book. The table of contents lists the chapters; the nav document and the NCX hold the same entries.</p>
 <h2 id="plain-text">Plain text<a class="headerlink" href="#plain-text" title="Permanent link">&para;</a></h2>

@@ -186,6 +186,14 @@
 <td><code>merge &lt;book&gt; &lt;book&gt;... -o &lt;out&gt;</code></td>
 <td>Joins two or more books with <code>Merger</code>. <code>--title=</code>, <code>--author=</code> (repeatable), <code>--language=</code>, <code>--flat</code> (no table of contents section per book).</td>
 </tr>
+<tr>
+<td><code>build &lt;source&gt; -o &lt;out&gt;</code></td>
+<td>Makes a book from a Markdown, text or HTML file with <a href="../book-builder/"><code>BookBuilder</code></a>. <code>--from=markdown\|text\|html</code> (default: from the extension <code>.md</code>, <code>.txt</code>, <code>.html</code>), <code>--title=</code> (default: the file name), <code>--author=</code> (repeatable), <code>--language=</code>, <code>--identifier=</code>, <code>--cover=&lt;image&gt;</code>, <code>--css=&lt;file&gt;</code>, <code>--split-level=&lt;1-6&gt;</code>, and <code>--images=&lt;dir&gt;</code>: the JPEG, PNG, GIF and WebP files of that directory, which the source refers to by file name. No other file is read. Prints the output and its number of chapters; builder warnings go to standard error.</td>
+</tr>
+<tr>
+<td><code>meta &lt;book&gt;</code></td>
+<td>Prints the metadata as JSON (<code>title</code>, <code>subtitle</code>, <code>authors</code>, <code>language</code>, <code>identifier</code>, <code>isbn</code>, <code>publisher</code>, <code>description</code>, <code>date</code>, <code>rights</code>, <code>cover</code>). With <code>--title=</code>, <code>--author=</code> (repeatable, replaces the authors), <code>--language=</code>, <code>--identifier=</code> (the unique identifier) or <code>--cover=&lt;image&gt;</code> and <code>-o &lt;out&gt;</code>, saves a copy with those changes; the book itself is never changed.</td>
+</tr>
 </tbody>
 </table>
 <p>Options that every command accepts: <code>-o</code>/<code>--output</code>, <code>--force</code>, <code>--trusted</code>, <code>-h</code>/<code>--help</code>. Calibre conversions are not offered; use the library for them.</p>
@@ -196,6 +204,9 @@ vendor/bin/php-epub compress book.epub --preset=strong -o small.epub
 vendor/bin/php-epub convert book.epub -o book.md
 vendor/bin/php-epub split book.epub -d parts --every=10
 vendor/bin/php-epub merge one.epub two.epub -o both.epub --title=&quot;Both&quot;
+vendor/bin/php-epub build novel.md -o novel.epub --title=&quot;The Novel&quot; --author=&quot;Ann Author&quot; --cover=cover.jpg --images=images
+vendor/bin/php-epub meta book.epub
+vendor/bin/php-epub meta book.epub -o fixed.epub --title=&quot;The Right Title&quot; --cover=cover.png
 </code></pre>
 
 <h2 id="exit-codes">Exit codes<a class="headerlink" href="#exit-codes" title="Permanent link">&para;</a></h2>
@@ -213,7 +224,7 @@ vendor/bin/php-epub merge one.epub two.epub -o both.epub --title=&quot;Both&quot
 </tr>
 <tr>
 <td><code>1</code></td>
-<td><code>validate</code> found problems</td>
+<td><code>validate</code> found problems, including a book it cannot read at all (not an EPUB, no readable package document, over a limit): that is reported as one <code>EPUB_UNREADABLE</code> error, also in <code>--json</code></td>
 </tr>
 <tr>
 <td><code>2</code></td>
@@ -221,13 +232,14 @@ vendor/bin/php-epub merge one.epub two.epub -o both.epub --title=&quot;Both&quot
 </tr>
 <tr>
 <td><code>3</code></td>
-<td>The operation failed: the book is not an EPUB or exceeds a limit, is DRM-protected (<code>convert</code>, <code>split</code>, <code>merge</code>), a file cannot be written</td>
+<td>The operation failed: the input does not exist, the book is not an EPUB or exceeds a limit (every command but <code>validate</code>), is DRM-protected (<code>convert</code>, <code>split</code>, <code>merge</code>), a file cannot be written</td>
 </tr>
 </tbody>
 </table>
+<p>Messages name the files of a book by their path inside it (<code>META-INF/container.xml</code>, <code>EPUB/package.opf</code>), never by the temporary directory the book was extracted to, so they are safe to show to the person who uploaded it.</p>
 <p>Results go to standard output, errors and warnings to standard error, prefixed with <code>php-epub:</code>.</p>
 <h2 id="untrusted-books">Untrusted books<a class="headerlink" href="#untrusted-books" title="Permanent link">&para;</a></h2>
-<p>The command line treats every book as untrusted input. Books are opened with <a href="../epub-reader/"><code>Limits::web()</code></a> (2,000 entries, 200 MiB, 8 MiB per XML or XHTML document), so a hostile archive fails with exit code <code>3</code> instead of filling the disk. <code>--trusted</code> switches to <code>Limits::default()</code> for books you made yourself.</p>
+<p>The command line treats every book as untrusted input. Books are opened with <a href="../epub-reader/"><code>Limits::web()</code></a> (2,000 entries, 200 MiB, 8 MiB per XML or XHTML document), so a hostile archive is refused instead of filling the disk: with exit code <code>3</code>, or for <code>validate</code> as an <code>EPUB_UNREADABLE</code> error with exit code <code>1</code>. <code>--trusted</code> switches to <code>Limits::default()</code> for books you made yourself.</p>
 <p>Nothing is overwritten without <code>--force</code>, and an output can never be the book it is made from: <code>repair</code>, <code>compress</code>, <code>convert</code> and <code>merge</code> always write a new file.</p>
 <h2 id="from-php">From PHP<a class="headerlink" href="#from-php" title="Permanent link">&para;</a></h2>
 <p>The same command is available in-process, which is how the tests run it:</p>
