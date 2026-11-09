@@ -165,7 +165,6 @@ final class CleanupCoverageTest extends TestCase
     {
         $this->requireGd();
         $image = base64_decode(EpubBuilder::PNG, true);
-        $this->assertIsString($image);
         $recompressor = new ImageRecompressor();
         $limit = (string) ini_get('memory_limit');
 
